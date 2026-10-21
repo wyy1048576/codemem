@@ -1,0 +1,86 @@
+{
+  "repo": "https://github.com/psf/requests@v2.32.3",
+  "machine": {
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
+    "device": "cpu"
+  },
+  "models": {
+    "code": "jinaai/jina-code-embeddings-0.5b",
+    "usage": "jinaai/jina-code-embeddings-0.5b"
+  },
+  "counts": {
+    "files": 36,
+    "chunks": 702,
+    "chunks_by_kind": {
+      "file_header": 35,
+      "function": 174,
+      "method": 493
+    },
+    "edges": 1584,
+    "vectors": {
+      "code": 702,
+      "usage": 182
+    }
+  },
+  "full_index": {
+    "seconds": 322.6,
+    "scan": 0.69,
+    "chunk": 0.15,
+    "write_chunks": 0.12,
+    "build_texts": 0.02,
+    "embed": 321.58,
+    "write_vectors": 0.03,
+    "total": 322.61
+  },
+  "embedded": {
+    "code": 702,
+    "usage": 182
+  },
+  "noop_update_seconds": 0.069,
+  "noop_embedded": {
+    "code": 0,
+    "usage": 0
+  },
+  "query_latency_ms": {
+    "median": 93.2,
+    "max": 101.7
+  },
+  "results": {
+    "retry a request when the connection fails": [
+      "src/requests/adapters.py:446-493 HTTPAdapter.get_connection_with_tls_context",
+      "src/requests/adapters.py:613-719 HTTPAdapter.send",
+      "src/requests/sessions.py:333-353 SessionRedirectMixin.rebuild_method",
+      "src/requests/sessions.py:282-300 SessionRedirectMixin.rebuild_auth",
+      "tests/test_testserver.py:78-92 TestTestServer.test_multiple_requests"
+    ],
+    "where are cookies merged into the outgoing request": [
+      "src/requests/cookies.py:124-137 extract_cookies_to_jar",
+      "src/requests/cookies.py:542-561 merge_cookies",
+      "src/requests/models.py:610-628 PreparedRequest.prepare_cookies",
+      "src/requests/utils.py:478-486 add_dict_to_cookiejar",
+      "src/requests/cookies.py:521-539 cookiejar_from_dict"
+    ],
+    "handle redirects and strip the authorization header": [
+      "src/requests/sessions.py:127-157 SessionRedirectMixin.should_strip_auth",
+      "src/requests/sessions.py:282-300 SessionRedirectMixin.rebuild_auth",
+      "src/requests/sessions.py:107-125 SessionRedirectMixin.get_redirect_target",
+      "src/requests/sessions.py:302-331 SessionRedirectMixin.rebuild_proxies",
+      "src/requests/sessions.py:159-280 SessionRedirectMixin.resolve_redirects"
+    ],
+    "parse the content type header charset": [
+      "src/requests/utils.py:539-561 get_encoding_from_headers",
+      "src/requests/utils.py:514-536 _parse_content_type_header",
+      "src/requests/utils.py:489-511 get_encodings_from_content",
+      "src/requests/utils.py:407-438 parse_dict_header",
+      "src/requests/utils.py:914-948 parse_header_links"
+    ],
+    "disable SSL certificate verification": [
+      "src/requests/adapters.py:304-357 HTTPAdapter.cert_verify",
+      "src/requests/adapters.py:446-493 HTTPAdapter.get_connection_with_tls_context",
+      "src/requests/adapters.py:396-444 HTTPAdapter.build_connection_pool_key_attributes",
+      "src/requests/adapters.py:90-134 _urllib3_request_context",
+      "tests/testserver/server.py:171-176 TLSServer._create_socket_and_bind"
+    ]
+  }
+}

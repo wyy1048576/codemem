@@ -1,0 +1,230 @@
+"""Service, watcher, CLI, agent config and MCP server (all with the fake embedder)."""
+
+import json
+import time
+
+import anyio
+import pytest
+
+from codemem import agents, prompts
+from codemem.cli import main
+from codemem.service import CodememService
+
+
+@pytest.fixture
+def fake_env(monkeypatch):
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+
+
+@pytest.fixture
+def service(sample_repo, tmp_path, fake_env):
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx")
+    yield svc
+    svc.close()
+
+
+def _wait_for(pred, timeout=10.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if pred():
+            return True
+        time.sleep(0.05)
+    return False
+
+
+# ---------------------------------------------------------------- service
+
+
+def test_service_background_index_and_refs(service):
+    assert service.state == "empty"
+    service.start_background_update(prewarm=False).join(timeout=30)
+    assert service.state == "ready" and service.progress == 100
+    by_id = service.get_chunk(service.store.get_chunk_by_key("auth/sessions.py::revoke_session").chunk_id)
+    by_line = service.get_chunk("auth/sessions.py:20")
+    by_key = service.get_chunk("auth/sessions.py::revoke_session")
+    assert by_id["chunk_id"] == by_line["chunk_id"] == by_key["chunk_id"]
+    assert {c["qualname"] for c in by_key["callers"]} == {"logout", "disable_user", "test_disabled_user_loses_sessions"}
+    assert [c["qualname"] for c in by_key["callees"]] == ["Table.delete"]
+    assert service.get_chunk("nope.py:1") is None and service.get_chunk("garbage") is None
+
+
+def test_status_reports_staleness(service, sample_repo):
+    service.update()
+    assert service.status()["stale"]["changed_files"] == 0
+    (sample_repo / "auth" / "extra.py").write_text("def extra():\n    pass\n")
+    info = service.status()
+    assert info["stale"]["changed_files"] == 1 and info["models"]["code"]["model"] == "fake:64"
+
+
+def test_concurrent_update_requests_coalesce(service):
+    service._update_lock.acquire()
+    try:
+        assert service.update() is None  # busy -> queued, not run in parallel
+        assert service._pending.is_set()
+    finally:
+        service._update_lock.release()
+
+
+def test_watcher_reindexes_after_save(service, sample_repo):
+    service.update()
+    service.start_watcher()
+    time.sleep(0.3)
+    (sample_repo / "auth" / "audit.py").write_text("def record_audit_event(evt):\n    return evt\n")
+    t0 = time.monotonic()
+    assert _wait_for(lambda: service.store.get_chunk_by_key("auth/audit.py::record_audit_event") is not None)
+    assert time.monotonic() - t0 < 5
+    hits = service.search("record_audit_event").results
+    assert hits[0].qualname == "record_audit_event"
+
+
+def test_watcher_ignores_non_python_and_skip_dirs(service, sample_repo):
+    service.update()
+    calls = []
+    service.request_update = lambda: calls.append(1)
+    service.start_watcher()
+    time.sleep(0.3)
+    (sample_repo / "notes.txt").write_text("hello")
+    (sample_repo / "build" / "x.py").write_text("x = 1")
+    time.sleep(1.0)
+    assert calls == []
+
+
+# ---------------------------------------------------------------- CLI
+
+
+def test_cli_index_search_status(sample_repo, tmp_path, fake_env, capsys):
+    idx = str(tmp_path / "idx")
+    assert main(["index", str(sample_repo), "--index-dir", idx]) == 0
+    assert "indexed 6 files" in capsys.readouterr().out
+
+    assert main(["search", "revoke session", "--repo", str(sample_repo), "--index-dir", idx, "-k", "3"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("1. auth/sessions.py:19-20  revoke_session")
+
+    assert main(["search", "logout", "--repo", str(sample_repo), "--index-dir", idx, "--json", "--debug"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["results"][0]["qualname"] == "logout" and "ranks" in data["results"][0]
+
+    assert main(["search", "x", "--repo", str(sample_repo), "--index-dir", idx, "--signals", "bogus"]) == 2
+    capsys.readouterr()
+
+    assert main(["status", str(sample_repo), "--index-dir", idx, "--json"]) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["state"] == "ready" and status["files"] == 6 and status["stale"]["changed_files"] == 0
+
+
+def test_cli_search_without_index(sample_repo, tmp_path, fake_env, capsys):
+    assert main(["search", "x", "--repo", str(sample_repo), "--index-dir", str(tmp_path / "none")]) == 2
+    assert "run `codemem index`" in capsys.readouterr().err
+
+
+def test_cli_default_index_dir_under_codemem_home(sample_repo, fake_env, isolated_home, capsys):
+    assert main(["index", str(sample_repo)]) == 0
+    dirs = list((isolated_home / "indexes").iterdir())
+    assert len(dirs) == 1 and dirs[0].name.startswith("sample_repo-")
+    assert (dirs[0] / "index.db").is_file() and (dirs[0] / "vec_code.faiss").is_file()
+
+
+def test_cli_init_dry_run_writes_nothing(sample_repo, fake_env, capsys):
+    assert main(["init", str(sample_repo), "--agents", "claude,cursor,codex", "--dry-run", "--write-agent-notes"]) == 0
+    out = capsys.readouterr().out
+    assert "would write" in out and "[mcp_servers.codemem]" in out
+    assert not (sample_repo / ".mcp.json").exists() and not (sample_repo / "CLAUDE.md").exists()
+
+
+def test_cli_init_writes_configs(sample_repo, tmp_path, fake_env, capsys):
+    (sample_repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}}))
+    idx = str(tmp_path / "idx")
+    rc = main(["init", str(sample_repo), "--agents", "claude,cursor", "--yes", "--write-agent-notes", "--index-dir", idx])
+    assert rc == 0
+    mcp = json.loads((sample_repo / ".mcp.json").read_text())
+    assert mcp["mcpServers"]["codemem"] == {"command": "codemem", "args": ["mcp"]}
+    assert "other" in mcp["mcpServers"]  # existing entries kept
+    cursor = json.loads((sample_repo / ".cursor" / "mcp.json").read_text())
+    assert cursor["mcpServers"]["codemem"]["args"] == ["mcp", "${workspaceFolder}"]
+    assert prompts.AGENT_NOTES_MARKER in (sample_repo / "CLAUDE.md").read_text()
+    assert "indexed 6 files" in capsys.readouterr().out
+    # Running again does not duplicate the notes.
+    again = agents.plan(sample_repo, ["claude"], write_agent_notes=True)
+    assert [a.agent for a in again] == ["claude"]
+
+
+def test_steering_levels_change_text():
+    texts = {lvl: prompts.tool_description("search_code", lvl) for lvl in ("none", "light", "strong")}
+    assert len(set(texts.values())) == 3 and "FIRST" in texts["strong"] and "grep" not in texts["none"]
+    assert prompts.agent_notes("none") is None
+
+
+# ---------------------------------------------------------------- MCP
+
+
+def test_mcp_tools_end_to_end(service):
+    from mcp import Client
+
+    from codemem.server import build_server
+
+    service.update()
+    server = build_server(service)
+
+    async def run():
+        async with Client(server) as client:
+            tools = {t.name: t for t in (await client.list_tools()).tools}
+            assert set(tools) == {"search_code", "get_chunk", "index_status"}
+            assert tools["search_code"].description == prompts.tool_description("search_code", "light")
+            assert client.instructions == prompts.server_instructions("light")
+            res = await client.call_tool("search_code", {"query": "revoke session", "k": 3})
+            text = res.content[0].text
+            assert "auth/sessions.py:19-20  revoke_session" in text
+            res = await client.call_tool("get_chunk", {"ref": "auth/sessions.py:20"})
+            assert "db.sessions.delete(session_id)" in res.content[0].text
+            assert "callers: " in res.content[0].text
+            res = await client.call_tool("index_status", {})
+            assert "state: ready" in res.content[0].text
+
+    anyio.run(run)
+
+
+def test_mcp_search_while_indexing_reports_progress(service):
+    from mcp import Client
+
+    from codemem.server import build_server
+
+    service.update()
+    service.state, service.progress = "indexing", 42.0
+    server = build_server(service)
+
+    async def run():
+        async with Client(server) as client:
+            res = await client.call_tool("search_code", {"query": "logout"})
+            assert "42% done" in res.content[0].text and "logout" in res.content[0].text
+
+    anyio.run(run)
+
+
+def test_mcp_stdio_subprocess(sample_repo, tmp_path, isolated_home):
+    """Real `codemem mcp` over stdio: handshake not blocked by indexing, stdout stays clean."""
+    import os
+    import sys
+
+    from mcp import Client, StdioServerParameters
+
+    env = {**os.environ, "CODEMEM_MODEL": "fake:64", "CODEMEM_HOME": str(isolated_home)}
+    params = StdioServerParameters(
+        command=sys.executable, args=["-m", "codemem.cli", "mcp", str(sample_repo)], env=env, cwd=str(tmp_path)
+    )
+
+    async def run():
+        with anyio.fail_after(60):
+            async with Client(params) as client:
+                tools = {t.name for t in (await client.list_tools()).tools}
+                assert tools == {"search_code", "get_chunk", "index_status"}
+                for _ in range(100):
+                    status = (await client.call_tool("index_status", {})).content[0].text
+                    if "state: ready" in status:
+                        break
+                    await anyio.sleep(0.1)
+                assert "state: ready" in status
+                res = await client.call_tool("search_code", {"query": "disable user"})
+                assert "disable_user" in res.content[0].text
+
+    anyio.run(run)
