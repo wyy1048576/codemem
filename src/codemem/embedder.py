@@ -88,6 +88,12 @@ def resolve_device(preference: str) -> str:
         return "cpu"
     if preference in ("auto", "cuda") and torch.cuda.is_available():
         return "cuda"
+    if preference in ("auto", "mps") and torch.backends.mps.is_available():
+        # Apple Silicon GPU. torch reports it as unavailable on Windows and Linux.
+        return "mps"
+    if preference == "mps":
+        log.warning("device=mps requested but torch.backends.mps is unavailable; using cpu")
+        return "cpu"
     if preference == "xpu":
         # Intel Arc via PyTorch's XPU backend: experimental, fall back quietly.
         if getattr(torch, "xpu", None) is not None and torch.xpu.is_available():

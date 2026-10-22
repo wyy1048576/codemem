@@ -112,7 +112,7 @@ print(resp.to_dict())
 variables (`CODEMEM_HOME`, `CODEMEM_DEVICE`, `CODEMEM_MODEL`, `CODEMEM_STEERING`).
 
 ```toml
-device = "auto"              # auto | cpu | xpu | cuda   (auto = cuda if available, else cpu)
+device = "auto"              # auto | cpu | xpu | cuda | mps   (auto = cuda, then mps, else cpu)
 embedding_dim = 256          # optional Matryoshka truncation; omit for full 896
 batch_size = 16
 max_seq_length = 1024
@@ -146,6 +146,10 @@ dev runs.
 **Intel Arc / XPU:** `device = "xpu"` needs a PyTorch build with XPU support (installed from
 PyTorch's XPU wheel index). This is experimental: if `torch.xpu` is unavailable, codemem logs
 a warning and falls back to CPU.
+
+**Apple Silicon / MPS:** `device = "mps"` uses the Mac GPU through the standard PyTorch wheel.
+`auto` picks it when CUDA is unavailable. On other platforms, codemem logs a warning and falls
+back to CPU.
 
 ## Index location
 
