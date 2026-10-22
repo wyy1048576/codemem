@@ -43,7 +43,7 @@ def _default_vectors() -> dict[str, VectorConfig]:
 
 @dataclass
 class Config:
-    device: str = "auto"  # auto | cpu | xpu | cuda
+    device: str = "auto"  # auto | cpu | xpu | cuda | mps
     vectors: dict[str, VectorConfig] = field(default_factory=_default_vectors)
     embedding_dim: int | None = None  # Matryoshka truncation; None = full dim
     batch_size: int = 16
@@ -158,8 +158,8 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         if value is not None:
             setattr(cfg, key, value)
 
-    if cfg.device not in {"auto", "cpu", "xpu", "cuda"}:
-        raise ValueError(f"device must be auto|cpu|xpu|cuda, got {cfg.device!r}")
+    if cfg.device not in {"auto", "cpu", "xpu", "cuda", "mps"}:
+        raise ValueError(f"device must be auto|cpu|xpu|cuda|mps, got {cfg.device!r}")
     if cfg.steering not in {"none", "light", "strong"}:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
     return cfg

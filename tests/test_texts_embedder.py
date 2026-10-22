@@ -118,3 +118,33 @@ def test_load_config_layers(tmp_path, monkeypatch):
     monkeypatch.setenv("CODEMEM_MODEL", "fake")
     cfg = load_config(repo)
     assert (cfg.steering, cfg.batch_size, cfg.vectors["code"].model) == ("strong", 8, "fake")
+
+
+def test_resolve_device_mps(monkeypatch):
+    import torch
+
+    from codemem.embedder import resolve_device
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    assert resolve_device("auto") == "mps"
+    assert resolve_device("mps") == "mps"
+    assert resolve_device("cpu") == "cpu"
+
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    assert resolve_device("auto") == "cpu"
+    assert resolve_device("mps") == "cpu"
+
+
+def test_resolve_device_cuda_before_mps(monkeypatch):
+    import torch
+
+    from codemem.embedder import resolve_device
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    assert resolve_device("auto") == "cuda"
+
+
+def test_config_accepts_mps():
+    assert config_from_dict({"device": "mps"}).device == "mps"
