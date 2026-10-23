@@ -8,7 +8,7 @@ cmeval works like a benchmark. Each search system (grep, codemem, or any other t
 
 ```bash
 cd eval
-uv sync
+uv sync                  # or: uv sync --extra codemem (adds the codemem adapter, PyTorch, the embedding model)
 uv run cmeval --help
 uv run pytest
 ```
@@ -73,7 +73,7 @@ adapter = "fake"
 | `fake` | Test and dry-run stand-in (`src/cmeval/adapters/fake.py`) |
 | `grep` | Offline grep baseline: ripgrep over keywords from the issue, files ranked by match count (`src/cmeval/adapters/grep.py`). Granularity `file`. Needs `rg` (`brew install ripgrep`). |
 | `grep_fn` | grep plus the next step an agent takes: each matching line is mapped to the function around it, functions ranked by matches (`grep_fn.py`). Granularity `line`. |
-| `codemem` | Not built yet |
+| `codemem` | Wilson's codemem through its library API (`src/cmeval/adapters/codemem.py`, the only file that imports codemem). Granularity `line`. Settings: `signals` (for example `["bm25", "code", "usage"]`) and `config` (passed to codemem's `config_from_dict`; user config files and env vars are ignored). Systems with the same index-time settings share one index and one in-memory service. Needs `uv sync --extra codemem`. |
 
 To add a system: write a class with the methods above in `src/cmeval/adapters/`, and add one line to `ADAPTERS` in `src/cmeval/systems.py`.
 

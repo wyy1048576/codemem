@@ -27,6 +27,7 @@ ADAPTERS: dict[str, str] = {
     "fake": "cmeval.adapters.fake:FakeRetriever",
     "grep": "cmeval.adapters.grep:GrepRetriever",
     "grep_fn": "cmeval.adapters.grep_fn:GrepFnRetriever",
+    "codemem": "cmeval.adapters.codemem:CodememRetriever",  # needs: uv sync --extra codemem
 }
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")

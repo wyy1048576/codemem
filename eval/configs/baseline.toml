@@ -1,0 +1,29 @@
+# Baseline comparison: the two grep baselines and the current codemem (Week 1 hybrid baseline)
+# with signals added one at a time. The three codemem systems share one index (same index_key).
+# Needs: uv sync --extra codemem
+
+[[system]]
+name = "grep"
+adapter = "grep"
+
+[[system]]
+name = "grep-fn"
+adapter = "grep_fn"
+
+[[system]]
+name = "cm-bm25"
+adapter = "codemem"
+signals = ["bm25"]
+config = { device = "auto" }
+
+[[system]]
+name = "cm-bm25-code"
+adapter = "codemem"
+signals = ["bm25", "code"]
+config = { device = "auto" }
+
+[[system]]
+name = "cm-bm25-code-usage"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto" }
