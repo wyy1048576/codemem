@@ -16,7 +16,6 @@ MAX_PROBLEMS_SHOWN = 50
 PLANNED = {
     "collect": "collect fresh tasks from GitHub issues and fixes",
     "review": "review tasks by hand",
-    "score": "score a run",
     "report": "write a report for a scored run",
 }
 
@@ -109,6 +108,32 @@ def cmd_run(args) -> int:
     return 0
 
 
+def cmd_score(args) -> int:
+    from .metrics.tokens import TokenCountError
+    from .score import DEFAULT_IOUS, ScoreError, score
+    from .tasks import TaskError
+
+    try:
+        summary = score(args.run, tokens=args.tokens, ious=tuple(args.iou) if args.iou else DEFAULT_IOUS,
+                        warn=lambda message: print(f"warning: {message}", file=sys.stderr),
+                        progress=lambda message: print(message, file=sys.stderr, flush=True))
+    except (ScoreError, TokenCountError, TaskError) as exc:
+        print(f"score {args.run}: {exc}", file=sys.stderr)
+        return 1
+
+    def fmt(value, digits=3):
+        return "-" if value is None else f"{value:.{digits}f}"
+
+    estimate = "  (token numbers are ESTIMATES, never report them)" if summary.estimate else ""
+    print(f"{summary.run_dir}: {summary.tasks_scored} tasks, {summary.rows} rows, tokens by {summary.counter}{estimate}")
+    print(f"  {'system':22} {'file R@10':>9} {'file MRR':>8} {'fn R@10':>8} {'fn MRR':>7} {'fn tok->1st':>11} {'search ms':>9}")
+    for r in summary.table:
+        print(f"  {r['system']:22} {fmt(r['file_recall@10']):>9} {fmt(r['file_mrr']):>8} {fmt(r['function_recall@10']):>8} "
+              f"{fmt(r['function_mrr']):>7} {fmt(r['function_tokens_to_first'], 0):>11} {fmt(r['search_ms_median'], 1):>9}")
+    print("  (function level at IoU 0.5; '-' = not applicable or not found)")
+    return 0
+
+
 def cmd_planned(args) -> int:
     print(f"cmeval {args.command}: not built yet", file=sys.stderr)
     return 2
@@ -142,6 +167,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k", type=int, default=50, help="hits for each search (default 50)")
     p.add_argument("--keep-indexes", action="store_true", help="keep index folders after the run")
     p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser("score", help="score a run: accuracy, tokens, latency")
+    p.add_argument("run", help="run id (in CMEVAL_HOME/runs) or path to a run folder")
+    p.add_argument("--tokens", choices=["anthropic", "estimate"], default="anthropic",
+                   help="anthropic: count_tokens (key from ANTHROPIC_API_KEY or the Keychain); estimate: rough, never reported")
+    p.add_argument("--iou", type=float, action="append", default=None, help="IoU thresholds (default 0.5, 0.3, 0.7)")
+    p.set_defaults(func=cmd_score)
 
     p = sub.add_parser("systems", help="check a system config and list its systems")
     p.add_argument("file", type=Path)

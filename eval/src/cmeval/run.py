@@ -14,7 +14,6 @@ Run folder CMEVAL_HOME/runs/<run_id>/:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import platform
 import re
@@ -24,11 +23,14 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from . import __version__, repos
+from .files import append_jsonl as _append_jsonl
+from .files import now as _now
+from .files import sha256_file as _sha256
+from .files import write_json as _write_json
 from .paths import indexes_dir, runs_dir
 from .retriever import Retriever, RetrieverError, check_hits
 from .systems import load_systems, make_system
@@ -56,10 +58,6 @@ class RunSummary:
     by_repo: dict[str, int] = field(default_factory=dict)
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
 def _eval_git() -> dict[str, Any]:
     here = Path(__file__).resolve().parent
     sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=here, capture_output=True, text=True)
@@ -67,22 +65,6 @@ def _eval_git() -> dict[str, Any]:
     if sha.returncode != 0:
         return {"sha": None, "dirty": None}
     return {"sha": sha.stdout.strip(), "dirty": bool(dirty.stdout.strip())}
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def _write_json(path: Path, data: dict) -> None:
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8", newline="\n")
-    tmp.replace(path)
-
-
-def _append_jsonl(path: Path, record: dict) -> None:
-    with path.open("a", encoding="utf-8", newline="\n") as f:
-        f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
-        f.flush()
 
 
 def _done_tasks(path: Path) -> set[str]:
