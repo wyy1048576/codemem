@@ -1,7 +1,10 @@
+import shutil
+
 import pytest
 
 from codemem.indexer import Indexer
-from codemem.search import rrf, search
+from codemem.schema import Chunk
+from codemem.search import _pick_top, rrf, search
 from codemem.store import Store
 
 QUERY = "disabled users stay logged in"
@@ -20,6 +23,55 @@ def test_rrf_weights_and_ties():
     fused = rrf({"a": [1], "b": [2]}, k=0, weights={"b": 2.0})
     assert fused == [(2, 2.0), (1, 1.0)]
     assert rrf({}, k=60) == []
+
+
+def _chunk(chunk_id, path, line):
+    return Chunk(key=f"{path}::f{line}", path=path, qualname=f"f{line}", name=f"f{line}", kind="function",
+                 start_line=line, end_line=line + 1, signature="", docstring="", code="", content_hash="",
+                 chunk_id=chunk_id)
+
+
+def test_ties_are_ordered_by_location_not_by_id():
+    chunks = {5: _chunk(5, "a.py", 1), 3: _chunk(3, "c.py", 1), 1: _chunk(1, "b.py", 9), 4: _chunk(4, "b.py", 2)}
+    fused = [(5, 0.9), (1, 0.5), (3, 0.5), (4, 0.5), (2, 0.4)]  # rrf() order: ties by id; id 2 has no row
+    top = _pick_top(fused, 4, lambda ids: {i: chunks[i] for i in ids if i in chunks})
+    assert [(c.location, score) for c, score in top] == [
+        ("a.py:1-2", 0.9), ("b.py:2-3", 0.5), ("b.py:9-10", 0.5), ("c.py:1-2", 0.5),
+    ]
+
+
+def test_a_tie_at_the_cut_is_kept_whole():
+    # 13 results tie for rank 2. The cut at k + 10 = 12 falls inside the group, and the result
+    # that comes first by location has the highest id, so it is last in rrf() order.
+    chunks = {0: _chunk(0, "top.py", 1), **{i: _chunk(i, f"f{20 - i:02}.py", 1) for i in range(1, 14)}}
+    fused = [(0, 0.9)] + [(i, 0.5) for i in range(1, 14)]
+    top = _pick_top(fused, 2, lambda ids: {i: chunks[i] for i in ids})
+    assert [c.path for c, _ in top] == ["top.py", "f07.py"]  # id 13
+
+
+def test_same_code_gives_the_same_order_with_other_chunk_ids(sample_repo, tmp_path, fake_config, recorder):
+    factory = lambda m, c: recorder  # noqa: E731
+    first = Store(tmp_path / "first")
+    Indexer(sample_repo, first, fake_config, embedder_factory=factory).update()
+    # Same code, other ids: index without api/routes.py, then add it back with an update.
+    routes, away = sample_repo / "api" / "routes.py", tmp_path / "routes.py"
+    shutil.move(routes, away)
+    second = Store(tmp_path / "second")
+    Indexer(sample_repo, second, fake_config, embedder_factory=factory).update()
+    shutil.move(away, routes)
+    Indexer(sample_repo, second, fake_config, embedder_factory=factory).update()
+
+    tie_with_other_id_order = False
+    for query in ("disabled users stay logged in", "session", "get user by id", "table rows", "logout"):
+        a, b = (search(s, query, fake_config, k=50, embedder_factory=factory).results for s in (first, second))
+        assert [(r.location, r.score) for r in a] == [(r.location, r.score) for r in b]
+        id_b = {r.key: r.chunk_id for r in b}
+        for x, y in zip(a, a[1:]):
+            if x.score == y.score and (x.chunk_id < y.chunk_id) != (id_b[x.key] < id_b[y.key]):
+                tie_with_other_id_order = True
+    assert tie_with_other_id_order  # the test really has ties that ids would order differently
+    first.close()
+    second.close()
 
 
 @pytest.fixture

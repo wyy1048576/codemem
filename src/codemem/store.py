@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS embeddings (
 );
 """
 
+VECTOR_TIE_MARGIN = 50  # extra vector hits fetched, so equal scores at the cut can be ordered
+
 _CHUNK_COLS = (
     "chunk_id, key, path, qualname, name, kind, class_name, start_line, end_line, "
     "signature, docstring, code, content_hash"
@@ -459,15 +461,16 @@ class Store:
     def bm25_search(
         self, match: str, n: int, weights: Sequence[float], path_prefix: str | None = None
     ) -> list[int]:
-        sql = "SELECT f.rowid FROM fts f"
+        sql = "SELECT f.rowid FROM fts f JOIN chunks c ON c.chunk_id = f.rowid"
         params: list[Any] = [match]
         where = "fts MATCH ?"
         if path_prefix:
-            sql += " JOIN chunks c ON c.chunk_id = f.rowid"
             where += " AND c.path LIKE ? ESCAPE '!'"
             params.append(_like_prefix(path_prefix))
         w = [float(x) for x in weights]
-        sql += f" WHERE {where} ORDER BY bm25(fts, ?, ?, ?) LIMIT ?"
+        # Equal scores (copies of the same code) are ordered by location, not by rowid:
+        # rowids depend on the history of the index.
+        sql += f" WHERE {where} ORDER BY bm25(fts, ?, ?, ?), c.path, c.start_line, c.key LIMIT ?"
         return [r[0] for r in self.conn.execute(sql, (*params, *w, n))]
 
     # ---- embeddings / vectors
@@ -558,7 +561,13 @@ class Store:
     ) -> list[tuple[int, float]]:
         with self._vec_lock:
             vs = self.vectors(vec_type)
-            return vs.search(query, n, allowed_ids) if vs is not None else []
+            hits = vs.search(query, n + VECTOR_TIE_MARGIN, allowed_ids) if vs is not None else []
+        # FAISS gives equal scores (copies of the same code) in insertion order, which depends
+        # on the history of the index. So equal scores are ordered by location. The extra hits
+        # let a group of equal scores at the cut be ordered as a whole.
+        place = {c.chunk_id: (c.path, c.start_line, c.key) for c in self.get_chunks([i for i, _ in hits]).values()}
+        hits.sort(key=lambda h: (-h[1], h[0] not in place, place.get(h[0], ("", 0, ""))))
+        return hits[:n]
 
     def save_vectors(self) -> None:
         """Persist dirty FAISS indexes + sidecars. Call after committing embedding rows."""

@@ -74,8 +74,28 @@ def rrf(
         w = weights.get(signal, 1.0)
         for rank, doc in enumerate(ids, start=1):
             scores[doc] = scores.get(doc, 0.0) + w / (k + rank)
-    # Ties broken by id for repeatable eval numbers.
+    # Ties broken by id, so rrf() alone is repeatable. search() then orders ties by location,
+    # because ids depend on the history of the index.
     return sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+def _pick_top(
+    fused: list[tuple[int, float]], k: int, get_chunks: Callable[[list[int]], dict[int, Chunk]]
+) -> list[tuple[Chunk, float]]:
+    """The k best results, with exact ties ordered by location (path, start line, key).
+
+    Chunk ids depend on the history of the index: the order of builds and updates, and the
+    file order of the OS. So ids must not decide the order of tied results, or which of them
+    get into the top k. The same code then gives the same order on any index.
+    """
+    # Over-fetch a little: a reader may see ids whose rows were just deleted by a writer.
+    cut = min(k + 10, len(fused))
+    while 0 < cut < len(fused) and fused[cut][1] == fused[cut - 1][1]:
+        cut += 1  # keep the whole group of results that tie with the last one
+    chunks = get_chunks([doc for doc, _ in fused[:cut]])
+    found = [(chunks[doc], score) for doc, score in fused[:cut] if doc in chunks]
+    found.sort(key=lambda cs: (-cs[1], cs[0].path, cs[0].start_line, cs[0].key))
+    return found[:k]
 
 
 def _preview(chunk: Chunk, max_lines: int, max_chars: int) -> str:
@@ -160,18 +180,11 @@ def search(
     t = time.perf_counter()
     fused = rrf(ranked, k=config.rrf_k, weights=config.rrf_weights)
     rank_of = {s: {doc: r for r, doc in enumerate(ids, start=1)} for s, ids in ranked.items()}
-    # Over-fetch a little: a reader may see ids whose rows were just deleted by a writer.
-    top = fused[: k + 10]
-    chunks = store.get_chunks([doc for doc, _ in top])
     results: list[ResultCard] = []
-    for doc, score in top:
-        chunk = chunks.get(doc)
-        if chunk is None:
-            continue
+    for chunk, score in _pick_top(fused, k, store.get_chunks):
+        doc = chunk.chunk_id
         ranks = {s: rank_of[s][doc] for s in ranked if doc in rank_of[s]} if debug else None
         results.append(make_card(chunk, score, config, ranks))
-        if len(results) == k:
-            break
     timings["fuse"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
     return SearchResponse(query=query, signals=list(signals), results=results, timings=timings)

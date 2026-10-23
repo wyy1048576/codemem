@@ -127,7 +127,7 @@ def walk_python_files(root: Path, config: Config, skip_dirs: set[Path] = frozens
                 continue
             keep.append(d)
         dirnames[:] = keep
-        for f in filenames:
+        for f in sorted(filenames):  # the OS file order would change chunk ids between machines
             if not f.endswith(".py"):
                 continue
             rel = f"{rel_dir}/{f}" if rel_dir else f
