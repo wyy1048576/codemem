@@ -134,6 +134,26 @@ def cmd_score(args) -> int:
     return 0
 
 
+def cmd_compare(args) -> int:
+    from .compare import CompareError, compare
+    from .repos import RepoError
+    from .score import ScoreError
+    from .tasks import TaskError
+
+    try:
+        result = compare(args.run_a, args.run_b, tasks_file=args.tasks)
+    except (CompareError, ScoreError, TaskError, RepoError) as exc:
+        print(f"compare {args.run_a} {args.run_b}: {exc}", file=sys.stderr)
+        return 1
+    print(f"update vs. rebuild check: {'PASS' if result.passed else 'FAIL (read the report)'}")
+    print(f"  {'system':22} {'tasks':>5} {'same top 10':>11} {'metric diff':>11} {'token diff':>10}  result")
+    for s in result.systems:
+        print(f"  {s.system:22} {s.tasks:>5} {s.same_top:>5} ({s.share_same_top:>4.0%}) {s.largest_diff:>11.4f} "
+              f"{s.largest_relative_diff:>10.2%}  {'pass' if s.passed else 'FAIL'}")
+    print(f"  report: {result.report_path}")
+    return 0
+
+
 def cmd_planned(args) -> int:
     print(f"cmeval {args.command}: not built yet", file=sys.stderr)
     return 2
@@ -176,6 +196,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tasks", type=Path, default=None,
                    help="tasks file to use instead of the path in meta.json (for runs from another machine; same sha256 required)")
     p.set_defaults(func=cmd_score)
+
+    p = sub.add_parser("compare", help="update vs. rebuild check: compare two scored runs of the same tasks")
+    p.add_argument("run_a", help="run id or folder (usually the update run; the report is written here)")
+    p.add_argument("run_b", help="run id or folder (usually the rebuild run)")
+    p.add_argument("--tasks", type=Path, default=None, help="tasks file to use instead of the path in run A's meta.json")
+    p.set_defaults(func=cmd_compare)
 
     p = sub.add_parser("systems", help="check a system config and list its systems")
     p.add_argument("file", type=Path)
