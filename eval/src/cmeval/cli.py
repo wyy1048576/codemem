@@ -16,7 +16,6 @@ MAX_PROBLEMS_SHOWN = 50
 PLANNED = {
     "collect": "collect fresh tasks from GitHub issues and fixes",
     "review": "review tasks by hand",
-    "report": "write a report for a scored run",
 }
 
 
@@ -134,6 +133,29 @@ def cmd_score(args) -> int:
     return 0
 
 
+def cmd_report(args) -> int:
+    from .report import ReportError, report
+    from .score import ScoreError
+    from .tasks import TaskError
+
+    try:
+        result = report(args.run, baseline=args.baseline, split=args.split, cutoff=args.cutoff, tasks_file=args.tasks)
+    except (ReportError, ScoreError, TaskError) as exc:
+        print(f"report {args.run}: {exc}", file=sys.stderr)
+        return 1
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    print(f"{result.report_path}: {result.tasks_scored} tasks")
+    if result.primary:
+        print(f"  primary metrics vs. {args.baseline} (Holm over {len(result.primary)} tests):")
+    for c in result.primary:
+        digits = 0 if c.metric == "tokens_to_first" else 3
+        diff = "-" if c.diff is None else f"{c.diff:+.{digits}f}"
+        p_holm = "-" if c.p_holm is None else f"{c.p_holm:.3f}"
+        print(f"  {c.system:22} {c.level} {c.metric:16} n={c.n:<3} diff {diff:>8}  Holm p {p_holm}")
+    return 0
+
+
 def cmd_compare(args) -> int:
     from .compare import CompareError, compare
     from .repos import RepoError
@@ -196,6 +218,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tasks", type=Path, default=None,
                    help="tasks file to use instead of the path in meta.json (for runs from another machine; same sha256 required)")
     p.set_defaults(func=cmd_score)
+
+    p = sub.add_parser("report", help="write report.md for a scored run: tables, intervals, paired tests")
+    p.add_argument("run", help="run id (in CMEVAL_HOME/runs) or path to a run folder")
+    p.add_argument("--baseline", default="grep-fn", help="system for the paired tests (default grep-fn)")
+    p.add_argument("--split", choices=["dev", "test"], default="dev", help="must match the run's split; test only at milestones")
+    p.add_argument("--cutoff", default="2026-07-01", help="issue date that splits tasks into before and after (default 2026-07-01)")
+    p.add_argument("--tasks", type=Path, default=None, help="tasks file to use instead of the path in meta.json (same sha256)")
+    p.set_defaults(func=cmd_report)
 
     p = sub.add_parser("compare", help="update vs. rebuild check: compare two scored runs of the same tasks")
     p.add_argument("run_a", help="run id or folder (usually the update run; the report is written here)")

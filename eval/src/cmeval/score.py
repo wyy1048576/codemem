@@ -27,7 +27,7 @@ from .metrics.tokens import BUDGETS, AnthropicCounter, TokenCounter, make_counte
 from .files import now, read_jsonl, sha256_file, write_json, write_text_atomic
 from .paths import runs_dir
 from .retriever import Hit
-from .tasks import load_tasks
+from .tasks import Task, load_tasks
 
 DEFAULT_IOUS = (0.5, 0.3, 0.7)
 MAIN_IOU = 0.5
@@ -57,6 +57,24 @@ def resolve_run(run: str | Path) -> Path:
     return path
 
 
+def run_tasks(meta: dict, tasks_file: str | Path | None = None) -> tuple[Path, dict[str, Task]]:
+    """The run's tasks by id, from the tasks file the run used.
+
+    A run made on another machine names a tasks file path from that machine. Another copy can
+    be given; it must have the same sha256 as the run's, or the labels would not match the hits.
+    """
+    try:
+        path = Path(tasks_file) if tasks_file is not None else Path(meta["tasks_file"])
+        sha = meta["tasks_sha256"]
+    except (KeyError, TypeError) as exc:
+        raise ScoreError(f"meta.json is not valid: {type(exc).__name__}: {exc}") from None
+    if not path.is_file():
+        raise ScoreError(f"tasks file {path} is missing (for a run from another machine, use --tasks FILE)")
+    if sha256_file(path) != sha:
+        raise ScoreError(f"tasks file {path} changed since the run; labels would not match the hits")
+    return path, {t.id: t for t in load_tasks(path)}
+
+
 def _check_ious(ious: tuple[float, ...]) -> tuple[float, ...]:
     bad = [i for i in ious if not 0 < i <= 1]
     if bad:
@@ -73,21 +91,13 @@ def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...]
     ious = _check_ious(tuple(ious))
     try:
         meta = json.loads((run_dir / "meta.json").read_text(encoding="utf-8"))
-        # A run made on another machine names a tasks file path from that machine. Another copy
-        # can be given; it must have the same sha256 as the run's.
-        tasks_file = Path(tasks_file) if tasks_file is not None else Path(meta["tasks_file"])
         systems = [(s["name"], s["granularity"], s["index_key"]) for s in meta["systems"]]
         run_k = int(meta.get("k", max(KS)))
         lines = {name: read_jsonl(run_dir / f"{name}.jsonl") for name, _, _ in systems}
         index_rows = read_jsonl(run_dir / "index.jsonl")
-        tasks_sha = meta["tasks_sha256"]
     except (ValueError, KeyError, TypeError) as exc:
         raise ScoreError(f"run files in {run_dir} are not valid: {type(exc).__name__}: {exc}") from None
-    if not tasks_file.is_file():
-        raise ScoreError(f"tasks file {tasks_file} is missing (for a run from another machine, use --tasks FILE)")
-    if sha256_file(tasks_file) != tasks_sha:
-        raise ScoreError(f"tasks file {tasks_file} changed since the run; labels would not match the hits")
-    tasks = {t.id: t for t in load_tasks(tasks_file)}
+    tasks_file, tasks = run_tasks(meta, tasks_file)
     ks = tuple(k for k in KS if k <= run_k)  # no recall@50 for a run that asked for 10 hits
 
     # ---- only tasks that every system finished, so all systems are compared on the same tasks
