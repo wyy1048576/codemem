@@ -39,11 +39,42 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 |---|---|
 | `cmeval validate FILE` | Check a task file and print counts by source, split, and repo |
 | `cmeval import swebench-verified [--n 50] [--seed 0]` | Sample and label SWE-bench Verified tasks (pinned dataset revision) |
+| `cmeval systems FILE` | Check a system config and list its systems (adapter, granularity, index key) |
 | `cmeval collect` | Not built yet |
 | `cmeval review` | Not built yet |
 | `cmeval run` | Not built yet |
 | `cmeval score` | Not built yet |
 | `cmeval report` | Not built yet |
+
+## Systems (the plug)
+
+Every retrieval system plugs in through one interface, `Retriever` in `src/cmeval/retriever.py`:
+
+| Method | Does |
+|---|---|
+| `build(repo, index_dir)` | Full index of the repo at its current commit. Returns an `IndexReport` (time, size, items). |
+| `update(repo, index_dir)` | Bring the index up to date after the repo moved. Must give the same results as `build`. |
+| `search(query, k)` | At most k `Hit`s, best first. |
+| `describe()` | Everything needed to repeat a run (versions, models, device, settings). |
+| `index_key()` | Hash of index-time settings. Systems with the same key share one index. |
+
+A `Hit` is a location, never a system's own ID: `path`, `start_line`, `end_line`, `symbol`, `score`, and `text` (exactly what an agent would see; token metrics count it). Each system declares its `granularity`: `"file"` (paths only) or `"line"` (line ranges on every hit).
+
+Systems are listed in TOML configs in `configs/`. Every key except `name` and `adapter` goes to the adapter:
+
+```toml
+[[system]]
+name = "fake-line"
+adapter = "fake"
+```
+
+| Adapter | Status |
+|---|---|
+| `fake` | Test and dry-run stand-in (`src/cmeval/adapters/fake.py`) |
+| `grep`, `grep_fn` | Not built yet |
+| `codemem` | Not built yet |
+
+To add a system: write a class with the methods above in `src/cmeval/adapters/`, and add one line to `ADAPTERS` in `src/cmeval/systems.py`.
 
 ## Local data
 

@@ -68,6 +68,25 @@ def cmd_import(args) -> int:
     return 0 if report.written else 1
 
 
+def cmd_systems(args) -> int:
+    from .systems import SystemsError, load_systems, make_system
+
+    try:
+        specs = load_systems(args.file)
+        systems = [make_system(spec) for spec in specs]
+    except FileNotFoundError:
+        print(f"{args.file}: no such file", file=sys.stderr)
+        return 1
+    except SystemsError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print(f"{args.file}: {len(systems)} systems")
+    for spec, system in zip(specs, systems):
+        print(f"  {spec.name:24} adapter={spec.adapter:10} granularity={system.granularity:5} index_key={system.index_key()}")
+        system.close()
+    return 0
+
+
 def cmd_planned(args) -> int:
     print(f"cmeval {args.command}: not built yet", file=sys.stderr)
     return 2
@@ -89,6 +108,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--revision", default=None, help="dataset revision (default: the pinned one)")
     p.add_argument("--out", type=Path, default=None, help="task file (default: eval/tasks/swebv-dev<n>.jsonl)")
     p.set_defaults(func=cmd_import)
+
+    p = sub.add_parser("systems", help="check a system config and list its systems")
+    p.add_argument("file", type=Path)
+    p.set_defaults(func=cmd_systems)
 
     for name, help_text in PLANNED.items():
         p = sub.add_parser(name, help=f"{help_text} (not built yet)")
