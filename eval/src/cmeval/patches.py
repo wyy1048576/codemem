@@ -59,6 +59,7 @@ class FileChange:
     insert_after: list[int] = field(default_factory=list)  # pure insertions between base line L and L+1
     added: int = 0
     removed: int = 0
+    diff: str = field(default="", repr=False)  # this file's part of the diff, unchanged
 
     @property
     def path(self) -> str:
@@ -133,6 +134,7 @@ def _file_change(pf) -> FileChange:
         insert_after=insert_after,
         added=pf.added,
         removed=pf.removed,
+        diff=str(pf),
     )
 
 
@@ -144,6 +146,47 @@ def parse_patch(text: str) -> list[FileChange]:
 def split_patch(text: str) -> dict[str, str]:
     """The diff text for each file class. Each file appears in exactly one part, with its text unchanged."""
     parts = {name: "" for name in FILE_CLASSES}
-    for pf in PatchSet(text):
-        parts[_file_change(pf).file_class] += str(pf)
+    for change in parse_patch(text):
+        parts[change.file_class] += change.diff
     return parts
+
+
+class PatchMismatch(ValueError):
+    """A diff does not fit the base text: its context or removed lines differ from the base."""
+
+
+def _strip_eol(line: str) -> str:
+    return line.rstrip("\r\n")
+
+
+def apply_file_diff(base_text: str | None, diff_text: str) -> str:
+    """Rebuild a file after the fix from its base text and its one-file diff.
+
+    Every context and removed line must equal the base line, so this also checks that the
+    diff belongs to this base. None as base_text means the file is new.
+    """
+    files = list(PatchSet(diff_text))
+    if len(files) != 1:
+        raise ValueError(f"expected a diff for one file, got {len(files)}")
+    path = files[0].path
+    base = (base_text or "").splitlines(keepends=True)
+    out: list[str] = []
+    pos = 0  # index of the next base line to copy
+    for hunk in files[0]:
+        start = hunk.source_start if hunk.source_length == 0 else hunk.source_start - 1
+        if start < pos or start > len(base):
+            raise PatchMismatch(f"{path}: hunk at base line {hunk.source_start} does not fit the base file")
+        out.extend(base[pos:start])
+        pos = start
+        for line in hunk:
+            if line.is_context or line.is_removed:
+                if pos >= len(base) or _strip_eol(base[pos]) != _strip_eol(line.value):
+                    found = _strip_eol(base[pos]) if pos < len(base) else "<end of file>"
+                    raise PatchMismatch(f"{path}:{pos + 1}: diff expects {_strip_eol(line.value)!r}, base has {found!r}")
+                if line.is_context:
+                    out.append(base[pos])
+                pos += 1
+            elif line.is_added:
+                out.append(line.value)
+    out.extend(base[pos:])
+    return "".join(out)

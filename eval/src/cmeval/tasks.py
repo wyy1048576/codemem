@@ -36,6 +36,7 @@ KNOWN_TAGS: dict[str, type] = {
     "has_test_patch": bool,
     "body_edited_after_fix": bool,
     "query_tokens": int,
+    "partial_labels": bool,  # a gold code file could not be labeled below file level
 }
 
 _ID_RE = re.compile(r"^(?P<owner>[A-Za-z0-9-]+)__(?P<name>[A-Za-z0-9_.-]+)-(?P<number>\d+)$")

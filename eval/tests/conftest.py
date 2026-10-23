@@ -1,6 +1,13 @@
+import subprocess
+from pathlib import Path
+
 import pytest
 
+from cmeval.repos import ensure_clone
 from cmeval.tasks import Fix, Gold, Issue, Span, Task
+
+FIXTURES = Path(__file__).parent / "fixtures"
+REMOTE_REPO = "acme/demo"
 
 PATCH = """\
 diff --git a/auth/sessions.py b/auth/sessions.py
@@ -49,3 +56,50 @@ def make_task():
         return Task(**fields)
 
     return make
+
+
+class RemoteRepo:
+    """A local git repo that stands in for GitHub."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.shas: list[str] = []
+
+    def git(self, *args: str) -> str:
+        return subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, text=True).stdout.strip()
+
+    def commit(self, files: dict[str, str], message: str = "change") -> str:
+        for name, text in files.items():
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(text.encode("utf-8"))
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", message)
+        sha = self.git("rev-parse", "HEAD")
+        self.shas.append(sha)
+        return sha
+
+    def diff(self, old: str, new: str) -> str:
+        return subprocess.run(
+            ["git", "diff", old, new], cwd=self.root, check=True, capture_output=True, text=True
+        ).stdout
+
+
+@pytest.fixture
+def remote(tmp_path, monkeypatch):
+    """REMOTE_REPO with 3 commits of app.py, already cloned into CMEVAL_HOME. User git config is ignored."""
+    config = tmp_path / "gitconfig"
+    config.write_text("")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    for key in ("GIT_AUTHOR", "GIT_COMMITTER"):
+        monkeypatch.setenv(f"{key}_NAME", "Test")
+        monkeypatch.setenv(f"{key}_EMAIL", "test@example.com")
+    root = tmp_path / "remote"
+    root.mkdir()
+    repo = RemoteRepo(root)
+    repo.git("init", "-q", "-b", "main")
+    for i in (1, 2, 3):
+        repo.commit({"app.py": f"VERSION = {i}\n"}, f"v{i}")
+    ensure_clone(REMOTE_REPO, url=str(root))
+    return repo

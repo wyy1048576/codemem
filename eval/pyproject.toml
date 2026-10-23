@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "unidiff>=1.0",
+    # Same ranges as codemem, so both packages can share one environment.
+    "tree-sitter>=0.25,<0.27",
+    "tree-sitter-python>=0.25,<0.26",
 ]
 
 [project.scripts]
