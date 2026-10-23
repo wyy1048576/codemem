@@ -80,3 +80,12 @@ def test_remove_worktree(remote):
     assert not path.exists()
     assert str(path) not in remote.git("--git-dir", str(repos.clone_path(REPO)), "worktree", "list")
     assert checkout(REPO, shas[0]) == path  # can be created again
+
+
+def test_checkout_recovers_after_a_worktree_folder_is_deleted_by_hand(remote):
+    import shutil
+
+    shas = remote.shas
+    path = checkout(REPO, shas[0])
+    shutil.rmtree(path)  # a user frees disk space without git
+    assert checkout(REPO, shas[0]) == path and head(path) == shas[0]

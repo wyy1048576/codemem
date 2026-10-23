@@ -4,11 +4,13 @@ The eval suite has its own definition finder (tree-sitter). It does not use code
 it must work for languages codemem does not support, and a tool must not be graded with its
 own ruler.
 
-Rules, for each code file the fix changes (line numbers on the base side):
-- A changed line belongs to the innermost named function that contains it (function gold)
-  and to the innermost class that contains it (class gold).
-- An insertion between base lines L and L+1 belongs to the innermost function (and class)
-  that contains both L and L+1. A new method right after method A is not inside A.
+Rules, for each code file the fix changes:
+- A removed or changed base line belongs to the innermost named function that contains it
+  (function gold) and to the innermost class that contains it (class gold).
+- An added line is placed in the fixed file: the innermost function (and class) around it there
+  that also exists in the base file is gold. Lines appended at the end of a function belong to
+  it; a new method added after method A belongs to the class, not to A.
+- Blank lines are ignored for function and class gold.
 - A change outside every function adds no function gold and sets module_level_change.
 - Anonymous functions (lambdas) are not definitions; their lines belong to the enclosing one.
 """
@@ -16,18 +18,19 @@ Rules, for each code file the fix changes (line numbers on the base side):
 from __future__ import annotations
 
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 
 from tree_sitter import Language, Node, Parser
+from unidiff.errors import UnidiffParseError
 
 from . import repos
-from .patches import PatchMismatch, align_file_diff, apply_file_diff, parse_patch
+from .patches import PatchMismatch, align_file_diff, apply_file_diff, parse_patch, split_lines
 from .tasks import Gold, Span, Unretrievable
 
-LABELER_VERSION = "cmeval-labels/1"
+LABELER_VERSION = "cmeval-labels/2"
 
 
 class LabelError(ValueError):
@@ -143,7 +146,11 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
     hunks_moved = 0
     changed_by_language: Counter[str] = Counter()
 
-    for change in parse_patch(patch):
+    try:
+        changes = parse_patch(patch)
+    except UnidiffParseError as exc:
+        raise LabelError(f"the patch cannot be parsed: {exc}") from None
+    for change in changes:
         if change.file_class != "code":
             continue
         if change.status == "added":
@@ -173,11 +180,11 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
         if defs is None:
             partial = True
             continue
-        file_module_level = _label_file(path, applied.changed, applied.insert_after, defs, gold)
+        new_defs = _definitions_or_none(new_text, change.language) if new_text is not None else None
+        file_module_level = _label_file(path, base_text, new_text, applied, defs, new_defs, gold)
         module_level = module_level or file_module_level
 
-        if new_text is not None:
-            new_defs = _definitions_or_none(new_text, change.language) or []
+        if new_defs is not None:
             known = {(d.kind, d.symbol) for d in defs}
             for d in new_defs:
                 if (d.kind, d.symbol) not in known:
@@ -203,7 +210,38 @@ def _definitions_or_none(source: str, language: str | None) -> list[Definition] 
     return None if has_error else defs
 
 
-def _label_file(path: str, changed: list[int], insert_after: list[int], defs: list[Definition], gold: Gold) -> bool:
+def _map_to_base(new_defs: list[Definition], base_defs: list[Definition]) -> dict[Definition, Definition]:
+    """Match each definition in the fixed file to the base definition with the same kind and symbol.
+
+    A symbol can appear more than once (a property getter and setter); the k-th one in the fixed
+    file matches the k-th one in the base file.
+    """
+    by_key: dict[tuple[str, str], list[Definition]] = defaultdict(list)
+    for d in base_defs:
+        by_key[(d.kind, d.symbol)].append(d)
+    seen: Counter[tuple[str, str]] = Counter()
+    mapping: dict[Definition, Definition] = {}
+    for d in new_defs:
+        key = (d.kind, d.symbol)
+        if seen[key] < len(by_key[key]):
+            mapping[d] = by_key[key][seen[key]]
+        seen[key] += 1
+    return mapping
+
+
+def _innermost_existing(new_defs: list[Definition], line: int, mapping: dict) -> Definition | None:
+    """The innermost definition around a line of the fixed file that also exists in the base file."""
+    for d in sorted((d for d in new_defs if d.contains(line)), key=lambda d: d.start, reverse=True):
+        if d in mapping:
+            return mapping[d]
+    return None
+
+
+def _is_blank(lines: list[str], line: int) -> bool:
+    return not (1 <= line <= len(lines)) or not lines[line - 1].strip()
+
+
+def _label_file(path, base_text, new_text, applied, defs, new_defs, gold: Gold) -> bool:
     """Add the file's gold classes and functions. Returns True if a change is outside every function."""
     functions = [d for d in defs if d.kind == "function"]
     classes = [d for d in defs if d.kind == "class"]
@@ -211,18 +249,36 @@ def _label_file(path: str, changed: list[int], insert_after: list[int], defs: li
     gold_classes: dict[Definition, None] = {}
     module_level = False
 
-    points = [(line,) for line in changed] + [(L, L + 1) for L in insert_after if L >= 1]
-    if any(L < 1 for L in insert_after):
-        module_level = True  # an insertion at the file start is outside every function
-    for point in points:
-        fn = _innermost(functions, *point)
-        cls = _innermost(classes, *point)
+    def add(fn: Definition | None, cls: Definition | None) -> None:
+        nonlocal module_level
         if fn is not None:
             gold_functions[fn] = None
         else:
             module_level = True
         if cls is not None:
             gold_classes[cls] = None
+
+    base_lines = split_lines(base_text)
+    for line in applied.changed:
+        if not _is_blank(base_lines, line):
+            add(_innermost(functions, line), _innermost(classes, line))
+
+    if new_defs is not None:
+        mapping = _map_to_base(new_defs, defs)
+        new_functions = [d for d in new_defs if d.kind == "function"]
+        new_classes = [d for d in new_defs if d.kind == "class"]
+        new_lines = split_lines(new_text)
+        for line in applied.added_lines:
+            if not _is_blank(new_lines, line):
+                add(_innermost_existing(new_functions, line, mapping), _innermost_existing(new_classes, line, mapping))
+    else:
+        # The fixed file cannot be parsed: fall back to the base side. An insertion between base
+        # lines L and L+1 belongs to the innermost definition that contains both.
+        for L in applied.insert_after:
+            if L < 1:
+                module_level = True
+            else:
+                add(_innermost(functions, L, L + 1), _innermost(classes, L, L + 1))
 
     gold.functions.extend(_span(path, d) for d in sorted(gold_functions, key=lambda d: d.start))
     gold.classes.extend(_span(path, d) for d in sorted(gold_classes, key=lambda d: d.start))
@@ -246,16 +302,27 @@ def _looks_like_identifier(name: str) -> bool:
     return "_" in name or any(c.isdigit() for c in name) or any(c.isupper() for c in name[1:])
 
 
+def _is_dunder(name: str) -> bool:
+    return len(name) > 4 and name.startswith("__") and name.endswith("__")
+
+
 def identifier_in_query(query: str, gold: Gold) -> bool:
     """True if the query names a gold function, class, or file. Used to report "easy for grep" tasks.
 
     A name counts as a whole word (case-sensitive) if it looks like an identifier, or if it is in
     code form (`name`, name(, .name). Plain words such as "query" or "save" do not count alone.
-    A file counts by its file name with extension (sessions.py) or by its path.
+    Dunder methods (__init__, __repr__) belong to every class, so they count only together with
+    their class: Foo.__init__. A file counts by its file name with extension (sessions.py) or by
+    its path.
     """
     for span in [*gold.functions, *gold.classes]:
-        name = span.symbol.rsplit(".", 1)[-1] if span.symbol else None
-        if not name:
+        if not span.symbol:
+            continue
+        parts = span.symbol.split(".")
+        name = parts[-1]
+        if _is_dunder(name):
+            if len(parts) > 1 and re.search(rf"(?<![\w]){re.escape(parts[-2])}\.{re.escape(name)}(?![\w])", query):
+                return True
             continue
         word = re.compile(rf"(?<![\w]){re.escape(name)}(?![\w])")
         code = re.compile(rf"`{re.escape(name)}`|(?<![\w]){re.escape(name)}\(|\.{re.escape(name)}(?![\w])")

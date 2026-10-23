@@ -6,7 +6,7 @@ from conftest import FIXTURES, REMOTE_REPO
 
 from cmeval.cli import main
 from cmeval.importers.swebench import balanced_order, import_swebench_verified, row_to_task
-from cmeval.labels import LabelError, LabelResult, label_at_commit
+from cmeval.labels import LABELER_VERSION, LabelError, LabelResult, label_at_commit
 from cmeval.tasks import Gold, Unretrievable, load_tasks, validate
 
 SAMPLE = (FIXTURES / "defs_sample.py").read_text()
@@ -61,7 +61,7 @@ def test_row_to_task_with_real_labels(remote):
     assert [s.symbol for s in task.gold.functions] == ["SessionManager.revoke_session"]
     assert task.tags["identifier_in_query"] is True and task.tags["has_test_patch"] is True
     assert task.tags["swebench_difficulty"] == "<15 min fix" and task.tags["query_tokens"] is None
-    assert task.language == "python" and task.labeler == "cmeval-labels/1"
+    assert task.language == "python" and task.labeler == LABELER_VERSION
 
 
 def test_balanced_order_takes_evenly_from_repos():
@@ -114,3 +114,33 @@ def test_cli_import_arguments(capsys):
     with pytest.raises(SystemExit) as info:
         main(["import", "imagenet"])
     assert info.value.code == 2
+
+
+def test_import_skips_rows_that_give_invalid_tasks():
+    rows = [fake_row("acme__demo-1", problem_statement="<!-- only the template -->"), fake_row("acme__demo-2")]
+    report = import_swebench_verified(n=1, rows=rows, label_fn=fake_label)
+    assert [t.id for t in report.tasks] == ["acme__demo-2"]
+    assert report.skipped == [{"id": "acme__demo-1", "reason": "invalid task: query is empty"}]
+
+
+def test_import_skips_unparsable_patches(remote):
+    rows = [fake_row("acme__demo-1", base_commit=remote.shas[0], patch="diff --git a/app.py b/app.py\n--- a/app.py\n+++ b/app.py\n@@ -1,3 +1,3 @@\n-x\n")]
+    report = import_swebench_verified(n=1, rows=rows)
+    assert report.tasks == [] and "cannot be parsed" in report.skipped[0]["reason"]
+
+
+def test_task_patch_keeps_code_files_only(remote):
+    base = remote.shas[-1]
+    fixed = remote.commit({"app.py": "VERSION = 9\n", "CHANGES.rst": "fixed\n"})
+    row = fake_row("acme__demo-3", base_commit=base, patch=remote.diff(base, fixed))
+    task = row_to_task(row, label_at_commit(REMOTE_REPO, base, row["patch"]))
+    assert "app.py" in task.patch and "CHANGES.rst" not in task.patch
+
+
+def test_short_import_does_not_replace_the_task_file(tmp_path):
+    out = tmp_path / "swebv-dev2.jsonl"
+    out.write_text("committed answer key\n")
+    rows = [fake_row("acme__demo-1"), fake_row("acme__demo-2", problem_statement="")]
+    report = import_swebench_verified(n=2, out=out, rows=rows, label_fn=fake_label)
+    assert len(report.tasks) == 1 and report.written is False
+    assert out.read_text() == "committed answer key\n" and not out.with_suffix(".meta.json").exists()

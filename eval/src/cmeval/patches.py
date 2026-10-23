@@ -26,7 +26,11 @@ LANGUAGE_BY_EXT = {
     ".rb": "ruby", ".php": "php", ".kt": "kotlin", ".scala": "scala", ".cs": "csharp", ".swift": "swift",
 }  # fmt: skip
 
-TEST_DIRS = {"test", "tests", "testing", "testdata", "__tests__", "spec", "specs"}
+# Directories that hold tests anywhere in a path.
+TEST_DIRS = {"tests", "testdata", "__tests__", "spec", "specs"}
+# Directories that hold tests only at the repo top or under src/. Elsewhere they are often library
+# code that a fix can change: django/test/, sympy/testing/, numpy/testing/.
+TOP_TEST_DIRS = {"test", "testing"}
 
 # File-name patterns that mark a test file, for each language.
 TEST_NAME_PATTERNS = {
@@ -75,7 +79,10 @@ def classify_path(path: str) -> tuple[str, str | None]:
     language = LANGUAGE_BY_EXT.get(p.suffix.lower())
     if language is None:
         return "other", None
-    if any(part.lower() in TEST_DIRS for part in p.parts[:-1]):
+    dirs = [part.lower() for part in p.parts[:-1]]
+    if any(d in TEST_DIRS for d in dirs):
+        return "test", language
+    if any(d in TOP_TEST_DIRS and (i == 0 or dirs[i - 1] == "src") for i, d in enumerate(dirs)):
         return "test", language
     if any(rx.match(p.name) for rx in _TEST_NAME_RE.get(language, [])):
         return "test", language
@@ -166,12 +173,26 @@ def _strip_eol(line: str) -> str:
     return line.rstrip("\r\n")
 
 
+def split_lines(text: str) -> list[str]:
+    """Lines with their endings, split on "\\n" only, the way git, unidiff, and tree-sitter count.
+
+    str.splitlines also splits on form feeds, vertical tabs, and other characters, which would
+    shift line numbers in files that contain them.
+    """
+    parts = text.split("\n")
+    lines = [part + "\n" for part in parts[:-1]]
+    if parts[-1]:  # a last line without a final newline
+        lines.append(parts[-1])
+    return lines
+
+
 @dataclass
 class AppliedDiff:
     new_text: str  # the file after the fix
     changed: list[int]  # base lines, where the hunks really apply
     insert_after: list[int]
     offsets: list[int]  # for each hunk: real start minus the start stated in the diff
+    added_lines: list[int] = field(default_factory=list)  # lines of the new file that the diff adds
 
 
 def _find_hunk(base: list[str], want: list[str], stated: int, lowest: int) -> int | None:
@@ -199,10 +220,11 @@ def align_file_diff(base_text: str | None, diff_text: str) -> AppliedDiff:
     if len(files) != 1:
         raise ValueError(f"expected a diff for one file, got {len(files)}")
     pf = files[0]
-    base = (base_text or "").splitlines(keepends=True)
+    base = split_lines(base_text) if base_text else []
     base_stripped = [_strip_eol(line) for line in base]
     out: list[str] = []
     offsets: list[int] = []
+    added_lines: list[int] = []
     pos = 0  # index of the next base line to copy
     for hunk in pf:
         want = [_strip_eol(line.value) for line in hunk if line.is_context or line.is_removed]
@@ -225,9 +247,10 @@ def align_file_diff(base_text: str | None, diff_text: str) -> AppliedDiff:
                 pos += 1
             elif line.is_added:
                 out.append(line.value)
+                added_lines.append(len(out))
     out.extend(base[pos:])
     changed, insert_after = _touched_lines(pf, offsets)
-    return AppliedDiff("".join(out), changed, insert_after, offsets)
+    return AppliedDiff("".join(out), changed, insert_after, offsets, added_lines)
 
 
 def apply_file_diff(base_text: str | None, diff_text: str) -> str:

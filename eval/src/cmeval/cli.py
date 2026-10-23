@@ -57,12 +57,15 @@ def cmd_import(args) -> int:
         out=out,
         progress=lambda message: print(message, file=sys.stderr, flush=True),
     )
-    print(f"{out}: {len(report.tasks)} tasks written, {len(report.skipped)} rows skipped")
+    if report.written:
+        print(f"{out}: {len(report.tasks)} tasks written, {len(report.skipped)} rows skipped")
+    else:
+        print(f"only {len(report.tasks)} of {args.n} tasks found; {out} was not changed", file=sys.stderr)
     for skip in report.skipped:
         print(f"  skipped {skip['id']}: {skip['reason']}")
     for key, value in report.stats.items():
         print(f"  {key}: {value}")
-    return 0 if len(report.tasks) == args.n else 1
+    return 0 if report.written else 1
 
 
 def cmd_planned(args) -> int:

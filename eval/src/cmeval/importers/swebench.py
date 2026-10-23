@@ -20,7 +20,8 @@ from pathlib import Path
 from .. import __version__
 from ..labels import LABELER_VERSION, LabelError, LabelResult, identifier_in_query, label_at_commit
 from ..paths import datasets_dir
-from ..tasks import Fix, Issue, Task, clean_query, save_tasks
+from ..patches import split_patch
+from ..tasks import Fix, Issue, Task, clean_query, save_tasks, validate
 
 DATASET = "SWE-bench/SWE-bench_Verified"
 DEFAULT_REVISION = "78f471bf655a3137b2e8a75af1501690ec009ec3"  # 2026-08-16
@@ -76,7 +77,7 @@ def row_to_task(row: dict, label: LabelResult) -> Task:
         # SWE-bench gives one date: the creation time of the fix PR.
         issue=Issue(created_at=row.get("created_at")),
         fix=Fix(pr_number=number, url=f"https://github.com/{repo}/pull/{number}"),
-        patch=row["patch"],
+        patch=split_patch(row["patch"])["code"],  # the schema keeps code files only
         test_patch=row.get("test_patch") or None,
         gold=label.gold,
         unretrievable=label.unretrievable,
@@ -112,6 +113,7 @@ class ImportReport:
     tasks: list[Task]
     skipped: list[dict] = field(default_factory=list)  # {"id": ..., "reason": ...}
     stats: dict = field(default_factory=dict)
+    written: bool = False  # False if fewer than n tasks were found: the old file is kept
 
 
 def label_stats(tasks: list[Task]) -> dict:
@@ -149,8 +151,10 @@ def import_swebench_verified(
 ) -> ImportReport:
     """Sample n rows (balanced over repos), label them, and write a task file plus a meta file.
 
-    A row whose patch does not fit its base commit is skipped with the reason and replaced by
-    the next row. Git or network errors stop the import, so a repo is never silently missing.
+    A row that cannot be labeled, or that gives an invalid task (for example an empty query), is
+    skipped with the reason and replaced by the next row. Git or network errors stop the import,
+    so a repo is never silently missing. If fewer than n tasks are found, nothing is written, so
+    a failed run never replaces a committed task file.
     """
     if rows is None:
         progress(f"downloading {DATASET} at {revision[:12]}")
@@ -169,12 +173,18 @@ def import_swebench_verified(
         if not label.gold.files:
             skipped.append({"id": row["instance_id"], "reason": "the patch changes no code file at the base commit"})
             continue
-        tasks.append(row_to_task(row, label))
+        task = row_to_task(row, label)
+        problems = validate(task)
+        if problems:
+            skipped.append({"id": row["instance_id"], "reason": "invalid task: " + "; ".join(problems)})
+            continue
+        tasks.append(task)
 
     tasks.sort(key=lambda t: (t.repo, t.id))
     report = ImportReport(tasks, skipped, label_stats(tasks))
-    if out is not None:
+    if out is not None and len(tasks) == n:
         save_tasks(out, tasks)
+        report.written = True
         meta = {
             "dataset": DATASET,
             "revision": revision,

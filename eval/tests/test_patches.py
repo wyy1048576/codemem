@@ -185,6 +185,15 @@ Binary files /dev/null and b/assets/logo.py differ
         ("include/util.hpp", ("code", "cpp")),
         ("kernel/sched.c", ("code", "c")),
         ("Tests/AppTests.swift", ("test", "swift")),
+        # test/ and testing/ hold tests only at the repo top or under src/; elsewhere they can be library code
+        ("django/test/testcases.py", ("code", "python")),
+        ("sympy/testing/pytest.py", ("code", "python")),
+        ("numpy/testing/_private/utils.py", ("code", "python")),
+        ("django/test/test_utils.py", ("test", "python")),  # the file name still marks a test
+        ("test/helpers.py", ("test", "python")),
+        ("testing/conftest_helpers.py", ("test", "python")),
+        ("src/test/scala/FooSpec.scala", ("test", "scala")),
+        ("lib/tests/util.py", ("test", "python")),
         ("README.md", ("other", None)),
         ("pyproject.toml", ("other", None)),
         ("docs/index.rst", ("other", None)),

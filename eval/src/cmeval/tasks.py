@@ -204,7 +204,7 @@ def validate(task: Task) -> list[str]:
         for i, span in enumerate(getattr(task.gold, level)):
             where = f"gold.{level}[{i}]"
             _check_span(span, where, add)
-            if span.path not in gold_files:
+            if isinstance(span.path, str) and span.path not in gold_files:
                 add(f"{where}: path {span.path!r} is not in gold.files")
     _check_files(task.unretrievable.files, "unretrievable.files", add)
     for level in ("classes", "functions"):
@@ -305,7 +305,9 @@ def load_tasks(path: Path | str) -> list[Task]:
                 problems.extend(f"{where}: {p}" for p in exc.problems)
                 continue
             problems.extend(f"{where} ({task.id}): {p}" for p in validate(task))
-            if task.id in first_line:
+            if not isinstance(task.id, str):
+                pass  # validate already reported it; a non-string id cannot be checked for duplicates
+            elif task.id in first_line:
                 problems.append(f"{where}: duplicate id {task.id!r} (first on line {first_line[task.id]})")
             else:
                 first_line[task.id] = lineno
@@ -323,9 +325,10 @@ def save_tasks(path: Path | str, tasks: Iterable[Task]) -> None:
     seen: set[str] = set()
     for i, task in enumerate(tasks):
         problems.extend(f"task {i} ({task.id}): {p}" for p in validate(task))
-        if task.id in seen:
-            problems.append(f"task {i}: duplicate id {task.id!r}")
-        seen.add(task.id)
+        if isinstance(task.id, str):
+            if task.id in seen:
+                problems.append(f"task {i}: duplicate id {task.id!r}")
+            seen.add(task.id)
     if problems:
         raise TaskError(problems)
 

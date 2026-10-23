@@ -183,3 +183,16 @@ def test_clean_query():
     assert clean_query("<!--\nmulti\nline\n-->\nBody\n```\ncode <!-- kept? no: hidden too -->\n```") == "Body\n```\ncode \n```"
     assert clean_query("  Stack trace:\n  File \"x.py\", line 3\n") == 'Stack trace:\n  File "x.py", line 3'
     assert clean_query(None) == "" and clean_query("") == ""
+
+
+def test_load_reports_unhashable_values_instead_of_crashing(make_task, tmp_path):
+    data = make_task().to_dict()
+    data["id"] = ["acme__auth-42"]
+    data["gold"]["functions"][0]["path"] = {"not": "a path"}
+    path = tmp_path / "tasks.jsonl"
+    path.write_text(json.dumps(data) + "\n" + json.dumps(data) + "\n", encoding="utf-8")
+    with pytest.raises(TaskError) as info:
+        load_tasks(path)
+    problems = "\n".join(info.value.problems)
+    assert "is not <owner>__<repo>-<number>" in problems
+    assert "gold.functions[0]: path" in problems

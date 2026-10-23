@@ -4,7 +4,7 @@ import pytest
 from conftest import FIXTURES, REMOTE_REPO
 
 from cmeval.labels import LabelError, find_definitions, identifier_in_query, label_at_commit, label_patch
-from cmeval.patches import PatchMismatch, apply_file_diff, parse_patch
+from cmeval.patches import PatchMismatch, apply_file_diff, parse_patch, split_lines
 from cmeval.tasks import Gold, Span
 
 SAMPLE = (FIXTURES / "defs_sample.py").read_text()
@@ -19,8 +19,8 @@ def make_diff(old: str | None, new: str | None, path: str = PATH) -> str:
     if new is None:
         head += "deleted file mode 100644\n"
     lines = difflib.unified_diff(
-        (old or "").splitlines(keepends=True),
-        (new or "").splitlines(keepends=True),
+        split_lines(old or ""),  # like git: lines end at "\n" only
+        split_lines(new or ""),
         fromfile=f"a/{path}" if old is not None else "/dev/null",
         tofile=f"b/{path}" if new is not None else "/dev/null",
     )
@@ -28,13 +28,13 @@ def make_diff(old: str | None, new: str | None, path: str = PATH) -> str:
 
 
 def edit(text: str, line: int, new_line: str) -> str:
-    lines = text.splitlines(keepends=True)
+    lines = split_lines(text)
     lines[line - 1] = new_line + "\n"
     return "".join(lines)
 
 
 def insert(text: str, after: int, new_lines: str) -> str:
-    lines = text.splitlines(keepends=True)
+    lines = split_lines(text)
     return "".join(lines[:after] + [new_lines] + lines[after:])
 
 
@@ -229,3 +229,56 @@ def test_shifted_insertion_gap_moves_too():
     shifted_base = "# a\n# b\n" + SAMPLE
     r = label_patch(diff, lambda p: shifted_base)
     assert symbols(r.gold.functions) == ["SessionManager.revoke_session"] and r.tags["hunks_moved"] == 1
+
+
+# ---- review fixes
+
+
+def test_lines_appended_at_the_end_of_a_function_belong_to_it():
+    # revoke_session ends at line 30, line 31 is blank: the new lines extend its body.
+    r = label(insert(SAMPLE, 30, "        else:\n            log('none')\n"))
+    assert symbols(r.gold.functions) == ["SessionManager.revoke_session"]
+    assert symbols(r.gold.classes) == ["SessionManager"]
+    assert r.tags["module_level_change"] is False
+
+
+def test_lines_appended_at_the_end_of_the_file_belong_to_the_last_function():
+    r = label(SAMPLE + "        log(v)\n")
+    assert symbols(r.gold.functions) == ["SessionManager.value"]
+    assert [s.start for s in r.gold.functions] == [40]  # the setter, not the getter
+
+
+def test_new_decorator_belongs_to_the_function():
+    r = label(insert(SAMPLE, 5, "@cache\n"))  # line 6 is "def top"
+    assert symbols(r.gold.functions) == ["top"] and r.tags["module_level_change"] is False
+
+
+def test_blank_line_changes_do_not_set_module_level():
+    r = label(insert(SAMPLE, 31, "\n"))
+    assert r.gold.functions == [] and r.tags["module_level_change"] is False
+
+
+def test_form_feed_does_not_shift_line_numbers():
+    base = "import os\n\x0c\n" + SAMPLE  # a page break, as in some older code
+    new = base.replace("            helper(s)\n", "            helper(s, force=True)\n")
+    r = label(new, old=base)
+    assert symbols(r.gold.functions) == ["SessionManager.revoke_session"]
+    assert r.tags["hunks_moved"] == 0 and r.gold.lines == [Span(PATH, 32, 32)]
+
+
+def test_unparsable_patch_is_a_label_error():
+    with pytest.raises(LabelError, match="cannot be parsed"):
+        label_patch("diff --git a/x.py b/x.py\n--- a/x.py\n+++ b/x.py\n@@ -1,3 +1,3 @@\n-a\n", lambda p: "a\n")
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        ("the __init__ method crashes", False),  # every class has one
+        ("Widget.__init__ crashes", False),  # another class
+        ("SessionManager.__init__ crashes", True),
+    ],
+)
+def test_dunder_names_count_only_with_their_class(query, expected):
+    gold = Gold(files=["auth/sessions.py"], functions=[Span("auth/sessions.py", 2, 5, "SessionManager.__init__")])
+    assert identifier_in_query(query, gold) is expected

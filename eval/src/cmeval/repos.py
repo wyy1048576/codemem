@@ -119,6 +119,8 @@ def checkout(repo: str, commit: str, name: str | None = None) -> Path:
         return path
 
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Forget worktrees whose folder was deleted by hand; git would refuse to add them again.
+    _git("worktree", "prune", cwd=clone_path(repo))
     _git("worktree", "add", "--detach", "--quiet", str(path), commit, cwd=clone_path(repo))
     return path
 
