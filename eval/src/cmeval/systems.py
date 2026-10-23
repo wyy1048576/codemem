@@ -25,6 +25,8 @@ from .retriever import GRANULARITIES, Retriever
 # adapter name -> "module:factory". The factory is called as factory(name=..., **params).
 ADAPTERS: dict[str, str] = {
     "fake": "cmeval.adapters.fake:FakeRetriever",
+    "grep": "cmeval.adapters.grep:GrepRetriever",
+    "grep_fn": "cmeval.adapters.grep_fn:GrepFnRetriever",
 }
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")

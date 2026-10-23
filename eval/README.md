@@ -13,7 +13,7 @@ uv run cmeval --help
 uv run pytest
 ```
 
-Python 3.11 or later.
+Python 3.11 or later. The grep baselines need ripgrep (`rg`) on PATH.
 
 ## Tasks
 
@@ -71,7 +71,8 @@ adapter = "fake"
 | Adapter | Status |
 |---|---|
 | `fake` | Test and dry-run stand-in (`src/cmeval/adapters/fake.py`) |
-| `grep`, `grep_fn` | Not built yet |
+| `grep` | Offline grep baseline: ripgrep over keywords from the issue, files ranked by match count (`src/cmeval/adapters/grep.py`). Granularity `file`. Needs `rg` (`brew install ripgrep`). |
+| `grep_fn` | grep plus the next step an agent takes: each matching line is mapped to the function around it, functions ranked by matches (`grep_fn.py`). Granularity `line`. |
 | `codemem` | Not built yet |
 
 To add a system: write a class with the methods above in `src/cmeval/adapters/`, and add one line to `ADAPTERS` in `src/cmeval/systems.py`.

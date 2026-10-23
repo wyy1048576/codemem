@@ -106,13 +106,16 @@ def find_definitions(source: str, language: str) -> tuple[list[Definition], bool
     return found, tree.root_node.has_error
 
 
-def _innermost(defs: list[Definition], *lines: int) -> Definition | None:
+def innermost(defs: list[Definition], *lines: int) -> Definition | None:
     """The containing definition with the latest start. Definitions nest, so that is the innermost."""
     best = None
     for d in defs:
         if all(d.contains(line) for line in lines) and (best is None or d.start >= best.start):
             best = d
     return best
+
+
+_innermost = innermost  # old private name
 
 
 def _ranges(lines: list[int]) -> list[tuple[int, int]]:
