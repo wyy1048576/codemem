@@ -74,6 +74,28 @@ def test_same_code_gives_the_same_order_with_other_chunk_ids(sample_repo, tmp_pa
     second.close()
 
 
+def test_copies_of_the_same_code_are_ordered_by_location_in_each_signal(tmp_path, fake_config, recorder):
+    from codemem.tokenize import fts_match_query
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    store = Store(tmp_path / "index")
+    factory = lambda m, c: recorder  # noqa: E731
+    same = "def same_thing():\n    return 1\n"
+    # z.py goes in first, so it has the lowest id and comes first in insertion order.
+    (repo / "z.py").write_text(same)
+    Indexer(repo, store, fake_config, embedder_factory=factory).update()
+    for name in "abcd":
+        (repo / f"{name}.py").write_text(same)
+    Indexer(repo, store, fake_config, embedder_factory=factory).update()
+    paths = lambda ids: [store.get_chunk(i).path for i in ids]  # noqa: E731
+    query = recorder.embed_queries(["same thing"])[0]
+    for n in (1, 2, 4):  # the 5 equal scores cross every cut
+        assert paths(i for i, _ in store.vector_search("code", query, n)) == ["a.py", "b.py", "c.py", "d.py"][:n]
+        assert paths(store.bm25_search(fts_match_query("same_thing"), n, fake_config.bm25_weights)) == ["a.py", "b.py", "c.py", "d.py"][:n]
+    store.close()
+
+
 @pytest.fixture
 def index(sample_repo, tmp_path, fake_config, recorder):
     store = Store(tmp_path / "index")

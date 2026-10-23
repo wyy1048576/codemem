@@ -7,6 +7,8 @@ from conftest import REMOTE_REPO
 from cmeval import repos
 from cmeval import run as run_module
 from cmeval.adapters.fake import FakeRetriever
+from cmeval.files import FileLock, drop_unfinished_line
+from cmeval.metrics.latency import index_costs
 from cmeval.cli import main
 from cmeval.paths import indexes_dir, runs_dir, worktrees_dir
 from cmeval.run import RunError, run
@@ -147,6 +149,109 @@ def test_a_stopped_build_is_built_again(setup, monkeypatch):
     first_task = [(r["system"], r["mode"]) for r in index if r["task_id"] == "acme__demo-2"]
     assert first_task == [("fake-a", "build"), ("fake-b", "update"), ("fake-go", "build")]
     assert not leftover.exists()  # built again from an empty folder
+
+
+def index_rows(run_id):
+    return [json.loads(l) for l in (runs_dir() / run_id / "index.jsonl").read_text().splitlines()]
+
+
+def test_a_stopped_update_is_marked_and_left_out_of_latency(setup, monkeypatch):
+    tasks_file, config_file, _ = setup
+    run(tasks_file, config_file, "r1", limit_per_repo=1, keep_indexes=True)
+    real_update = FakeRetriever.update
+
+    def stopped(self, repo, index_dir):
+        real_update(self, repo, index_dir)
+        raise KeyboardInterrupt  # stopped during the update for the second task
+
+    monkeypatch.setattr(FakeRetriever, "update", stopped)
+    with pytest.raises(KeyboardInterrupt):
+        run(tasks_file, config_file, "r1", keep_indexes=True)
+    monkeypatch.setattr(FakeRetriever, "update", real_update)
+    run(tasks_file, config_file, "r1")
+    rows = [r for r in index_rows("r1") if r["system"] == "fake-a"]
+    assert [(r["task_id"], r["mode"], r.get("resumed", False)) for r in rows] == [
+        ("acme__demo-2", "build", False), ("acme__demo-3", "update", True), ("acme__demo-1", "update", False),
+    ]
+    by_task = {r["task_id"]: r["report"]["seconds"] for r in rows}
+    assert index_costs(rows, "fake-a")["update_seconds_median"] == by_task["acme__demo-1"]  # the resumed row is left out
+
+
+def test_an_update_after_a_finished_build_counts_once(setup, monkeypatch):
+    tasks_file, config_file, _ = setup
+    real_search = FakeRetriever.search
+
+    def stopped(self, query, k):
+        if query == "which version":
+            raise KeyboardInterrupt  # stopped after the build row, before the first timed search
+        return real_search(self, query, k)
+
+    monkeypatch.setattr(FakeRetriever, "search", stopped)
+    with pytest.raises(KeyboardInterrupt):
+        run(tasks_file, config_file, "r1")
+    monkeypatch.setattr(FakeRetriever, "search", real_search)
+    run(tasks_file, config_file, "r1")
+    rows = [r for r in index_rows("r1") if r["system"] == "fake-a"]
+    assert [(r["task_id"], r["mode"]) for r in rows][:2] == [("acme__demo-2", "build"), ("acme__demo-2", "update")]
+    updates = sorted(r["report"]["seconds"] for r in rows if r["task_id"] != "acme__demo-2")
+    costs = index_costs(rows, "fake-a")
+    assert costs["build_seconds_mean"] == rows[0]["report"]["seconds"]
+    assert costs["update_seconds_median"] == pytest.approx(sum(updates) / 2)  # the repeat for demo-2 is left out
+
+
+def test_a_second_process_on_the_same_run_id_is_refused(setup):
+    tasks_file, config_file, _ = setup
+    (runs_dir() / "r1").mkdir(parents=True)
+    other = FileLock(runs_dir() / "r1" / "run.lock")
+    assert other.acquire()  # another process works on r1
+    with pytest.raises(RunError, match="in use by another cmeval process"):
+        run(tasks_file, config_file, "r1")
+    other.release()
+    assert run(tasks_file, config_file, "r1").searched == 9
+
+
+def test_resume_with_other_code_is_refused(setup, monkeypatch):
+    tasks_file, config_file, _ = setup
+    run(tasks_file, config_file, "r1", limit_per_repo=1)
+    real_git = run_module._eval_git
+    monkeypatch.setattr(run_module, "_eval_git", lambda: {"sha": "0" * 40, "dirty": False})
+    with pytest.raises(RunError, match="other inputs \\(cmeval code\\)"):
+        run(tasks_file, config_file, "r1")
+    monkeypatch.setattr(run_module, "_eval_git", real_git)
+    real_key = FakeRetriever.index_key
+    monkeypatch.setattr(FakeRetriever, "index_key", lambda self: "other-device")
+    with pytest.raises(RunError, match="system code or index settings"):
+        run(tasks_file, config_file, "r1")
+    monkeypatch.setattr(FakeRetriever, "index_key", real_key)
+    run(tasks_file, config_file, "r1")
+    meta = json.loads((runs_dir() / "r1" / "meta.json").read_text())
+    assert len(meta["sessions"]) == 2 and all("machine" in s and "cmeval_git" in s for s in meta["sessions"])
+
+
+def test_a_cleanup_error_keeps_the_real_error(setup, monkeypatch):
+    tasks_file, config_file, _ = setup
+
+    def cannot_remove(worktree):
+        raise repos.RepoError("worktree is locked")
+
+    monkeypatch.setattr(run_module.repos, "remove_worktree", cannot_remove)
+    monkeypatch.setattr(run_module.repos, "head", lambda worktree: "0" * 40)
+    with pytest.raises(RunError, match="worktree is at 0000"):
+        run(tasks_file, config_file, "r1")
+    assert "worktree is at" in json.loads((runs_dir() / "r1" / "meta.json").read_text())["error"]
+
+
+def test_drop_unfinished_line(tmp_path):
+    path = tmp_path / "a.jsonl"
+    path.write_bytes(b"")
+    assert not drop_unfinished_line(path)
+    path.write_bytes(b'{"a": 1}\n')
+    assert not drop_unfinished_line(path) and path.read_bytes() == b'{"a": 1}\n'
+    path.write_bytes(b'{"a": 1}\n{"b"')
+    assert drop_unfinished_line(path) and path.read_bytes() == b'{"a": 1}\n'
+    path.write_bytes(b'{"b"')
+    assert drop_unfinished_line(path) and path.read_bytes() == b""
+    assert not drop_unfinished_line(tmp_path / "missing.jsonl")
 
 
 def test_resume_with_other_inputs_is_refused(setup):

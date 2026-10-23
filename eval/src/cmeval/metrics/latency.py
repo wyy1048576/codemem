@@ -24,16 +24,18 @@ def search_latency(search_ms: list[float]) -> dict[str, float | None]:
 def index_costs(index_rows: list[dict], system: str) -> dict[str, float | None]:
     """Index cost of the system that does the real work for a shared group (its own rows only).
 
-    A resumed run can write a second row for the same task. Only the first one counts: it did
-    the real work, and the second one found nothing left to do.
+    A resumed run can write more than one row for the same task (for example a build, then an
+    update that finds nothing left to do). Only the first one counts: it did the real work.
+    Rows marked "resumed" finished an update that a stopped run had started, so they show only
+    part of the work and are left out.
     files_failed_max is the largest count in any one report: a file that keeps failing would be
     counted again at every update if the counts were added up.
     """
     first: dict[tuple, dict] = {}
     for position, r in enumerate(index_rows):
-        if r["system"] == system:
+        if r["system"] == system and not r.get("resumed"):
             # Rows without a task id cannot be matched, so they are never merged.
-            key = (r["task_id"], r["mode"]) if r.get("task_id") else ("row", position)
+            key = (r["task_id"],) if r.get("task_id") else ("row", position)
             first.setdefault(key, r)
     rows = list(first.values())
     builds = [r["report"]["seconds"] for r in rows if r["mode"] == "build"]

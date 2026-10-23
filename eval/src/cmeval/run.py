@@ -28,7 +28,7 @@ from typing import Any
 
 from . import __version__, repos
 from .files import append_jsonl as _append_jsonl
-from .files import drop_unfinished_line, read_jsonl
+from .files import FileLock, drop_unfinished_line, read_jsonl
 from .files import now as _now
 from .files import sha256_file as _sha256
 from .files import write_json as _write_json
@@ -41,6 +41,9 @@ _RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 WARMUP_QUERY = "warm up"
 # Settings that must match when a run is resumed. Filters (repos, limit) may change between runs.
 RESUME_KEYS = ("tasks_sha256", "config_sha256", "split", "index_mode", "k")
+# Marker files in each index folder; see _index_group.
+BUILT_MARK = "cmeval-built"
+STARTED_MARK = "cmeval-started"
 
 
 class RunError(RuntimeError):
@@ -116,13 +119,16 @@ def run(
     if limit_per_repo is not None:
         ordered = {repo: group[:limit_per_repo] for repo, group in ordered.items()}
 
-    # ---- run folder and meta (resume only with the same inputs)
+    # ---- run folder and meta (resume only with the same inputs and the same code)
     run_dir = runs_dir() / run_id
     meta_path = run_dir / "meta.json"
+    session = {"started": _now(), "cmeval_git": _eval_git(),
+               "machine": {"platform": platform.platform(), "processor": platform.processor() or platform.machine(),
+                           "python": sys.version.split()[0]}}
     meta = {
         "run_id": run_id,
         "cmeval_version": __version__,
-        "cmeval_git": _eval_git(),
+        "cmeval_git": session["cmeval_git"],
         "tasks_file": str(tasks_file.resolve()),
         "tasks_sha256": _sha256(tasks_file),
         "config_file": str(config_file.resolve()),
@@ -136,22 +142,55 @@ def run(
              "index_key": s.index_key(), "describe": s.describe()}
             for spec, s in zip(specs, systems)
         ],
-        "machine": {"platform": platform.platform(), "processor": platform.processor() or platform.machine(),
-                    "python": sys.version.split()[0]},
+        "machine": session["machine"],
     }
-    if meta_path.exists():
-        old = json.loads(meta_path.read_text(encoding="utf-8"))
-        changed = [key for key in RESUME_KEYS if old.get(key) != meta[key]]
-        if changed:
-            raise RunError(f"run id {run_id!r} exists with other inputs ({', '.join(changed)}); use a new run id")
-        meta["started"] = old.get("started")
-        meta["resumed"] = old.get("resumed", 0) + 1
-    else:
-        meta["started"] = _now()
     run_dir.mkdir(parents=True, exist_ok=True)
-    meta.update(status="running", filters={"repos": repo_filter, "limit_per_repo": limit_per_repo})
-    _write_json(meta_path, meta)
+    lock = FileLock(run_dir / "run.lock")
+    if not lock.acquire():
+        raise RunError(f"run id {run_id!r} is in use by another cmeval process; wait for it to end, or stop it first")
+    try:
+        if meta_path.exists():
+            old = json.loads(meta_path.read_text(encoding="utf-8"))
+            changed = [key for key in RESUME_KEYS if old.get(key) != meta[key]]
+            changed += [part for part, value in _code(meta).items() if _code(old)[part] != value]
+            if changed:
+                raise RunError(f"run id {run_id!r} exists with other inputs ({', '.join(changed)}); use a new run id")
+            if meta["cmeval_git"].get("dirty"):
+                progress("warning: cmeval has uncommitted changes, so this resume cannot check that the code is the same")
+            meta["started"] = old.get("started")
+            meta["resumed"] = old.get("resumed", 0) + 1
+            meta["sessions"] = old.get("sessions", [])
+        else:
+            meta["started"] = session["started"]
+            meta["sessions"] = []
+        meta["sessions"].append(session)  # each start of this run: when, which code, which machine
+        meta.update(status="running", filters={"repos": repo_filter, "limit_per_repo": limit_per_repo})
+        _write_json(meta_path, meta)
+        return _run_tasks(run_id, run_dir, meta, systems, ordered, index_mode, k, keep_indexes, progress, start)
+    finally:
+        lock.release()
 
+
+def _code(meta: dict) -> dict[str, Any]:
+    """The code of a run: cmeval's commit and, for each system, its index settings and commit.
+
+    A resume must use the same code. Otherwise the old and new tasks of one run would come
+    from different code, and meta.json could not show it. The index key also holds the
+    device, so a resume on another kind of GPU is refused too.
+    """
+    git = meta.get("cmeval_git") or {}
+    return {
+        "cmeval code": [git.get("sha"), git.get("dirty")],
+        "system code or index settings": [
+            [s.get("name"), s.get("index_key"), (s.get("describe") or {}).get("codemem_git")]
+            for s in meta.get("systems", [])
+        ],
+    }
+
+
+def _run_tasks(run_id: str, run_dir: Path, meta: dict, systems: list[Retriever], ordered: dict[str, list[Task]],
+               index_mode: str, k: int, keep_indexes: bool, progress: Callable[[str], None], start: float) -> RunSummary:
+    meta_path = run_dir / "meta.json"
     summary = RunSummary(run_dir=run_dir, tasks=sum(len(g) for g in ordered.values()), systems=len(systems))
     out_files = {s.name: run_dir / f"{s.name}.jsonl" for s in systems}
     index_file = run_dir / "index.jsonl"
@@ -159,10 +198,6 @@ def run(
         if drop_unfinished_line(path):
             progress(f"{path.name}: dropped an unfinished last line from a stopped run")
     done = {s.name: {line["task_id"] for line in _read_run_file(out_files[s.name])} for s in systems}
-    # (repo, index_key) pairs with a finished build or update. An index folder without one holds
-    # a build that was stopped: it is deleted and built again from empty, so the results and the
-    # build time are the same as in a run that never stopped.
-    indexed = {(r["repo"], r["index_key"]) for r in _read_run_file(index_file)}
     groups: dict[str, list[Retriever]] = {}
     for s in systems:
         groups.setdefault(s.index_key(), []).append(s)
@@ -178,6 +213,7 @@ def run(
             # Always a new worktree: one left by a stopped run may be half checked out.
             repos.discard_live(repo, f"run-{run_id}")
             worktree = repos.checkout(repo, todo[0].base_commit, name=f"run-{run_id}")
+            finished = False
             try:
                 for task_number, task in enumerate(todo, start=1):
                     progress(f"[repo {repo_number}/{len(ordered)}] {repo}  task {task_number}/{len(todo)}  {task.id}")
@@ -188,18 +224,7 @@ def run(
                         if all(task.id in done[m.name] for m in members):
                             continue  # resume: this group already searched this task
                         index_dir = index_root / repos.slug(repo) / key
-                        if index_dir.exists() and (repo, key) not in indexed:
-                            shutil.rmtree(index_dir)  # no service has it open yet: this is a new process
-                        for position, system in enumerate(members):
-                            fresh = position == 0 and (index_mode == "rebuild" or not index_dir.exists())
-                            index_dir.mkdir(parents=True, exist_ok=True)
-                            report = (system.build if fresh else system.update)(worktree, index_dir)
-                            summary.index_calls += 1
-                            _append_jsonl(index_file, {
-                                "repo": repo, "commit": task.base_commit, "task_id": task.id, "index_key": key,
-                                "system": system.name, "mode": "build" if fresh else "update", "report": report.to_dict(),
-                            })
-                            indexed.add((repo, key))
+                        _index_group(index_dir, members, worktree, task, repo, key, index_mode, index_file, summary)
                     for system in systems:
                         if task.id in done[system.name]:
                             continue
@@ -220,10 +245,17 @@ def run(
                         done[system.name].add(task.id)
                         summary.searched += 1
                     summary.by_repo[repo] = summary.by_repo.get(repo, 0) + 1
+                finished = True
             finally:
                 for system in systems:
                     system.close()  # frees in-memory state for this repo; index folders stay for resume
-                repos.remove_worktree(worktree)
+                try:
+                    repos.remove_worktree(worktree)
+                except repos.RepoError as exc:
+                    if finished:
+                        raise
+                    # The run already failed: keep that error. The next run discards the worktree.
+                    progress(f"warning: could not remove {worktree}: {exc}")
     except BaseException as exc:
         meta.update(status="failed", error=f"{type(exc).__name__}: {exc}", ended=_now())
         _write_json(meta_path, meta)
@@ -235,3 +267,39 @@ def run(
     meta.update(status="done", ended=_now(), error=None, searched=summary.searched, skipped=summary.skipped)
     _write_json(meta_path, meta)
     return summary
+
+
+def _index_group(index_dir: Path, members: list[Retriever], worktree: Path, task: Task, repo: str, key: str,
+                 index_mode: str, index_file: Path, summary: RunSummary) -> None:
+    """Build or update the index of one group of systems for one task, and write index.jsonl.
+
+    Two marker files in the index folder tell a resumed run what a stopped run left there:
+    - BUILT_MARK is written after a finished build. A folder without it holds a stopped build.
+      It is deleted and built again from empty, so the results and the build time are the same
+      as in a run that never stopped.
+    - STARTED_MARK is written before indexing and removed after it. A folder that still has it
+      holds a stopped update. The update is finished now, but its index.jsonl row would show
+      only part of the work, so it is marked "resumed" and the latency metrics leave it out.
+    """
+    resumed = False
+    if index_dir.exists():
+        if not (index_dir / BUILT_MARK).exists():
+            shutil.rmtree(index_dir)  # no service has it open yet: a stopped build is from another process
+        elif (index_dir / STARTED_MARK).exists():
+            resumed = True
+    index_dir.mkdir(parents=True, exist_ok=True)
+    (index_dir / STARTED_MARK).touch()
+    for position, system in enumerate(members):
+        fresh = position == 0 and (index_mode == "rebuild" or not (index_dir / BUILT_MARK).exists())
+        if fresh:
+            (index_dir / BUILT_MARK).unlink(missing_ok=True)  # a rebuild that stops is a stopped build
+        report = (system.build if fresh else system.update)(worktree, index_dir)
+        if fresh:
+            (index_dir / BUILT_MARK).touch()
+        summary.index_calls += 1
+        row = {"repo": repo, "commit": task.base_commit, "task_id": task.id, "index_key": key,
+               "system": system.name, "mode": "build" if fresh else "update", "report": report.to_dict()}
+        if resumed and position == 0 and not fresh:
+            row["resumed"] = True
+        _append_jsonl(index_file, row)
+    (index_dir / STARTED_MARK).unlink()

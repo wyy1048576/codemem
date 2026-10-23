@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,14 +40,63 @@ def drop_unfinished_line(path: Path) -> bool:
     append_jsonl writes each line and its newline in one write, so a line without a newline
     was never finished. The runner does that task again.
     """
-    if not path.exists():
-        return False
-    data = path.read_bytes()
-    if not data or data.endswith(b"\n"):
+    if not path.exists() or path.stat().st_size == 0:
         return False
     with path.open("r+b") as f:
+        f.seek(-1, os.SEEK_END)
+        if f.read(1) == b"\n":
+            return False  # the normal case: only the last byte is read
+        data = path.read_bytes()
         f.truncate(data.rfind(b"\n") + 1)
     return True
+
+
+class FileLock:
+    """An exclusive lock on a file, so two processes never work on one run at the same time.
+
+    The OS releases the lock when the process ends, also after kill -9 or a crash, so a stopped
+    run can always be resumed.
+    """
+
+    def __init__(self, path: Path):
+        self.path = Path(path)
+        self._fh = None
+
+    def acquire(self) -> bool:
+        """True if this process now holds the lock; False if another process holds it."""
+        fh = open(self.path, "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fh.close()
+            return False
+        self._fh = fh
+        return True
+
+    def release(self) -> None:
+        if self._fh is None:
+            return
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                self._fh.seek(0)
+                msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(self._fh.fileno(), fcntl.LOCK_UN)
+        finally:
+            self._fh.close()
+            self._fh = None
 
 
 def read_jsonl(path: Path) -> list[dict]:

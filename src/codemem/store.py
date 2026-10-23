@@ -19,7 +19,7 @@ import sqlite3
 import threading
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -71,8 +71,6 @@ CREATE TABLE IF NOT EXISTS embeddings (
     PRIMARY KEY (chunk_id, vec_type)
 );
 """
-
-VECTOR_TIE_MARGIN = 50  # extra vector hits fetched, so equal scores at the cut can be ordered
 
 _CHUNK_COLS = (
     "chunk_id, key, path, qualname, name, kind, class_name, start_line, end_line, "
@@ -164,6 +162,19 @@ class FaissVectorStore(VectorStore):
 
 
 # --------------------------------------------------------------------------- lock
+
+
+def _fetch_whole_ties(fetch: Callable[[int], list[tuple[int, float]]], n: int) -> list[tuple[int, float]]:
+    """fetch(size) gives the best `size` (id, score) pairs. Fetch more until the group of equal
+    scores at position n is complete, so the order of a tie never depends on where the cut is."""
+    if n <= 0:
+        return []
+    size = n + 1
+    while True:
+        hits = fetch(size)
+        if len(hits) < size or hits[-1][1] != hits[n - 1][1]:
+            return hits
+        size *= 2
 
 
 class IndexLock:
@@ -461,17 +472,17 @@ class Store:
     def bm25_search(
         self, match: str, n: int, weights: Sequence[float], path_prefix: str | None = None
     ) -> list[int]:
-        sql = "SELECT f.rowid FROM fts f JOIN chunks c ON c.chunk_id = f.rowid"
-        params: list[Any] = [match]
+        w = [float(x) for x in weights]
+        sql = "SELECT f.rowid, bm25(fts, ?, ?, ?) AS s FROM fts f"
+        params: list[Any] = [*w, match]
         where = "fts MATCH ?"
         if path_prefix:
+            sql += " JOIN chunks c ON c.chunk_id = f.rowid"
             where += " AND c.path LIKE ? ESCAPE '!'"
             params.append(_like_prefix(path_prefix))
-        w = [float(x) for x in weights]
-        # Equal scores (copies of the same code) are ordered by location, not by rowid:
-        # rowids depend on the history of the index.
-        sql += f" WHERE {where} ORDER BY bm25(fts, ?, ?, ?), c.path, c.start_line, c.key LIMIT ?"
-        return [r[0] for r in self.conn.execute(sql, (*params, *w, n))]
+        sql += f" WHERE {where} ORDER BY s LIMIT ?"
+        hits = _fetch_whole_ties(lambda size: [(r[0], r[1]) for r in self.conn.execute(sql, (*params, size))], n)
+        return [i for i, _ in self._order_ties(hits, n, higher_is_better=False)]
 
     # ---- embeddings / vectors
     def _vec_path(self, vec_type: str) -> Path:
@@ -561,13 +572,35 @@ class Store:
     ) -> list[tuple[int, float]]:
         with self._vec_lock:
             vs = self.vectors(vec_type)
-            hits = vs.search(query, n + VECTOR_TIE_MARGIN, allowed_ids) if vs is not None else []
-        # FAISS gives equal scores (copies of the same code) in insertion order, which depends
-        # on the history of the index. So equal scores are ordered by location. The extra hits
-        # let a group of equal scores at the cut be ordered as a whole.
-        place = {c.chunk_id: (c.path, c.start_line, c.key) for c in self.get_chunks([i for i, _ in hits]).values()}
-        hits.sort(key=lambda h: (-h[1], h[0] not in place, place.get(h[0], ("", 0, ""))))
-        return hits[:n]
+            if vs is None:
+                return []
+            hits = _fetch_whole_ties(lambda size: vs.search(query, size, allowed_ids), n)
+        return self._order_ties(hits, n, higher_is_better=True)
+
+    def _order_ties(self, hits: list[tuple[int, float]], n: int, higher_is_better: bool) -> list[tuple[int, float]]:
+        """The first n hits, with equal scores ordered by location (path, start line, key).
+
+        Equal scores come from copies of the same code. SQLite and FAISS give them in rowid or
+        insertion order, and both depend on the history of the index. Locations are read only
+        when there are equal scores, so a search without ties costs nothing extra.
+        """
+        tied: set[int] = set()
+        for (a, score_a), (b, score_b) in zip(hits, hits[1:]):
+            if score_a == score_b:
+                tied.update((a, b))
+        if not tied:
+            return hits[:n]
+        place: dict[int, tuple[str, int, str]] = {}
+        ids = list(tied)
+        for start in range(0, len(ids), 500):
+            batch = ids[start : start + 500]
+            marks = ",".join("?" * len(batch))
+            for r in self.conn.execute(f"SELECT chunk_id, path, start_line, key FROM chunks WHERE chunk_id IN ({marks})", batch):
+                place[r[0]] = (r[1], r[2], r[3])
+        sign = -1 if higher_is_better else 1
+        # A hit without a chunk row (deleted by a writer) goes last in its group.
+        ordered = sorted(hits, key=lambda h: (sign * h[1], h[0] not in place, place.get(h[0], ("", 0, ""))))
+        return ordered[:n]
 
     def save_vectors(self) -> None:
         """Persist dirty FAISS indexes + sidecars. Call after committing embedding rows."""
