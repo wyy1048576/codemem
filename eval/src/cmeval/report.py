@@ -255,7 +255,7 @@ def _warnings(meta: dict, score_meta: dict, summary: list[dict], task_ids: list[
     for row in summary:
         if row["metric"] == "files_failed_max" and row["mean"] and float(row["mean"]) > 0:
             out.append(f"{row['system']}: up to {float(row['mean']):.0f} files could not be indexed")
-    sessions = meta.get("sessions") or []
+    sessions = [] if meta.get("merged_from") else meta.get("sessions") or []  # a merge lists its parts instead
     kinds = {(json.dumps(s.get("cmeval_git"), sort_keys=True), (s.get("machine") or {}).get("platform")) for s in sessions}
     if len(kinds) > 1:
         out.append(f"the run was made in {len(sessions)} sessions with different code or machines: "
@@ -289,6 +289,10 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
         f"taken off each count; scored {score_meta.get('scored')}",
         f"- Intervals: 95% percentile bootstrap, {kw['resamples']:,} resamples, seed {kw['seed']}",
     ]
+    for part in meta.get("merged_from") or []:
+        lines.append(f"- Merged part: {', '.join(part['systems'])} from run `{part['run_id']}` "
+                     f"(cmeval {((part.get('cmeval_git') or {}).get('sha') or '')[:12]}, "
+                     f"{(part.get('machine') or {}).get('platform')}, ended {part.get('ended')})")
     if meta.get("split") == "dev":
         lines.append("- Dev split: these numbers guide development. p-values here are guidance only.")
     if warnings:
@@ -400,6 +404,8 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
             cells.append("-" if value is None else f"{value:,.1f}")
         lines.append(f"| {name} | " + " | ".join(cells) + " |")
     lines.append("\nIndex MB = 10^6 bytes. Systems with the same index settings share one index.")
+    if meta.get("merged_from"):
+        lines.append("This run is merged from separate runs, so search times of different parts come from different sessions.")
 
     # ---- task counts
     lines += ["", "## Task counts", "", f"{len(task_ids)} tasks scored. Tasks left out at each level:", "",

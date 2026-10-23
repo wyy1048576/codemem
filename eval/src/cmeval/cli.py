@@ -156,6 +156,24 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_merge(args) -> int:
+    import json
+
+    from .merge import MergeError, merge
+    from .score import ScoreError
+
+    try:
+        new_dir = merge(args.base, args.extra, args.run_id, systems=args.system)
+    except (MergeError, ScoreError) as exc:
+        print(f"merge {args.base} {args.extra}: {exc}", file=sys.stderr)
+        return 1
+    meta = json.loads((new_dir / "meta.json").read_text(encoding="utf-8"))
+    print(f"run {args.run_id}: {new_dir}")
+    print(f"  systems: {', '.join(s['name'] for s in meta['systems'])}")
+    print(f"  next: cmeval score {args.run_id}")
+    return 0
+
+
 def cmd_compare(args) -> int:
     from .compare import CompareError, compare
     from .repos import RepoError
@@ -226,6 +244,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cutoff", default="2026-07-01", help="issue date that splits tasks into before and after (default 2026-07-01)")
     p.add_argument("--tasks", type=Path, default=None, help="tasks file to use instead of the path in meta.json (same sha256)")
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("merge", help="copy systems of one run into a copy of another run, for one report")
+    p.add_argument("base", help="run id or folder whose systems all stay")
+    p.add_argument("extra", help="run id or folder with the systems to add")
+    p.add_argument("--run-id", required=True, help="name of the new merged run folder")
+    p.add_argument("--system", action="append", default=None,
+                   help="system of EXTRA to add (repeatable; default: every system not in BASE)")
+    p.set_defaults(func=cmd_merge)
 
     p = sub.add_parser("compare", help="update vs. rebuild check: compare two scored runs of the same tasks")
     p.add_argument("run_a", help="run id or folder (usually the update run; the report is written here)")
