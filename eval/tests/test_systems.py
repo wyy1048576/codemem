@@ -62,3 +62,11 @@ def test_shipped_smoke_config_loads():
     systems = [make_system(s) for s in specs]
     assert [s.granularity for s in systems] == ["line", "file"]
     assert systems[0].index_key() == systems[1].index_key()  # same index, different reporting
+
+
+def test_any_adapter_creation_error_is_a_config_error(capsys):
+    with pytest.raises(SystemsError, match="cannot create adapter 'grep'.*ripgrep"):
+        make_system(SystemSpec("g", "grep", {"rg": "/no/such/rg"}))
+    pytest.importorskip("codemem")
+    with pytest.raises(SystemsError, match="cannot create adapter 'codemem'"):
+        make_system(SystemSpec("c", "codemem", {"config": {"device": "gpu"}}))

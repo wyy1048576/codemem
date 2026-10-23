@@ -9,11 +9,15 @@ Three facts about codemem shape this adapter:
   not see each other's updates. So systems with the same index_key share one service.
 - codemem.search.search takes the config for each call. So systems that share a service can
   still use their own search-time settings (signals, RRF and BM25 weights).
+- codemem.search.search drops any requested signal that has no vectors in the index. The adapter
+  checks signals when it is created and after each search, so an ablation never runs as a
+  different system under its name.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import logging
 import subprocess
 import time
 from pathlib import Path
@@ -27,6 +31,8 @@ from codemem.search import SearchResponse, search
 from codemem.service import CodememService
 
 from ..retriever import Hit, IndexReport, RetrieverError, stable_hash
+
+log = logging.getLogger(__name__)
 
 # Settings that change the index. Everything else in codemem's Config is used at search time.
 INDEX_TIME_FIELDS = (
@@ -64,7 +70,13 @@ class CodememRetriever:
         self.signals = list(signals) if signals is not None else None  # None: every available signal
         # config_from_dict only: no ~/.codemem/config.toml, no .codemem.toml, no env vars.
         self.config = config_from_dict(config or {})
-        self._config_raw = config or {}
+        if self.signals is not None:
+            usable = {"bm25", *self.config.enabled_vec_types()}
+            unknown = [s for s in self.signals if s not in usable]
+            if unknown or not self.signals:
+                raise RetrieverError(
+                    f"{name}: signals {unknown or self.signals} are not usable; choose from {sorted(usable)}"
+                )
         self._index_dir: Path | None = None
         self._key = self.index_key()
 
@@ -97,19 +109,23 @@ class CodememRetriever:
 
     def _service(self, repo: Path, index_dir: Path) -> CodememService:
         index_dir = Path(index_dir).resolve()
+        repo = Path(repo).resolve()
         entry = _SHARED.get(index_dir)
-        if entry is None:
-            service = CodememService(Path(repo), index_dir=index_dir, config=self.config)
-            entry = _SHARED[index_dir] = {"service": service, "key": self._key, "users": 0}
-        elif entry["key"] != self._key:
+        # Check first, then attach: a refused system must not stay tied to another index.
+        if entry is not None and entry["key"] != self._key:
             raise RetrieverError(f"{self.name}: {index_dir} already holds an index with other index-time settings")
+        if entry is not None and entry["service"].repo_root != repo:
+            raise RetrieverError(f"{self.name}: {index_dir} indexes {entry['service'].repo_root}, not {repo}")
+        if entry is None:
+            service = CodememService(repo, index_dir=index_dir, config=self.config)
+            # CodememService walks up to the nearest .git; pin it to the folder the runner gives.
+            service.repo_root = repo
+            entry = _SHARED[index_dir] = {"service": service, "key": self._key, "users": 0}
         if self._index_dir != index_dir:
             if self._index_dir is not None:
                 self._release()
             entry["users"] += 1
             self._index_dir = index_dir
-        if entry["service"].repo_root != Path(repo).resolve():
-            raise RetrieverError(f"{self.name}: {index_dir} indexes {entry['service'].repo_root}, not {repo}")
         return entry["service"]
 
     def _index(self, repo: Path, index_dir: Path, full: bool) -> IndexReport:
@@ -119,12 +135,16 @@ class CodememRetriever:
         seconds = time.perf_counter() - start
         if service.last_error or stats is None:
             raise RetrieverError(f"{self.name}: codemem indexing failed: {service.last_error or 'update did not run'}")
+        if stats.errors:
+            # Files codemem could not chunk are missing from the index. Not fatal for a whole run,
+            # but never hidden: the count goes into the index report and the log.
+            log.warning("%s: %d files could not be indexed, for example %s", self.name, len(stats.errors), stats.errors[0])
         return IndexReport(
             seconds=seconds,
             bytes_on_disk=_dir_size(self._index_dir),
             items=service.store.counts()["chunks"],
             items_reembedded=sum(stats.embedded.values()),
-            extra=stats.to_dict(),
+            extra={**stats.to_dict(), "files_failed": len(stats.errors)},
         )
 
     def build(self, repo: Path, index_dir: Path) -> IndexReport:
@@ -140,6 +160,9 @@ class CodememRetriever:
             raise RetrieverError(f"{self.name}: search before build")
         service = _SHARED[self._index_dir]["service"]
         resp = search(service.store, query, self.config, k=k, signals=self.signals, debug=True)
+        if self.signals is not None and list(resp.signals) != self.signals:
+            missing = [s for s in self.signals if s not in resp.signals]
+            raise RetrieverError(f"{self.name}: the index has no vectors for signals {missing}, so this system cannot run as configured")
         hits = []
         for rank, card in enumerate(resp.results, start=1):
             # The card exactly as the MCP tool shows it to an agent (no debug ranks).

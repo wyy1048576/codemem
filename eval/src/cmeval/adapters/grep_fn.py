@@ -7,14 +7,13 @@ ranks functions by keyword matches. So grep can be graded at file, class, and fu
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 from typing import Any
 
 from ..labels import LANGUAGES, Definition, find_definitions, innermost
 from ..patches import classify_path
 from ..retriever import Hit
-from .grep import GrepRetriever, format_lines, rg_count, rg_lines
+from .grep import GrepRetriever, format_lines, rank_files, rg_count, rg_lines
 
 
 class GrepFnRetriever(GrepRetriever):
@@ -23,7 +22,8 @@ class GrepFnRetriever(GrepRetriever):
     def __init__(self, name: str = "grep-fn", top_files: int = 50, **kwargs):
         super().__init__(name=name, **kwargs)
         self.top_files = top_files
-        self._defs_cache: dict[tuple[str, str], list[Definition]] = {}
+        # (path, mtime_ns, size) -> functions. Cleared on build and update, so it never grows past one commit.
+        self._defs_cache: dict[tuple[str, int, int], list[Definition]] = {}
 
     def describe(self) -> dict[str, Any]:
         return {**super().describe(), "adapter": "grep_fn", "top_files": self.top_files, "languages": sorted(LANGUAGES)}
@@ -33,19 +33,27 @@ class GrepFnRetriever(GrepRetriever):
         language = classify_path(path)[1]
         if language not in LANGUAGES:
             return None
-        text = (self.repo / path).read_text(encoding="utf-8", errors="replace")
-        key = (path, hashlib.sha256(text.encode("utf-8")).hexdigest())
+        file = self.repo / path
+        stat = file.stat()
+        key = (path, stat.st_mtime_ns, stat.st_size)
         if key not in self._defs_cache:
+            # Bytes, not text mode: text mode turns a lone "\r" into a line break, and line numbers
+            # would drift from rg's, which count "\n" only.
+            text = file.read_bytes().decode("utf-8", "replace")
             defs, _ = find_definitions(text, language)  # a partial parse still finds most functions
             self._defs_cache[key] = [d for d in defs if d.kind == "function"]
         return self._defs_cache[key]
+
+    def build(self, repo: Path, index_dir: Path):
+        self._defs_cache.clear()
+        return super().build(repo, index_dir)
 
     def search(self, query: str, k: int) -> list[Hit]:
         keywords = self._keywords(query)
         if not keywords:
             return []
         counts = rg_count(self.rg, self.repo, keywords)
-        top = [path for path, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[: self.top_files]]
+        top = [path for path, _ in rank_files(counts)[: self.top_files]]
         lines = rg_lines(self.rg, self.repo, keywords, top)
 
         scored = []

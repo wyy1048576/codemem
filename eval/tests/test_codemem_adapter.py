@@ -127,3 +127,65 @@ def test_search_before_build_and_describe():
     assert info["device"] in {"cpu", "mps", "cuda", "xpu"}
     assert info["config"]["vectors"]["code"]["model"] == "fake"
     assert info["index_key"] == cm.index_key()
+
+
+# ---- review fixes
+
+
+def test_unusable_signals_are_refused_when_the_system_is_made():
+    with pytest.raises(RetrieverError, match="not usable"):
+        CodememRetriever(signals=["bm25", "cod"], config=FAKE)  # typo
+    with pytest.raises(RetrieverError, match="not usable"):
+        CodememRetriever(signals=["bm25", "usage"], config={**FAKE, "vectors": {**FAKE["vectors"], "usage": {"enabled": False}}})
+
+
+def test_a_signal_without_vectors_is_an_error_not_a_quiet_fallback(tmp_path):
+    root = tmp_path / "lonely"
+    root.mkdir()
+    (root / "solo.py").write_text("def nobody_calls_me():\n    pass\n")  # no callers, so no usage vectors
+    cm = CodememRetriever(signals=["bm25", "code", "usage"], config=FAKE)
+    cm.build(root, tmp_path / "idx")
+    with pytest.raises(RetrieverError, match=r"no vectors for signals \['usage'\]"):
+        cm.search("nobody calls me", k=5)
+
+
+def test_files_that_fail_to_index_are_counted(repo, tmp_path, monkeypatch):
+    import codemem.indexer
+
+    real = codemem.indexer.chunk_source
+
+    def flaky(source, rel, *args, **kwargs):
+        if rel.endswith("test_sessions.py"):
+            raise ValueError("cannot parse")
+        return real(source, rel, *args, **kwargs)
+
+    monkeypatch.setattr(codemem.indexer, "chunk_source", flaky)
+    report = CodememRetriever(config=FAKE).build(repo, tmp_path / "idx")
+    assert report.extra["files_failed"] == 1 and "test_sessions.py" in report.extra["errors"][0]
+
+
+def test_snapshot_without_git_inside_another_git_tree(tmp_path):
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", str(tmp_path / "outer")], check=True)
+    inner = tmp_path / "outer" / "snapshots" / "app"
+    inner.mkdir(parents=True)
+    (inner / "app.py").write_text("def revoke_session():\n    pass\n")
+    cm = CodememRetriever(config=FAKE)
+    cm.build(inner, tmp_path / "idx")
+    assert [h.path for h in cm.search("revoke session", 5)][0] == "app.py"  # relative to inner, not outer
+
+
+def test_refused_build_does_not_attach_to_the_other_index(repo, tmp_path):
+    other_repo = tmp_path / "other"
+    other_repo.mkdir()
+    (other_repo / "x.py").write_text("def x():\n    pass\n")
+    a = CodememRetriever(name="a", config=FAKE)
+    a.build(repo, tmp_path / "idx")
+    b = CodememRetriever(name="b", config=FAKE)
+    with pytest.raises(RetrieverError, match="indexes"):
+        b.build(other_repo, tmp_path / "idx")
+    with pytest.raises(RetrieverError, match="search before build"):
+        b.search("revoke session", 5)
+    a.close()
+    assert adapter._SHARED == {}  # b never became a user

@@ -43,3 +43,7 @@ def test_lowercase_no_duplicates_and_cap():
 def test_no_keywords():
     assert extract_keywords("it is not ok") == []
     assert extract_keywords("") == []
+
+
+def test_backtick_call_with_arguments_gives_the_name():
+    assert extract_keywords("calling `make_user(name)` fails")[0] == "make_user"

@@ -88,6 +88,8 @@ def make_system(spec: SystemSpec) -> Retriever:
         system = factory(name=spec.name, **spec.params)
     except TypeError as exc:
         raise SystemsError(f"system {spec.name!r}: bad settings for adapter {spec.adapter!r}: {exc}") from None
+    except Exception as exc:  # for example rg missing, or a bad codemem config value
+        raise SystemsError(f"system {spec.name!r}: cannot create adapter {spec.adapter!r}: {exc}") from None
     if not isinstance(system, Retriever):
         raise SystemsError(f"system {spec.name!r}: adapter {spec.adapter!r} does not implement Retriever")
     if system.granularity not in GRANULARITIES:

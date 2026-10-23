@@ -127,3 +127,19 @@ def test_grep_fn_sees_file_changes_after_update(repo):
     grep_fn.update(repo, repo)
     hit = next(h for h in grep_fn.search(QUERY, 50) if h.path == "auth/users.py")
     assert (hit.start_line, hit.end_line) == (3, 4)  # the definitions cache is keyed by content
+
+
+# ---- review fixes
+
+
+def test_grep_fn_line_numbers_match_rg_with_a_lone_carriage_return(tmp_path):
+    # rg counts "\n" only. Line 1 is "# a\r# b"; def f is on line 3, not line 4.
+    (tmp_path / "m.py").write_bytes(b"# a\r# b\n\ndef f():\n    revoke_session()\n")
+    grep_fn = GrepFnRetriever()
+    grep_fn.build(tmp_path, tmp_path)
+    [hit] = grep_fn.search(QUERY, 5)
+    assert (hit.symbol, hit.start_line, hit.end_line) == ("f", 3, 4)
+
+
+def test_rg_can_be_given_by_command_name():
+    assert GrepRetriever(rg="rg").rg == shutil.which("rg")

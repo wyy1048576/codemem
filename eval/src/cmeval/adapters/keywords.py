@@ -73,7 +73,7 @@ def extract_keywords(query: str, max_keywords: int = MAX_KEYWORDS) -> list[str]:
     ordered: list[str] = []
 
     for span in _BACKTICK_RE.findall(query):
-        span = span.strip().rstrip("()").strip(".,:;")
+        span = span.strip().split("(", 1)[0].strip(".,:;")  # `make_user(name)` -> make_user
         if span and " " not in span and len(span) <= 60:
             ordered.append(span)
             if "." in span and len(span.rsplit(".", 1)[-1]) >= 4:

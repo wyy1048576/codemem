@@ -20,9 +20,10 @@ MAX_COLUMNS = 300  # long lines (minified code) are cut in the hit text, as an a
 
 
 def find_rg(path: str | None = None) -> str:
-    rg = path or shutil.which("rg")
-    if not rg or not Path(rg).exists():
-        raise RetrieverError("ripgrep (rg) not found on PATH; install it: brew install ripgrep")
+    """The rg binary: a configured path or command name, else rg on PATH."""
+    rg = shutil.which(path or "rg") or (path if path and Path(path).is_file() else None)
+    if not rg:
+        raise RetrieverError(f"ripgrep ({path or 'rg'}) not found; install it: brew install ripgrep")
     return rg
 
 
@@ -81,6 +82,11 @@ def rg_lines(rg: str, repo: Path, keywords: list[str], paths: list[str], max_cou
     return lines
 
 
+def rank_files(counts: dict[str, int]) -> list[tuple[str, int]]:
+    """Files by match count, highest first; ties by path."""
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
 def format_lines(path: str, lines: list[tuple[int, str]]) -> str:
     """Lines in `rg -n` form, as an agent would see them."""
     return "\n".join(f"{path}:{number}:{content}" for number, content in lines)
@@ -125,7 +131,7 @@ class GrepRetriever:
         if not keywords:
             return []
         counts = rg_count(self.rg, self.repo, keywords)
-        ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:k]
+        ranked = rank_files(counts)[:k]
         lines = rg_lines(self.rg, self.repo, keywords, [path for path, _ in ranked], max_count=self.max_lines)
         hits = [
             Hit(path, score=float(count), text=format_lines(path, lines.get(path, [])), extra={"matches": count})
