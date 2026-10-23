@@ -221,7 +221,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("report", help="write report.md for a scored run: tables, intervals, paired tests")
     p.add_argument("run", help="run id (in CMEVAL_HOME/runs) or path to a run folder")
-    p.add_argument("--baseline", default="grep-fn", help="system for the paired tests (default grep-fn)")
+    p.add_argument("--baseline", default="grep-fn-plus", help="system for the paired tests (default grep-fn-plus)")
     p.add_argument("--split", choices=["dev", "test"], default="dev", help="must match the run's split; test only at milestones")
     p.add_argument("--cutoff", default="2026-07-01", help="issue date that splits tasks into before and after (default 2026-07-01)")
     p.add_argument("--tasks", type=Path, default=None, help="tasks file to use instead of the path in meta.json (same sha256)")

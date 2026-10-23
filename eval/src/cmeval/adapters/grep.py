@@ -54,15 +54,27 @@ def _patterns(keywords: list[str]) -> list[str]:
     return args
 
 
-def rg_count(rg: str, repo: Path, keywords: list[str]) -> dict[str, int]:
+def _type_args(types: list[str] | None) -> list[str]:
+    """rg file-type filters, for example ["py"] for Python files only."""
+    return [arg for t in types or [] for arg in ("--type", t)]
+
+
+def rg_count(rg: str, repo: Path, keywords: list[str], types: list[str] | None = None) -> dict[str, int]:
     """Matches of any keyword in each file of the repo (respects .gitignore; skips hidden and binary files)."""
-    out = _run_rg(rg, repo, ["--count-matches", *_patterns(keywords), "--", "."])
+    out = _run_rg(rg, repo, ["--count-matches", *_type_args(types), *_patterns(keywords), "--", "."])
     counts: dict[str, int] = {}
     for line in out.splitlines():
         path, _, count = line.partition("\0")
         if count.isdigit():
             counts[path.removeprefix("./")] = int(count)
     return counts
+
+
+def rg_files(rg: str, repo: Path, keywords: list[str] | None = None, types: list[str] | None = None) -> set[str]:
+    """Files that contain any of the keywords; with no keywords, every searchable file."""
+    args = ["--files"] if keywords is None else ["--files-with-matches", *_patterns(keywords)]
+    out = _run_rg(rg, repo, [*args, *_type_args(types), "--", "."])
+    return {path.removeprefix("./") for path in out.split("\0") if path}  # --null: one path per NUL
 
 
 def rg_lines(rg: str, repo: Path, keywords: list[str], paths: list[str], max_count: int | None = None) -> dict[str, list[tuple[int, str]]]:

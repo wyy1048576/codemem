@@ -143,3 +143,60 @@ def test_grep_fn_line_numbers_match_rg_with_a_lone_carriage_return(tmp_path):
 
 def test_rg_can_be_given_by_command_name():
     assert GrepRetriever(rg="rg").rg == shutil.which("rg")
+
+
+@pytest.fixture
+def ranked_repo(tmp_path):
+    """One function with a rare keyword once; long functions and tests that repeat a common word."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "core.py").write_text("def fix_here():\n    return special_widget\n")
+    for name in ("a", "b", "c"):
+        (tmp_path / "src" / f"{name}.py").write_text("def busy():\n" + "    common = common + 1\n" * 6)
+    (tmp_path / "tests" / "test_core.py").write_text("def test_it():\n" + "    special_widget(common)\n" * 9)
+    (tmp_path / "notes.md").write_text("common special_widget " * 40 + "\n")
+    return tmp_path
+
+
+def _symbols(grep_fn, root, query="`special_widget` common"):
+    grep_fn.build(root, root)
+    return [(h.path, h.symbol) for h in grep_fn.search(query, 50)]
+
+
+def test_grep_fn_idf_weights_rare_keywords_and_ignores_length(ranked_repo):
+    naive = _symbols(GrepFnRetriever(), ranked_repo)
+    assert naive[0] == ("tests/test_core.py", "test_it")  # 18 raw matches
+    assert naive.index(("src/core.py", "fix_here")) > naive.index(("src/a.py", "busy"))  # 1 match < 12
+    idf = _symbols(GrepFnRetriever(weighting="idf"), ranked_repo)
+    # special_widget is in 3 of 6 files, common in 5: the function with both rare and common words wins,
+    # then the one with the rare word once beats the long functions that repeat the common word.
+    assert idf[:2] == [("tests/test_core.py", "test_it"), ("src/core.py", "fix_here")]
+
+
+def test_grep_fn_tests_last(ranked_repo):
+    hits = _symbols(GrepFnRetriever(weighting="idf", tests_last=True), ranked_repo)
+    assert hits[0] == ("src/core.py", "fix_here") and hits[-1] == ("tests/test_core.py", "test_it")
+
+
+def test_grep_fn_types_keep_docs_out_of_the_file_budget(ranked_repo):
+    assert _symbols(GrepFnRetriever(top_files=1), ranked_repo) == []  # the top file is notes.md: no functions
+    assert _symbols(GrepFnRetriever(top_files=1, types=["py"]), ranked_repo) == [("tests/test_core.py", "test_it")]
+
+
+def test_grep_fn_clean_keywords(ranked_repo):
+    grep_fn = GrepFnRetriever(clean_keywords=True)
+    grep_fn.build(ranked_repo, ranked_repo)
+    query = "See https://github.com/acme/demo and commit `3f31fc9a` in setup.py: `special_widget` breaks"
+    naive = GrepFnRetriever()
+    naive.build(ranked_repo, ranked_repo)
+    removed = set(naive._keywords(query)) - set(grep_fn._keywords(query))
+    assert removed == {"github.com", "3f31fc9a", "setup.py"}  # a web address, a commit hash, a file name
+    assert grep_fn._keywords(query)[:2] == ["special_widget", "https"]  # plain words stay
+
+
+def test_grep_fn_options_are_checked_and_described():
+    with pytest.raises(RetrieverError, match="weighting 'tfidf'"):
+        GrepFnRetriever(weighting="tfidf")
+    described = GrepFnRetriever(types=["py"], weighting="idf", clean_keywords=True, tests_last=True).describe()
+    assert (described["types"], described["weighting"], described["clean_keywords"], described["tests_last"]) == (["py"], "idf", True, True)
+    assert GrepFnRetriever().describe()["weighting"] == "count"

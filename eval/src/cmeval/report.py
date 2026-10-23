@@ -5,8 +5,8 @@ and the run's tasks file. No search and no network.
 
 Contents:
 - main tables (file, function, class level): each mean with a 95% bootstrap interval;
-- paired comparison with a baseline system (default grep-fn): mean difference, paired 95%
-  bootstrap interval, Wilcoxon signed-rank p;
+- paired comparison with a baseline system (default grep-fn-plus, the stronger grep; the naive
+  grep-fn stays in every table): mean difference, paired 95% bootstrap interval, Wilcoxon p;
 - two primary metrics, fixed before the first results (2026-10-23): function-level MRR and
   function-level tokens to the first right answer. Their p-values get one Holm correction
   over all primary tests. Every other comparison is "exploratory" and shows a raw p;
@@ -30,7 +30,7 @@ from .metrics.matching import LEVELS
 from .metrics.stats import (RESAMPLES, SEED, WilcoxonResult, bootstrap_ci, differences, holm, wilcoxon)
 from .score import MAIN_IOU, resolve_run, run_tasks
 
-DEFAULT_BASELINE = "grep-fn"
+DEFAULT_BASELINE = "grep-fn-plus"  # the stronger grep (2026-10-23); older runs: --baseline grep-fn
 DEFAULT_CUTOFF = "2026-07-01"
 ALPHA = 0.05
 SMALL_N = 20  # below this, percentile bootstrap intervals are too narrow

@@ -1,0 +1,10 @@
+# grep-fn-plus alone: the stronger grep baseline (chosen on the dev split, 2026-10-23), for a run that
+# is merged into an earlier run with `cmeval merge`. Grep needs no index, so this run is quick.
+
+[[system]]
+name = "grep-fn-plus"
+adapter = "grep_fn"
+types = ["py"]
+weighting = "idf"
+clean_keywords = true
+tests_last = true
