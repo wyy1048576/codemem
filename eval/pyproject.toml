@@ -12,6 +12,10 @@ dependencies = [
     "pyarrow>=15",
 ]
 
+[project.optional-dependencies]
+# The codemem adapter. Install with: uv sync --extra codemem
+codemem = ["codemem"]
+
 [project.scripts]
 cmeval = "cmeval.cli:main"
 
@@ -27,3 +31,6 @@ packages = ["src/cmeval"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv.sources]
+codemem = { path = "..", editable = true }

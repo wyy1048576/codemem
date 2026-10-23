@@ -1,0 +1,11 @@
+# Dry-run config with two fake systems (no real search). Real configs come with the grep and
+# codemem adapters.
+
+[[system]]
+name = "fake-line"
+adapter = "fake"
+
+[[system]]
+name = "fake-file"
+adapter = "fake"
+granularity = "file"

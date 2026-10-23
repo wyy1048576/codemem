@@ -8,12 +8,12 @@ cmeval works like a benchmark. Each search system (grep, codemem, or any other t
 
 ```bash
 cd eval
-uv sync
+uv sync                  # or: uv sync --extra codemem (adds the codemem adapter, PyTorch, the embedding model)
 uv run cmeval --help
 uv run pytest
 ```
 
-Python 3.11 or later.
+Python 3.11 or later. The grep baselines need ripgrep (`rg`) on PATH.
 
 ## Tasks
 
@@ -39,11 +39,43 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 |---|---|
 | `cmeval validate FILE` | Check a task file and print counts by source, split, and repo |
 | `cmeval import swebench-verified [--n 50] [--seed 0]` | Sample and label SWE-bench Verified tasks (pinned dataset revision) |
+| `cmeval systems FILE` | Check a system config and list its systems (adapter, granularity, index key) |
 | `cmeval collect` | Not built yet |
 | `cmeval review` | Not built yet |
 | `cmeval run` | Not built yet |
 | `cmeval score` | Not built yet |
 | `cmeval report` | Not built yet |
+
+## Systems (the plug)
+
+Every retrieval system plugs in through one interface, `Retriever` in `src/cmeval/retriever.py`:
+
+| Method | Does |
+|---|---|
+| `build(repo, index_dir)` | Full index of the repo at its current commit. Returns an `IndexReport` (time, size, items). |
+| `update(repo, index_dir)` | Bring the index up to date after the repo moved. Must give the same results as `build`. |
+| `search(query, k)` | At most k `Hit`s, best first. |
+| `describe()` | Everything needed to repeat a run (versions, models, device, settings). |
+| `index_key()` | Hash of index-time settings. Systems with the same key share one index. |
+
+A `Hit` is a location, never a system's own ID: `path`, `start_line`, `end_line`, `symbol`, `score`, and `text` (exactly what an agent would see; token metrics count it). Each system declares its `granularity`: `"file"` (paths only) or `"line"` (line ranges on every hit).
+
+Systems are listed in TOML configs in `configs/`. Every key except `name` and `adapter` goes to the adapter:
+
+```toml
+[[system]]
+name = "fake-line"
+adapter = "fake"
+```
+
+| Adapter | Status |
+|---|---|
+| `fake` | Test and dry-run stand-in (`src/cmeval/adapters/fake.py`) |
+| `grep` | Offline grep baseline: ripgrep over keywords from the issue, files ranked by match count (`src/cmeval/adapters/grep.py`). Granularity `file`. Needs `rg` (`brew install ripgrep`). |
+| `grep_fn` | grep plus the next step an agent takes: each matching line is mapped to the function around it, functions ranked by matches (`grep_fn.py`). Granularity `line`. |
+| `codemem` | Wilson's codemem through its library API (`src/cmeval/adapters/codemem.py`, the only file that imports codemem). Granularity `line`. Settings: `signals` (for example `["bm25", "code", "usage"]`) and `config` (passed to codemem's `config_from_dict`; user config files and env vars are ignored). Systems with the same index-time settings share one index and one in-memory service. Needs `uv sync --extra codemem`. |
+
+To add a system: write a class with the methods above in `src/cmeval/adapters/`, and add one line to `ADAPTERS` in `src/cmeval/systems.py`.
 
 ## Local data
 

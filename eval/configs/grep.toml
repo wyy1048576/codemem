@@ -1,0 +1,9 @@
+# The two offline grep baselines (Decision 4).
+
+[[system]]
+name = "grep"
+adapter = "grep"
+
+[[system]]
+name = "grep-fn"
+adapter = "grep_fn"

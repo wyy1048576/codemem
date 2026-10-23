@@ -106,7 +106,7 @@ def find_definitions(source: str, language: str) -> tuple[list[Definition], bool
     return found, tree.root_node.has_error
 
 
-def _innermost(defs: list[Definition], *lines: int) -> Definition | None:
+def innermost(defs: list[Definition], *lines: int) -> Definition | None:
     """The containing definition with the latest start. Definitions nest, so that is the innermost."""
     best = None
     for d in defs:
@@ -261,7 +261,7 @@ def _label_file(path, base_text, new_text, applied, defs, new_defs, gold: Gold) 
     base_lines = split_lines(base_text)
     for line in applied.changed:
         if not _is_blank(base_lines, line):
-            add(_innermost(functions, line), _innermost(classes, line))
+            add(innermost(functions, line), innermost(classes, line))
 
     if new_defs is not None:
         mapping = _map_to_base(new_defs, defs)
@@ -278,7 +278,7 @@ def _label_file(path, base_text, new_text, applied, defs, new_defs, gold: Gold) 
             if L < 1:
                 module_level = True
             else:
-                add(_innermost(functions, L, L + 1), _innermost(classes, L, L + 1))
+                add(innermost(functions, L, L + 1), innermost(classes, L, L + 1))
 
     gold.functions.extend(_span(path, d) for d in sorted(gold_functions, key=lambda d: d.start))
     gold.classes.extend(_span(path, d) for d in sorted(gold_classes, key=lambda d: d.start))
