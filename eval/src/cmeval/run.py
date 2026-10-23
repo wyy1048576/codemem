@@ -28,6 +28,7 @@ from typing import Any
 
 from . import __version__, repos
 from .files import append_jsonl as _append_jsonl
+from .files import drop_unfinished_line, read_jsonl
 from .files import now as _now
 from .files import sha256_file as _sha256
 from .files import write_json as _write_json
@@ -67,14 +68,11 @@ def _eval_git() -> dict[str, Any]:
     return {"sha": sha.stdout.strip(), "dirty": bool(dirty.stdout.strip())}
 
 
-def _done_tasks(path: Path) -> set[str]:
-    if not path.exists():
-        return set()
-    done = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            done.add(json.loads(line)["task_id"])
-    return done
+def _read_run_file(path: Path) -> list[dict]:
+    try:
+        return read_jsonl(path)
+    except ValueError as exc:
+        raise RunError(f"cannot resume: {exc}") from None
 
 
 def order_tasks(tasks: list[Task]) -> dict[str, list[Task]]:
@@ -156,7 +154,15 @@ def run(
 
     summary = RunSummary(run_dir=run_dir, tasks=sum(len(g) for g in ordered.values()), systems=len(systems))
     out_files = {s.name: run_dir / f"{s.name}.jsonl" for s in systems}
-    done = {s.name: _done_tasks(out_files[s.name]) for s in systems}
+    index_file = run_dir / "index.jsonl"
+    for path in (*out_files.values(), index_file):
+        if drop_unfinished_line(path):
+            progress(f"{path.name}: dropped an unfinished last line from a stopped run")
+    done = {s.name: {line["task_id"] for line in _read_run_file(out_files[s.name])} for s in systems}
+    # (repo, index_key) pairs with a finished build or update. An index folder without one holds
+    # a build that was stopped: it is deleted and built again from empty, so the results and the
+    # build time are the same as in a run that never stopped.
+    indexed = {(r["repo"], r["index_key"]) for r in _read_run_file(index_file)}
     groups: dict[str, list[Retriever]] = {}
     for s in systems:
         groups.setdefault(s.index_key(), []).append(s)
@@ -169,6 +175,8 @@ def run(
             summary.skipped += sum(1 for t in group_tasks for s in systems if t.id in done[s.name])
             if not todo:
                 continue
+            # Always a new worktree: one left by a stopped run may be half checked out.
+            repos.discard_live(repo, f"run-{run_id}")
             worktree = repos.checkout(repo, todo[0].base_commit, name=f"run-{run_id}")
             try:
                 for task_number, task in enumerate(todo, start=1):
@@ -180,15 +188,18 @@ def run(
                         if all(task.id in done[m.name] for m in members):
                             continue  # resume: this group already searched this task
                         index_dir = index_root / repos.slug(repo) / key
+                        if index_dir.exists() and (repo, key) not in indexed:
+                            shutil.rmtree(index_dir)  # no service has it open yet: this is a new process
                         for position, system in enumerate(members):
                             fresh = position == 0 and (index_mode == "rebuild" or not index_dir.exists())
                             index_dir.mkdir(parents=True, exist_ok=True)
                             report = (system.build if fresh else system.update)(worktree, index_dir)
                             summary.index_calls += 1
-                            _append_jsonl(run_dir / "index.jsonl", {
+                            _append_jsonl(index_file, {
                                 "repo": repo, "commit": task.base_commit, "task_id": task.id, "index_key": key,
                                 "system": system.name, "mode": "build" if fresh else "update", "report": report.to_dict(),
                             })
+                            indexed.add((repo, key))
                     for system in systems:
                         if task.id in done[system.name]:
                             continue

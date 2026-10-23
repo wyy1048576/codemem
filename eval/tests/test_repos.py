@@ -2,7 +2,7 @@ import pytest
 from conftest import REMOTE_REPO as REPO
 
 from cmeval import repos
-from cmeval.repos import RepoError, checkout, ensure_commit, head, move_to, read_file, remove_worktree
+from cmeval.repos import RepoError, checkout, discard_live, ensure_commit, head, move_to, read_file, remove_worktree
 
 
 def test_fixed_snapshot(remote):
@@ -80,6 +80,18 @@ def test_remove_worktree(remote):
     assert not path.exists()
     assert str(path) not in remote.git("--git-dir", str(repos.clone_path(REPO)), "worktree", "list")
     assert checkout(REPO, shas[0]) == path  # can be created again
+
+
+def test_discard_live_removes_a_broken_worktree(remote):
+    shas = remote.shas
+    live = checkout(REPO, shas[0], name="run1")
+    (live / ".git").write_text("gitdir: /nowhere\n")  # git cannot use this worktree any more
+    discard_live(REPO, "run1")
+    assert not live.exists()
+    assert checkout(REPO, shas[1], name="run1") == live and head(live) == shas[1]
+    discard_live(REPO, "run1")
+    discard_live(REPO, "run1")  # nothing left to remove: no error
+    assert not live.exists()
 
 
 def test_checkout_recovers_after_a_worktree_folder_is_deleted_by_hand(remote):

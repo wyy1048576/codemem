@@ -1,9 +1,12 @@
 import json
+from pathlib import Path
 
 import pytest
 from conftest import REMOTE_REPO
 
+from cmeval import repos
 from cmeval import run as run_module
+from cmeval.adapters.fake import FakeRetriever
 from cmeval.cli import main
 from cmeval.paths import indexes_dir, runs_dir, worktrees_dir
 from cmeval.run import RunError, run
@@ -109,6 +112,43 @@ def test_resume_continues_without_duplicates(setup):
     assert json.loads((runs_dir() / "r1" / "meta.json").read_text())["resumed"] == 1
 
 
+def test_resume_after_a_hard_stop(setup):
+    """A power loss during a write and a stop during a checkout: the next run cleans up and finishes."""
+    tasks_file, config_file, _ = setup
+    run(tasks_file, config_file, "r1", limit_per_repo=1, keep_indexes=True)
+    with (runs_dir() / "r1" / "fake-a.jsonl").open("a") as f:
+        f.write('{"task_id": "acme__demo-3", "hi')  # unfinished line
+    live = repos.checkout(REMOTE_REPO, lines("r1", "fake-b")[0]["commit"], name="run-r1")
+    (live / "half-checked-out.py").write_text("")  # move_to refuses a worktree with changes
+    git_dir = Path(repos._git("rev-parse", "--absolute-git-dir", cwd=live).stdout.strip())
+    (git_dir / "index.lock").write_text("")
+    run(tasks_file, config_file, "r1")
+    for name in ("fake-a", "fake-b", "fake-go"):
+        assert [l["task_id"] for l in lines("r1", name)] == ["acme__demo-2", "acme__demo-3", "acme__demo-1"]
+    assert not live.exists()
+
+
+def test_a_stopped_build_is_built_again(setup, monkeypatch):
+    tasks_file, config_file, _ = setup
+    real_build = FakeRetriever.build
+
+    def stopped(self, repo, index_dir):
+        real_build(self, repo, index_dir)
+        raise KeyboardInterrupt  # stopped after the index folder exists, before its row is written
+
+    monkeypatch.setattr(FakeRetriever, "build", stopped)
+    with pytest.raises(KeyboardInterrupt):
+        run(tasks_file, config_file, "r1")
+    leftover = next((indexes_dir() / "r1" / "acme__demo").iterdir()) / "left-by-the-stopped-build"
+    leftover.write_text("")
+    monkeypatch.setattr(FakeRetriever, "build", real_build)
+    run(tasks_file, config_file, "r1")
+    index = [json.loads(l) for l in (runs_dir() / "r1" / "index.jsonl").read_text().splitlines()]
+    first_task = [(r["system"], r["mode"]) for r in index if r["task_id"] == "acme__demo-2"]
+    assert first_task == [("fake-a", "build"), ("fake-b", "update"), ("fake-go", "build")]
+    assert not leftover.exists()  # built again from an empty folder
+
+
 def test_resume_with_other_inputs_is_refused(setup):
     tasks_file, config_file, _ = setup
     run(tasks_file, config_file, "r1", limit_per_repo=1)
@@ -152,8 +192,6 @@ def test_bad_run_id_and_index_mode(setup):
 
 def test_cli_run(setup, capsys):
     tasks_file, _, _ = setup
-    from pathlib import Path
-
     smoke = Path(__file__).parents[1] / "configs" / "smoke.toml"
     assert main(["run", "--tasks", str(tasks_file), "--config", str(smoke), "--run-id", "cli1"]) == 0
     out = capsys.readouterr()

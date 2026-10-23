@@ -24,17 +24,18 @@ def search_latency(search_ms: list[float]) -> dict[str, float | None]:
 def index_costs(index_rows: list[dict], system: str) -> dict[str, float | None]:
     """Index cost of the system that does the real work for a shared group (its own rows only).
 
-    A resumed run can write a second row for the same task; only the last one counts.
+    A resumed run can write a second row for the same task. Only the first one counts: it did
+    the real work, and the second one found nothing left to do.
     files_failed_max is the largest count in any one report: a file that keeps failing would be
     counted again at every update if the counts were added up.
     """
-    last: dict[tuple, dict] = {}
+    first: dict[tuple, dict] = {}
     for position, r in enumerate(index_rows):
         if r["system"] == system:
             # Rows without a task id cannot be matched, so they are never merged.
             key = (r["task_id"], r["mode"]) if r.get("task_id") else ("row", position)
-            last[key] = r
-    rows = list(last.values())
+            first.setdefault(key, r)
+    rows = list(first.values())
     builds = [r["report"]["seconds"] for r in rows if r["mode"] == "build"]
     updates = [r["report"]["seconds"] for r in rows if r["mode"] == "update"]
     reembedded = [r["report"]["items_reembedded"] for r in rows if r["report"].get("items_reembedded") is not None]

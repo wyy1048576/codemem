@@ -33,6 +33,22 @@ def append_jsonl(path: Path, record: dict) -> None:
         f.flush()
 
 
+def drop_unfinished_line(path: Path) -> bool:
+    """Cut a last line that has no newline (a write stopped by a power loss). True if cut.
+
+    append_jsonl writes each line and its newline in one write, so a line without a newline
+    was never finished. The runner does that task again.
+    """
+    if not path.exists():
+        return False
+    data = path.read_bytes()
+    if not data or data.endswith(b"\n"):
+        return False
+    with path.open("r+b") as f:
+        f.truncate(data.rfind(b"\n") + 1)
+    return True
+
+
 def read_jsonl(path: Path) -> list[dict]:
     """Rows of a JSON-lines file ([] if missing). A bad line raises ValueError naming the file and line."""
     if not path.exists():

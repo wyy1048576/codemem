@@ -229,6 +229,6 @@ def test_bad_rpm_setting_is_a_clear_error(monkeypatch, tmp_path):
 def test_repeated_index_rows_count_once_and_failures_are_not_summed():
     row = lambda task, seconds, failed: {"system": "a", "task_id": task, "mode": "update",
                                          "report": {"seconds": seconds, "bytes_on_disk": 1, "items_reembedded": 0, "extra": {"files_failed": failed}}}
-    rows = [row("t1", 1.0, 1), row("t2", 9.0, 1), row("t2", 3.0, 1), row("t3", 5.0, 1)]  # t2 twice (resume)
+    rows = [row("t1", 1.0, 1), row("t2", 9.0, 1), row("t2", 0.01, 1), row("t3", 5.0, 1)]  # t2 again after a resume: no work left
     costs = index_costs(rows, "a")
-    assert costs["update_seconds_median"] == 3.0 and costs["files_failed_max"] == 1.0
+    assert costs["update_seconds_median"] == 5.0 and costs["files_failed_max"] == 1.0  # the first t2 row counts

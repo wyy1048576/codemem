@@ -109,6 +109,29 @@ def is_clean(worktree: Path) -> bool:
     return _git("status", "--porcelain", "--untracked-files=all", cwd=worktree).stdout == ""
 
 
+def live_path(repo: str, name: str) -> Path:
+    """Folder of the movable worktree "name" for this repo."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", name):
+        raise RepoError(f"worktree name {name!r} may only use letters, digits, '_', '.', '-'")
+    return worktrees_dir() / f"{slug(repo)}{LIVE_MARK}{name}"
+
+
+def discard_live(repo: str, name: str) -> None:
+    """Remove the movable worktree "name" if it exists, in any state.
+
+    A process that was stopped during a checkout can leave the worktree with local changes or
+    a stale index.lock, and then move_to refuses it. The runner discards it and makes a new one.
+    """
+    path = live_path(repo, name)
+    if not path.exists():
+        return
+    try:
+        remove_worktree(path)
+    except RepoError:
+        shutil.rmtree(path, ignore_errors=True)
+        _git("worktree", "prune", cwd=clone_path(repo))
+
+
 def checkout(repo: str, commit: str, name: str | None = None) -> Path:
     """A clean worktree at the commit.
 
@@ -116,12 +139,7 @@ def checkout(repo: str, commit: str, name: str | None = None) -> Path:
     moved to the commit.
     """
     ensure_commit(repo, commit)
-    if name is None:
-        path = worktrees_dir() / f"{slug(repo)}@{commit[:12]}"
-    else:
-        if not re.match(r"^[A-Za-z0-9_.-]+$", name):
-            raise RepoError(f"worktree name {name!r} may only use letters, digits, '_', '.', '-'")
-        path = worktrees_dir() / f"{slug(repo)}{LIVE_MARK}{name}"
+    path = worktrees_dir() / f"{slug(repo)}@{commit[:12]}" if name is None else live_path(repo, name)
 
     if path.exists():
         if name is not None:
