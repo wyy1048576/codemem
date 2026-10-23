@@ -1,0 +1,161 @@
+import json
+
+import pytest
+from conftest import REMOTE_REPO
+
+from cmeval import run as run_module
+from cmeval.cli import main
+from cmeval.paths import indexes_dir, runs_dir, worktrees_dir
+from cmeval.run import RunError, run
+from cmeval.tasks import Fix, Gold, save_tasks
+
+CONFIG = """
+[[system]]
+name = "fake-a"
+adapter = "fake"
+
+[[system]]
+name = "fake-b"
+adapter = "fake"
+granularity = "file"
+
+[[system]]
+name = "fake-go"
+adapter = "fake"
+suffix = ".go"
+"""
+
+
+@pytest.fixture
+def setup(remote, tmp_path, monkeypatch, make_task):
+    """3 dev tasks whose commit dates are out of ID order, 1 test task, a config, and a record of every system made."""
+    shas = []
+    for i, date in enumerate(["2021-01-03T00:00:00", "2021-01-01T00:00:00", "2021-01-02T00:00:00"]):
+        monkeypatch.setenv("GIT_COMMITTER_DATE", date)
+        shas.append(remote.commit({"app.py": f"VERSION = {10 + i}\nversion_name = 'v{i}'\n"}))
+    monkeypatch.delenv("GIT_COMMITTER_DATE")
+
+    def task(n, sha, split="dev"):
+        return make_task(id=f"acme__demo-{n}", repo=REMOTE_REPO, base_commit=sha, split=split,
+                         fix=Fix(pr_number=n), gold=Gold(files=["app.py"]), query="which version")
+
+    tasks_file = tmp_path / "tasks.jsonl"
+    save_tasks(tasks_file, [task(1, shas[0]), task(2, shas[1]), task(3, shas[2]), task(9, shas[0], split="test")])
+    config_file = tmp_path / "systems.toml"
+    config_file.write_text(CONFIG)
+
+    made = {}
+    real = run_module.make_system
+
+    def record(spec):
+        made[spec.name] = real(spec)
+        return made[spec.name]
+
+    monkeypatch.setattr(run_module, "make_system", record)
+    return tasks_file, config_file, made
+
+
+def lines(run_id, system):
+    return [json.loads(l) for l in (runs_dir() / run_id / f"{system}.jsonl").read_text().splitlines()]
+
+
+def test_run_writes_files_in_commit_date_order(setup):
+    tasks_file, config_file, made = setup
+    summary = run(tasks_file, config_file, "r1")
+    assert (summary.tasks, summary.systems, summary.searched, summary.skipped) == (3, 3, 9, 0)
+    for name in ("fake-a", "fake-b", "fake-go"):
+        assert [l["task_id"] for l in lines("r1", name)] == ["acme__demo-2", "acme__demo-3", "acme__demo-1"]
+    first = lines("r1", "fake-a")[0]
+    assert first["hits"][0]["path"] == "app.py" and first["search_ms"] >= 0
+    meta = json.loads((runs_dir() / "r1" / "meta.json").read_text())
+    assert meta["status"] == "done" and meta["split"] == "dev" and len(meta["systems"]) == 3
+    assert meta["systems"][0]["index_key"] == meta["systems"][1]["index_key"] != meta["systems"][2]["index_key"]
+    assert not (indexes_dir() / "r1").exists()  # deleted at the end
+    assert not any("@live-run-r1" in p.name for p in worktrees_dir().iterdir())  # worktree removed
+
+
+def test_shared_index_is_built_once_and_updated_after(setup):
+    tasks_file, config_file, made = setup
+    run(tasks_file, config_file, "r1")
+    index = [json.loads(l) for l in (runs_dir() / "r1" / "index.jsonl").read_text().splitlines()]
+    first_task = [(r["system"], r["mode"]) for r in index if r["task_id"] == "acme__demo-2"]
+    assert first_task == [("fake-a", "build"), ("fake-b", "update"), ("fake-go", "build")]
+    assert all(r["mode"] == "update" for r in index if r["task_id"] != "acme__demo-2")
+    a, b = made["fake-a"], made["fake-b"]
+    assert (a.calls.count("build"), a.calls.count("update")) == (1, 2)
+    assert (b.calls.count("build"), b.calls.count("update")) == (0, 3)
+    assert a.calls.count("search") == 4  # 3 tasks + 1 untimed warm-up
+
+
+def test_rebuild_mode_builds_for_every_task(setup):
+    tasks_file, config_file, made = setup
+    run(tasks_file, config_file, "r1", index_mode="rebuild")
+    assert made["fake-a"].calls.count("build") == 3 and made["fake-b"].calls.count("build") == 0
+
+
+def test_test_split_needs_to_be_asked_for(setup):
+    tasks_file, config_file, _ = setup
+    run(tasks_file, config_file, "rt", split="test")
+    assert [l["task_id"] for l in lines("rt", "fake-a")] == ["acme__demo-9"]
+
+
+def test_resume_continues_without_duplicates(setup):
+    tasks_file, config_file, made = setup
+    run(tasks_file, config_file, "r1", limit_per_repo=1)
+    assert [l["task_id"] for l in lines("r1", "fake-a")] == ["acme__demo-2"]
+    summary = run(tasks_file, config_file, "r1")
+    assert (summary.searched, summary.skipped) == (6, 3)
+    assert [l["task_id"] for l in lines("r1", "fake-a")] == ["acme__demo-2", "acme__demo-3", "acme__demo-1"]
+    assert json.loads((runs_dir() / "r1" / "meta.json").read_text())["resumed"] == 1
+
+
+def test_resume_with_other_inputs_is_refused(setup):
+    tasks_file, config_file, _ = setup
+    run(tasks_file, config_file, "r1", limit_per_repo=1)
+    config_file.write_text(CONFIG + "\n# changed\n")
+    with pytest.raises(RunError, match="exists with other inputs .*config_sha256"):
+        run(tasks_file, config_file, "r1")
+    config_file.write_text(CONFIG)  # same config again; another index mode is still refused
+    with pytest.raises(RunError, match=r"other inputs \(index_mode\)"):
+        run(tasks_file, config_file, "r1", index_mode="rebuild")
+
+
+def test_leak_check_stops_the_run(setup, monkeypatch):
+    tasks_file, config_file, _ = setup
+    monkeypatch.setattr(run_module.repos, "head", lambda worktree: "0" * 40)
+    with pytest.raises(RunError, match="worktree is at 0000"):
+        run(tasks_file, config_file, "r1")
+    meta = json.loads((runs_dir() / "r1" / "meta.json").read_text())
+    assert meta["status"] == "failed" and "worktree is at" in meta["error"]
+
+
+def test_broken_hit_contract_stops_the_run(setup):
+    tasks_file, config_file, _ = setup
+    config_file.write_text('[[system]]\nname = "bad"\nadapter = "fake"\nscript = { "which version" = [ { path = "app.py" } ] }\n')
+    with pytest.raises(RunError, match="bad: hit 0 .*without line numbers"):
+        run(tasks_file, config_file, "r1")
+
+
+def test_keep_indexes(setup):
+    tasks_file, config_file, _ = setup
+    run(tasks_file, config_file, "r1", keep_indexes=True)
+    assert (indexes_dir() / "r1" / "acme__demo").is_dir()
+
+
+def test_bad_run_id_and_index_mode(setup):
+    tasks_file, config_file, _ = setup
+    with pytest.raises(RunError, match="run id"):
+        run(tasks_file, config_file, "has space")
+    with pytest.raises(RunError, match="index mode"):
+        run(tasks_file, config_file, "r1", index_mode="sometimes")
+
+
+def test_cli_run(setup, capsys):
+    tasks_file, _, _ = setup
+    from pathlib import Path
+
+    smoke = Path(__file__).parents[1] / "configs" / "smoke.toml"
+    assert main(["run", "--tasks", str(tasks_file), "--config", str(smoke), "--run-id", "cli1"]) == 0
+    out = capsys.readouterr()
+    assert "3 tasks x 2 systems: 6 searches done" in out.out and "[repo 1/1] acme/demo" in out.err
+    assert main(["run", "--tasks", str(tasks_file), "--config", str(smoke), "--run-id", "bad id"]) == 1

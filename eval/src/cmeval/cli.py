@@ -16,7 +16,6 @@ MAX_PROBLEMS_SHOWN = 50
 PLANNED = {
     "collect": "collect fresh tasks from GitHub issues and fixes",
     "review": "review tasks by hand",
-    "run": "run retrieval systems on tasks",
     "score": "score a run",
     "report": "write a report for a scored run",
 }
@@ -87,6 +86,29 @@ def cmd_systems(args) -> int:
     return 0
 
 
+def cmd_run(args) -> int:
+    from .repos import RepoError
+    from .retriever import RetrieverError
+    from .run import RunError, run
+    from .systems import SystemsError
+    from .tasks import TaskError
+
+    try:
+        summary = run(
+            args.tasks, args.config, args.run_id,
+            split=args.split, repo_filter=args.repo, limit_per_repo=args.limit_per_repo,
+            index_mode=args.index_mode, k=args.k, keep_indexes=args.keep_indexes,
+            progress=lambda message: print(message, file=sys.stderr, flush=True),
+        )
+    except (RunError, SystemsError, TaskError, RetrieverError, RepoError, FileNotFoundError) as exc:
+        print(f"run {args.run_id}: {exc}", file=sys.stderr)
+        return 1
+    print(f"run {args.run_id}: {summary.run_dir}")
+    print(f"  {summary.tasks} tasks x {summary.systems} systems: {summary.searched} searches done, "
+          f"{summary.skipped} already done, {summary.index_calls} index calls, {summary.seconds:.1f} s")
+    return 0
+
+
 def cmd_planned(args) -> int:
     print(f"cmeval {args.command}: not built yet", file=sys.stderr)
     return 2
@@ -108,6 +130,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--revision", default=None, help="dataset revision (default: the pinned one)")
     p.add_argument("--out", type=Path, default=None, help="task file (default: eval/tasks/swebv-dev<n>.jsonl)")
     p.set_defaults(func=cmd_import)
+
+    p = sub.add_parser("run", help="run every system in a config on every task")
+    p.add_argument("--tasks", type=Path, required=True, help="task file (.jsonl)")
+    p.add_argument("--config", type=Path, required=True, help="system config (.toml)")
+    p.add_argument("--run-id", required=True, help="name of the run folder in CMEVAL_HOME/runs")
+    p.add_argument("--split", choices=["dev", "test"], default="dev", help="default dev; test only at milestones")
+    p.add_argument("--repo", action="append", default=None, help="only this repo (owner/name); repeatable")
+    p.add_argument("--limit-per-repo", type=int, default=None, help="first N tasks of each repo (by date)")
+    p.add_argument("--index-mode", choices=["update", "rebuild"], default="update")
+    p.add_argument("--k", type=int, default=50, help="hits for each search (default 50)")
+    p.add_argument("--keep-indexes", action="store_true", help="keep index folders after the run")
+    p.set_defaults(func=cmd_run)
 
     p = sub.add_parser("systems", help="check a system config and list its systems")
     p.add_argument("file", type=Path)

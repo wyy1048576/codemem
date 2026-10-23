@@ -16,8 +16,8 @@ def test_help_lists_commands(capsys):
 
 
 def test_planned_command_exits_2(capsys):
-    assert main(["run", "--tasks", "x.jsonl"]) == 2
-    assert "cmeval run: not built yet" in capsys.readouterr().err
+    assert main(["score", "runs/x"]) == 2
+    assert "cmeval score: not built yet" in capsys.readouterr().err
 
 
 def test_validate_good_file(make_task, tmp_path, capsys):

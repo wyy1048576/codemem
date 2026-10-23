@@ -76,6 +76,12 @@ def ensure_commit(repo: str, sha: str) -> None:
         raise RepoError(f"commit {sha} not found in {repo}")
 
 
+def commit_time(repo: str, sha: str) -> int:
+    """Committer time of a commit (Unix seconds). The runner sorts tasks by it."""
+    ensure_commit(repo, sha)
+    return int(_git("show", "-s", "--format=%ct", sha, cwd=clone_path(repo)).stdout.strip())
+
+
 def read_file(repo: str, commit: str, path: str) -> str | None:
     """File content at a commit, or None if the file does not exist there. Needs no worktree."""
     ensure_commit(repo, commit)
