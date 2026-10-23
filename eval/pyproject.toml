@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Evaluation suite for repository-level code retrieval (grep, codemem, and other systems)."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "unidiff>=1.0",
+]
 
 [project.scripts]
 cmeval = "cmeval.cli:main"
