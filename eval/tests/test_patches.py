@@ -201,3 +201,27 @@ def test_split_patch_keeps_every_file_once():
     parts = split_patch(code + test + doc)
     assert parts == {"code": code, "test": test, "other": doc}
     assert split_patch(code)["test"] == ""
+
+
+def test_align_file_diff_finds_moved_hunks():
+    from cmeval.patches import PatchMismatch, align_file_diff
+
+    base = "".join(f"line {i}\n" for i in range(1, 21))
+    diff = header("f.py") + "@@ -3,3 +3,3 @@\n line 5\n-line 6\n+LINE 6\n line 7\n"  # states line 3, really line 5
+    applied = align_file_diff(base, diff)
+    assert applied.offsets == [2] and applied.changed == [6]
+    assert applied.new_text == base.replace("line 6\n", "LINE 6\n")
+    exact = header("f.py") + "@@ -5,3 +5,3 @@\n line 5\n-line 6\n+LINE 6\n line 7\n"
+    assert align_file_diff(base, exact).offsets == [0]
+    with pytest.raises(PatchMismatch, match="matches nowhere"):
+        align_file_diff(base, header("f.py") + "@@ -5,2 +5,2 @@\n line 5\n-line 99\n+x\n")
+
+
+def test_align_prefers_the_nearest_exact_match():
+    from cmeval.patches import align_file_diff
+
+    base = "a\nx\nb\na\nx\nb\n"  # the same three lines twice: at index 0 and index 3
+    diff = header("f.py") + "@@ -4,3 +4,3 @@\n a\n-x\n+y\n b\n"
+    assert align_file_diff(base, diff).changed == [5]  # the stated position wins when it matches
+    diff_off = header("f.py") + "@@ -3,3 +3,3 @@\n a\n-x\n+y\n b\n"  # stated index 2: index 3 is 1 away, index 0 is 2 away
+    assert align_file_diff(base, diff_off).changed == [5]

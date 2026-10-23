@@ -37,6 +37,7 @@ KNOWN_TAGS: dict[str, type] = {
     "body_edited_after_fix": bool,
     "query_tokens": int,
     "partial_labels": bool,  # a gold code file could not be labeled below file level
+    "hunks_moved": int,  # diff hunks that apply at a different line than the diff states
 }
 
 _ID_RE = re.compile(r"^(?P<owner>[A-Za-z0-9-]+)__(?P<name>[A-Za-z0-9_.-]+)-(?P<number>\d+)$")
@@ -335,10 +336,25 @@ def save_tasks(path: Path | str, tasks: Iterable[Task]) -> None:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             for task in tasks:
                 f.write(dumps(task) + "\n")
+        os.chmod(tmp, 0o644)  # mkstemp makes the file private; a task file is shared data
         os.replace(tmp, path)
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise
+
+
+# ---- queries
+
+
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+
+
+def clean_query(text: str | None) -> str:
+    """Remove hidden HTML comments (for example issue template instructions) and outer whitespace.
+
+    Everything a person sees on the issue page stays, including code blocks and stack traces.
+    """
+    return _HTML_COMMENT_RE.sub("", text or "").strip()
 
 
 # ---- splits

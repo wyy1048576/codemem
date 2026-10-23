@@ -24,7 +24,7 @@ from functools import lru_cache
 from tree_sitter import Language, Node, Parser
 
 from . import repos
-from .patches import FileChange, PatchMismatch, apply_file_diff, parse_patch
+from .patches import PatchMismatch, align_file_diff, apply_file_diff, parse_patch
 from .tasks import Gold, Span, Unretrievable
 
 LABELER_VERSION = "cmeval-labels/1"
@@ -140,6 +140,7 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
     unretrievable = Unretrievable()
     module_level = False
     partial = False
+    hunks_moved = 0
     changed_by_language: Counter[str] = Counter()
 
     for change in parse_patch(patch):
@@ -156,20 +157,23 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
         if base_text is None:
             raise LabelError(f"{change.old_path}: the patch changes it, but it does not exist at the base commit")
         try:
-            new_text = apply_file_diff(base_text, change.diff) if change.status != "deleted" else None
+            applied = align_file_diff(base_text, change.diff)
         except PatchMismatch as exc:
             raise LabelError(str(exc)) from None
+        hunks_moved += sum(1 for offset in applied.offsets if offset)
+        new_text = applied.new_text if change.status != "deleted" else None
 
-        gold.files.append(change.old_path)
-        changed_by_language[change.language] += len(change.changed) + len(change.insert_after)
-        for start, end in _ranges(change.changed + [max(L, 1) for L in change.insert_after]):
-            gold.lines.append(Span(change.old_path, start, end))
+        path = change.old_path
+        gold.files.append(path)
+        changed_by_language[change.language] += len(applied.changed) + len(applied.insert_after)
+        for start, end in _ranges(applied.changed + [max(L, 1) for L in applied.insert_after]):
+            gold.lines.append(Span(path, start, end))
 
         defs = _definitions_or_none(base_text, change.language)
         if defs is None:
             partial = True
             continue
-        file_module_level = _label_file(change, defs, gold)
+        file_module_level = _label_file(path, applied.changed, applied.insert_after, defs, gold)
         module_level = module_level or file_module_level
 
         if new_text is not None:
@@ -186,6 +190,7 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
         "n_gold_functions": len(gold.functions),
         "module_level_change": module_level,
         "partial_labels": partial,
+        "hunks_moved": hunks_moved,
     }
     return LabelResult(gold, unretrievable, language, tags)
 
@@ -198,7 +203,7 @@ def _definitions_or_none(source: str, language: str | None) -> list[Definition] 
     return None if has_error else defs
 
 
-def _label_file(change: FileChange, defs: list[Definition], gold: Gold) -> bool:
+def _label_file(path: str, changed: list[int], insert_after: list[int], defs: list[Definition], gold: Gold) -> bool:
     """Add the file's gold classes and functions. Returns True if a change is outside every function."""
     functions = [d for d in defs if d.kind == "function"]
     classes = [d for d in defs if d.kind == "class"]
@@ -206,8 +211,8 @@ def _label_file(change: FileChange, defs: list[Definition], gold: Gold) -> bool:
     gold_classes: dict[Definition, None] = {}
     module_level = False
 
-    points = [(line,) for line in change.changed] + [(L, L + 1) for L in change.insert_after if L >= 1]
-    if any(L < 1 for L in change.insert_after):
+    points = [(line,) for line in changed] + [(L, L + 1) for L in insert_after if L >= 1]
+    if any(L < 1 for L in insert_after):
         module_level = True  # an insertion at the file start is outside every function
     for point in points:
         fn = _innermost(functions, *point)
@@ -219,7 +224,6 @@ def _label_file(change: FileChange, defs: list[Definition], gold: Gold) -> bool:
         if cls is not None:
             gold_classes[cls] = None
 
-    path = change.old_path
     gold.functions.extend(_span(path, d) for d in sorted(gold_functions, key=lambda d: d.start))
     gold.classes.extend(_span(path, d) for d in sorted(gold_classes, key=lambda d: d.start))
     return module_level

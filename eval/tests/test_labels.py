@@ -70,7 +70,7 @@ def test_change_in_method():
     assert r.gold.files == [PATH] and r.language == "python"
     assert r.gold.lines == [Span(PATH, 30, 30)]
     assert r.tags == {"n_gold_files": 1, "n_gold_classes": 1, "n_gold_functions": 1,
-                      "module_level_change": False, "partial_labels": False}
+                      "module_level_change": False, "partial_labels": False, "hunks_moved": 0}
 
 
 def test_change_in_nested_function_is_innermost_only():
@@ -162,7 +162,7 @@ def test_unsupported_language_is_file_level_only():
 def test_patch_that_does_not_fit_the_base_is_rejected():
     diff = make_diff(SAMPLE, edit(SAMPLE, 30, "            helper(s, force=True)"))
     other_base = edit(SAMPLE, 29, "        for s in self.all_sessions(user):")
-    with pytest.raises(LabelError, match="auth/sessions.py:29: diff expects"):
+    with pytest.raises(LabelError, match="auth/sessions.py: hunk at base line 2[0-9] matches nowhere"):
         label_patch(diff, lambda p: other_base)
     with pytest.raises(LabelError, match="does not exist at the base commit"):
         label_patch(diff, lambda p: None)
@@ -211,3 +211,21 @@ def test_identifier_in_query(query, expected):
                    Span("auth/sessions.py", 46, 49, "Query.query")],
     )
     assert identifier_in_query(query, gold) is expected
+
+
+def test_diff_with_shifted_line_numbers_is_labeled_where_it_really_applies():
+    """Some SWE-bench patches state line numbers that are off from the base file (git apply finds them)."""
+    diff = make_diff(SAMPLE, edit(SAMPLE, 30, "            helper(s, force=True)"))
+    shifted_base = "# one\n# two\n# three\n# four\n# five\n" + SAMPLE  # every line is 5 lower
+    r = label_patch(diff, lambda p: shifted_base)
+    assert symbols(r.gold.functions) == ["SessionManager.revoke_session"]
+    assert r.gold.lines == [Span(PATH, 35, 35)]  # line 30 of the diff is line 35 of this base
+    assert [(s.start, s.end) for s in r.gold.functions] == [(30, 35)]
+    assert r.tags["hunks_moved"] == 1
+
+
+def test_shifted_insertion_gap_moves_too():
+    diff = make_diff(SAMPLE, insert(SAMPLE, 29, "            log(s)\n"))
+    shifted_base = "# a\n# b\n" + SAMPLE
+    r = label_patch(diff, lambda p: shifted_base)
+    assert symbols(r.gold.functions) == ["SessionManager.revoke_session"] and r.tags["hunks_moved"] == 1

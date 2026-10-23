@@ -55,6 +55,8 @@ class FileChange:
     status: str  # modified | added | deleted | renamed
     file_class: str  # code | test | other
     language: str | None
+    # Base lines as stated in the diff. labels.py uses align_file_diff, which also handles
+    # diffs whose line numbers are off from the base file.
     changed: list[int] = field(default_factory=list)  # base lines removed or modified
     insert_after: list[int] = field(default_factory=list)  # pure insertions between base line L and L+1
     added: int = 0
@@ -86,20 +88,25 @@ def _strip_prefix(name: str, prefix: str) -> str | None:
     return name[len(prefix):] if name.startswith(prefix) else name
 
 
-def _touched_lines(patched_file) -> tuple[list[int], list[int]]:
-    """Base-side changed lines and pure-insertion points for one file."""
+def _touched_lines(patched_file, offsets: list[int] | None = None) -> tuple[list[int], list[int]]:
+    """Base-side changed lines and pure-insertion points for one file.
+
+    offsets (one per hunk) move each hunk from the line numbers stated in the diff to where it
+    really applies in the base file.
+    """
     changed: set[int] = set()
     insert_after: set[int] = set()
-    for hunk in patched_file:
+    for i, hunk in enumerate(patched_file):
+        shift = offsets[i] if offsets else 0
         # Last base line seen. A hunk with no base lines (-U0 insertion, new file) inserts after source_start.
-        last_base = hunk.source_start if hunk.source_length == 0 else hunk.source_start - 1
+        last_base = (hunk.source_start if hunk.source_length == 0 else hunk.source_start - 1) + shift
         prev_type = None
         for line in hunk:
             if line.is_removed:
-                changed.add(line.source_line_no)
-                last_base = line.source_line_no
+                changed.add(line.source_line_no + shift)
+                last_base = line.source_line_no + shift
             elif line.is_context:
-                last_base = line.source_line_no
+                last_base = line.source_line_no + shift
             elif line.is_added and prev_type not in ("-", "+"):
                 # An added run that does not follow removed lines is a pure insertion.
                 # Added lines after removed lines are part of that modification.
@@ -159,34 +166,70 @@ def _strip_eol(line: str) -> str:
     return line.rstrip("\r\n")
 
 
-def apply_file_diff(base_text: str | None, diff_text: str) -> str:
-    """Rebuild a file after the fix from its base text and its one-file diff.
+@dataclass
+class AppliedDiff:
+    new_text: str  # the file after the fix
+    changed: list[int]  # base lines, where the hunks really apply
+    insert_after: list[int]
+    offsets: list[int]  # for each hunk: real start minus the start stated in the diff
 
-    Every context and removed line must equal the base line, so this also checks that the
-    diff belongs to this base. None as base_text means the file is new.
+
+def _find_hunk(base: list[str], want: list[str], stated: int, lowest: int) -> int | None:
+    """Index where the hunk's base lines match exactly: the stated index if it matches, else the nearest one."""
+    if not want:  # a hunk with no base lines (-U0 insertion) has nothing to match
+        return stated if lowest <= stated <= len(base) else None
+    highest = len(base) - len(want)
+    for distance in range(0, max(stated - lowest, highest - stated, 0) + 1):
+        for start in (stated - distance, stated + distance) if distance else (stated,):
+            if lowest <= start <= highest and base[start : start + len(want)] == want:
+                return start
+    return None
+
+
+def align_file_diff(base_text: str | None, diff_text: str) -> AppliedDiff:
+    """Apply a one-file diff to its base text the way `git apply` does, and find the real lines.
+
+    Each hunk applies where its context and removed lines equal the base lines exactly (no
+    fuzz). The stated line numbers are tried first; if the base moved (some SWE-bench patches
+    are off by a few lines), the nearest exact match is used. No exact match anywhere raises
+    PatchMismatch, so a diff that does not belong to this base can never be labeled.
+    None as base_text means the file is new.
     """
     files = list(PatchSet(diff_text))
     if len(files) != 1:
         raise ValueError(f"expected a diff for one file, got {len(files)}")
-    path = files[0].path
+    pf = files[0]
     base = (base_text or "").splitlines(keepends=True)
+    base_stripped = [_strip_eol(line) for line in base]
     out: list[str] = []
+    offsets: list[int] = []
     pos = 0  # index of the next base line to copy
-    for hunk in files[0]:
-        start = hunk.source_start if hunk.source_length == 0 else hunk.source_start - 1
-        if start < pos or start > len(base):
-            raise PatchMismatch(f"{path}: hunk at base line {hunk.source_start} does not fit the base file")
+    for hunk in pf:
+        want = [_strip_eol(line.value) for line in hunk if line.is_context or line.is_removed]
+        stated = hunk.source_start if hunk.source_length == 0 else hunk.source_start - 1
+        start = _find_hunk(base_stripped, want, stated, pos)
+        if start is None:
+            first = want[0] if want else ""
+            raise PatchMismatch(
+                f"{pf.path}: hunk at base line {hunk.source_start} matches nowhere in the base file "
+                f"(first expected line {first!r})"
+            )
+        offsets.append(start - stated)
         out.extend(base[pos:start])
         pos = start
         for line in hunk:
-            if line.is_context or line.is_removed:
-                if pos >= len(base) or _strip_eol(base[pos]) != _strip_eol(line.value):
-                    found = _strip_eol(base[pos]) if pos < len(base) else "<end of file>"
-                    raise PatchMismatch(f"{path}:{pos + 1}: diff expects {_strip_eol(line.value)!r}, base has {found!r}")
-                if line.is_context:
-                    out.append(base[pos])
+            if line.is_context:
+                out.append(base[pos])
+                pos += 1
+            elif line.is_removed:
                 pos += 1
             elif line.is_added:
                 out.append(line.value)
     out.extend(base[pos:])
-    return "".join(out)
+    changed, insert_after = _touched_lines(pf, offsets)
+    return AppliedDiff("".join(out), changed, insert_after, offsets)
+
+
+def apply_file_diff(base_text: str | None, diff_text: str) -> str:
+    """The file after the fix. See align_file_diff."""
+    return align_file_diff(base_text, diff_text).new_text

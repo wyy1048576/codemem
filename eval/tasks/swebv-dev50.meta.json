@@ -1,0 +1,35 @@
+{
+  "dataset": "SWE-bench/SWE-bench_Verified",
+  "revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+  "n": 50,
+  "seed": 0,
+  "cmeval_version": "0.1.0",
+  "labeler": "cmeval-labels/1",
+  "created": "2026-10-23T03:15:45+00:00",
+  "skipped": [],
+  "stats": {
+    "tasks": 50,
+    "tasks_per_repo": {
+      "astropy/astropy": 5,
+      "django/django": 5,
+      "matplotlib/matplotlib": 5,
+      "mwaskom/seaborn": 2,
+      "pallets/flask": 1,
+      "psf/requests": 5,
+      "pydata/xarray": 5,
+      "pylint-dev/pylint": 5,
+      "pytest-dev/pytest": 5,
+      "scikit-learn/scikit-learn": 4,
+      "sphinx-doc/sphinx": 4,
+      "sympy/sympy": 4
+    },
+    "mean_gold_files": 1.34,
+    "mean_gold_classes": 0.92,
+    "mean_gold_functions": 1.62,
+    "share_no_gold_function": 0.08,
+    "share_module_level_change": 0.4,
+    "share_partial_labels": 0.0,
+    "share_identifier_in_query": 0.54,
+    "share_with_unretrievable_functions": 0.22
+  }
+}

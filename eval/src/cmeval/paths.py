@@ -34,3 +34,13 @@ def runs_dir() -> Path:
 
 def token_cache_dir() -> Path:
     return cmeval_home() / "token-cache"
+
+
+def datasets_dir() -> Path:
+    """Downloaded public datasets, pinned by revision."""
+    return cmeval_home() / "datasets"
+
+
+def default_tasks_dir() -> Path:
+    """eval/tasks in the repo, where task files (answer keys) are kept in git."""
+    return Path(__file__).resolve().parents[2] / "tasks"

@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import replace
 
 import pytest
@@ -31,6 +32,8 @@ def test_round_trip_and_stable_bytes(make_task, tmp_path):
     save_tasks(path, loaded)
     assert path.read_bytes() == first
     assert first.count(b"\n") == 2 and b"\r\n" not in first
+    if os.name == "posix":
+        assert path.stat().st_mode & 0o777 == 0o644
 
 
 def test_json_starts_with_schema_and_keeps_unicode(make_task):
@@ -171,3 +174,12 @@ def test_select(make_task):
     assert select([dev, test], None) == [dev, test]
     with pytest.raises(ValueError):
         select([dev], "train")
+
+
+def test_clean_query():
+    from cmeval.tasks import clean_query
+
+    assert clean_query("Title\n\n<!-- hidden -->Body") == "Title\n\nBody"
+    assert clean_query("<!--\nmulti\nline\n-->\nBody\n```\ncode <!-- kept? no: hidden too -->\n```") == "Body\n```\ncode \n```"
+    assert clean_query("  Stack trace:\n  File \"x.py\", line 3\n") == 'Stack trace:\n  File "x.py", line 3'
+    assert clean_query(None) == "" and clean_query("") == ""

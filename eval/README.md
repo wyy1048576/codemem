@@ -25,12 +25,20 @@ Every task has a `split`:
 
 The split of a fresh task comes from a hash of its ID, so it never changes.
 
+Task files:
+
+| File | Source | Split |
+|---|---|---|
+| `tasks/swebv-dev50.jsonl` | 50 SWE-bench Verified tasks, about the same number from each of its 12 repos, labeled with cmeval's rules. `swebv-dev50.meta.json` records the dataset revision, seed, skipped rows, and label statistics. | dev |
+
+Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions that the fix changed, found with tree-sitter on the code at `base_commit`.
+
 ## Commands
 
 | Command | Status |
 |---|---|
 | `cmeval validate FILE` | Check a task file and print counts by source, split, and repo |
-| `cmeval import` | Not built yet |
+| `cmeval import swebench-verified [--n 50] [--seed 0]` | Sample and label SWE-bench Verified tasks (pinned dataset revision) |
 | `cmeval collect` | Not built yet |
 | `cmeval review` | Not built yet |
 | `cmeval run` | Not built yet |
