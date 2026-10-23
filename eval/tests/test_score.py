@@ -160,3 +160,18 @@ def test_bad_run_files_are_a_score_error(run_dir):
     (run / "line-sys.jsonl").write_text((run / "line-sys.jsonl").read_text() + '{"task_id": "cut-of\n')
     with pytest.raises(ScoreError, match="line-sys.jsonl:4: not valid JSON"):
         score("r1", counter=WordCounter())
+
+
+def test_tasks_file_override_for_runs_from_another_machine(run_dir, tmp_path):
+    run, tasks_file = run_dir
+    meta = json.loads((run / "meta.json").read_text())
+    meta["tasks_file"] = "C:\\Users\\someone\\eval\\tasks\\tasks.jsonl"  # a Windows path
+    (run / "meta.json").write_text(json.dumps(meta))
+    with pytest.raises(ScoreError, match="use --tasks FILE"):
+        score("r1", counter=WordCounter())
+    copy = tmp_path / "copy.jsonl"
+    copy.write_bytes(tasks_file.read_bytes())
+    assert score("r1", counter=WordCounter(), tasks_file=copy).tasks_scored == 3
+    copy.write_bytes(tasks_file.read_bytes() + b"\n")
+    with pytest.raises(ScoreError, match="changed since the run"):
+        score("r1", counter=WordCounter(), tasks_file=copy)

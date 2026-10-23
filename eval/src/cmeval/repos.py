@@ -44,14 +44,20 @@ def clone_path(repo: str) -> Path:
 
 
 def ensure_clone(repo: str, url: str | None = None) -> Path:
-    """Clone the repo once (bare) and return the clone path."""
+    """Clone the repo once (bare) and return the clone path.
+
+    core.autocrlf is always false in the clone (its worktrees inherit it). Git for Windows
+    converts line endings on checkout by default, and then file contents, hit texts, and token
+    counts would differ from other machines.
+    """
     path = clone_path(repo)
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".partial")
         shutil.rmtree(tmp, ignore_errors=True)
-        _git("clone", "--bare", "--quiet", url or f"https://github.com/{repo}.git", str(tmp))
+        _git("clone", "--bare", "--quiet", "-c", "core.autocrlf=false", url or f"https://github.com/{repo}.git", str(tmp))
         tmp.rename(path)  # a stopped clone never looks like a finished one
+    _git("config", "core.autocrlf", "false", cwd=path)  # also for clones made before this setting
     return path
 
 

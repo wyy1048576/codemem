@@ -115,6 +115,16 @@ How a run works:
 
 Scoring uses only tasks that every system in the run finished, so all systems are compared on the same tasks. A run that is not `done`, or left-out tasks, give a warning.
 
+## Runs on other machines
+
+A run can be made on one machine and scored on another (for example a Windows laptop with an NVIDIA GPU, scored on a Mac that has the token cache and the API key):
+
+1. On the other machine, clone this repo with `git clone -c core.autocrlf=false ...` (cmeval sets the same option on its own repo clones), so task files and checkouts keep Unix line endings and the task file has the same sha256.
+2. Run `cmeval run ...` there, and copy the run folder (`CMEVAL_HOME/runs/<run-id>/`) to the scoring machine.
+3. Score it with `cmeval score <run-id> --tasks tasks/<file>.jsonl`. The file must have the same sha256 as the run's.
+
+Compare systems only within one machine: GPU and CPU round slightly differently, so embedding results can change a little between machines.
+
 ## Local data
 
 Large data (repo clones, snapshots, indexes, raw runs, token cache) lives in `CMEVAL_HOME`, default `~/.cmeval/`. It is not part of git.

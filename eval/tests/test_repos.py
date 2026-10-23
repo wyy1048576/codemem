@@ -89,3 +89,11 @@ def test_checkout_recovers_after_a_worktree_folder_is_deleted_by_hand(remote):
     path = checkout(REPO, shas[0])
     shutil.rmtree(path)  # a user frees disk space without git
     assert checkout(REPO, shas[0]) == path and head(path) == shas[0]
+
+
+def test_clones_never_convert_line_endings(remote):
+    clone = repos.clone_path(REPO)
+    assert remote.git("--git-dir", str(clone), "config", "core.autocrlf") == "false"
+    remote.git("--git-dir", str(clone), "config", "core.autocrlf", "true")  # an older clone, or a changed setting
+    repos.ensure_clone(REPO)
+    assert remote.git("--git-dir", str(clone), "config", "core.autocrlf") == "false"

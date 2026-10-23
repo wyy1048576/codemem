@@ -114,7 +114,7 @@ def cmd_score(args) -> int:
     from .tasks import TaskError
 
     try:
-        summary = score(args.run, tokens=args.tokens, ious=tuple(args.iou) if args.iou else DEFAULT_IOUS,
+        summary = score(args.run, tokens=args.tokens, ious=tuple(args.iou) if args.iou else DEFAULT_IOUS, tasks_file=args.tasks,
                         warn=lambda message: print(f"warning: {message}", file=sys.stderr),
                         progress=lambda message: print(message, file=sys.stderr, flush=True))
     except (ScoreError, TokenCountError, TaskError) as exc:
@@ -173,6 +173,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tokens", choices=["anthropic", "estimate"], default="anthropic",
                    help="anthropic: count_tokens (key from ANTHROPIC_API_KEY or the Keychain); estimate: rough, never reported")
     p.add_argument("--iou", type=float, action="append", default=None, help="IoU thresholds (default 0.5, 0.3, 0.7)")
+    p.add_argument("--tasks", type=Path, default=None,
+                   help="tasks file to use instead of the path in meta.json (for runs from another machine; same sha256 required)")
     p.set_defaults(func=cmd_score)
 
     p = sub.add_parser("systems", help="check a system config and list its systems")

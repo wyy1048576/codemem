@@ -66,13 +66,16 @@ def _check_ious(ious: tuple[float, ...]) -> tuple[float, ...]:
 
 
 def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...] = DEFAULT_IOUS,
+          tasks_file: str | Path | None = None,
           counter: TokenCounter | None = None, warn: Callable[[str], None] = lambda message: None,
           progress: Callable[[str], None] = lambda message: None) -> ScoreSummary:
     run_dir = resolve_run(run)
     ious = _check_ious(tuple(ious))
     try:
         meta = json.loads((run_dir / "meta.json").read_text(encoding="utf-8"))
-        tasks_file = Path(meta["tasks_file"])
+        # A run made on another machine names a tasks file path from that machine. Another copy
+        # can be given; it must have the same sha256 as the run's.
+        tasks_file = Path(tasks_file) if tasks_file is not None else Path(meta["tasks_file"])
         systems = [(s["name"], s["granularity"], s["index_key"]) for s in meta["systems"]]
         run_k = int(meta.get("k", max(KS)))
         lines = {name: read_jsonl(run_dir / f"{name}.jsonl") for name, _, _ in systems}
@@ -81,7 +84,7 @@ def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...]
     except (ValueError, KeyError, TypeError) as exc:
         raise ScoreError(f"run files in {run_dir} are not valid: {type(exc).__name__}: {exc}") from None
     if not tasks_file.is_file():
-        raise ScoreError(f"tasks file {tasks_file} is missing")
+        raise ScoreError(f"tasks file {tasks_file} is missing (for a run from another machine, use --tasks FILE)")
     if sha256_file(tasks_file) != tasks_sha:
         raise ScoreError(f"tasks file {tasks_file} changed since the run; labels would not match the hits")
     tasks = {t.id: t for t in load_tasks(tasks_file)}
