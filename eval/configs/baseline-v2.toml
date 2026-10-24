@@ -1,0 +1,63 @@
+# Baseline comparison for codemem v2: the grep baselines of baseline.toml and the codemem v2
+# systems of codemem-v2.toml (which share one index). Needs: uv sync --extra codemem, and ripgrep.
+
+[[system]]
+name = "grep"
+adapter = "grep"
+
+[[system]]
+name = "grep-fn"
+adapter = "grep_fn"
+
+# The stronger grep baseline (2026-10-23): Python files only, rare keywords weigh more, noisy
+# keywords dropped, tests last. The report's primary tests compare against it.
+[[system]]
+name = "grep-fn-plus"
+adapter = "grep_fn"
+types = ["py"]
+weighting = "idf"
+clean_keywords = true
+tests_last = true
+
+[[system]]
+name = "cm2-bm25"
+adapter = "codemem"
+signals = ["bm25"]
+config = { device = "auto" }
+
+[[system]]
+name = "cm2-bm25-code"
+adapter = "codemem"
+signals = ["bm25", "code"]
+config = { device = "auto" }
+
+[[system]]
+name = "cm2-bm25-code-usage"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto" }
+
+# Search-time variants of the full system.
+[[system]]
+name = "cm2-full-fn"  # functions and methods only (no class or block results)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", kinds = ["function", "method"] }
+
+[[system]]
+name = "cm2-full-tests-down"  # test chunks keep half their fused score (like grep-fn-plus tests_last, softer)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5 }
+
+[[system]]
+name = "cm2-full-no-tests"  # test chunks never returned
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.0 }
+
+[[system]]
+name = "cm2-full-v1-bm25"  # v1 BM25 weights (name 10, signature 5, body 1; no path or doc field)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", bm25 = { weights = [10, 5, 1] } }

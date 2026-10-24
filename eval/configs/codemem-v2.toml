@@ -1,0 +1,47 @@
+# codemem v2 (multi-language backend, docs/baseline-v2-diff.md). Every system here shares ONE index
+# (same index-time settings) and differs only at search time, so the variants cost one indexing run.
+# cm2-bm25 / cm2-bm25-code / cm2-bm25-code-usage mirror cm-* in baseline.toml (codemem v1).
+# Needs: uv sync --extra codemem
+
+[[system]]
+name = "cm2-bm25"
+adapter = "codemem"
+signals = ["bm25"]
+config = { device = "auto" }
+
+[[system]]
+name = "cm2-bm25-code"
+adapter = "codemem"
+signals = ["bm25", "code"]
+config = { device = "auto" }
+
+[[system]]
+name = "cm2-bm25-code-usage"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto" }
+
+# Search-time variants of the full system.
+[[system]]
+name = "cm2-full-fn"  # functions and methods only (no class or block results)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", kinds = ["function", "method"] }
+
+[[system]]
+name = "cm2-full-tests-down"  # test chunks keep half their fused score (like grep-fn-plus tests_last, softer)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5 }
+
+[[system]]
+name = "cm2-full-no-tests"  # test chunks never returned
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.0 }
+
+[[system]]
+name = "cm2-full-v1-bm25"  # v1 BM25 weights (name 10, signature 5, body 1; no path or doc field)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", bm25 = { weights = [10, 5, 1] } }
