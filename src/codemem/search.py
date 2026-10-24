@@ -163,19 +163,25 @@ def available_signals(store: Store, config: Config) -> list[str]:
     return [BM25] + [v for v in config.enabled_vec_types() if v in stored]
 
 
-def _weigh_tests(store: Store, fused: list[tuple[int, float]], weight: float) -> list[tuple[int, float]]:
-    """Multiply the fused score of test chunks by `weight` (0 < weight < 1 pushes them down)."""
+def _reweigh(
+    store: Store, fused: list[tuple[int, float]], test_weight: float, kind_weights: dict[str, float]
+) -> list[tuple[int, float]]:
+    """Multiply fused scores by the test weight (test chunks) and the weight of each chunk's kind,
+    so kinds an agent rarely wants (tests, classes, blocks) can be pushed down without dropping them."""
     ids = [doc for doc, _ in fused]
-    tests: set[int] = set()
+    factor: dict[int, float] = {}
     for start in range(0, len(ids), 500):
         batch = ids[start : start + 500]
         marks = ",".join("?" * len(batch))
-        tests.update(r[0] for r in store.conn.execute(
-            f"SELECT chunk_id FROM chunks WHERE is_test = 1 AND chunk_id IN ({marks})", batch
-        ))
-    if not tests:
+        for chunk_id, kind, is_test in store.conn.execute(
+            f"SELECT chunk_id, kind, is_test FROM chunks WHERE chunk_id IN ({marks})", batch
+        ):
+            f = kind_weights.get(kind, 1.0) * (test_weight if is_test else 1.0)
+            if f != 1.0:
+                factor[chunk_id] = f
+    if not factor:
         return fused
-    weighed = [(doc, score * weight if doc in tests else score) for doc, score in fused]
+    weighed = [(doc, score * factor.get(doc, 1.0)) for doc, score in fused]
     return sorted(weighed, key=lambda kv: (-kv[1], kv[0]))
 
 
@@ -192,6 +198,7 @@ def search(
     kinds: Sequence[str] | None = None,
     languages: Sequence[str] | None = None,
     test_weight: float | None = None,
+    kind_weights: dict[str, float] | None = None,
 ) -> SearchResponse:
     timings: dict[str, float] = {}
     t_total = time.perf_counter()
@@ -245,8 +252,9 @@ def search(
 
     t = time.perf_counter()
     fused = rrf(ranked, k=config.rrf_k, weights=config.rrf_weights)
-    if 0 < test_weight < 1:
-        fused = _weigh_tests(store, fused, test_weight)
+    kind_weights = config.kind_weights if kind_weights is None else kind_weights
+    if (0 < test_weight != 1) or any(w != 1.0 for w in kind_weights.values()):
+        fused = _reweigh(store, fused, test_weight if test_weight > 0 else 1.0, kind_weights)
     rank_of = {s: {doc: r for r, doc in enumerate(ids, start=1)} for s, ids in ranked.items()}
     query_tokens = set(tokenize(query, stopwords=True))
     results: list[ResultCard] = []

@@ -90,6 +90,7 @@ class Config:
     # search-time result filters (the eval adapter can set them per system)
     kinds: list[str] | None = None  # None = every kind; e.g. ["function", "method"]
     test_weight: float = 1.0  # multiplies the fused score of test chunks; 0 drops them
+    kind_weights: dict[str, float] = field(default_factory=dict)  # e.g. {"class": 0.5}; missing kinds 1.0
     steering: str = "light"  # none | light | strong
     preview_lines: int = 12
     preview_chars: int = 800
@@ -193,7 +194,7 @@ def _env_overrides() -> dict[str, Any]:
 _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
-    "window_overlap_lines", "max_block_lines", "vector_cache", "kinds", "test_weight",
+    "window_overlap_lines", "max_block_lines", "vector_cache", "kinds", "test_weight", "kind_weights",
 )
 
 
@@ -240,10 +241,10 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         unknown = [lang for lang in cfg.languages if lang not in supported_languages()]
         if unknown:
             raise ValueError(f"unknown languages {unknown}; choose from {supported_languages()}")
-    if cfg.kinds is not None:
-        from .schema import KINDS
+    from .schema import KINDS
 
-        unknown = [k for k in cfg.kinds if k not in KINDS]
+    for kinds in (cfg.kinds or [], cfg.kind_weights):
+        unknown = [k for k in kinds if k not in KINDS]
         if unknown:
             raise ValueError(f"unknown kinds {unknown}; choose from {list(KINDS)}")
     return cfg

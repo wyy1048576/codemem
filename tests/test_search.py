@@ -219,3 +219,17 @@ def test_card_names_the_best_window_of_a_long_function(tmp_path, fake_config):
     assert card.best_lines is not None and card.best_lines[1] == 302 and card.best_lines[0] > 200
     assert "flush_the_audit_log_now()" in card.preview  # the preview shows that window
     store.close()
+
+
+def test_kind_weights_push_kinds_down(index):
+    store, cfg, factory = index
+    plain = search(store, "session table", cfg, k=50, embedder_factory=factory).results
+    assert any(r.kind == "class" for r in plain)
+    weighed = search(store, "session table", cfg, k=50, kind_weights={"class": 0.01}, embedder_factory=factory).results
+    first_class = next(i for i, r in enumerate(weighed) if r.kind == "class")
+    assert all(r.kind == "class" for r in weighed[first_class:])  # every class now ranks below the rest
+    assert {r.key for r in plain} == {r.key for r in weighed}  # pushed down, not dropped
+    with pytest.raises(ValueError, match="unknown kinds"):
+        from codemem.config import config_from_dict
+
+        config_from_dict({"kind_weights": {"klass": 0.5}})
