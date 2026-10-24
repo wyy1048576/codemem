@@ -61,6 +61,17 @@ def ensure_clone(repo: str, url: str | None = None) -> Path:
     return path
 
 
+def shallow_clone(repo: str, branch: str, dest: Path, url: str | None = None) -> str:
+    """Check out only the newest commit of one branch into dest (no history). Returns its sha.
+
+    Much smaller than a full clone. For numbers about today's code only; the collector and the
+    runner need the full clone from ensure_clone.
+    """
+    _git("clone", "--depth", "1", "--single-branch", "--branch", branch, "--no-tags", "--quiet",
+         "-c", "core.autocrlf=false", url or f"https://github.com/{repo}.git", str(dest))
+    return _git("rev-parse", "HEAD", cwd=dest).stdout.strip()
+
+
 def has_commit(repo: str, sha: str) -> bool:
     clone = clone_path(repo)
     if not clone.exists():

@@ -40,11 +40,14 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 | `cmeval validate FILE` | Check a task file and print counts by source, split, and repo |
 | `cmeval import swebench-verified [--n 50] [--seed 0]` | Sample and label SWE-bench Verified tasks (pinned dataset revision) |
 | `cmeval systems FILE` | Check a system config and list its systems (adapter, granularity, index key) |
+| `cmeval repo-stats [--candidates FILE] [--repo R ...] [--since DATE] [--until DATE] [--functions]` | Numbers for choosing repos for fresh tasks: size, languages, a PR funnel after the cutoff, and (with `--functions`) the Python files, lines, and chunks that codemem indexes, from a shallow clone. GitHub answers are cached in `CMEVAL_HOME/gh-cache`. Needs `gh` with a login. |
 | `cmeval collect` | Not built yet |
 | `cmeval review` | Not built yet |
 | `cmeval run --tasks FILE --config FILE --run-id ID [--split dev\|test] [--repo R] [--limit-per-repo N] [--index-mode update\|rebuild]` | Run every system on every task; saves hits and timings (see "Run files") |
 | `cmeval score RUN [--tokens anthropic\|estimate] [--iou T ...]` | Score a run: accuracy, tokens, latency (see "Metrics") |
-| `cmeval report` | Not built yet |
+| `cmeval report RUN [--baseline grep-fn-plus] [--split dev\|test] [--cutoff DATE] [--tasks FILE]` | Write `report.md` for a scored run: tables, intervals, paired tests |
+| `cmeval merge BASE EXTRA --run-id ID [--system S ...]` | Copy systems of one run into a copy of another run, for one report |
+| `cmeval compare RUN_A RUN_B [--tasks FILE]` | Update vs. rebuild check: compare two scored runs of the same tasks |
 
 ## Systems (the plug)
 
@@ -127,4 +130,4 @@ Compare systems only within one machine: GPU and CPU round slightly differently,
 
 ## Local data
 
-Large data (repo clones, snapshots, indexes, raw runs, token cache) lives in `CMEVAL_HOME`, default `~/.cmeval/`. It is not part of git.
+Large data (repo clones, snapshots, indexes, raw runs, token cache, GitHub API cache) lives in `CMEVAL_HOME`, default `~/.cmeval/`. It is not part of git.

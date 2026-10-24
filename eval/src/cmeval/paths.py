@@ -41,6 +41,21 @@ def datasets_dir() -> Path:
     return cmeval_home() / "datasets"
 
 
+def gh_cache_dir() -> Path:
+    """GitHub API responses, one JSON file for each request."""
+    return cmeval_home() / "gh-cache"
+
+
+def tmp_dir() -> Path:
+    """Short-lived data, for example shallow clones for repo-stats."""
+    return cmeval_home() / "tmp"
+
+
+def default_results_dir() -> Path:
+    """eval/results in the repo."""
+    return Path(__file__).resolve().parents[2] / "results"
+
+
 def default_tasks_dir() -> Path:
     """eval/tasks in the repo, where task files (answer keys) are kept in git."""
     return Path(__file__).resolve().parents[2] / "tasks"
