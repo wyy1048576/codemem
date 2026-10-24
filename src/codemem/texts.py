@@ -1,8 +1,7 @@
 """Text builders: one text per (chunk, vector type), each embedded separately.
 
 A builder is `fn(chunk, ctx) -> str | None`; None means "no vector of this type
-for this chunk". New types (summary, file summary, ...) register here without
-changes to the store or search.
+for this chunk". New types register here without changes to the store or search.
 """
 
 from __future__ import annotations
@@ -79,10 +78,3 @@ def build_usage(chunk: Chunk, ctx: BuildContext) -> str | None:
     for subject in commits[:5]:
         lines.append(f"changed in commit: {subject}")
     return "\n".join(lines)
-
-
-@register("summary")
-def build_summary(chunk: Chunk, ctx: BuildContext) -> str | None:
-    # Slot for LLM summaries (not in Week 1). Enabling `vectors.summary` is a no-op
-    # until a summarizer fills this in.
-    return None

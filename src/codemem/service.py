@@ -6,6 +6,7 @@ assumptions, so a future daemon can reuse it unchanged.
 
 from __future__ import annotations
 
+import bisect
 import logging
 import threading
 import time
@@ -61,9 +62,13 @@ class CodememService:
         lo, hi = _PHASE_SPAN.get(phase, (0.0, 0.0))
         self.progress = 100 * (lo + (hi - lo) * (done / total if total else 1.0))
 
-    def update(self, *, full: bool = False) -> IndexStats | None:
-        """Run an update now (blocking). Concurrent requests coalesce into one re-run."""
-        if not self._update_lock.acquire(blocking=False):
+    def update(self, *, full: bool = False, wait: bool = False) -> IndexStats | None:
+        """Run an update now (blocking). Concurrent requests coalesce into one re-run.
+
+        If another update is running: with `wait`, run after it finishes; otherwise ask it to
+        run once more and return None.
+        """
+        if not self._update_lock.acquire(blocking=wait):
             self._pending.set()
             return None
         try:
@@ -88,6 +93,39 @@ class CodememService:
                     return self.last_stats
         finally:
             self._update_lock.release()
+
+    def reindex(self) -> IndexStats | None:
+        """Agent-requested update: returns once every change on disk is in the index."""
+        return self.update(wait=True)
+
+    def pending_changes(self, *, limit: int = 50) -> dict[str, Any]:
+        """Files that differ from the index, most depended-on first, so an agent can judge
+        whether a reindex is worth it. Importance comes from the indexed call graph (name
+        matching, so approximate): how many other files call into the file, and the share of
+        indexed files that fewer other files call into (`percentile`)."""
+        scan = Indexer(self.repo_root, self.store, self.config).scan()
+        known = self.store.get_files()
+        changes = [(s.rel, "modified" if s.rel in known else "added") for s, _, _ in scan.changed]
+        changes += [(rel, "deleted") for rel in scan.deleted]
+        files: list[dict[str, Any]] = []
+        if changes:
+            inbound = self.store.inbound_by_file()
+            counts = sorted(inbound.get(p, (0, 0))[0] for p in known)
+            for rel, change in changes:
+                n_files, n_calls = inbound.get(rel, (0, 0))
+                below = bisect.bisect_left(counts, n_files)
+                files.append({
+                    "path": rel, "change": change, "inbound_files": n_files, "inbound_calls": n_calls,
+                    "percentile": round(100 * below / len(counts)) if counts else 0,
+                })
+            files.sort(key=lambda f: (-f["inbound_files"], -f["inbound_calls"], f["path"]))
+        return {
+            "changed_files": len(scan.changed),
+            "deleted_files": len(scan.deleted),
+            "total_files": scan.total,
+            "files": files[:limit],
+            "more_files": max(0, len(files) - limit),
+        }
 
     def start_background_update(self, *, full: bool = False, prewarm: bool = True) -> threading.Thread:
         def run() -> None:
@@ -189,11 +227,9 @@ class CodememService:
             "error": self.last_error,
         }
         if check_staleness and self.state not in ("indexing", "updating"):
-            scan = Indexer(self.repo_root, store, self.config).scan()
             head = git_head(self.repo_root)
             info["stale"] = {
-                "changed_files": len(scan.changed),
-                "deleted_files": len(scan.deleted),
+                **self.pending_changes(),
                 "head": head,
                 "head_moved": bool(head and head != info["indexed_commit"]),
             }

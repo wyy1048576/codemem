@@ -50,6 +50,14 @@ def plan(repo_root: Path, agents: list[str], *, write_agent_notes: bool = False,
             "claude", f"add 'codemem' to {path.name} (or run: claude mcp add codemem -- codemem mcp)",
             path, _merge_mcp_json(path, {"command": COMMAND, "args": ["mcp"]}),
         ))
+        # The skill tells the agent when to call `reindex`, since the server doesn't re-index on save.
+        skill = repo_root / ".claude" / "skills" / prompts.REINDEX_SKILL_NAME / "SKILL.md"
+        content = prompts.reindex_skill()
+        existing = skill.read_text("utf-8") if skill.is_file() else None
+        if existing != content:
+            verb = "add" if existing is None else "replace (yours differs)"
+            rel = skill.relative_to(repo_root).as_posix()
+            actions.append(Action("claude", f"{verb} {rel}: when to reindex", skill, content))
     if "cursor" in agents:
         path = repo_root / ".cursor" / "mcp.json"
         actions.append(Action(

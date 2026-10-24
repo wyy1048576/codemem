@@ -34,6 +34,19 @@ def format_chunk(d: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def format_reindex(stats: dict[str, Any]) -> str:
+    embedded = ", ".join(f"{v} {k}" for k, v in stats["embedded"].items() if v) or "nothing"
+    lines = [
+        f"index updated in {stats['timings'].get('total', 0.0):.1f}s: {stats['files_changed']} files changed, "
+        f"{stats['files_deleted']} deleted",
+        f"functions: {stats['chunks_added']} added, {stats['chunks_updated']} updated, {stats['chunks_deleted']} deleted",
+        f"re-embedded: {embedded}",
+    ]
+    if stats["errors"]:
+        lines.append("errors: " + "; ".join(stats["errors"][:5]))
+    return "\n".join(lines)
+
+
 def format_status(info: dict[str, Any]) -> str:
     lines = [f"state: {info['state']}" + (f" ({info['progress']}%)" if info.get("progress") is not None else "")]
     lines.append(f"repo: {info['repo']}")
@@ -50,8 +63,15 @@ def format_status(info: dict[str, Any]) -> str:
     if stale := info.get("stale"):
         lines.append(
             f"stale: {stale['changed_files']} changed, {stale['deleted_files']} deleted"
-            + (", git HEAD moved" if stale["head_moved"] else "")
+            f" (of {stale['total_files']} files)" + (", git HEAD moved" if stale["head_moved"] else "")
         )
+        for f in stale["files"]:
+            lines.append(
+                f"  {f['change']:8s} {f['path']}  called from {f['inbound_files']} other files "
+                f"({f['inbound_calls']} calls), percentile {f['percentile']}"
+            )
+        if stale["more_files"]:
+            lines.append(f"  ... and {stale['more_files']} more")
     if info.get("error"):
         lines.append(f"error: {info['error']}")
     return "\n".join(lines)

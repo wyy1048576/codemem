@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from codemem.callgraph import is_test_caller, is_test_path, resolve_edges
 from codemem.config import Config, config_from_dict
@@ -65,10 +66,11 @@ def test_usage_text_includes_commits_when_given():
     assert "changed in commit: Fix session leak" in TEXT_BUILDERS["usage"](_chunk(1, "f"), ctx)
 
 
-def test_summary_slot_disabled_and_build_texts_skips_none():
+def test_build_texts_skips_none_and_rejects_unknown_types():
     c = _chunk(1, "f")
-    assert TEXT_BUILDERS["summary"](c, BuildContext()) is None
-    assert build_texts(c, BuildContext(), ["code", "usage", "summary"]) == {"code": c.code}
+    assert build_texts(c, BuildContext(), ["code", "usage"]) == {"code": c.code}  # no callers: no usage
+    with pytest.raises(KeyError, match="summary"):
+        build_texts(c, BuildContext(), ["summary"])  # the LLM summary slot was removed
 
 
 def test_fake_embedder_deterministic_normalized_and_similarity():
@@ -103,6 +105,13 @@ def test_config_parsing():
     assert cfg.model_id("code") == "jinaai/jina-code-embeddings-1.5b@256"
     assert cfg.bm25_weights == (3, 2, 1) and cfg.rrf_k == 10 and cfg.rrf_weights == {"bm25": 2.0}
     assert cfg.max_defs_per_name == 3
+
+
+def test_config_watch_is_off_by_default():
+    assert Config().watch is False and config_from_dict({}).watch is False
+    assert config_from_dict({"watch": True}).watch is True
+    with pytest.raises(ValueError, match="watch"):
+        config_from_dict({"watch": "yes"})
 
 
 def test_load_config_layers(tmp_path, monkeypatch):

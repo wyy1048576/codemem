@@ -58,7 +58,7 @@ def test_build_and_search(repo, tmp_path):
     assert (revoke.path, revoke.start_line, revoke.end_line) == ("auth/sessions.py", 2, 5)
     assert hits[0].text.startswith("1. ") and hits[1].text.startswith("2. ")  # MCP card, real rank number
     assert "[id " in hits[0].text and "bm25=" not in hits[0].text  # no debug ranks in what the agent sees
-    assert set(hits[0].extra["signals"]) == {"bm25", "code", "usage"}
+    assert set(hits[0].extra["signals"]) == {"bm25", "name", "code", "usage"}
 
 
 def test_signals_select_what_is_searched(repo, tmp_path):

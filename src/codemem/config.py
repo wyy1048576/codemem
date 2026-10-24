@@ -42,8 +42,6 @@ def _default_vectors() -> dict[str, VectorConfig]:
     return {
         "code": VectorConfig(),
         "usage": VectorConfig(),
-        # Slot only in Week 1: the builder returns None, so nothing is embedded.
-        "summary": VectorConfig(enabled=False),
     }
 
 
@@ -69,6 +67,8 @@ class Config:
     steering: str = "light"  # none | light | strong
     preview_lines: int = 12
     preview_chars: int = 800
+    # Re-index on save inside the MCP server. Off: the agent calls `reindex` when it decides to.
+    watch: bool = False
     debounce_ms: int = 400
 
     def enabled_vec_types(self) -> list[str]:
@@ -235,6 +235,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         "ignore": raw.get("ignore"),
         "steering": raw.get("steering"),
         "candidates": raw.get("candidates"),
+        "watch": raw.get("watch"),
     }
     bm25 = raw.get("bm25") or {}
     rrf = raw.get("rrf") or {}
@@ -257,6 +258,8 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"device must be auto|cpu|xpu|cuda|mps, got {cfg.device!r}")
     if cfg.vector_backend != "faiss" and ":" not in cfg.vector_backend:
         raise ValueError(f"vector_backend must be faiss or 'module:Class', got {cfg.vector_backend!r}")
+    if not isinstance(cfg.watch, bool):
+        raise ValueError(f"watch must be true or false, got {cfg.watch!r}")
     if cfg.steering not in {"none", "light", "strong"}:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
     return cfg

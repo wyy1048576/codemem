@@ -192,7 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp = common(sub.add_parser("search", help="search the index"), path=False)
     sp.add_argument("query")
     sp.add_argument("-k", type=int, default=10)
-    sp.add_argument("--signals", help="comma list, e.g. bm25,code,usage (default: all available)")
+    sp.add_argument("--signals", help="comma list, e.g. bm25,name,code,usage (default: all available)")
     sp.add_argument("--path-prefix", help="only results under this repo-relative path")
     sp.add_argument("--repo", help="repository (default: git root of the current directory)")
     sp.add_argument("--json", action="store_true")

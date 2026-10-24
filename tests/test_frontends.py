@@ -1,6 +1,7 @@
 """Service, watcher, CLI, agent config and MCP server (all with the fake embedder)."""
 
 import json
+import threading
 import time
 
 import anyio
@@ -56,6 +57,31 @@ def test_status_reports_staleness(service, sample_repo):
     assert info["stale"]["changed_files"] == 1 and info["models"]["code"]["model"] == "fake:64"
 
 
+def test_pending_changes_rank_files_by_how_much_depends_on_them(service, sample_repo):
+    service.update()
+    assert service.pending_changes()["files"] == []
+    for rel in ("auth/sessions.py", "api/routes.py"):
+        (sample_repo / rel).write_text((sample_repo / rel).read_text() + "\n# edited\n")
+    (sample_repo / "auth" / "audit.py").write_text("def record_audit_event(evt):\n    return evt\n")
+    (sample_repo / "auth" / "db.py").unlink()
+    pending = service.pending_changes()
+    assert (pending["changed_files"], pending["deleted_files"], pending["total_files"]) == (3, 1, 6)
+    files = {f["path"]: f for f in pending["files"]}
+    assert [f["path"] for f in pending["files"]][:2] == ["auth/sessions.py", "auth/db.py"]
+    # revoke_session and friends are called from routes, users and the tests.
+    assert files["auth/sessions.py"] == {
+        "path": "auth/sessions.py", "change": "modified", "inbound_files": 3, "inbound_calls": 4, "percentile": 83,
+    }
+    assert files["auth/db.py"]["change"] == "deleted" and files["auth/db.py"]["inbound_files"] == 2
+    assert files["api/routes.py"]["inbound_files"] == 0 and files["api/routes.py"]["percentile"] == 0
+    assert files["auth/audit.py"]["change"] == "added"
+    assert service.pending_changes(limit=1)["more_files"] == 3
+
+    stats = service.reindex()
+    assert stats.files_changed == 3 and stats.files_deleted == 1
+    assert service.pending_changes()["files"] == []
+
+
 def test_concurrent_update_requests_coalesce(service):
     service._update_lock.acquire()
     try:
@@ -63,6 +89,20 @@ def test_concurrent_update_requests_coalesce(service):
         assert service._pending.is_set()
     finally:
         service._update_lock.release()
+
+
+def test_reindex_waits_for_a_running_update(service, sample_repo):
+    service.update()
+    service._update_lock.acquire()
+    done = []
+    worker = threading.Thread(target=lambda: done.append(service.reindex()))
+    worker.start()
+    time.sleep(0.2)
+    assert not done  # waiting, not skipped
+    (sample_repo / "auth" / "audit.py").write_text("def record_audit_event(evt):\n    return evt\n")
+    service._update_lock.release()
+    worker.join(timeout=30)
+    assert done[0] is not None and done[0].files_changed == 1
 
 
 def test_watcher_reindexes_after_save(service, sample_repo):
@@ -130,6 +170,7 @@ def test_cli_init_dry_run_writes_nothing(sample_repo, fake_env, capsys):
     out = capsys.readouterr().out
     assert "would write" in out and "[mcp_servers.codemem]" in out
     assert not (sample_repo / ".mcp.json").exists() and not (sample_repo / "CLAUDE.md").exists()
+    assert "codemem-reindex/SKILL.md" in out and not (sample_repo / ".claude").exists()
 
 
 def test_cli_init_writes_configs(sample_repo, tmp_path, fake_env, capsys):
@@ -143,16 +184,36 @@ def test_cli_init_writes_configs(sample_repo, tmp_path, fake_env, capsys):
     cursor = json.loads((sample_repo / ".cursor" / "mcp.json").read_text())
     assert cursor["mcpServers"]["codemem"]["args"] == ["mcp", "${workspaceFolder}"]
     assert prompts.AGENT_NOTES_MARKER in (sample_repo / "CLAUDE.md").read_text()
+    skill = sample_repo / ".claude" / "skills" / "codemem-reindex" / "SKILL.md"
+    assert skill.read_text("utf-8") == prompts.reindex_skill()
     assert "indexed 6 files" in capsys.readouterr().out
-    # Running again does not duplicate the notes.
+    # Running again does not duplicate the notes or rewrite the skill.
     again = agents.plan(sample_repo, ["claude"], write_agent_notes=True)
-    assert [a.agent for a in again] == ["claude"]
+    assert [a.path.name for a in again] == [".mcp.json"]
+    skill.write_text("my own version", encoding="utf-8")
+    again = agents.plan(sample_repo, ["claude"])
+    assert again[-1].path == skill and "yours differs" in again[-1].description
+
+
+def test_reindex_skill_has_frontmatter_and_names_the_tools():
+    text = prompts.reindex_skill()
+    head, _, body = text.removeprefix("---\n").partition("\n---\n")
+    assert head.startswith(f"name: {prompts.REINDEX_SKILL_NAME}\n") and "\ndescription: " in head
+    for word in ("index_status", "reindex", "inbound_files", "percentile", "total_files", "head_moved"):
+        assert word in body
 
 
 def test_steering_levels_change_text():
     texts = {lvl: prompts.tool_description("search_code", lvl) for lvl in ("none", "light", "strong")}
     assert len(set(texts.values())) == 3 and "FIRST" in texts["strong"] and "grep" not in texts["none"]
     assert prompts.agent_notes("none") is None
+
+
+def test_instructions_mention_reindex_only_without_watcher():
+    for lvl in ("none", "light", "strong"):
+        assert "not after every edit" in prompts.tool_description("reindex", lvl)
+        assert "reindex()" in prompts.server_instructions(lvl)
+        assert prompts.server_instructions(lvl, watch=True) == prompts._INSTRUCTIONS[lvl]
 
 
 # ---------------------------------------------------------------- MCP
@@ -169,9 +230,9 @@ def test_mcp_tools_end_to_end(service):
     async def run():
         async with Client(server) as client:
             tools = {t.name: t for t in (await client.list_tools()).tools}
-            assert set(tools) == {"search_code", "get_chunk", "index_status"}
+            assert set(tools) == {"search_code", "get_chunk", "index_status", "reindex"}
             assert tools["search_code"].description == prompts.tool_description("search_code", "light")
-            assert client.instructions == prompts.server_instructions("light")
+            assert client.instructions == prompts.server_instructions("light", watch=False)
             res = await client.call_tool("search_code", {"query": "revoke session", "k": 3})
             text = res.content[0].text
             assert "auth/sessions.py:19-20  revoke_session" in text
@@ -180,6 +241,14 @@ def test_mcp_tools_end_to_end(service):
             assert "callers: " in res.content[0].text
             res = await client.call_tool("index_status", {})
             assert "state: ready" in res.content[0].text
+
+            (service.repo_root / "auth" / "audit.py").write_text("def record_audit_event(evt):\n    return evt\n")
+            status = (await client.call_tool("index_status", {})).content[0].text
+            assert "added    auth/audit.py  called from 0 other files" in status
+            res = await client.call_tool("reindex", {})
+            assert "1 files changed" in res.content[0].text and "re-embedded: 1 code" in res.content[0].text
+            status = (await client.call_tool("index_status", {})).content[0].text
+            assert "stale: 0 changed, 0 deleted" in status
 
     anyio.run(run)
 
@@ -217,7 +286,7 @@ def test_mcp_stdio_subprocess(sample_repo, tmp_path, isolated_home):
         with anyio.fail_after(60):
             async with Client(params) as client:
                 tools = {t.name for t in (await client.list_tools()).tools}
-                assert tools == {"search_code", "get_chunk", "index_status"}
+                assert tools == {"search_code", "get_chunk", "index_status", "reindex"}
                 for _ in range(100):
                     status = (await client.call_tool("index_status", {})).content[0].text
                     if "state: ready" in status:
@@ -226,5 +295,14 @@ def test_mcp_stdio_subprocess(sample_repo, tmp_path, isolated_home):
                 assert "state: ready" in status
                 res = await client.call_tool("search_code", {"query": "disable user"})
                 assert "disable_user" in res.content[0].text
+
+                # No watcher by default: a save is not indexed until the agent calls reindex.
+                (sample_repo / "auth" / "audit.py").write_text("def record_audit_event(evt):\n    return evt\n")
+                await anyio.sleep(1.5)  # well past the 400 ms debounce a watcher would use
+                res = await client.call_tool("search_code", {"query": "record_audit_event", "k": 1})
+                assert "record_audit_event" not in res.content[0].text
+                await client.call_tool("reindex", {})
+                res = await client.call_tool("search_code", {"query": "record_audit_event", "k": 1})
+                assert "auth/audit.py:1-2  record_audit_event" in res.content[0].text
 
     anyio.run(run)

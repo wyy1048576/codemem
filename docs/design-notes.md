@@ -3,13 +3,17 @@
 Owner: Wilson (Person A, platform/backend). Team: Andre (retrieval), Andrew (data/eval).
 Status: decisions agreed in discussion on Oct 20, 2026. This file is the brief for building the Week 1 backend skeleton.
 
+**Changed on Oct 24, 2026:**
+- **LLM summaries are dropped.** The `summary` slot is removed from the code, the config and the store. We won't use them.
+- **The agent decides when to re-index.** The MCP server no longer re-indexes on save (config `watch = false` by default). `index_status()` lists changed files with how much of the repo depends on each, a new `reindex()` tool updates the index, and a Claude Code skill (`codemem-reindex`, installed by `init`) tells the agent how to weigh the two. Change detection (hashes, chunk diff, text hashes) is unchanged.
+
 ---
 
 ## 1. What we're building
 
 A **local, agent-agnostic code search tool**. A developer points it at a repository. It indexes every function and exposes search to coding agents (Claude Code, Codex, Cursor) through an **MCP server** and to humans/eval scripts through a **CLI**. The goal is finding the code relevant to an issue more accurately, with fewer tokens and in less time than grep.
 
-Research context: we compare grep vs. hybrid BM25 + embedding baseline vs. our additions (usage context, LLM summaries, hierarchy, query routing, token-budgeted results) on SWE-bench / LocBench. The platform must make these components **easy to toggle and swap**.
+Research context: we compare grep vs. hybrid BM25 + embedding baseline vs. our additions (usage context, hierarchy, query routing, token-budgeted results) on SWE-bench / LocBench. The platform must make these components **easy to toggle and swap**.
 
 ## 2. Product shape (decided)
 
@@ -22,7 +26,7 @@ Research context: we compare grep vs. hybrid BM25 + embedding baseline vs. our a
 
 `init` → chunk (tree-sitter, Python) → build texts (code, usage) → embed (jina-0.5b) → store (SQLite + FAISS) → hybrid search (BM25 + vectors, RRF) → MCP + CLI, plus watcher + catch-up.
 
-**Not in Week 1:** LLM summaries (leave a pluggable slot), hierarchy summaries, query routing, token-budget cards beyond a simple cap, daemon, web UI, non-Python languages.
+**Not in Week 1:** hierarchy summaries, query routing, token-budget cards beyond a simple cap, daemon, web UI, non-Python languages.
 
 ## 4. Environment
 
@@ -43,7 +47,7 @@ codemem/
     schema.py      # Chunk dataclass + IDs
     chunker.py     # tree-sitter Python chunking + call extraction
     tokenize.py    # code-aware tokenization for BM25
-    texts.py       # text builders: code, usage, (summary slot)
+    texts.py       # text builders: code, usage
     embedder.py    # Embedder interface; JinaEmbedder; FakeEmbedder for tests
     store.py       # SQLite (metadata, FTS5, call graph) + FAISS per vector type
     indexer.py     # full + incremental indexing (hash based)
@@ -79,9 +83,8 @@ Each function gets **several different texts**, each embedded separately into it
 |---|---|---|
 | `code` | the function's source (signature + docstring + body) | yes |
 | `usage` | callers ("called by X in path"), tests ("tested by test_Y"), optionally commit subjects | yes |
-| `summary` | LLM-written 1–2 sentence description of the code | **slot only** (builder interface, disabled) |
 
-- Implement text builders as a **registry** (`name → function(chunk, context) → str | None`) so new types (summary, file summary, etc.) are added without touching the store or search.
+- Implement text builders as a **registry** (`name → function(chunk, context) → str | None`) so new types are added without touching the store or search.
 - **Call graph resolution (baseline heuristic):** link a call to every chunk with that function name; **ignore names defined more than N times** (configurable, e.g. 5) to avoid noise like `get`/`run`. Callers in files under `tests/` or named `test_*` count as "tested by". Keep the heuristic isolated so it can be improved.
 - **Commit messages:** optional, **off by default** (`git log` per file is noisy at function level). Only ever read history up to the indexed commit (no leakage for SWE-bench).
 - Cap usage text length (e.g. top 20 callers/tests).
@@ -117,7 +120,7 @@ Pre-tokenize in Python before inserting into FTS5, and apply the **same function
 
 - **Default: `jinaai/jina-code-embeddings-0.5b`** via `sentence-transformers`. 896-dim (supports truncation, Matryoshka). Keep **`jina-code-embeddings-1.5b`** configurable for evals.
 - **Use the model's task prompts:** queries with `prompt_name="nl2code_query"`, code/text documents with `prompt_name="nl2code_document"`. The prefixes are roughly "Find the most relevant code snippet given the following query:\n" / "Candidate code snippet:\n". **Verify via `model.prompts` after loading** (confirmed for the 1.5b card; assumed for 0.5b). Handle this inside the embedder so callers never see prefixes.
-- Model is configured **per vector type** (e.g. code → jina, usage → jina; later maybe usage/summary → Qwen3-Embedding-0.6B). A query is embedded once **per distinct model** in use.
+- Model is configured **per vector type** (e.g. code → jina, usage → jina; later maybe usage → Qwen3-Embedding-0.6B). A query is embedded once **per distinct model** in use.
 - Optional `embedding_dim` truncation setting (default full).
 - Batch encoding; cache model on first download (Hugging Face cache). License: jina code models are reportedly non-commercial, fine for the course. Note in the README.
 - Provide a **`FakeEmbedder`** (deterministic, hash-based, tiny dim) for tests and fast dev without downloading the model.
@@ -125,11 +128,11 @@ Pre-tokenize in Python before inserting into FTS5, and apply the **same function
 ## 12. Indexing & freshness
 
 - **Full index:** walk files → chunk → build texts → embed what's missing → write store.
-- **Incremental (used by catch-up and watcher):**
+- **Incremental (used by catch-up, `reindex` and the optional watcher):**
   1. Detect changed/added/deleted files by `content_hash` (mtime as a quick pre-check).
   2. Re-chunk changed files; match chunks by `key`; update changed rows, insert new, delete removed (also remove their vectors and edges).
   3. Recompute call edges (cheap) and rebuild **all** text builders' texts; compare `text_hash` against `embeddings`; **re-embed only texts whose hash changed**. This correctly refreshes callers' and callees' usage text when a function changes.
-- **Watcher:** `watchdog`, debounce (~300–500 ms), batch events, then run incremental. Target: update within ~1 s of a save for small edits.
+- **Watcher (optional since Oct 24, `watch = true`):** `watchdog`, debounce (~300–500 ms), batch events, then run incremental. Target: update within ~1 s of a save for small edits. By default the agent calls `reindex()` instead.
 - **Concurrency:** one writer at a time (simple lock file in the index dir); SQLite WAL mode so searches can run during updates.
 - Record timings (chunk/embed/write) and counts (chunks re-embedded); needed later for RQ3.
 
@@ -165,11 +168,12 @@ codemem mcp [PATH]         # MCP server over stdio (what agents launch)
 - **MCP Python SDK v2 note:** `FastMCP` was renamed. Use `from mcp.server.mcpserver import MCPServer` (`MCPServer(name=..., instructions=...)`, `@server.tool(...)`, `server.run("stdio")`), **or** pin `mcp<2` and use `FastMCP`. Pick one deliberately and pin the version range.
 - Transport: **stdio**. Never print to stdout except protocol messages (logs → stderr / log file).
 - Repo resolution: CLI arg, else the working directory the agent launched it in (walk up to the git root).
-- On startup: open the index (build it if missing), run catch-up, start the watcher, then serve. Don't block the handshake for minutes on a first full index. Start indexing in the background and let tools report "indexing in progress, X% done".
+- On startup: open the index (build it if missing), run catch-up, start the watcher if `watch = true`, then serve. Don't block the handshake for minutes on a first full index. Start indexing in the background and let tools report "indexing in progress, X% done".
 - Tools (keep the list small and clear):
   - `search_code(query: str, k: int = 10, path_prefix: str | None = None)` → result cards
   - `get_chunk(chunk_id or path:line)` → full code + callers/callees
-  - `index_status()` → ready/indexing, counts, staleness
+  - `index_status()` → ready/indexing, counts, staleness (changed files, ranked by how many other files call into them)
+  - `reindex()` → update the index now (added Oct 24)
 - Tool descriptions and server `instructions` come from `prompts.py` (see §17).
 
 ## 17. Agent discovery & steering
@@ -199,7 +203,6 @@ codemem mcp [PATH]         # MCP server over stdio (what agents launch)
 
 ## 20. Open items (decide later)
 
-- LLM for summaries (Claude API vs. local) and cost/caching policy.
 - Whether a daemon is needed (depends on whether freshness experiments need updates while no agent runs).
 - Optional web viewer (browse chunks, run queries, show call graph), also useful for presentations.
 - Better call resolution (imports/scopes), hierarchy, query routing, token-budgeted cards.

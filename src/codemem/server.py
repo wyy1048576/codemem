@@ -13,7 +13,7 @@ from pathlib import Path
 from mcp.server.mcpserver import MCPServer
 
 from . import __version__, prompts
-from .render import format_chunk, format_results, format_status
+from .render import format_chunk, format_reindex, format_results, format_status
 from .service import CodememService
 
 log = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def build_server(service: CodememService) -> MCPServer:
     server = MCPServer(
         name=prompts.SERVER_NAME,
         version=__version__,
-        instructions=prompts.server_instructions(steering),
+        instructions=prompts.server_instructions(steering, watch=service.config.watch),
     )
 
     @server.tool(name="search_code", description=prompts.tool_description("search_code", steering))
@@ -54,6 +54,13 @@ def build_server(service: CodememService) -> MCPServer:
             {k: info.get(k) for k in ("state", "progress", "chunks", "vectors", "stale")}, default=str
         )
 
+    @server.tool(name="reindex", description=prompts.tool_description("reindex", steering))
+    def reindex() -> str:
+        stats = service.reindex()  # sync tools run in a worker thread, so the server stays responsive
+        if stats is None or service.last_error:
+            return f"Reindex failed: {service.last_error or 'unknown error'}"
+        return format_reindex(stats.to_dict())
+
     return server
 
 
@@ -63,10 +70,11 @@ def run_stdio(repo: Path | str | None = None, index_dir: Path | str | None = Non
     log.info("codemem MCP server for %s (index %s)", service.repo_root, service.index_dir)
     # Catch-up / first index runs in the background so the handshake isn't blocked.
     service.start_background_update()
-    try:
-        service.start_watcher()
-    except Exception:
-        log.exception("file watcher failed to start; index will only refresh on restart")
+    if service.config.watch:
+        try:
+            service.start_watcher()
+        except Exception:
+            log.exception("file watcher failed to start; the index refreshes on reindex or restart")
     try:
         build_server(service).run("stdio")
     finally:

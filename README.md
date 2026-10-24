@@ -27,7 +27,7 @@ which is the default device here.
 
 ```bash
 cd path/to/repo
-codemem init --agents claude          # writes .mcp.json (asks first), then builds the index
+codemem init --agents claude          # writes .mcp.json + the reindex skill (asks first), then indexes
 codemem search "disabled users stay logged in" --debug
 codemem status
 ```
@@ -36,7 +36,7 @@ codemem status
 |---|---|
 | `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--write-agent-notes] [--dry-run] [-y]` | Register with agents, then index |
 | `codemem index [PATH] [--full] [--json]` | Build or incrementally update the index |
-| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--json] [--debug]` | Search |
+| `codemem search QUERY [-k 10] [--signals bm25,name,code,usage] [--path-prefix DIR] [--json] [--debug]` | Search |
 | `codemem status [PATH] [--json]` | Counts, models, indexed commit, staleness |
 | `codemem watch [PATH]` | Foreground watcher: re-index on save |
 | `codemem mcp [PATH]` | MCP server over stdio (what agents launch) |
@@ -45,30 +45,54 @@ Every command accepts `--index-dir DIR`. The eval harness uses it for per-commit
 
 ### Agents
 
-- **Claude Code:** `init --agents claude` writes a project `.mcp.json`. You can also run
-  `claude mcp add codemem -- codemem mcp`.
+- **Claude Code:** `init --agents claude` writes a project `.mcp.json` and the skill
+  `.claude/skills/codemem-reindex/SKILL.md`, which tells the agent when to reindex (below).
+  You can also run `claude mcp add codemem -- codemem mcp`.
 - **Cursor:** `init --agents cursor` writes `.cursor/mcp.json`.
 - **Codex:** `init --agents codex` prints a `~/.codex/config.toml` snippet. It never edits
   that global file.
 
-The MCP server exposes three tools: `search_code(query, k, path_prefix)`, `get_chunk(ref)`
-and `index_status()`. On startup it answers the handshake immediately, runs a hash-based
-catch-up (or the first full index) in the background, and starts a file watcher. Until the
-first index is done, search results carry an "indexing, X% done" note.
+The MCP server exposes four tools: `search_code(query, k, path_prefix)`, `get_chunk(ref)`,
+`index_status()` and `reindex()`. On startup it answers the handshake immediately and runs a
+hash-based catch-up (or the first full index) in the background. Until the first index is
+done, search results carry an "indexing, X% done" note.
+
+### When the index updates
+
+The MCP server does **not** re-index on save. The agent decides when:
+
+- `index_status()` lists the files that differ from the index (from any source: the agent,
+  the user, git), most depended-on first. For each one it gives `inbound_files` (how many
+  other files call into it), `inbound_calls` and `percentile` (share of indexed files that
+  fewer other files call into), plus `total_files` and whether git HEAD moved.
+- `reindex()` updates the index and returns what changed. It re-embeds only changed texts,
+  so its cost grows with the size of the change.
+- The `codemem-reindex` skill tells the agent how to weigh how much changed against how
+  central the changed files are. Its text lives in `prompts.py`.
+
+`watch = true` in the config brings back re-index on save (watchdog, 400 ms debounce).
+`codemem watch` always watches. Don't run `codemem index` while an MCP server is running on
+the same index: the server keeps searching the vectors it loaded.
 
 ## How it works
 
 ```
 walk .py files (respects .gitignore) -> tree-sitter chunks (one per function/method + file header)
-  -> call graph (name heuristic) -> texts per chunk: code, usage (callers/tests), summary (slot)
+  -> call graph (name heuristic) -> texts per chunk: code, usage (callers/tests)
   -> embed each text type into its own FAISS index (jina-code-embeddings-0.5b)
   -> SQLite: chunks, FTS5 (pre-tokenized, weighted BM25), calls/edges, embedding hashes
-search: BM25 top-N + vector top-N per enabled set -> RRF (k=60) -> result cards
+search: BM25 top-N + exact-name hits + vector top-N per enabled set -> RRF (k=60) -> result cards
 ```
 
 - **Incremental updates** re-chunk only changed files (content hash, mtime pre-check), rebuild
   all texts, and re-embed only the texts whose hash changed. Renaming a caller therefore
   refreshes the callee's usage vector and leaves its code vector alone.
+- **Exact names:** the `name` signal finds functions the query names exactly: `merge_setting`,
+  `Session.send`, or plain words that join into one ("merge setting"). Single plain words don't
+  count, and names defined more than `max_defs_per_name` times are skipped. Its default RRF
+  weight (100) puts those functions first. Without it, a function with no callers (no usage
+  vector) loses exact-name queries to functions that all three other signals rank moderately.
+  `[rrf] weights = { name = 1.0 }` makes it an ordinary vote.
 - **Ablations:** pick the signals per query (`--signals bm25,usage`). Each vector set can be
   enabled or disabled, or given its own model, in the config.
 - **Crash safety:** each `vec_<type>.faiss` has an `ids.json` sidecar. If an update is
@@ -86,12 +110,12 @@ search: BM25 top-N + vector top-N per enabled set -> RRF (k=60) -> result cards
 | `chunker.py` | tree-sitter Python chunking + call extraction |
 | `tokenize.py` | code-aware BM25 tokenization (shared by index and query) |
 | `callgraph.py` | call resolution heuristic (isolated so it can be replaced) |
-| `texts.py` | text-builder registry: `code`, `usage`, `summary` slot |
+| `texts.py` | text-builder registry: `code`, `usage` |
 | `embedder.py` | `Embedder` interface, sentence-transformers/jina, `FakeEmbedder` |
 | `store.py` | SQLite + `VectorStore` backend (default FAISS `IndexIDMap2(IndexFlatIP)`) |
 | `indexer.py` | full + incremental indexing, timings |
 | `search.py` | BM25, vector search, RRF, result cards (pure library function) |
-| `service.py` | long-lived owner of an index: background updates, progress, watcher |
+| `service.py` | long-lived owner of an index: background updates, reindex, pending changes, watcher |
 | `watcher.py` | watchdog + debounce |
 | `prompts.py` | **all** agent-facing text (tool descriptions, instructions, notes) |
 | `agents.py` | agent config writers for `init` |
@@ -120,14 +144,13 @@ max_seq_length = 1024
 steering = "light"           # none | light | strong  (agent-study variable)
 max_file_size = 1000000
 ignore = ["migrations/"]     # extra gitignore-style patterns
+watch = false                # true: the MCP server re-indexes on save
 
 [vectors.code]
 model = "jinaai/jina-code-embeddings-0.5b"
 [vectors.usage]
 model = "jinaai/jina-code-embeddings-0.5b"
 enabled = true
-[vectors.summary]
-enabled = false              # slot only in Week 1
 
 [bm25]
 weights = [10.0, 5.0, 1.0]   # name, signature, body

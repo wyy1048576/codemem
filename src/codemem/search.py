@@ -1,4 +1,4 @@
-"""Hybrid retrieval: BM25 (FTS5) + one vector search per enabled vector set, merged with RRF.
+"""Hybrid retrieval: BM25 (FTS5) + exact names + one vector search per enabled vector set, merged with RRF.
 
 `search()` is a pure library function returning structured results; MCP and the
 CLI only format them.
@@ -6,6 +6,7 @@ CLI only format them.
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
@@ -19,6 +20,71 @@ from .store import Store
 from .tokenize import fts_match_query
 
 BM25 = "bm25"
+NAME = "name"
+# Signals that need no stored vectors.
+LEXICAL = (BM25, NAME)
+# Default RRF weight of the name signal: large enough that a function the query names exactly
+# ranks above everything else (100/(60+50) beats 3 signals at rank 1, 3/61). Set
+# `[rrf] weights = { name = 1.0 }` to make it an ordinary vote.
+NAME_WEIGHT = 100.0
+
+_NAME_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*")
+_PLAIN_WORD = re.compile(r"[A-Za-z][a-z0-9]*")
+
+
+def _identifier_shaped(token: str) -> bool:
+    """snake_case, _private, or camelCase / CapWords with an inner capital (HTTPAdapter)."""
+    return "_" in token or (any(c.isupper() for c in token[1:]) and any(c.islower() for c in token))
+
+
+def query_names(query: str) -> list[str]:
+    """Function names the query spells out, in query order.
+
+    Identifier-shaped tokens (`merge_setting`, `getUser`), dotted names (`Session.send`,
+    matched on qualname, plus its shorter suffixes), and runs of 2-4 plain words joined with
+    "_" ("merge setting" -> `merge_setting`). Single plain words never count, so "proxy" doesn't
+    pin every function named `proxy`.
+    """
+    tokens = _NAME_TOKEN.findall(query)
+    plain = [t.lower() if _PLAIN_WORD.fullmatch(t) else None for t in tokens]
+    out: list[str] = []
+    for i, token in enumerate(tokens):
+        if "." in token:
+            parts = token.split(".")
+            out += [".".join(parts[j:]) for j in range(len(parts) - 1)]
+            if _identifier_shaped(parts[-1]):
+                out.append(parts[-1])
+        elif _identifier_shaped(token):
+            out.append(token)
+        for n in (4, 3, 2):
+            run = plain[i : i + n]
+            if len(run) == n and all(run):
+                out.append("_".join(run))
+    return list(dict.fromkeys(out))
+
+
+def name_hits(store: Store, query: str, config: Config, allowed_ids: Sequence[int] | None = None) -> list[int]:
+    """Functions whose name (or qualname, for dotted names) the query spells out.
+
+    In query order, then by location. A name defined more than `max_defs_per_name` times
+    (`__init__`, `get`) is skipped, the same noise rule as the call graph.
+    """
+    wanted = query_names(query)
+    if not wanted:
+        return []
+    found: dict[str, list[tuple[str, int, int]]] = {}
+    for chunk_id, name, qualname, path, line in store.definitions_named(w.rsplit(".", 1)[-1] for w in wanted):
+        found.setdefault(name, []).append((path, line, chunk_id))
+        if qualname != name:
+            found.setdefault(qualname, []).append((path, line, chunk_id))
+    allowed = set(allowed_ids) if allowed_ids is not None else None
+    out: list[int] = []
+    for w in wanted:
+        defs = sorted(found.get(w, []))
+        if len(defs) > config.max_defs_per_name:
+            continue
+        out += [i for _, _, i in defs if (allowed is None or i in allowed) and i not in out]
+    return out
 
 
 @dataclass
@@ -127,7 +193,7 @@ def make_card(chunk: Chunk, score: float, config: Config, ranks: dict[str, int] 
 
 def available_signals(store: Store, config: Config) -> list[str]:
     stored = set(store.vec_types())
-    return [BM25] + [v for v in config.enabled_vec_types() if v in stored]
+    return [*LEXICAL] + [v for v in config.enabled_vec_types() if v in stored]
 
 
 def search(
@@ -147,10 +213,10 @@ def search(
     if signals is None:
         signals = available_signals(store, config)
     else:
-        unknown = [s for s in signals if s != BM25 and s not in config.vectors]
+        unknown = [s for s in signals if s not in LEXICAL and s not in config.vectors]
         if unknown:
-            raise ValueError(f"unknown signals {unknown}; choose from {[BM25, *config.vectors]}")
-        signals = [s for s in signals if s == BM25 or s in stored_vec_types]
+            raise ValueError(f"unknown signals {unknown}; choose from {[*LEXICAL, *config.vectors]}")
+        signals = [s for s in signals if s in LEXICAL or s in stored_vec_types]
 
     allowed = store.ids_with_prefix(path_prefix) if path_prefix else None
     n = max(config.candidates, k)
@@ -162,7 +228,12 @@ def search(
         ranked[BM25] = store.bm25_search(match, n, config.bm25_weights, path_prefix) if match else []
         timings[BM25] = time.perf_counter() - t
 
-    vec_signals = [s for s in signals if s != BM25]
+    if NAME in signals:
+        t = time.perf_counter()
+        ranked[NAME] = name_hits(store, query, config, allowed)
+        timings[NAME] = time.perf_counter() - t
+
+    vec_signals = [s for s in signals if s not in LEXICAL]
     if vec_signals and (allowed is None or allowed):
         # Embed the query once per distinct model, not once per vector set.
         query_vecs: dict[tuple, np.ndarray] = {}
@@ -180,7 +251,7 @@ def search(
             timings[vec_type] = time.perf_counter() - t
 
     t = time.perf_counter()
-    fused = rrf(ranked, k=config.rrf_k, weights=config.rrf_weights)
+    fused = rrf(ranked, k=config.rrf_k, weights={NAME: NAME_WEIGHT, **config.rrf_weights})
     rank_of = {s: {doc: r for r, doc in enumerate(ids, start=1)} for s, ids in ranked.items()}
     results: list[ResultCard] = []
     for chunk, score in _pick_top(fused, k, store.get_chunks):

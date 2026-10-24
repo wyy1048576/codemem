@@ -47,7 +47,6 @@ def fake_config():
     cfg.vectors = {
         "code": VectorConfig(model="fake:64"),
         "usage": VectorConfig(model="fake:64"),
-        "summary": VectorConfig(model="fake:64", enabled=False),
     }
     return cfg
 
