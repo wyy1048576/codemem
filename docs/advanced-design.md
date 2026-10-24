@@ -303,6 +303,61 @@ over a repo's history* is itself a small, publishable freshness question (it tie
 longer chunks (ECIR 2026 workshop). Function lengths are heavy-tailed, so check the bias on
 our data before training.
 
+### 4.8 How search works end to end in the final design
+
+**Running example** (dev task flask-5014, a real miss of v2):
+- The issue: *"Require a non-empty name for Blueprints … It would be helpful if a `ValueError` was raised."*
+- The gold function, `Blueprint.__init__`, is 35 lines long. Most of it is a parameter list and attribute assignments.
+- The fix goes next to the two lines `if "." in name: raise ValueError(...)`.
+- v2 ranks the function 17th: its one vector describes "set up a blueprint's options", and the two lines that matter are averaged away.
+
+**What is stored for each chunk:**
+
+| | v2 today | final design |
+|---|---|---|
+| BM25 entry (5 fields) | yes | same |
+| code vector: one per 3,000-character window, 896-d | yes | same; finds candidates |
+| usage vector: callers and tests, when there are any | yes | grows into anchor vectors (§2) |
+| late-interaction vectors | none | **m small vectors** (e.g. 8–32 × 128-d): one for the signature, one per statement group, one for the called names. Each keeps its line range. |
+
+**What happens for a query: a funnel, cheapest first.**
+
+```
+query ──► 0. exact lookup ─────────────── names that exist in the index (dotted names,
+     │                                    stack frames, error strings): pinned on top
+     ├──► 1. candidates ──── BM25 + code + usage over the whole repo, RRF ──► top 200
+     │                       (what v2 does now, with a deeper cut)
+     ├──► 2. late interaction ── query → ~32 small vectors; chunk score =
+     │                       Σ over query vectors of the best-matching chunk vector
+     │                       (MaxSim), combined with the stage-1 rank ──► top 50
+     ├──► 3. reranker (optional) ── reads query and code together ──► top 10
+     └──► 4. cards ── the chunk vectors that won stage 2 name the lines to show
+```
+
+**In the example:**
+1. Stage 1 must only keep `__init__` in its top 200. At rank 17 that is easy.
+2. In stage 2, the vector for `if "." in name: raise ValueError(...)` matches the query vectors for *name*, *ValueError* and *raised*. The other `Blueprint` methods match only *Blueprint*.
+3. The card shows those two lines, which is where the fix goes.
+4. *Hypothesis; this is exactly what E-A2 tests.*
+
+**Why two stages instead of many vectors everywhere:**
+- **Cost.** Stage 2 scores only 200 chunks: 200 × 32 × 32 dot products, a few milliseconds including reading the vectors. Searching all of a repo's small vectors (3.2M for 100k chunks) needs an index like PLAID. That can come later; testing the idea does not need it.
+- **Stage 1 sets the ceiling.**
+  - On the 13 local dev tasks, v2's default has a gold function in its top 10 for 8 of 12 tasks, in its top 20 for 9 and in its top 50 for 10.
+  - So stage 2 could rescue at most 2 tasks there (flask-5014 at 17, seaborn-3069 at 48).
+  - The other 2 misses never reach the candidates. They need stage 0 or anchors (§1).
+- **Updates stay as they are.** A changed function is re-encoded by both encoders. Nothing global is rebuilt.
+
+**How it fits the v2 code:**
+- **Store:** a new vector type (say `late`). Its parts are statement groups. The `vectors` table already holds several parts per chunk with line offsets, so the schema does not change. Stage 2 reads a candidate's rows by chunk id and needs no FAISS index.
+- **Search:** one new step after RRF, `rescore(top N)`. Its settings are the depth, the weight against stage 1 and the query-side pooling. Like every search-time setting, they can be swept on one index.
+- **Indexing:** the late encoder runs on changed chunks only, next to today's embedder.
+
+**Decisions, in order:**
+1. **Off-the-shelf first** (E-A2, laptop): a code ColBERT model (LateOn-Code 149M via PyLate) as stage 2 over v2's top 200. If it adds fewer than 2 function MRR points on dev50, multi-vector is not the main bet.
+2. **Per token or pooled.** Per-token vectors cost ~7.7 GB per 100k functions (128-d fp16). Structure-seeded pooling (§4.4) costs ~100–200 MB and is the novel part.
+3. **Training** (GPU, E-A3 to E-A5): the token head and pooler, distilled from an 8B teacher.
+
 ---
 
 ## 5. Train on the repo's own links, then distill (idea 4)
