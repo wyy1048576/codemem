@@ -147,6 +147,13 @@ def test_refusals(run_dir, tmp_path):
         report("r1", baseline="grep-fn")
 
 
+def test_variants_of_the_baseline_are_not_primary(run_dir):
+    # cm-a has the same adapter as the baseline cm-b, so only grep-fn is a system under test.
+    result = report("r1", baseline="cm-b", resamples=500)
+    assert sorted({c.system for c in result.primary}) == ["grep-fn"] and len(result.primary) == 2
+    assert "Holm correction over all 2 tests" in result.report_path.read_text()
+
+
 def test_a_file_level_baseline_has_no_primary_tests(run_dir):
     result = report("r1", baseline="grep", resamples=500)
     assert result.primary == [] and "n/a: the baseline grep has no function-level results" in result.report_path.read_text()

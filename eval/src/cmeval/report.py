@@ -8,8 +8,9 @@ Contents:
 - paired comparison with a baseline system (default grep-fn-plus, the stronger grep; the naive
   grep-fn stays in every table): mean difference, paired 95% bootstrap interval, Wilcoxon p;
 - two primary metrics, fixed before the first results (2026-10-23): function-level MRR and
-  function-level tokens to the first right answer. Their p-values get one Holm correction
-  over all primary tests. Every other comparison is "exploratory" and shows a raw p;
+  function-level tokens to the first right answer, for each system under test (another adapter
+  than the baseline). Their p-values get one Holm correction over all primary tests. Every
+  other comparison, including variants of the baseline, is "exploratory" and shows a raw p;
 - group tables (means and counts only), the IoU check, latency and size, task counts.
 
 The same inputs always give the same report: tasks are taken in sorted order, the bootstrap
@@ -221,7 +222,11 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     task_ids = sorted(scores.task_ids)
     kw = {"resamples": resamples, "seed": seed}
     granularity = {name: g for name, g, _ in systems}
-    line_systems = [name for name in names if granularity[name] != "file"]
+    adapter = {s["name"]: s.get("adapter") for s in meta["systems"]}
+    # Systems under test: function-level systems with another adapter than the baseline. Variants
+    # of the baseline (for example the naive grep-fn next to grep-fn-plus) are not part of the
+    # primary family; their comparisons are exploratory. The family size is fixed by the design.
+    under_test = [name for name in names if granularity[name] != "file" and adapter[name] != adapter[baseline]]
 
     # paired comparisons; the primary family is fixed by the design, not by the results
     comparisons: list[Comparison] = []
@@ -233,7 +238,7 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
                 continue
             for metric in HEADLINE:
                 comparisons.append(_compare(scores, name, baseline, level, metric, **kw))
-    family = [c for c in comparisons if (c.level, c.metric) in PRIMARY and c.system in line_systems]
+    family = [c for c in comparisons if (c.level, c.metric) in PRIMARY and c.system in under_test]
     for c, p in zip(family, holm([c.test.p for c in family])):
         c.primary, c.p_holm = True, p
 
