@@ -1,5 +1,7 @@
 # codemem: Design Notes & Build Brief (Week 1)
 
+> **Superseded for the backend by v2** (Oct 24): see [architecture.md](architecture.md), [data-model.md](data-model.md) and [baseline-v2-diff.md](baseline-v2-diff.md). This brief is kept as the record of the Week 1 decisions.
+
 Owner: Wilson (Person A, platform/backend). Team: Andre (retrieval), Andrew (data/eval).
 Status: decisions agreed in discussion on Oct 20, 2026. This file is the brief for building the Week 1 backend skeleton.
 
