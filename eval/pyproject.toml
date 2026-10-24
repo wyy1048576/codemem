@@ -10,6 +10,7 @@ dependencies = [
     "tree-sitter>=0.25,<0.27",
     "tree-sitter-python>=0.25,<0.26",
     "pyarrow>=15",
+    "anthropic>=2,<3",  # token counting (count_tokens)
 ]
 
 [project.optional-dependencies]

@@ -44,14 +44,20 @@ def clone_path(repo: str) -> Path:
 
 
 def ensure_clone(repo: str, url: str | None = None) -> Path:
-    """Clone the repo once (bare) and return the clone path."""
+    """Clone the repo once (bare) and return the clone path.
+
+    core.autocrlf is always false in the clone (its worktrees inherit it). Git for Windows
+    converts line endings on checkout by default, and then file contents, hit texts, and token
+    counts would differ from other machines.
+    """
     path = clone_path(repo)
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".partial")
         shutil.rmtree(tmp, ignore_errors=True)
-        _git("clone", "--bare", "--quiet", url or f"https://github.com/{repo}.git", str(tmp))
+        _git("clone", "--bare", "--quiet", "-c", "core.autocrlf=false", url or f"https://github.com/{repo}.git", str(tmp))
         tmp.rename(path)  # a stopped clone never looks like a finished one
+    _git("config", "core.autocrlf", "false", cwd=path)  # also for clones made before this setting
     return path
 
 
@@ -76,6 +82,12 @@ def ensure_commit(repo: str, sha: str) -> None:
         raise RepoError(f"commit {sha} not found in {repo}")
 
 
+def commit_time(repo: str, sha: str) -> int:
+    """Committer time of a commit (Unix seconds). The runner sorts tasks by it."""
+    ensure_commit(repo, sha)
+    return int(_git("show", "-s", "--format=%ct", sha, cwd=clone_path(repo)).stdout.strip())
+
+
 def read_file(repo: str, commit: str, path: str) -> str | None:
     """File content at a commit, or None if the file does not exist there. Needs no worktree."""
     ensure_commit(repo, commit)
@@ -97,6 +109,29 @@ def is_clean(worktree: Path) -> bool:
     return _git("status", "--porcelain", "--untracked-files=all", cwd=worktree).stdout == ""
 
 
+def live_path(repo: str, name: str) -> Path:
+    """Folder of the movable worktree "name" for this repo."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", name):
+        raise RepoError(f"worktree name {name!r} may only use letters, digits, '_', '.', '-'")
+    return worktrees_dir() / f"{slug(repo)}{LIVE_MARK}{name}"
+
+
+def discard_live(repo: str, name: str) -> None:
+    """Remove the movable worktree "name" if it exists, in any state.
+
+    A process that was stopped during a checkout can leave the worktree with local changes or
+    a stale index.lock, and then move_to refuses it. The runner discards it and makes a new one.
+    """
+    path = live_path(repo, name)
+    if not path.exists():
+        return
+    try:
+        remove_worktree(path)
+    except RepoError:
+        shutil.rmtree(path, ignore_errors=True)
+        _git("worktree", "prune", cwd=clone_path(repo))
+
+
 def checkout(repo: str, commit: str, name: str | None = None) -> Path:
     """A clean worktree at the commit.
 
@@ -104,12 +139,7 @@ def checkout(repo: str, commit: str, name: str | None = None) -> Path:
     moved to the commit.
     """
     ensure_commit(repo, commit)
-    if name is None:
-        path = worktrees_dir() / f"{slug(repo)}@{commit[:12]}"
-    else:
-        if not re.match(r"^[A-Za-z0-9_.-]+$", name):
-            raise RepoError(f"worktree name {name!r} may only use letters, digits, '_', '.', '-'")
-        path = worktrees_dir() / f"{slug(repo)}{LIVE_MARK}{name}"
+    path = worktrees_dir() / f"{slug(repo)}@{commit[:12]}" if name is None else live_path(repo, name)
 
     if path.exists():
         if name is not None:

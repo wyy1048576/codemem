@@ -14,6 +14,17 @@ def _edit(path, text):
     os.utime(path, (st.st_atime, st.st_mtime + 2))
 
 
+def test_file_order_of_the_os_does_not_matter(sample_repo, fake_config, monkeypatch):
+    normal = list(walk_python_files(sample_repo, fake_config))
+    real_walk = os.walk
+
+    def reversed_walk(top, *args, **kwargs):
+        for dirpath, dirnames, filenames in real_walk(top, *args, **kwargs):
+            yield dirpath, dirnames, filenames[::-1]
+
+    monkeypatch.setattr(os, "walk", reversed_walk)
+    assert list(walk_python_files(sample_repo, fake_config)) == normal  # same order, so same chunk ids
+
 @pytest.fixture
 def indexed(sample_repo, tmp_path, fake_config, recorder):
     store = Store(tmp_path / "index")

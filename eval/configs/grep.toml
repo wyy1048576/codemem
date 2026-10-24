@@ -7,3 +7,13 @@ adapter = "grep"
 [[system]]
 name = "grep-fn"
 adapter = "grep_fn"
+
+# The stronger grep baseline (2026-10-23): Python files only, rare keywords weigh more, noisy
+# keywords dropped, tests last.
+[[system]]
+name = "grep-fn-plus"
+adapter = "grep_fn"
+types = ["py"]
+weighting = "idf"
+clean_keywords = true
+tests_last = true

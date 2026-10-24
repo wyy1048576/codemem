@@ -42,8 +42,8 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 | `cmeval systems FILE` | Check a system config and list its systems (adapter, granularity, index key) |
 | `cmeval collect` | Not built yet |
 | `cmeval review` | Not built yet |
-| `cmeval run` | Not built yet |
-| `cmeval score` | Not built yet |
+| `cmeval run --tasks FILE --config FILE --run-id ID [--split dev\|test] [--repo R] [--limit-per-repo N] [--index-mode update\|rebuild]` | Run every system on every task; saves hits and timings (see "Run files") |
+| `cmeval score RUN [--tokens anthropic\|estimate] [--iou T ...]` | Score a run: accuracy, tokens, latency (see "Metrics") |
 | `cmeval report` | Not built yet |
 
 ## Systems (the plug)
@@ -76,6 +76,54 @@ adapter = "fake"
 | `codemem` | Wilson's codemem through its library API (`src/cmeval/adapters/codemem.py`, the only file that imports codemem). Granularity `line`. Settings: `signals` (for example `["bm25", "code", "usage"]`) and `config` (passed to codemem's `config_from_dict`; user config files and env vars are ignored). Systems with the same index-time settings share one index and one in-memory service. Needs `uv sync --extra codemem`. |
 
 To add a system: write a class with the methods above in `src/cmeval/adapters/`, and add one line to `ADAPTERS` in `src/cmeval/systems.py`.
+
+## Run files
+
+`cmeval run` writes `CMEVAL_HOME/runs/<run-id>/`:
+
+| File | Content |
+|---|---|
+| `meta.json` | Inputs with sha256 hashes, settings, each system's `describe()` and `index_key`, machine, start and end time, status |
+| `<system>.jsonl` | One line for each task: `task_id`, `commit`, `search_ms`, `hits` (each hit with its text) |
+| `index.jsonl` | One line for each index build or update: repo, commit, system, `index_key`, mode, `IndexReport` |
+
+How a run works:
+- Tasks are sorted by the commit date of their `base_commit`. For each repo, one worktree steps forward from task to task.
+- Systems with the same `index_key` share one index: the first system of the group builds it once, then updates it at each next commit. `--index-mode rebuild` builds it again for every task.
+- Before each search, the runner checks that the worktree is at the task's exact `base_commit`.
+- The first search of each system is an untimed warm-up (it may load a model).
+- A stopped run continues where it stopped: run the same command again. Changing the tasks file, the config, the split, the index mode, or k under the same run id is refused.
+- `--split` is `dev` by default. Use `--split test` only for reported results.
+
+## Metrics
+
+`cmeval score` writes `scores.jsonl` (one row for each task, system, level, IoU, and metric), `summary.csv` (means), and `score-meta.json` into the run folder. It only reads the run files, so scoring can change without new searches.
+
+**Levels.** File, class, and function.
+- File level: a hit finds a gold file if the paths are equal; ranks are over unique paths.
+- Class and function level: a hit finds a gold item if it is in the same file and either lies inside the gold range or overlaps it with line IoU (shared lines / covered lines) of 0.5 or more. Ranks are over raw hits. Scores at IoU 0.3 and 0.7 are also written, as a sensitivity check.
+- Each gold item counts once, at its first matching hit.
+- Left out (a row with the reason, never a 0): file-granularity systems at class and function level (n/a), tasks with `partial_labels`, and tasks with no gold at that level.
+
+**Accuracy.** `recall@k`, `precision@k` (relevant positions in the top k / k), `success@k` (all gold in the top k), and `mrr`, for k = 1, 5, 10, 20, 50.
+
+**Tokens.** Counted with Anthropic's `count_tokens` for the agent-study model (`DEFAULT_MODEL` in `src/cmeval/metrics/tokens.py`), on each hit's `text` only (the fixed request overhead is measured and subtracted). Counts are cached in `CMEVAL_HOME/token-cache/` by text hash. The API key comes from `ANTHROPIC_API_KEY` or, on macOS, the Keychain entry `anthropic-api-key`. Requests are paced to 90 per minute (`CMEVAL_TOKEN_RPM`), because some accounts allow only 100. Without a key, scoring stops with a clear message. `--tokens estimate` gives rough numbers that are marked and must never be reported.
+- `tokens_to_first`: tokens of all hits up to and including the first hit that finds gold (`found` = 0 or 1).
+- `recall@budget<B>` for B = 500 to 8000: recall of the whole hits that fit in B tokens.
+
+**Latency.** Search time (median, 95th percentile) and index cost (build, update, items re-embedded, size, most files that failed in one index report) of each system's index group.
+
+Scoring uses only tasks that every system in the run finished, so all systems are compared on the same tasks. A run that is not `done`, or left-out tasks, give a warning.
+
+## Runs on other machines
+
+A run can be made on one machine and scored on another (for example a Windows laptop with an NVIDIA GPU, scored on a Mac that has the token cache and the API key):
+
+1. On the other machine, clone this repo with `git clone -c core.autocrlf=false ...` (cmeval sets the same option on its own repo clones), so task files and checkouts keep Unix line endings and the task file has the same sha256.
+2. Run `cmeval run ...` there, and copy the run folder (`CMEVAL_HOME/runs/<run-id>/`) to the scoring machine.
+3. Score it with `cmeval score <run-id> --tasks tasks/<file>.jsonl`. The file must have the same sha256 as the run's.
+
+Compare systems only within one machine: GPU and CPU round slightly differently, so embedding results can change a little between machines.
 
 ## Local data
 

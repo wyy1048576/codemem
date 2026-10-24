@@ -1,0 +1,285 @@
+{
+  "run_id": "2026-10-23-b4b-update",
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "93f7db1413ec195f42b5148e72a5addb8e7561e4",
+    "dirty": false
+  },
+  "tasks_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/tasks/swebv-dev50.jsonl",
+  "tasks_sha256": "b327c2015aca3f74657ec92f3251d559746d3cd7864e6e2273ccc1282148e887",
+  "config_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/configs/baseline.toml",
+  "config_sha256": "6e5169d239d45a521a50213617fb4a3d4106e12eda647c1fa30dfaefc6cc177e",
+  "config_text": "# Baseline comparison: the two grep baselines and the current codemem (Week 1 hybrid baseline)\n# with signals added one at a time. The three codemem systems share one index (same index_key).\n# Needs: uv sync --extra codemem\n\n[[system]]\nname = \"grep\"\nadapter = \"grep\"\n\n[[system]]\nname = \"grep-fn\"\nadapter = \"grep_fn\"\n\n# The stronger grep baseline (2026-10-23): Python files only, rare keywords weigh more, noisy\n# keywords dropped, tests last. The report's primary tests compare against it.\n[[system]]\nname = \"grep-fn-plus\"\nadapter = \"grep_fn\"\ntypes = [\"py\"]\nweighting = \"idf\"\nclean_keywords = true\ntests_last = true\n\n[[system]]\nname = \"cm-bm25\"\nadapter = \"codemem\"\nsignals = [\"bm25\"]\nconfig = { device = \"auto\" }\n\n[[system]]\nname = \"cm-bm25-code\"\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\"]\nconfig = { device = \"auto\" }\n\n[[system]]\nname = \"cm-bm25-code-usage\"\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\" }\n",
+  "split": "dev",
+  "index_mode": "update",
+  "k": 50,
+  "systems": [
+    {
+      "name": "grep",
+      "adapter": "grep",
+      "granularity": "file",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227
+      }
+    },
+    {
+      "name": "grep-fn",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": null,
+        "weighting": "count",
+        "clean_keywords": false,
+        "tests_last": false
+      }
+    },
+    {
+      "name": "grep-fn-plus",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": [
+          "py"
+        ],
+        "weighting": "idf",
+        "clean_keywords": true,
+        "tests_last": true
+      }
+    },
+    {
+      "name": "cm-bm25",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "8898399b2cca63c4",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.1.0",
+        "codemem_git": {
+          "sha": "93f7db1413ec195f42b5148e72a5addb8e7561e4",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25"
+        ],
+        "index_key": "8898399b2cca63c4",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            5.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm-bm25-code",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "8898399b2cca63c4",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.1.0",
+        "codemem_git": {
+          "sha": "93f7db1413ec195f42b5148e72a5addb8e7561e4",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code"
+        ],
+        "index_key": "8898399b2cca63c4",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            5.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm-bm25-code-usage",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "8898399b2cca63c4",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.1.0",
+        "codemem_git": {
+          "sha": "93f7db1413ec195f42b5148e72a5addb8e7561e4",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "8898399b2cca63c4",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            5.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    }
+  ],
+  "machine": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "processor": "arm",
+    "python": "3.11.9"
+  },
+  "started": "2026-10-24T00:47:01+00:00",
+  "sessions": [
+    {
+      "started": "2026-10-24T00:47:01+00:00",
+      "cmeval_git": {
+        "sha": "93f7db1413ec195f42b5148e72a5addb8e7561e4",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      }
+    }
+  ],
+  "status": "done",
+  "filters": {
+    "repos": [
+      "mwaskom/seaborn",
+      "psf/requests",
+      "pytest-dev/pytest"
+    ],
+    "limit_per_repo": null
+  },
+  "ended": "2026-10-24T00:54:50+00:00",
+  "error": null,
+  "searched": 72,
+  "skipped": 0
+}
