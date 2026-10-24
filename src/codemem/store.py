@@ -1,4 +1,7 @@
-"""Storage: SQLite (metadata, FTS5, call graph) + one FAISS index per vector type.
+"""Storage: SQLite (metadata, FTS5, call graph) + one vector index per vector type.
+
+The vector index is a `VectorStore` backend: FAISS by default, or a class named in config
+(`vector_backend = "module:Class"`). Changing the backend drops and re-embeds all vectors.
 
 Consistency model
 -----------------
@@ -7,7 +10,8 @@ SQLite is the source of truth for chunks and for *which texts are embedded*
 of an update (and periodically during long ones). Each `vec_<type>.faiss` has a
 sidecar `vec_<type>.ids.json` mapping chunk_id -> text_hash for the vectors in
 that file. On open, `reconcile()` drops `embeddings` rows that don't match the
-sidecar, so after a crash those texts are simply re-embedded.
+sidecar, so after a crash those texts are simply re-embedded. Other backends save to
+`vec_<type><suffix>` and get the same sidecar check.
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import sqlite3
 import threading
 import time
@@ -27,6 +32,7 @@ from typing import Any
 import faiss
 import numpy as np
 
+from .plugins import load_object
 from .schema import Chunk
 from .texts import Ref
 from .tokenize import to_fts_text
@@ -88,9 +94,41 @@ def _atomic_write(path: Path, data: bytes) -> None:
 
 
 class VectorStore(ABC):
-    """Swappable vector index keyed by chunk_id. Vectors must be L2-normalized."""
+    """Swappable vector index keyed by chunk_id. Vectors must be L2-normalized.
+
+    Contract for `search`: at most k (id, score) pairs, best first, higher score = more
+    similar, and only ids in `allowed_ids` when it is given. Scores must be the real
+    similarity: equal scores are treated as ties. Store calls one instance from one thread
+    at a time.
+
+    Persistence: Store saves each vector type to `<index_dir>/vec_<type><suffix>` (a file or
+    a folder, the backend decides) after committing the matching SQLite rows.
+    """
 
     dim: int
+    suffix: str = ".vec"
+
+    @classmethod
+    def create(cls, dim: int) -> VectorStore:
+        return cls(dim)
+
+    @abstractmethod
+    def save(self, path: Path) -> None: ...
+
+    @classmethod
+    @abstractmethod
+    def load(cls, path: Path) -> VectorStore: ...
+
+    @classmethod
+    def exists(cls, path: Path) -> bool:
+        return path.exists()
+
+    @classmethod
+    def delete(cls, path: Path) -> None:
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink(missing_ok=True)
 
     @abstractmethod
     def upsert(self, ids: Sequence[int], vecs: np.ndarray) -> None: ...
@@ -112,6 +150,8 @@ class VectorStore(ABC):
 
 class FaissVectorStore(VectorStore):
     """Exact inner-product search; IndexIDMap2 so chunk_id is the FAISS id."""
+
+    suffix = ".faiss"
 
     def __init__(self, dim: int, index: Any = None):
         self.dim = dim
@@ -159,6 +199,16 @@ class FaissVectorStore(VectorStore):
         # Read through Python (not faiss.read_index) so non-ASCII Windows paths work.
         index = faiss.deserialize_index(np.frombuffer(path.read_bytes(), dtype=np.uint8))
         return cls(index.d, index)
+
+
+def vector_backend_class(name: str) -> type[VectorStore]:
+    """`faiss` or "module:Class" -> the VectorStore subclass."""
+    if name == "faiss":
+        return FaissVectorStore
+    cls = load_object(name)
+    if not (isinstance(cls, type) and issubclass(cls, VectorStore)):
+        raise TypeError(f"{name} must be a subclass of codemem.store.VectorStore")
+    return cls
 
 
 # --------------------------------------------------------------------------- lock
@@ -250,14 +300,23 @@ def _like_prefix(prefix: str) -> str:
 
 
 class Store:
-    def __init__(self, index_dir: Path | str, *, bm25_stem: bool = False, bm25_stopwords: bool = False):
+    def __init__(
+        self,
+        index_dir: Path | str,
+        *,
+        bm25_stem: bool = False,
+        bm25_stopwords: bool = False,
+        vector_backend: str = "faiss",
+    ):
         self.index_dir = Path(index_dir)
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.index_dir / "index.db"
         self.tok_opts = {"stem": bm25_stem, "stopwords": bm25_stopwords}
+        self.vector_backend = vector_backend
+        self._backend = vector_backend_class(vector_backend)
         self._local = threading.local()
         self._vec_lock = threading.RLock()
-        self._vectors: dict[str, FaissVectorStore] = {}
+        self._vectors: dict[str, VectorStore] = {}
         self._vectors_loaded: set[str] = set()
         self._dirty: set[str] = set()
         self._all_conns: list[sqlite3.Connection] = []
@@ -486,22 +545,40 @@ class Store:
 
     # ---- embeddings / vectors
     def _vec_path(self, vec_type: str) -> Path:
-        return self.index_dir / f"vec_{vec_type}.faiss"
+        return self.index_dir / f"vec_{vec_type}{self._backend.suffix}"
 
     def _sidecar_path(self, vec_type: str) -> Path:
         return self.index_dir / f"vec_{vec_type}.ids.json"
 
-    def vectors(self, vec_type: str) -> FaissVectorStore | None:
+    def vectors(self, vec_type: str) -> VectorStore | None:
         with self._vec_lock:
             if vec_type not in self._vectors_loaded:
                 self._vectors_loaded.add(vec_type)
                 path = self._vec_path(vec_type)
-                if path.is_file():
+                if self._backend.exists(path):
                     try:
-                        self._vectors[vec_type] = FaissVectorStore.load(path)
+                        self._vectors[vec_type] = self._backend.load(path)
                     except Exception:  # corrupt file: rebuild this vec type
                         log.exception("could not load %s; it will be rebuilt", path)
             return self._vectors.get(vec_type)
+
+    def ensure_backend(self) -> bool:
+        """Writer-only. Drop all vectors if the index was built with another backend.
+        Returns True if reset. Indexes from before the setting existed used FAISS."""
+        stored = self.get_meta("vector_backend", "faiss")
+        if stored == self.vector_backend:
+            return False
+        log.info("vector backend changed (%s -> %s); rebuilding all vectors", stored, self.vector_backend)
+        for vec_type in self.vec_types():
+            self.drop_vec_type(vec_type)
+        # Files of the old backend may use another suffix; nothing of the new one exists yet.
+        for p in self.index_dir.glob("vec_*"):
+            VectorStore.delete(p)
+        with self._vec_lock:
+            self._vectors.clear()
+            self._vectors_loaded.clear()
+        self.set_meta("vector_backend", self.vector_backend)
+        return True
 
     def vec_types(self) -> list[str]:
         """Vector types that have stored embeddings."""
@@ -525,8 +602,8 @@ class Store:
             self._vectors.pop(vec_type, None)
             self._vectors_loaded.add(vec_type)
             self._dirty.add(vec_type)
-        for p in (self._vec_path(vec_type), self._sidecar_path(vec_type)):
-            p.unlink(missing_ok=True)
+        self._backend.delete(self._vec_path(vec_type))
+        self._sidecar_path(vec_type).unlink(missing_ok=True)
 
     def embedding_hashes(self, vec_type: str) -> dict[int, str]:
         rows = self.conn.execute("SELECT chunk_id, text_hash FROM embeddings WHERE vec_type = ?", (vec_type,))
@@ -544,7 +621,7 @@ class Store:
                 if vs is not None:
                     log.info("dimension of %s changed (%d -> %d); rebuilding", vec_type, vs.dim, dim)
                     self.conn.execute("DELETE FROM embeddings WHERE vec_type = ?", (vec_type,))
-                vs = self._vectors[vec_type] = FaissVectorStore(dim)
+                vs = self._vectors[vec_type] = self._backend.create(dim)
             vs.upsert(ids, vecs)
             self._dirty.add(vec_type)
         self.set_meta(f"vec.{vec_type}.dim", dim)
