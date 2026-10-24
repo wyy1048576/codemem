@@ -290,7 +290,7 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
     git = meta.get("cmeval_git") or {}
     codemem = next((s["describe"].get("codemem_git") for s in meta["systems"] if s.get("adapter") == "codemem"), None)
     lines = [
-        f"# Results: {run_dir.name}", "",
+        f"# Results: {meta.get('run_id') or run_dir.name}", "",  # the run id, also for a copied folder
         f"- Tasks: `{Path(meta.get('tasks_file', '')).name}` (sha256 {meta.get('tasks_sha256', '')[:12]}), "
         f"split {meta.get('split')}, {len(task_ids)} tasks scored",
         f"- Systems: {', '.join(names)}; baseline for the paired tests: {baseline}",

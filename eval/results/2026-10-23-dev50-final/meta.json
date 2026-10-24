@@ -1,0 +1,387 @@
+{
+  "run_id": "2026-10-23-dev50-final",
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "c6b2933cc7626dc1140f429da8d1efc8c608020f",
+    "dirty": false
+  },
+  "tasks_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/tasks/swebv-dev50.jsonl",
+  "tasks_sha256": "b327c2015aca3f74657ec92f3251d559746d3cd7864e6e2273ccc1282148e887",
+  "config_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/configs/grep.toml",
+  "config_sha256": "346eb13abe6917deb54e88fe81f9698885518bc2b9f02162dfd754b236980b10",
+  "config_text": "# The two offline grep baselines (Decision 4).\n\n[[system]]\nname = \"grep\"\nadapter = \"grep\"\n\n[[system]]\nname = \"grep-fn\"\nadapter = \"grep_fn\"\n\n# The stronger grep baseline (2026-10-23): Python files only, rare keywords weigh more, noisy\n# keywords dropped, tests last.\n[[system]]\nname = \"grep-fn-plus\"\nadapter = \"grep_fn\"\ntypes = [\"py\"]\nweighting = \"idf\"\nclean_keywords = true\ntests_last = true\n\n# merged from 2026-10-23-dev50:\n# Baseline comparison: the two grep baselines and the current codemem (Week 1 hybrid baseline)\n# with signals added one at a time. The three codemem systems share one index (same index_key).\n# Needs: uv sync --extra codemem\n\n[[system]]\nname = \"grep\"\nadapter = \"grep\"\n\n[[system]]\nname = \"grep-fn\"\nadapter = \"grep_fn\"\n\n[[system]]\nname = \"cm-bm25\"\nadapter = \"codemem\"\nsignals = [\"bm25\"]\nconfig = { device = \"auto\" }\n\n[[system]]\nname = \"cm-bm25-code\"\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\"]\nconfig = { device = \"auto\" }\n\n[[system]]\nname = \"cm-bm25-code-usage\"\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\" }\n",
+  "split": "dev",
+  "index_mode": "update",
+  "k": 50,
+  "systems": [
+    {
+      "name": "grep",
+      "adapter": "grep",
+      "granularity": "file",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227
+      }
+    },
+    {
+      "name": "grep-fn",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": null,
+        "weighting": "count",
+        "clean_keywords": false,
+        "tests_last": false
+      }
+    },
+    {
+      "name": "grep-fn-plus",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": [
+          "py"
+        ],
+        "weighting": "idf",
+        "clean_keywords": true,
+        "tests_last": true
+      }
+    },
+    {
+      "name": "cm-bm25",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "8898399b2cca63c4",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.1.0",
+        "codemem_git": {
+          "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25"
+        ],
+        "index_key": "8898399b2cca63c4",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            5.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm-bm25-code",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "8898399b2cca63c4",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.1.0",
+        "codemem_git": {
+          "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code"
+        ],
+        "index_key": "8898399b2cca63c4",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            5.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm-bm25-code-usage",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "8898399b2cca63c4",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.1.0",
+        "codemem_git": {
+          "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "8898399b2cca63c4",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            5.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    }
+  ],
+  "machine": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "processor": "arm",
+    "python": "3.11.9"
+  },
+  "started": "2026-10-24T01:21:13+00:00",
+  "sessions": [
+    {
+      "started": "2026-10-24T01:21:13+00:00",
+      "cmeval_git": {
+        "sha": "c6b2933cc7626dc1140f429da8d1efc8c608020f",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      }
+    },
+    {
+      "started": "2026-10-23T17:45:42+00:00",
+      "cmeval_git": {
+        "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      }
+    },
+    {
+      "started": "2026-10-23T18:32:38+00:00",
+      "cmeval_git": {
+        "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      }
+    }
+  ],
+  "status": "done",
+  "filters": {
+    "repos": null,
+    "limit_per_repo": null
+  },
+  "ended": "2026-10-24T01:22:11+00:00",
+  "merged": "2026-10-24T01:22:37+00:00",
+  "merged_from": [
+    {
+      "run_id": "2026-10-23-dev50-grep2",
+      "systems": [
+        "grep",
+        "grep-fn",
+        "grep-fn-plus"
+      ],
+      "cmeval_git": {
+        "sha": "c6b2933cc7626dc1140f429da8d1efc8c608020f",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      },
+      "started": "2026-10-24T01:21:13+00:00",
+      "ended": "2026-10-24T01:22:11+00:00",
+      "index_mode": "update",
+      "config_sha256": "346eb13abe6917deb54e88fe81f9698885518bc2b9f02162dfd754b236980b10",
+      "sessions": [
+        {
+          "started": "2026-10-24T01:21:13+00:00",
+          "cmeval_git": {
+            "sha": "c6b2933cc7626dc1140f429da8d1efc8c608020f",
+            "dirty": false
+          },
+          "machine": {
+            "platform": "macOS-26.5-arm64-arm-64bit",
+            "processor": "arm",
+            "python": "3.11.9"
+          }
+        }
+      ]
+    },
+    {
+      "run_id": "2026-10-23-dev50",
+      "systems": [
+        "cm-bm25",
+        "cm-bm25-code",
+        "cm-bm25-code-usage"
+      ],
+      "cmeval_git": {
+        "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      },
+      "started": "2026-10-23T17:45:42+00:00",
+      "ended": "2026-10-23T19:49:37+00:00",
+      "index_mode": "update",
+      "config_sha256": "3e3ba163d1823888ef7dbc02ad426dddc124f47b25544957ce53b85d84d6548e",
+      "sessions": [
+        {
+          "started": "2026-10-23T17:45:42+00:00",
+          "cmeval_git": {
+            "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+            "dirty": false
+          },
+          "machine": {
+            "platform": "macOS-26.5-arm64-arm-64bit",
+            "processor": "arm",
+            "python": "3.11.9"
+          }
+        },
+        {
+          "started": "2026-10-23T18:32:38+00:00",
+          "cmeval_git": {
+            "sha": "d5c2013aa8a534f28bbdd614d6315531b0908226",
+            "dirty": false
+          },
+          "machine": {
+            "platform": "macOS-26.5-arm64-arm-64bit",
+            "processor": "arm",
+            "python": "3.11.9"
+          }
+        }
+      ]
+    }
+  ]
+}
