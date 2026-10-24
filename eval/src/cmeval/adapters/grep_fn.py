@@ -11,7 +11,10 @@ options make it closer to how an agent greps (chosen on the dev split, 2026-10-2
   function scores the sum of the weights of the different keywords in it, not the raw count
   (so long functions that repeat one word do not win);
 - clean_keywords: drop keywords that are URLs, paths, file names, or commit hashes;
-- tests_last: rank functions in test files after all other functions.
+- tests_last: rank functions in test files after all other functions (test files as the gold
+  labeler sees them: patches.classify_path).
+
+Keywords are counted on whole lines. Only the hit text cuts long lines, as `rg --max-columns`.
 """
 
 from __future__ import annotations
@@ -26,13 +29,13 @@ from ..labels import LANGUAGES, Definition, find_definitions, innermost
 from ..patches import classify_path
 from ..retriever import Hit
 from ..retriever import RetrieverError
-from .grep import GrepRetriever, format_lines, rank_files, rg_count, rg_files, rg_lines
+from .grep import GrepRetriever, format_lines, preview_line, rank_files, rg_count, rg_files, rg_lines
 from .keywords import extract_keywords
 
 WEIGHTINGS = ("count", "idf")
-# A keyword that cannot name code: a commit hash, a path, a web address, or a file name.
-NOISE_RE = re.compile(r"^[0-9a-f]{7,}$|/|\.(com|org|net|io)\b|\.(py|rst|txt|md|cfg|toml|json|ya?ml)$")
-TEST_PATH_RE = re.compile(r"(^|/)(tests?|testing)(/|$)|(^|/)test_[^/]*\.py$|_test\.py$|(^|/)conftest\.py$")
+# A keyword that cannot name code: a commit hash, a path, a web address, or a file name. Not .io
+# (astropy.io) and not .json (Response.json): those are often real code names.
+NOISE_RE = re.compile(r"^[0-9a-f]{7,}$|/|\.(com|org|net)\b|\.(py|rst|txt|md|cfg|toml|ya?ml)$")
 SPARE_KEYWORDS = 10  # extra keywords taken before cleaning, so the cleaned list can still be full
 
 
@@ -49,6 +52,7 @@ class GrepFnRetriever(GrepRetriever):
         self.weighting = weighting
         self.clean_keywords = clean_keywords
         self.tests_last = tests_last
+        self._n_files: int | None = None  # files of the chosen types; fixed for one checkout
         # (path, mtime_ns, size) -> functions. Cleared on build and update, so it never grows past one commit.
         self._defs_cache: dict[tuple[str, int, int], list[Definition]] = {}
 
@@ -66,7 +70,9 @@ class GrepFnRetriever(GrepRetriever):
 
     def _idf(self, keywords: list[str]) -> tuple[dict[str, float], dict[str, float]]:
         """Keyword weights log(N / (1 + files with it)) + 1, and each file's sum over its keywords."""
-        n_files = max(1, len(rg_files(self.rg, self.repo, types=self.types)))
+        if self._n_files is None:
+            self._n_files = max(1, len(rg_files(self.rg, self.repo, types=self.types)))
+        n_files = self._n_files
         with ThreadPoolExecutor(max_workers=8) as pool:  # one rg for each keyword, in parallel
             found = dict(zip(keywords, pool.map(lambda kw: rg_files(self.rg, self.repo, [kw], self.types), keywords)))
         weights = {kw: math.log(n_files / (1 + len(files))) + 1 for kw, files in found.items()}
@@ -94,6 +100,7 @@ class GrepFnRetriever(GrepRetriever):
 
     def build(self, repo: Path, index_dir: Path):
         self._defs_cache.clear()
+        self._n_files = None
         return super().build(repo, index_dir)
 
     def search(self, query: str, k: int) -> list[Hit]:
@@ -106,7 +113,7 @@ class GrepFnRetriever(GrepRetriever):
         else:
             weights, ranked = None, rank_files(rg_count(self.rg, self.repo, keywords, self.types))
         top = [path for path, _ in ranked[: self.top_files]]
-        lines = rg_lines(self.rg, self.repo, keywords, top)
+        lines = rg_lines(self.rg, self.repo, keywords, top, max_columns=None)  # count on whole lines
 
         scored = []
         for file_rank, path in enumerate(top):
@@ -125,8 +132,8 @@ class GrepFnRetriever(GrepRetriever):
                     if count:
                         entry[0] += count
                         entry[1].add(kw)
-                entry[2].append((number, content))
-            last = 1 if self.tests_last and TEST_PATH_RE.search(path) else 0
+                entry[2].append((number, preview_line(content)))
+            last = 1 if self.tests_last and classify_path(path)[0] == "test" else 0
             for fn, (raw, distinct, fn_lines) in per_function.items():
                 score = sum(weights[kw] for kw in distinct) if weights else raw
                 scored.append((last, -score, -raw, file_rank, fn.start, path, fn, fn_lines, score, raw))

@@ -8,9 +8,9 @@ Contents:
 - paired comparison with a baseline system (default grep-fn-plus, the stronger grep; the naive
   grep-fn stays in every table): mean difference, paired 95% bootstrap interval, Wilcoxon p;
 - two primary metrics, fixed before the first results (2026-10-23): function-level MRR and
-  function-level tokens to the first right answer, for each system under test (another adapter
-  than the baseline). Their p-values get one Holm correction over all primary tests. Every
-  other comparison, including variants of the baseline, is "exploratory" and shows a raw p;
+  function-level tokens to the first right answer, for each primary system (PRIMARY_SYSTEMS, the
+  3 codemem systems). Their p-values get one Holm correction over all primary tests. Every other
+  comparison, including other grep variants, is "exploratory" and shows a raw p;
 - group tables (means and counts only), the IoU check, latency and size, task counts.
 
 The same inputs always give the same report: tasks are taken in sorted order, the bootstrap
@@ -42,6 +42,9 @@ COST = HEADLINE[5:]
 LOWER_IS_BETTER = frozenset({"tokens_to_first", "not_found_share"})
 COUNTS = frozenset({"tokens_to_first"})  # in tokens, not between 0 and 1
 PRIMARY = (("function", "mrr"), ("function", "tokens_to_first"))
+# The systems under test for the primary tests, fixed in the design (2026-10-23). The family is
+# PRIMARY x these systems, so its size never depends on which other systems a run has.
+PRIMARY_SYSTEMS = ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage")
 GROUP_METRICS = (("function", "mrr"), ("function", "recall@10"), ("file", "recall@10"), ("function", "tokens_to_first"))
 IOU_METRICS = ("mrr", "recall@10")
 IOUS = (0.3, 0.5, 0.7)
@@ -202,6 +205,7 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
 
 
 def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "dev", cutoff: str = DEFAULT_CUTOFF,
+           primary: list[str] | tuple[str, ...] = PRIMARY_SYSTEMS,
            tasks_file: str | Path | None = None, resamples: int = RESAMPLES, seed: int = SEED) -> ReportResult:
     run_dir = resolve_run(run)
     data = _load(run_dir)
@@ -222,11 +226,11 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     task_ids = sorted(scores.task_ids)
     kw = {"resamples": resamples, "seed": seed}
     granularity = {name: g for name, g, _ in systems}
-    adapter = {s["name"]: s.get("adapter") for s in meta["systems"]}
-    # Systems under test: function-level systems with another adapter than the baseline. Variants
-    # of the baseline (for example the naive grep-fn next to grep-fn-plus) are not part of the
-    # primary family; their comparisons are exploratory. The family size is fixed by the design.
-    under_test = [name for name in names if granularity[name] != "file" and adapter[name] != adapter[baseline]]
+    under_test = list(dict.fromkeys(primary))
+    bad = [n for n in under_test if n not in names or n == baseline or granularity[n] == "file"]
+    if bad:
+        raise ReportError(f"primary systems {bad} are not function-level systems of this run other than the "
+                          f"baseline; the run has {names} (choose them with --primary)")
 
     # paired comparisons; the primary family is fixed by the design, not by the results
     comparisons: list[Comparison] = []
@@ -260,12 +264,17 @@ def _warnings(meta: dict, score_meta: dict, summary: list[dict], task_ids: list[
     for row in summary:
         if row["metric"] == "files_failed_max" and row["mean"] and float(row["mean"]) > 0:
             out.append(f"{row['system']}: up to {float(row['mean']):.0f} files could not be indexed")
-    sessions = [] if meta.get("merged_from") else meta.get("sessions") or []  # a merge lists its parts instead
-    kinds = {(json.dumps(s.get("cmeval_git"), sort_keys=True), (s.get("machine") or {}).get("platform")) for s in sessions}
-    if len(kinds) > 1:
-        out.append(f"the run was made in {len(sessions)} sessions with different code or machines: "
-                   + "; ".join(f"{(s.get('machine') or {}).get('platform')} at {(s.get('cmeval_git') or {}).get('sha', '')[:12]}"
-                               for s in sessions))
+    # Each run (or each part of a merged run) must come from one code version on one machine.
+    # The parts of a merged run may differ from each other: the header lists them.
+    parts = meta.get("merged_from") or [{"run_id": meta.get("run_id"), "sessions": meta.get("sessions")}]
+    for part in parts:
+        sessions = part.get("sessions") or []
+        kinds = {(json.dumps(s.get("cmeval_git"), sort_keys=True), (s.get("machine") or {}).get("platform"))
+                 for s in sessions}
+        if len(kinds) > 1:
+            out.append(f"run {part.get('run_id')} was made in {len(sessions)} sessions with different code or machines: "
+                       + "; ".join(f"{(s.get('machine') or {}).get('platform')} at "
+                                   f"{((s.get('cmeval_git') or {}).get('sha') or '')[:12]}" for s in sessions))
     ended, scored = meta.get("ended"), score_meta.get("scored")
     if ended and scored and datetime.fromisoformat(ended) > datetime.fromisoformat(scored):
         out.append("the run changed after it was scored: score it again")

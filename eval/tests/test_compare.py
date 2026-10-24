@@ -153,3 +153,34 @@ def test_cli_compare(make_run, capsys):
     out = capsys.readouterr().out
     assert "update vs. rebuild check: PASS" in out and "compare-re.md" in out
     assert main(["compare", "up", "missing"]) == 1
+
+
+def test_compare_names_the_code_and_warns_when_it_is_not_the_check(make_run):
+    make_run("up", "update", both_tasks(ranked(base_hits())))
+    make_run("re", "rebuild", both_tasks(ranked(base_hits())))
+    for name, sha in (("up", "a" * 40), ("re", "b" * 40)):
+        path = runs_dir() / name / "meta.json"
+        meta = json.loads(path.read_text())
+        meta["systems"][0].update(adapter="codemem", describe={"codemem_git": {"sha": sha, "dirty": False}})
+        path.write_text(json.dumps(meta))
+    result = compare("up", "re", exists=no_stale)
+    assert result.warnings == [f"the runs use different codemem code: {'a' * 40} vs. {'b' * 40}"]
+    text = result.report_path.read_text()
+    assert "codemem aaaaaaaaaaaa" in text and "- Warning: the runs use different codemem code" in text
+    make_run("up2", "update", both_tasks(ranked(base_hits())))
+    assert any("index modes update and update" in w for w in compare("up", "up2", exists=no_stale).warnings)
+
+
+def test_compare_needs_the_same_hits_per_search_and_tasks_file(make_run):
+    make_run("up", "update", both_tasks(ranked(base_hits())))
+    make_run("re", "rebuild", both_tasks(ranked(base_hits())))
+    path = runs_dir() / "re" / "meta.json"
+    meta = json.loads(path.read_text())
+    path.write_text(json.dumps({**meta, "k": 10}))
+    with pytest.raises(CompareError, match="different numbers of hits"):
+        compare("up", "re")
+    tasks_file = json.loads((runs_dir() / "up" / "meta.json").read_text())["tasks_file"]
+    with open(tasks_file, "a") as f:
+        f.write("\n")  # the tasks file changed after the runs
+    with pytest.raises(CompareError, match="changed since the run"):
+        compare("up", "up")

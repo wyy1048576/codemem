@@ -61,7 +61,7 @@ def test_a_merged_run_can_be_scored_and_reported(runs):
     merge("base", "extra", "merged")
     summary = score("merged", counter=CharCounter())
     assert summary.tasks_scored == 3 and {r["system"] for r in summary.table} == {"fake-a", "fake-b", "fake-c"}
-    result = report("merged", baseline="fake-a", resamples=200)
+    result = report("merged", baseline="fake-a", primary=["fake-b", "fake-c"], resamples=200)
     text = result.report_path.read_text()
     assert "Merged part: fake-c from run `extra`" in text and "merged from separate runs" in text
     assert not any("sessions" in w for w in result.warnings)  # the parts are listed instead
@@ -88,6 +88,9 @@ def test_merge_refusals(runs, tmp_path, make_task):
     meta_path.write_text(json.dumps({**meta, "k": 10}))
     with pytest.raises(MergeError, match="different k"):
         merge("base", "extra", "m3")
+    meta_path.write_text(json.dumps({**meta, "index_mode": "rebuild"}))
+    with pytest.raises(MergeError, match="different index_mode"):
+        merge("base", "extra", "m5")
     meta_path.write_text(json.dumps({**meta, "status": "failed"}))
     with pytest.raises(MergeError, match="only finished runs"):
         merge("base", "extra", "m4")
@@ -99,3 +102,16 @@ def test_cli_merge(runs, capsys):
     out = capsys.readouterr().out
     assert "systems: fake-a, fake-b, fake-c" in out and "cmeval score merged" in out
     assert main(["merge", "base", "extra", "--run-id", "merged"]) == 1
+
+
+def test_a_mixed_part_of_a_merged_run_is_still_flagged(runs):
+    path = runs_dir() / "base" / "meta.json"
+    meta = json.loads(path.read_text())
+    meta["sessions"] = [{"cmeval_git": {"sha": "a" * 40}, "machine": {"platform": "mac"}},
+                        {"cmeval_git": {"sha": "a" * 40}, "machine": {"platform": "windows"}}]
+    path.write_text(json.dumps(meta))
+    merge("base", "extra", "merged")
+    score("merged", counter=CharCounter())
+    warnings = report("merged", baseline="fake-a", primary=["fake-b", "fake-c"], resamples=200).warnings
+    assert [w for w in warnings if "sessions" in w] == [
+        "run base was made in 2 sessions with different code or machines: mac at aaaaaaaaaaaa; windows at aaaaaaaaaaaa"]

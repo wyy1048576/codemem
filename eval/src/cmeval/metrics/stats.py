@@ -14,6 +14,7 @@ from __future__ import annotations
 import functools
 import math
 import random
+from array import array
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -32,15 +33,17 @@ def quantile(sorted_values: Sequence[float], q: float) -> float:
     return sorted_values[low] + (sorted_values[high] - sorted_values[low]) * (position - low)
 
 
-@functools.lru_cache(maxsize=None)
-def resample_indexes(n: int, resamples: int, seed: int) -> tuple[tuple[int, ...], ...]:
+@functools.lru_cache(maxsize=16)
+def resample_indexes(n: int, resamples: int, seed: int) -> tuple[array, ...]:
     """The resamples (each n indexes drawn with replacement), the same for every metric of size n.
 
-    A string seed is hashed with sha512, so the draws do not depend on PYTHONHASHSEED.
+    A string seed is hashed with sha512, so the draws do not depend on PYTHONHASHSEED. Each
+    resample is a compact array (2 or 4 bytes per index), so a large task set stays small in memory.
     """
     rng = random.Random(f"{seed}:{n}:{resamples}")
     population = range(n)
-    return tuple(tuple(rng.choices(population, k=n)) for _ in range(resamples))
+    typecode = "H" if n <= 0xFFFF else "I"
+    return tuple(array(typecode, rng.choices(population, k=n)) for _ in range(resamples))
 
 
 def bootstrap_ci(values: Sequence[float], *, resamples: int = RESAMPLES, seed: int = SEED,

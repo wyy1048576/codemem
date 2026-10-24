@@ -77,11 +77,21 @@ def rg_files(rg: str, repo: Path, keywords: list[str] | None = None, types: list
     return {path.removeprefix("./") for path in out.split("\0") if path}  # --null: one path per NUL
 
 
-def rg_lines(rg: str, repo: Path, keywords: list[str], paths: list[str], max_count: int | None = None) -> dict[str, list[tuple[int, str]]]:
-    """Matching lines (line number, content) in the given files."""
+def preview_line(content: str) -> str:
+    """A long line cut as `rg --max-columns MAX_COLUMNS --max-columns-preview` shows it."""
+    if len(content.encode("utf-8")) <= MAX_COLUMNS:
+        return content
+    return content[:MAX_COLUMNS] + " [... omitted end of long line]"
+
+
+def rg_lines(rg: str, repo: Path, keywords: list[str], paths: list[str], max_count: int | None = None,
+             max_columns: int | None = MAX_COLUMNS) -> dict[str, list[tuple[int, str]]]:
+    """Matching lines (line number, content) in the given files; long lines cut unless max_columns is None."""
     if not paths:
         return {}
-    args = ["--line-number", "--no-heading", "--with-filename", "--max-columns", str(MAX_COLUMNS), "--max-columns-preview"]
+    args = ["--line-number", "--no-heading", "--with-filename"]
+    if max_columns is not None:
+        args += ["--max-columns", str(max_columns), "--max-columns-preview"]
     if max_count is not None:
         args += ["--max-count", str(max_count)]
     out = _run_rg(rg, repo, [*args, *_patterns(keywords), "--", *paths])

@@ -25,8 +25,7 @@ from pathlib import Path
 
 from . import repos
 from .files import read_jsonl, write_text_atomic
-from .score import resolve_run
-from .tasks import load_tasks
+from .score import ScoreError, resolve_run, run_tasks
 
 TOP = 10
 MIN_SAME_TOP = 0.95
@@ -68,6 +67,7 @@ class CompareResult:
     run_b: Path
     systems: list[SystemResult]
     report_path: Path
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
@@ -154,10 +154,14 @@ def compare(run_a: str | Path, run_b: str | Path, *, tasks_file: str | Path | No
     names_a, names_b = [s["name"] for s in meta_a["systems"]], [s["name"] for s in meta_b["systems"]]
     if names_a != names_b:
         raise CompareError(f"the two runs have different systems: {names_a} vs. {names_b}")
-    tasks_path = Path(tasks_file) if tasks_file is not None else Path(meta_a["tasks_file"])
-    if not tasks_path.is_file():
-        raise CompareError(f"tasks file {tasks_path} is missing (use --tasks FILE)")
-    repo_of = {t.id: t.repo for t in load_tasks(tasks_path)}
+    if meta_a.get("k") != meta_b.get("k"):
+        raise CompareError(f"the two runs asked for different numbers of hits: {meta_a.get('k')} vs. {meta_b.get('k')}")
+    try:
+        _, tasks = run_tasks(meta_a, tasks_file)  # with the sha256 check: labels must match the hits
+    except ScoreError as exc:
+        raise CompareError(str(exc)) from None
+    repo_of = {task_id: t.repo for task_id, t in tasks.items()}
+    warnings = _warnings(meta_a, meta_b)
 
     results = []
     for name in names_a:
@@ -197,8 +201,32 @@ def compare(run_a: str | Path, run_b: str | Path, *, tasks_file: str | Path | No
         results.append(result)
 
     report_path = path_a / f"compare-{path_b.name}.md"
-    out = CompareResult(path_a, path_b, results, report_path)
+    out = CompareResult(path_a, path_b, results, report_path, warnings)
     write_text_atomic(report_path, render(out, meta_a, meta_b))
+    return out
+
+
+def code(meta: dict) -> dict:
+    """The code a run used: cmeval's commit, and codemem's commit if a codemem system ran."""
+    git = meta.get("cmeval_git") or {}
+    codemem = next((s.get("describe", {}).get("codemem_git") for s in meta.get("systems", [])
+                    if s.get("adapter") == "codemem"), None) or {}
+    return {"cmeval": git.get("sha"), "cmeval_dirty": git.get("dirty"),
+            "codemem": codemem.get("sha"), "codemem_dirty": codemem.get("dirty")}
+
+
+def _warnings(meta_a: dict, meta_b: dict) -> list[str]:
+    """Reasons why the comparison may not be the update vs. rebuild check for the reported code."""
+    out = []
+    modes = {meta_a.get("index_mode"), meta_b.get("index_mode")}
+    if modes != {"update", "rebuild"}:
+        out.append(f"the runs use index modes {meta_a.get('index_mode')} and {meta_b.get('index_mode')}; "
+                   "the update vs. rebuild check needs one of each")
+    code_a, code_b = code(meta_a), code(meta_b)
+    if code_a["codemem"] != code_b["codemem"]:
+        out.append(f"the runs use different codemem code: {code_a['codemem']} vs. {code_b['codemem']}")
+    if any(c[key] for c in (code_a, code_b) for key in ("cmeval_dirty", "codemem_dirty")):
+        out.append("a run used code with uncommitted changes, so the code version is not exact")
     return out
 
 
@@ -210,11 +238,15 @@ def render(result: CompareResult, meta_a: dict, meta_b: dict) -> str:
     a, b = result.run_a.name, result.run_b.name
     lines = [
         "# Update vs. rebuild check (F3 B4, Decision 5)", "",
-        f"- A: `{a}` (index mode {meta_a.get('index_mode')})",
-        f"- B: `{b}` (index mode {meta_b.get('index_mode')})",
+        f"- A: `{a}` (index mode {meta_a.get('index_mode')}, codemem {(code(meta_a)['codemem'] or '-')[:12]}, "
+        f"cmeval {(code(meta_a)['cmeval'] or '-')[:12]})",
+        f"- B: `{b}` (index mode {meta_b.get('index_mode')}, codemem {(code(meta_b)['codemem'] or '-')[:12]}, "
+        f"cmeval {(code(meta_b)['cmeval'] or '-')[:12]})",
+        "- The check covers the codemem code named above. Results from other codemem code need their own check.",
         f"- Rules: for each system, at least {MIN_SAME_TOP:.0%} of tasks have the same set of top-{TOP} hits "
         f"(by location); every metric's mean differs by less than {MAX_DIFF}; token counts by less than "
         f"{MAX_RELATIVE_DIFF:.0%}.", "",
+        *([f"- Warning: {w}" for w in result.warnings] + [""] if result.warnings else []),
         f"## Result: {'PASS' if result.passed else 'FAIL (read the differences below)'}", "",
         "| system | tasks | same top 10 | largest metric difference | largest token difference | result |",
         "|---|---|---|---|---|---|",

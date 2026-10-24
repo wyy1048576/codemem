@@ -200,3 +200,31 @@ def test_grep_fn_options_are_checked_and_described():
     described = GrepFnRetriever(types=["py"], weighting="idf", clean_keywords=True, tests_last=True).describe()
     assert (described["types"], described["weighting"], described["clean_keywords"], described["tests_last"]) == (["py"], "idf", True, True)
     assert GrepFnRetriever().describe()["weighting"] == "count"
+
+
+def test_tests_last_uses_the_labelers_test_rule(tmp_path):
+    (tmp_path / "pkg" / "testing").mkdir(parents=True)
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "pkg" / "testing" / "helpers.py").write_text("def helper():\n    special_widget(1)\n")  # library code
+    (tmp_path / "tests" / "test_a.py").write_text("def test_a():\n    special_widget(1)\n    special_widget(2)\n")
+    hits = _symbols(GrepFnRetriever(tests_last=True), tmp_path, "`special_widget`")
+    assert hits == [("pkg/testing/helpers.py", "helper"), ("tests/test_a.py", "test_a")]
+
+
+def test_clean_keywords_keeps_code_names_that_look_like_addresses(ranked_repo):
+    grep_fn = GrepFnRetriever(clean_keywords=True)
+    grep_fn.build(ranked_repo, ranked_repo)
+    keywords = grep_fn._keywords("`astropy.io.fits.open` and `Response.json` fail, see https://github.com/x/y")
+    assert "astropy.io.fits.open" in keywords and "response.json" in keywords and "github.com" not in keywords
+
+
+def test_grep_fn_counts_keywords_on_whole_lines_and_cuts_only_the_text(tmp_path):
+    (tmp_path / "long.py").write_text("def wide():\n    x = '" + "a" * 320 + "' + special_widget\n")
+    (tmp_path / "short.py").write_text("def narrow():\n    return 1  # special_widget\n")
+    grep_fn = GrepFnRetriever()
+    grep_fn.build(tmp_path, tmp_path)
+    hits = {h.path: h for h in grep_fn.search("`special_widget`", 10)}
+    assert hits["long.py"].score == 1.0  # the match after column 300 counts
+    rg_text = subprocess.run(["rg", "--no-config", "-n", "--with-filename", "--max-columns", "300", "--max-columns-preview",
+                              "-e", "special_widget", "long.py"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
+    assert hits["long.py"].text == rg_text  # the hit text is cut exactly as rg shows it

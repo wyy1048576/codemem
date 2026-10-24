@@ -201,11 +201,15 @@ def test_whitespace_only_text_is_counted_after_an_a(tmp_path):
 
 
 def test_counts_that_finish_after_a_failure_are_kept(tmp_path):
+    import threading
     import time
+
+    started = threading.Barrier(4)  # the failure comes only when all 4 calls are running
 
     class FailsFirst(FakeClient):
         def count_tokens(self, model, messages):
             text = messages[0]["content"]
+            started.wait(timeout=5)
             if text == "bad":
                 raise ConnectionError("gone")  # fails at once ...
             time.sleep(0.2)  # ... while the others are still running

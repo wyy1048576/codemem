@@ -8,7 +8,7 @@ run need no new search or index:
 
 NEW is a new run folder: the run files of BASE, plus the <system>.jsonl files and index rows of
 the chosen EXTRA systems. BASE and EXTRA are not changed. The two runs must use the same tasks
-file, split, and hits per search, and EXTRA must have every task that BASE has. meta.json of NEW
+file, split, hits per search, and index mode, and EXTRA must have every task that BASE has. meta.json of NEW
 records both parts (code, machine, sessions). NEW has no scores: score it next.
 """
 
@@ -23,7 +23,7 @@ from .paths import runs_dir
 from .run import _RUN_ID_RE
 from .score import resolve_run
 
-MUST_MATCH = ("tasks_sha256", "split", "k")
+MUST_MATCH = ("tasks_sha256", "split", "k", "index_mode")
 
 
 class MergeError(RuntimeError):
@@ -43,7 +43,8 @@ def _load(run_dir: Path) -> tuple[dict, dict[str, list[dict]], list[dict]]:
 def _part(run_dir: Path, meta: dict, systems: list[str]) -> dict:
     return {"run_id": run_dir.name, "systems": systems, "cmeval_git": meta.get("cmeval_git"),
             "machine": meta.get("machine"), "started": meta.get("started"), "ended": meta.get("ended"),
-            "index_mode": meta.get("index_mode"), "config_sha256": meta.get("config_sha256")}
+            "index_mode": meta.get("index_mode"), "config_sha256": meta.get("config_sha256"),
+            "sessions": meta.get("sessions") or []}
 
 
 def merge(base: str | Path, extra: str | Path, run_id: str, *, systems: list[str] | None = None) -> Path:

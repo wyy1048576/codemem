@@ -31,6 +31,7 @@ TASKS = [("acme__auth-1", "acme/auth", True, "2025-05-01T00:00:00Z"),
          ("acme__web-4", "acme/web", True, "2026-09-01T00:00:00Z"),
          ("acme__web-5", "acme/web", True, "2024-01-01T00:00:00Z"),
          ("acme__web-6", "acme/web", False, "2026-10-01T00:00:00Z")]
+PRIMARY = ["cm-a", "cm-b"]  # the systems under test in these hand-made runs
 FOUND_BY_CM_B = {"acme__auth-1", "acme__auth-2", "acme__web-4"}
 
 
@@ -82,7 +83,7 @@ def edit_json(path, **changes):
 
 
 def test_primary_comparisons_with_hand_computed_numbers(run_dir):
-    result = report("r1", baseline="grep-fn", resamples=500)
+    result = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500)
     primary = {(c.system, c.metric): c for c in result.primary}
     assert sorted(primary) == [("cm-a", "mrr"), ("cm-a", "tokens_to_first"), ("cm-b", "mrr"), ("cm-b", "tokens_to_first")]
     a_mrr, a_tok = primary[("cm-a", "mrr")], primary[("cm-a", "tokens_to_first")]
@@ -101,7 +102,7 @@ def test_primary_comparisons_with_hand_computed_numbers(run_dir):
 
 
 def test_main_tables_and_counts(run_dir):
-    text = report("r1", baseline="grep-fn", resamples=500).report_path.read_text()
+    text = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).report_path.read_text()
     assert "| grep | - | n/a | n/a | n/a | n/a | n/a |" in text  # file-granularity: n/a below file level, never 0
     assert "| cm-a | 6 | 1.000 [1.000, 1.000] |" in text
     assert "| grep | function | 6 | file-granularity system: 6 |" in text
@@ -113,7 +114,7 @@ def test_main_tables_and_counts(run_dir):
 
 
 def test_group_tables(run_dir):
-    text = report("r1", baseline="grep-fn", resamples=500).report_path.read_text()
+    text = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).report_path.read_text()
     assert "- language: all 6 tasks are 'python', so there is no table." in text
     assert "### By identifier in query" in text and "### By repo" in text and "### By issue date" in text
     assert "| before 2026-07-01 | 3 |" in text and "| on or after 2026-07-01 | 3 |" in text
@@ -122,12 +123,12 @@ def test_group_tables(run_dir):
 
 
 def test_warnings(run_dir):
-    assert report("r1", baseline="grep-fn", resamples=500).warnings == []
+    assert report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).warnings == []
     edit_json(run_dir / "score-meta.json", token_estimate=True)
     edit_json(run_dir / "meta.json", status="failed", sessions=[
         {"cmeval_git": {"sha": "a" * 40}, "machine": {"platform": "mac"}},
         {"cmeval_git": {"sha": "a" * 40}, "machine": {"platform": "windows"}}])
-    warnings = report("r1", baseline="grep-fn", resamples=500).warnings
+    warnings = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).warnings
     assert any("ESTIMATES" in w for w in warnings) and any("not 'done'" in w for w in warnings)
     assert any("2 sessions" in w and "windows" in w for w in warnings)
     assert "## Warnings" in (run_dir / "report.md").read_text()
@@ -135,40 +136,43 @@ def test_warnings(run_dir):
 
 def test_refusals(run_dir, tmp_path):
     with pytest.raises(ReportError, match="pass --split dev"):
-        report("r1", baseline="grep-fn", split="test")
+        report("r1", baseline="grep-fn", primary=PRIMARY, split="test")
     with pytest.raises(ReportError, match="baseline 'grep-fn-plus' is not a system"):
         report("r1")  # the default baseline; this run has only the naive grep-fn
     with pytest.raises(ReportError, match="baseline 'nope'"):
-        report("r1", baseline="nope")
+        report("r1", baseline="nope", primary=PRIMARY)
     with pytest.raises(ReportError, match="not a date"):
-        report("r1", baseline="grep-fn", cutoff="July")
+        report("r1", baseline="grep-fn", primary=PRIMARY, cutoff="July")
     (run_dir / "scores.jsonl").unlink()
     with pytest.raises(ReportError, match="not scored yet"):
-        report("r1", baseline="grep-fn")
+        report("r1", baseline="grep-fn", primary=PRIMARY)
 
 
-def test_variants_of_the_baseline_are_not_primary(run_dir):
-    # cm-a has the same adapter as the baseline cm-b, so only grep-fn is a system under test.
-    result = report("r1", baseline="cm-b", resamples=500)
-    assert sorted({c.system for c in result.primary}) == ["grep-fn"] and len(result.primary) == 2
+def test_the_primary_systems_are_an_explicit_list(run_dir):
+    with pytest.raises(ReportError, match=r"primary systems \['cm-bm25'"):
+        report("r1", baseline="grep-fn")  # the default list names the real codemem systems
+    with pytest.raises(ReportError, match=r"primary systems \['grep'\]"):
+        report("r1", baseline="grep-fn", primary=["cm-a", "grep"])  # grep has no function level
+    result = report("r1", baseline="grep-fn", primary=["cm-b"], resamples=500)
+    assert {c.system for c in result.primary} == {"cm-b"} and len(result.primary) == 2
     assert "Holm correction over all 2 tests" in result.report_path.read_text()
 
 
 def test_a_file_level_baseline_has_no_primary_tests(run_dir):
-    result = report("r1", baseline="grep", resamples=500)
+    result = report("r1", baseline="grep", primary=PRIMARY, resamples=500)
     assert result.primary == [] and "n/a: the baseline grep has no function-level results" in result.report_path.read_text()
 
 
 def test_same_inputs_give_the_same_report(run_dir):
-    first = report("r1", baseline="grep-fn").report_path.read_text()
+    first = report("r1", baseline="grep-fn", primary=PRIMARY).report_path.read_text()
     rows = (run_dir / "scores.jsonl").read_text().splitlines()
     random.Random(0).shuffle(rows)
     (run_dir / "scores.jsonl").write_text("\n".join(rows) + "\n")
-    assert report("r1", baseline="grep-fn").report_path.read_text() == first
+    assert report("r1", baseline="grep-fn", primary=PRIMARY).report_path.read_text() == first
 
 
 def test_cli_report(run_dir, capsys):
-    assert main(["report", "r1", "--baseline", "grep-fn"]) == 0
+    assert main(["report", "r1", "--baseline", "grep-fn", "--primary", "cm-a", "--primary", "cm-b"]) == 0
     out = capsys.readouterr().out
     assert "report.md: 6 tasks" in out and "Holm over 4 tests" in out and "cm-a" in out
     assert main(["report", "missing"]) == 1

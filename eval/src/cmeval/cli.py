@@ -139,7 +139,9 @@ def cmd_report(args) -> int:
     from .tasks import TaskError
 
     try:
-        result = report(args.run, baseline=args.baseline, split=args.split, cutoff=args.cutoff, tasks_file=args.tasks)
+        kwargs = {"primary": args.primary} if args.primary else {}
+        result = report(args.run, baseline=args.baseline, split=args.split, cutoff=args.cutoff, tasks_file=args.tasks,
+                        **kwargs)
     except (ReportError, ScoreError, TaskError) as exc:
         print(f"report {args.run}: {exc}", file=sys.stderr)
         return 1
@@ -185,6 +187,8 @@ def cmd_compare(args) -> int:
     except (CompareError, ScoreError, TaskError, RepoError) as exc:
         print(f"compare {args.run_a} {args.run_b}: {exc}", file=sys.stderr)
         return 1
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
     print(f"update vs. rebuild check: {'PASS' if result.passed else 'FAIL (read the report)'}")
     print(f"  {'system':22} {'tasks':>5} {'same top 10':>11} {'metric diff':>11} {'token diff':>10}  result")
     for s in result.systems:
@@ -241,6 +245,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("run", help="run id (in CMEVAL_HOME/runs) or path to a run folder")
     p.add_argument("--baseline", default="grep-fn-plus", help="system for the paired tests (default grep-fn-plus)")
     p.add_argument("--split", choices=["dev", "test"], default="dev", help="must match the run's split; test only at milestones")
+    p.add_argument("--primary", action="append", default=None,
+                   help="system for the primary tests (repeatable; default: the 3 codemem systems)")
     p.add_argument("--cutoff", default="2026-07-01", help="issue date that splits tasks into before and after (default 2026-07-01)")
     p.add_argument("--tasks", type=Path, default=None, help="tasks file to use instead of the path in meta.json (same sha256)")
     p.set_defaults(func=cmd_report)
