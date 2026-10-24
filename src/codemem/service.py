@@ -21,6 +21,7 @@ from .watcher import RepoWatcher
 
 log = logging.getLogger(__name__)
 
+_LONG_CLASS_LINES = 80
 # Rough share of total work per phase, for a single progress percentage.
 _PHASE_SPAN = {"chunk": (0.0, 0.15), "embed": (0.15, 1.0), "done": (1.0, 1.0)}
 
@@ -154,10 +155,16 @@ class CodememService:
         def brief(c) -> dict[str, Any]:
             return {"chunk_id": c.chunk_id, "qualname": c.qualname, "location": c.location}
 
+        code = chunk.code
+        members = self.store.children_of(chunk.key) if chunk.kind == "class" else []
+        if chunk.kind == "class" and chunk.skeleton and code.count("\n") >= _LONG_CLASS_LINES:
+            # A long class is read through its outline and members, not as thousands of lines.
+            code = chunk.skeleton + f"\n... ({code.count(chr(10)) + 1} lines; use get_chunk on a member)"
         return {
             **make_card(chunk, 0.0, self.config).to_dict(),
-            "code": chunk.code,
+            "code": code,
             "docstring": chunk.docstring,
+            "members": [brief(c) for c in members],
             "callers": [brief(c) for c in self.store.callers_of(chunk.chunk_id)],
             "callees": [brief(c) for c in self.store.callees_of(chunk.chunk_id)],
         }
@@ -171,7 +178,11 @@ class CodememService:
             "index_dir": str(self.index_dir),
             **store.counts(),
             "models": {
-                v: {"model": store.get_meta(f"vec.{v}.model"), "dim": store.get_meta(f"vec.{v}.dim")}
+                v: {
+                    "model": (store.get_meta(f"vec.{v}.embedder") or "").split("|", 1)[0] or None,
+                    "embedder": store.get_meta(f"vec.{v}.embedder"),
+                    "dim": store.vector_dim(v),
+                }
                 for v in self.config.enabled_vec_types()
             },
             "indexed_commit": store.get_meta("indexed_commit"),

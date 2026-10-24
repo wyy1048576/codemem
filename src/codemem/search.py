@@ -1,7 +1,8 @@
 """Hybrid retrieval: BM25 (FTS5) + one vector search per enabled vector set, merged with RRF.
 
 `search()` is a pure library function returning structured results; MCP and the
-CLI only format them.
+CLI only format them. A chunk with several vectors of one type (windows of a long function)
+is scored by its best one, and the card says which lines that window covers.
 """
 
 from __future__ import annotations
@@ -15,8 +16,8 @@ import numpy as np
 from .config import Config
 from .embedder import Embedder, make_embedder
 from .schema import Chunk
-from .store import Store
-from .tokenize import fts_match_query
+from .store import ChunkFilter, Store, VectorHit
+from .tokenize import fts_match_query, tokenize
 
 BM25 = "bm25"
 
@@ -35,6 +36,11 @@ class ResultCard:
     preview: str
     score: float
     ranks: dict[str, int] | None = None  # per-signal 1-based ranks (debug)
+    language: str = "python"
+    subkind: str = ""
+    name: str = ""
+    is_test: bool = False
+    best_lines: tuple[int, int] | None = None  # the best-matching window of a long chunk
 
     @property
     def location(self) -> str:
@@ -98,8 +104,27 @@ def _pick_top(
     return found[:k]
 
 
-def _preview(chunk: Chunk, max_lines: int, max_chars: int) -> str:
-    lines = chunk.code.splitlines()
+def _focus(lines: list[str], query_tokens: set[str], size: int) -> int:
+    """Start of the `size`-line stretch around the line sharing the most query tokens."""
+    best_i, best = 0, 0
+    for i, line in enumerate(lines):
+        score = len(query_tokens.intersection(tokenize(line)))
+        if score > best:
+            best_i, best = i, score
+    return max(0, min(best_i - size // 3, len(lines) - size))
+
+
+def _preview(
+    chunk: Chunk, max_lines: int, max_chars: int, best_lines: tuple[int, int] | None = None,
+    query_tokens: set[str] | None = None,
+) -> str:
+    text_source = chunk.skeleton if chunk.kind == "class" and chunk.skeleton else chunk.code
+    lines = text_source.splitlines()
+    if best_lines is not None:  # show the window that matched, not the top of a long function
+        lines = lines[best_lines[0] - chunk.start_line : best_lines[1] - chunk.start_line + 1]
+        if query_tokens and len(lines) > max_lines:  # and, inside it, the lines that match the query
+            start = _focus(lines, query_tokens, max_lines)
+            lines = lines[start:]
     text = "\n".join(lines[:max_lines])
     if len(text) > max_chars:
         text = text[:max_chars].rstrip() + " ..."
@@ -108,7 +133,10 @@ def _preview(chunk: Chunk, max_lines: int, max_chars: int) -> str:
     return text
 
 
-def make_card(chunk: Chunk, score: float, config: Config, ranks: dict[str, int] | None = None) -> ResultCard:
+def make_card(
+    chunk: Chunk, score: float, config: Config, ranks: dict[str, int] | None = None,
+    best_lines: tuple[int, int] | None = None, query_tokens: set[str] | None = None,
+) -> ResultCard:
     return ResultCard(
         chunk_id=chunk.chunk_id or 0,
         key=chunk.key,
@@ -119,15 +147,36 @@ def make_card(chunk: Chunk, score: float, config: Config, ranks: dict[str, int] 
         kind=chunk.kind,
         signature=chunk.signature,
         doc=chunk.docstring.strip().splitlines()[0] if chunk.docstring.strip() else "",
-        preview=_preview(chunk, config.preview_lines, config.preview_chars),
+        preview=_preview(chunk, config.preview_lines, config.preview_chars, best_lines, query_tokens),
         score=score,
         ranks=ranks,
+        language=chunk.language,
+        subkind=chunk.subkind,
+        name=chunk.name,
+        is_test=chunk.is_test,
+        best_lines=best_lines,
     )
 
 
 def available_signals(store: Store, config: Config) -> list[str]:
     stored = set(store.vec_types())
     return [BM25] + [v for v in config.enabled_vec_types() if v in stored]
+
+
+def _weigh_tests(store: Store, fused: list[tuple[int, float]], weight: float) -> list[tuple[int, float]]:
+    """Multiply the fused score of test chunks by `weight` (0 < weight < 1 pushes them down)."""
+    ids = [doc for doc, _ in fused]
+    tests: set[int] = set()
+    for start in range(0, len(ids), 500):
+        batch = ids[start : start + 500]
+        marks = ",".join("?" * len(batch))
+        tests.update(r[0] for r in store.conn.execute(
+            f"SELECT chunk_id FROM chunks WHERE is_test = 1 AND chunk_id IN ({marks})", batch
+        ))
+    if not tests:
+        return fused
+    weighed = [(doc, score * weight if doc in tests else score) for doc, score in fused]
+    return sorted(weighed, key=lambda kv: (-kv[1], kv[0]))
 
 
 def search(
@@ -140,6 +189,9 @@ def search(
     path_prefix: str | None = None,
     debug: bool = False,
     embedder_factory: Callable[[str, Config], Embedder] = make_embedder,
+    kinds: Sequence[str] | None = None,
+    languages: Sequence[str] | None = None,
+    test_weight: float | None = None,
 ) -> SearchResponse:
     timings: dict[str, float] = {}
     t_total = time.perf_counter()
@@ -152,14 +204,23 @@ def search(
             raise ValueError(f"unknown signals {unknown}; choose from {[BM25, *config.vectors]}")
         signals = [s for s in signals if s == BM25 or s in stored_vec_types]
 
-    allowed = store.ids_with_prefix(path_prefix) if path_prefix else None
+    kinds = kinds if kinds is not None else config.kinds
+    test_weight = config.test_weight if test_weight is None else test_weight
+    flt = ChunkFilter(
+        path_prefix=path_prefix or None,
+        kinds=tuple(kinds) if kinds is not None else None,
+        languages=tuple(languages) if languages else None,
+        exclude_tests=test_weight <= 0,
+    )
+    allowed = store.filter_ids(flt) if flt.active else None
     n = max(config.candidates, k)
     ranked: dict[str, list[int]] = {}
+    best_part: dict[tuple[str, int], VectorHit] = {}
 
     if BM25 in signals:
         t = time.perf_counter()
         match = fts_match_query(query, stem=config.bm25_stem, stopwords=config.bm25_stopwords)
-        ranked[BM25] = store.bm25_search(match, n, config.bm25_weights, path_prefix) if match else []
+        ranked[BM25] = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
         timings[BM25] = time.perf_counter() - t
 
     vec_signals = [s for s in signals if s != BM25]
@@ -174,17 +235,29 @@ def search(
                 timings[f"embed_query:{model}"] = time.perf_counter() - t
             t = time.perf_counter()
             hits = store.vector_search(vec_type, query_vecs[model], n, allowed)
-            ranked[vec_type] = [i for i, _ in hits]
+            ranked[vec_type] = [h.chunk_id for h in hits]
+            for h in hits:
+                best_part[(vec_type, h.chunk_id)] = h
             timings[vec_type] = time.perf_counter() - t
+    elif vec_signals:
+        for vec_type in vec_signals:
+            ranked[vec_type] = []
 
     t = time.perf_counter()
     fused = rrf(ranked, k=config.rrf_k, weights=config.rrf_weights)
+    if 0 < test_weight < 1:
+        fused = _weigh_tests(store, fused, test_weight)
     rank_of = {s: {doc: r for r, doc in enumerate(ids, start=1)} for s, ids in ranked.items()}
+    query_tokens = set(tokenize(query, stopwords=True))
     results: list[ResultCard] = []
     for chunk, score in _pick_top(fused, k, store.get_chunks):
         doc = chunk.chunk_id
         ranks = {s: rank_of[s][doc] for s in ranked if doc in rank_of[s]} if debug else None
-        results.append(make_card(chunk, score, config, ranks))
+        hit = best_part.get(("code", doc))
+        best_lines = None
+        if hit is not None and hit.n_parts > 1 and chunk.kind != "class":
+            best_lines = (chunk.start_line + hit.start_off, chunk.start_line + hit.end_off)
+        results.append(make_card(chunk, score, config, ranks, best_lines, query_tokens))
     timings["fuse"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
     return SearchResponse(query=query, signals=list(signals), results=results, timings=timings)

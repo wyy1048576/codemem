@@ -1,11 +1,22 @@
-"""Compact plain-text rendering shared by the MCP tools and the CLI."""
+"""Compact plain-text rendering shared by the MCP tools and the CLI.
+
+A card is what an agent reads for one result; the eval harness counts its tokens.
+"""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
-from .search import SearchResponse
+from .search import ResultCard, SearchResponse
+
+
+def card_label(r: ResultCard) -> str:
+    if r.kind == "block":
+        return f"<{r.subkind or 'block'}> {r.name}" if r.subkind != "imports" else "<imports>"
+    if r.kind == "class" and r.subkind and r.subkind != "class":
+        return f"{r.qualname} ({r.subkind})"
+    return r.qualname
 
 
 def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool = True) -> str:
@@ -13,21 +24,28 @@ def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool =
         return f"No results for {resp.query!r}."
     out: list[str] = []
     for i, r in enumerate(resp.results, start=1):
-        head = f"{i}. {r.location}  {r.qualname}  [id {r.chunk_id}]"
+        head = f"{i}. {r.location}  {card_label(r)}  [id {r.chunk_id}]"
+        if r.best_lines:
+            head += f"  best {r.best_lines[0]}-{r.best_lines[1]}"
         if debug and r.ranks is not None:
             head += "  " + " ".join(f"{s}={rank}" for s, rank in sorted(r.ranks.items())) + f" rrf={r.score:.4f}"
         out.append(head)
-        out.append(f"   {r.signature}")
+        if r.kind != "block":
+            out.append(f"   {r.signature}")
         if r.doc:
             out.append(f"   {r.doc}")
-        if preview and r.preview and r.kind != "file_header":
-            body = r.preview.splitlines()[1:]  # first line repeats the signature/decorator
+        if preview and r.preview:
+            body = r.preview.splitlines()
+            if r.kind != "block" and not r.best_lines:
+                body = body[1:]  # first line repeats the signature/decorator
             out.extend(f"   | {line}" for line in body[:6])
     return "\n".join(out)
 
 
 def format_chunk(d: dict[str, Any]) -> str:
     lines = [f"{d['location']}  {d['qualname']}  [id {d['chunk_id']}]", "", d["code"], ""]
+    if d.get("members"):
+        lines.append("members: " + ", ".join(f"{c['qualname']} ({c['location']})" for c in d["members"]))
     for label in ("callers", "callees"):
         items = d[label]
         lines.append(f"{label}: " + (", ".join(f"{c['qualname']} ({c['location']})" for c in items) or "none"))
@@ -41,6 +59,8 @@ def format_status(info: dict[str, Any]) -> str:
     lines.append(
         f"files: {info['files']}  chunks: {info['chunks']} {json.dumps(info['chunks_by_kind'])}  edges: {info['edges']}"
     )
+    if info.get("chunks_by_language"):
+        lines.append(f"languages: {json.dumps(info['chunks_by_language'])}")
     lines.append(f"vectors: {json.dumps(info['vectors'])}")
     for vec_type, m in info["models"].items():
         lines.append(f"  {vec_type}: {m['model']} (dim {m['dim']})")

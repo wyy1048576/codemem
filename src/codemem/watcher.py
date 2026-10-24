@@ -1,4 +1,4 @@
-"""watchdog -> debounced incremental re-index."""
+"""watchdog -> debounced incremental re-index (files in any supported language, and ignore rules)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ from pathlib import Path
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from .config import ALWAYS_SKIP_DIRS
+from .config import ALWAYS_SKIP_DIRS, REPO_CONFIG_NAME
+from .languages import EXTENSIONS
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class _Handler(FileSystemEventHandler):
         if any(p in ALWAYS_SKIP_DIRS for p in parts[:-1]):
             return False
         name = parts[-1] if parts else ""
-        return name.endswith(".py") or name == ".gitignore"
+        return os.path.splitext(name)[1].lower() in EXTENSIONS or name in (".gitignore", REPO_CONFIG_NAME)
 
     def on_any_event(self, event: FileSystemEvent) -> None:
         if event.event_type in ("opened", "closed_no_write"):

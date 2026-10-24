@@ -10,25 +10,26 @@ SERVER_NAME = "codemem"
 
 _SEARCH_CODE = {
     "none": (
-        "Search this repository's functions by natural-language or identifier query. "
-        "Returns ranked functions with file:line, signature and a short preview."
+        "Search this repository's code (functions, classes, top-level code) by natural-language or "
+        "identifier query. Returns ranked results with file:line, signature and a short preview."
     ),
     "light": (
         "Use search_code to locate code relevant to an issue, bug or feature, especially when you "
-        "don't know exact identifiers. Returns ranked functions with file:line, signature and a "
-        "short preview. Prefer this over grep for exploratory search; use grep for exact strings."
+        "don't know exact identifiers. Returns ranked functions, classes and code blocks with "
+        "file:line, signature and a short preview. Prefer this over grep for exploratory search; use "
+        "grep for exact strings."
     ),
     "strong": (
         "Use search_code FIRST to locate code relevant to an issue, bug or feature, especially when "
         "you don't know exact identifiers. It combines keyword and semantic search over every "
-        "function, including who calls it and which tests cover it, and returns ranked functions "
-        "with file:line. Always try this before grep/find for exploratory search; use grep only for "
+        "function and class, including who calls it and which tests cover it, and returns ranked "
+        "results with file:line. Always try this before grep/find for exploratory search; use grep only for "
         "exact strings. Then call get_chunk on promising results instead of reading whole files."
     ),
 }
 
 _GET_CHUNK = {
-    "none": "Return the full source of one indexed function plus its callers and callees.",
+    "none": "Return the full source of one indexed function or class plus its callers and callees.",
     "light": (
         "Return the full source of one function plus its callers and callees. `ref` is a chunk id "
         "from search_code, a `path:line` location, or a `path::qualname` key."
@@ -47,10 +48,10 @@ _INDEX_STATUS = {
 }
 
 _INSTRUCTIONS = {
-    "none": "codemem: code search over this repository's functions.",
+    "none": "codemem: code search over this repository's functions and classes.",
     "light": (
-        "codemem indexes every function in this repository (code, callers, tests) for hybrid "
-        "keyword + semantic search.\n"
+        "codemem indexes every function and class in this repository (code, callers, tests) for "
+        "hybrid keyword + semantic search.\n"
         "- search_code(query): find functions relevant to a task; describe behaviour in plain "
         "words or use identifiers.\n"
         "- get_chunk(ref): read one result in full with its callers/callees.\n"
@@ -58,8 +59,8 @@ _INSTRUCTIONS = {
         "Use grep for exact string matches."
     ),
     "strong": (
-        "codemem indexes every function in this repository (code, callers, tests) for hybrid "
-        "keyword + semantic search. Start every code-location task with search_code: describe the "
+        "codemem indexes every function and class in this repository (code, callers, tests) for "
+        "hybrid keyword + semantic search. Start every code-location task with search_code: describe the "
         "behaviour from the issue in plain words (you don't need exact identifiers). Inspect hits "
         "with get_chunk and follow callers/callees from there. Fall back to grep only for exact "
         "strings, and re-run search_code with different wording before giving up."

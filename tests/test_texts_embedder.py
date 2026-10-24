@@ -4,7 +4,7 @@ from codemem.callgraph import is_test_caller, is_test_path, resolve_edges
 from codemem.config import Config, config_from_dict
 from codemem.embedder import FakeEmbedder, make_embedder
 from codemem.schema import Chunk
-from codemem.texts import TEXT_BUILDERS, BuildContext, Ref, build_texts
+from codemem.texts import TEXT_BUILDERS, BuildContext, Ref, build_parts, build_texts
 
 
 def _chunk(chunk_id, name, path="auth/sessions.py", kind="function"):
@@ -45,10 +45,24 @@ def test_usage_text_lists_callers_and_tests():
     )
 
 
-def test_usage_text_none_without_callers_and_for_headers():
+def test_usage_text_none_without_callers_and_for_blocks():
     assert TEXT_BUILDERS["usage"](_chunk(1, "lonely"), BuildContext()) is None
-    header = _chunk(5, "mod", kind="file_header")
-    assert TEXT_BUILDERS["usage"](header, BuildContext(callers={5: [Ref(1, "a", "a", "a.py", 1)]})) is None
+    block = _chunk(5, "mod", kind="block")
+    assert TEXT_BUILDERS["usage"](block, BuildContext(callers={5: [Ref(1, "a", "a", "a.py", 1)]})) is None
+
+
+def test_usage_text_uses_the_callers_test_flag_and_names_block_callers():
+    revoke = _chunk(1, "revoke_session")
+    ctx = BuildContext(callers={1: [
+        Ref(3, "<block>", "describe(...)", "web/users.test.ts", 3, is_test=True, kind="block"),
+        Ref(2, "disableUser", "disableUser", "web/users.ts", 5, is_test=False),
+        Ref(4, "check", "check", "django/test/client.py", 9, is_test=False),  # not a test, despite test/
+    ]})
+    assert TEXT_BUILDERS["usage"](revoke, ctx).splitlines()[1:] == [
+        "called by check in django/test/client.py",
+        "called by disableUser in web/users.ts",
+        "tested in web/users.test.ts",
+    ]
 
 
 def test_usage_text_caps_and_reserves_room_for_tests():
@@ -68,7 +82,45 @@ def test_usage_text_includes_commits_when_given():
 def test_summary_slot_disabled_and_build_texts_skips_none():
     c = _chunk(1, "f")
     assert TEXT_BUILDERS["summary"](c, BuildContext()) is None
-    assert build_texts(c, BuildContext(), ["code", "usage", "summary"]) == {"code": c.code}
+    assert build_texts(c, BuildContext(code_header=False), ["code", "usage", "summary"]) == {"code": c.code}
+
+
+def test_code_text_has_a_context_header():
+    method = _chunk(1, "SessionManager.revoke", kind="method")
+    assert TEXT_BUILDERS["code"](method, BuildContext()) == (
+        "# auth/sessions.py\n# in SessionManager\ndef SessionManager.revoke():\n    pass"
+    )
+    go = Chunk(key="k", path="auth/sessions.go", qualname="RevokeSession", name="RevokeSession", kind="function",
+               start_line=3, end_line=5, signature="", docstring="RevokeSession deletes one session.",
+               code="func RevokeSession(id string) {\n}", content_hash="x", language="go")
+    # Doc comments of non-Python code sit above the span, so they are added back.
+    assert TEXT_BUILDERS["code"](go, BuildContext()).splitlines()[:2] == [
+        "// auth/sessions.go", "// RevokeSession deletes one session."
+    ]
+
+
+def test_class_text_is_its_skeleton():
+    c = Chunk(key="k", path="a.py", qualname="A", name="A", kind="class", start_line=1, end_line=40, signature="class A:",
+              docstring="", code="class A:\n" + "\n".join(f"    def m{i}(self):\n        pass" for i in range(20)),
+              content_hash="x", skeleton="class A:\n    def m0(self):")
+    assert TEXT_BUILDERS["code"](c, BuildContext()) == "# a.py\nclass A:\n    def m0(self):"
+
+
+def test_long_code_is_split_into_windows():
+    lines = [f"    x{i} = compute({i})  # line {i}" for i in range(400)]
+    code = "def big():\n" + "\n".join(lines)
+    c = Chunk(key="k", path="m/big.py", qualname="big", name="big", kind="function", start_line=10,
+              end_line=10 + len(lines), signature="def big():", docstring="", code=code, content_hash="x")
+    ctx = BuildContext(window_chars=2000, window_overlap_lines=3)
+    parts = build_parts(c, ctx, "code")
+    assert len(parts) > 3 and all(len(p.text) <= 2000 for p in parts)
+    assert [p.part for p in parts] == list(range(len(parts))) and {p.n_parts for p in parts} == {len(parts)}
+    assert parts[0].start_off == 0 and parts[-1].end_off == len(lines)
+    assert all(b.start_off <= a.end_off < b.end_off for a, b in zip(parts, parts[1:]))  # overlapping, in order
+    assert parts[1].text.splitlines()[:2] == ["# m/big.py", f"# part 2/{len(parts)}"]
+    assert build_parts(c, ctx, "usage") == []  # no callers: no usage vector
+    short = build_parts(_chunk(1, "f"), ctx, "code")
+    assert len(short) == 1 and (short[0].start_off, short[0].end_off) == (0, 1)
 
 
 def test_fake_embedder_deterministic_normalized_and_similarity():

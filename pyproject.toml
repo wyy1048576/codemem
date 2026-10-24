@@ -1,12 +1,20 @@
 [project]
 name = "codemem"
-version = "0.1.0"
-description = "Local, agent-agnostic code search (hybrid BM25 + embeddings) exposed via MCP and CLI."
+version = "0.2.0"
+description = "Local, agent-agnostic code search (hybrid BM25 + embeddings, nine languages) exposed via MCP and CLI."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "tree-sitter>=0.25,<0.27",
+    # One official grammar per supported language (see src/codemem/languages/).
     "tree-sitter-python>=0.25,<0.26",
+    "tree-sitter-javascript>=0.25,<0.26",
+    "tree-sitter-typescript>=0.23,<0.24",
+    "tree-sitter-go>=0.25,<0.26",
+    "tree-sitter-java>=0.23,<0.24",
+    "tree-sitter-c>=0.24,<0.25",
+    "tree-sitter-cpp>=0.23,<0.24",
+    "tree-sitter-rust>=0.24,<0.25",
     "pathspec>=0.12",
     "faiss-cpu>=1.9",
     "numpy>=1.26",
