@@ -80,14 +80,15 @@ search: BM25 top-N + vector top-N per enabled set -> RRF (k=60) -> result cards
 
 | Module | Role |
 |---|---|
-| `config.py` | settings, index paths, per-vector-type models |
+| `config.py` | settings, index paths, per-vector-type models, model version hashes |
+| `plugins.py` | loads `"module:Class"` plugins named in config |
 | `schema.py` | `Chunk` dataclass, keys, hashes |
 | `chunker.py` | tree-sitter Python chunking + call extraction |
 | `tokenize.py` | code-aware BM25 tokenization (shared by index and query) |
 | `callgraph.py` | call resolution heuristic (isolated so it can be replaced) |
 | `texts.py` | text-builder registry: `code`, `usage`, `summary` slot |
 | `embedder.py` | `Embedder` interface, sentence-transformers/jina, `FakeEmbedder` |
-| `store.py` | SQLite + `VectorStore` (FAISS `IndexIDMap2(IndexFlatIP)`) |
+| `store.py` | SQLite + `VectorStore` backend (default FAISS `IndexIDMap2(IndexFlatIP)`) |
 | `indexer.py` | full + incremental indexing, timings |
 | `search.py` | BM25, vector search, RRF, result cards (pure library function) |
 | `service.py` | long-lived owner of an index: background updates, progress, watcher |
@@ -141,7 +142,34 @@ include_commits = false
 
 Changing a vector type's model (or `embedding_dim`) rebuilds only that vector set.
 `CODEMEM_MODEL=fake` uses the hash-based `FakeEmbedder` everywhere, which is handy for fast
-dev runs.
+dev runs. It wins over a custom `embedder`.
+
+### Swapping models, embedders and the vector store
+
+```toml
+vector_backend = "faiss"     # or "mypkg.vectors:LanceStore"; changing it re-embeds everything
+
+[vectors.code]
+model = "C:/models/my-code-encoder"   # hub name or local folder (use an absolute path)
+embedder = "mypkg.embed:MyEmbedder"   # optional; default is sentence-transformers
+version = "v3"                         # optional; see below
+```
+
+- **Embedder:** a subclass of `codemem.embedder.Embedder` (`dim`, `embed_documents`,
+  `embed_queries`, L2-normalized float32 output), built as `MyEmbedder(model, config)`.
+  A model that loads with sentence-transformers needs only `model`, no `embedder`.
+- **Model version:** each vector set records a model id
+  (`model[@embedding_dim][#version][+embedder]`). If it changes, that set is re-embedded.
+  For a local model folder, `version` defaults to a hash of the folder's file contents, so
+  retrained weights saved over the same folder are picked up on the next update. The hash
+  is the same on every machine. File hashes are cached in `~/.codemem/model_hashes.json`, so
+  each checkpoint is read once. Hub names get no version unless you set one.
+- **Vector backend:** a subclass of `codemem.store.VectorStore`. It implements `upsert`,
+  `remove`, `search`, `ids`, `__len__`, `save(path)`, `load(path)` and sets `suffix` (the
+  saved name is `vec_<type><suffix>`, a file or a folder). `search` must return at most k
+  `(id, score)` pairs, best first, with real similarity scores, filtered to `allowed_ids`
+  when given. BM25, chunks and the call graph stay in SQLite. See `tests/test_plugins.py` for a
+  small numpy backend and embedder.
 
 **Intel Arc / XPU:** `device = "xpu"` needs a PyTorch build with XPU support (installed from
 PyTorch's XPU wheel index). This is experimental: if `torch.xpu` is unavailable, codemem logs
@@ -154,7 +182,8 @@ back to CPU.
 ## Index location
 
 `~/.codemem/indexes/<repo-name>-<hash-of-abs-path>/` by default (`CODEMEM_HOME` moves the
-base). It contains `index.db`, `vec_<type>.faiss` (+ `.ids.json`) and `write.lock`.
+base). It contains `index.db`, `vec_<type>.faiss` (+ `.ids.json`; another backend uses its
+own suffix) and `write.lock`.
 
 ## License note
 

@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field
 
 import numpy as np
 
-from .config import Config
+from .config import Config, VectorConfig
 from .embedder import Embedder, make_embedder
 from .schema import Chunk
 from .store import Store
@@ -119,7 +119,7 @@ def search(
     signals: Sequence[str] | None = None,
     path_prefix: str | None = None,
     debug: bool = False,
-    embedder_factory: Callable[[str, Config], Embedder] = make_embedder,
+    embedder_factory: Callable[[VectorConfig, Config], Embedder] = make_embedder,
 ) -> SearchResponse:
     timings: dict[str, float] = {}
     t_total = time.perf_counter()
@@ -145,13 +145,15 @@ def search(
     vec_signals = [s for s in signals if s != BM25]
     if vec_signals and (allowed is None or allowed):
         # Embed the query once per distinct model, not once per vector set.
-        query_vecs: dict[str, np.ndarray] = {}
+        query_vecs: dict[tuple, np.ndarray] = {}
         for vec_type in vec_signals:
-            model = config.vectors[vec_type].model
+            spec = config.vectors[vec_type]
+            model = (spec.model, spec.embedder, spec.version)
             if model not in query_vecs:
                 t = time.perf_counter()
-                query_vecs[model] = embedder_factory(model, config).embed_queries([query])[0]
-                timings[f"embed_query:{model}"] = time.perf_counter() - t
+                query_vecs[model] = embedder_factory(spec, config).embed_queries([query])[0]
+                label = f"{spec.model}+{spec.embedder}" if spec.embedder else spec.model
+                timings[f"embed_query:{label}"] = time.perf_counter() - t
             t = time.perf_counter()
             hits = store.vector_search(vec_type, query_vecs[model], n, allowed)
             ranked[vec_type] = [i for i, _ in hits]

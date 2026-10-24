@@ -38,7 +38,12 @@ class CodememService:
         self.index_dir = Path(index_dir) if index_dir else default_index_dir(self.repo_root)
         self.config = config or load_config(self.repo_root)
         self.embedder_factory = embedder_factory
-        self.store = Store(self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords)
+        self.store = Store(
+            self.index_dir,
+            bm25_stem=self.config.bm25_stem,
+            bm25_stopwords=self.config.bm25_stopwords,
+            vector_backend=self.config.vector_backend,
+        )
         self.state = "ready" if self.has_index() else "empty"
         self.progress = 0.0
         self.last_error: str | None = None
@@ -113,11 +118,15 @@ class CodememService:
 
     def prewarm(self) -> None:
         """Load embedding models so the first query doesn't pay for it."""
-        for model in {self.config.vectors[v].model for v in self.config.enabled_vec_types()}:
+        specs = {}
+        for v in self.config.enabled_vec_types():
+            spec = self.config.vectors[v]
+            specs.setdefault((spec.model, spec.embedder, spec.version), spec)
+        for spec in specs.values():
             try:
-                self.embedder_factory(model, self.config).embed_queries(["warmup"])
+                self.embedder_factory(spec, self.config).embed_queries(["warmup"])
             except Exception:
-                log.exception("could not load embedding model %s", model)
+                log.exception("could not load embedding model %s", spec.model)
 
     def start_watcher(self) -> RepoWatcher:
         self._watcher = RepoWatcher(

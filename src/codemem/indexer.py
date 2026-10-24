@@ -22,7 +22,7 @@ import pathspec
 
 from .callgraph import resolve_edges
 from .chunker import chunk_source
-from .config import ALWAYS_SKIP_DIRS, Config
+from .config import ALWAYS_SKIP_DIRS, Config, VectorConfig
 from .embedder import Embedder, make_embedder
 from .schema import Chunk, text_hash
 from .store import IndexLock, Store
@@ -31,7 +31,7 @@ from .texts import BuildContext, build_texts
 log = logging.getLogger(__name__)
 
 ProgressFn = Callable[[str, int, int], None]  # (phase, done, total)
-EmbedderFactory = Callable[[str, Config], Embedder]
+EmbedderFactory = Callable[[VectorConfig, Config], Embedder]
 
 
 @dataclass
@@ -220,6 +220,8 @@ class Indexer:
         stats = IndexStats()
         t_start = time.perf_counter()
         store = self.store
+        with store.transaction():
+            store.ensure_backend()
         if full:
             self._wipe()
         else:
@@ -355,7 +357,7 @@ class Indexer:
             stats.embedded[vec_type] = len(items)
             if not items:
                 continue
-            embedder = self.embedder_factory(cfg.vectors[vec_type].model, cfg)
+            embedder = self.embedder_factory(cfg.vectors[vec_type], cfg)
             model_id = cfg.model_id(vec_type)
             for start in range(0, len(items), step):
                 batch = items[start : start + step]

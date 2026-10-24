@@ -2,6 +2,9 @@
 
 Callers only see `embed_documents` / `embed_queries`; task prompts/prefixes are
 handled here. All outputs are float32, L2-normalized, shape (n, dim).
+
+A custom embedder is named per vector type in config (`vectors.<type>.embedder =
+"module:Class"`). It subclasses `Embedder` and is built as `Class(model, config)`.
 """
 
 from __future__ import annotations
@@ -14,7 +17,8 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from .config import Config
+from .config import Config, VectorConfig, model_version
+from .plugins import load_object
 from .tokenize import tokenize
 
 log = logging.getLogger(__name__)
@@ -180,14 +184,32 @@ _CACHE: dict[tuple, Embedder] = {}
 _CACHE_LOCK = threading.Lock()
 
 
-def make_embedder(model_name: str, config: Config) -> Embedder:
-    """Build (or reuse) the embedder for a model name. `fake` / `fake:<dim>` -> FakeEmbedder."""
-    key = (model_name, config.device, config.embedding_dim, config.batch_size, config.max_seq_length)
+def make_embedder(spec: VectorConfig | str, config: Config) -> Embedder:
+    """Build (or reuse) the embedder for a vector type's spec (or a bare model name).
+
+    `fake` / `fake:<dim>` -> FakeEmbedder, even with a custom embedder set, so
+    CODEMEM_MODEL=fake always gives a test setup. Then `spec.embedder`, then sentence-transformers.
+    """
+    if isinstance(spec, str):
+        spec = VectorConfig(model=spec)
+    model_name = spec.model
+    fake = model_name == "fake" or model_name.startswith("fake:")
+    # The version is in the key so retrained weights in the same folder load fresh.
+    version = None if fake else model_version(spec)
+    key = (
+        model_name, spec.embedder, version,
+        config.device, config.embedding_dim, config.batch_size, config.max_seq_length,
+    )
     with _CACHE_LOCK:
         if key not in _CACHE:
-            if model_name == "fake" or model_name.startswith("fake:"):
+            if fake:
                 dim = int(model_name.split(":", 1)[1]) if ":" in model_name else 64
                 _CACHE[key] = FakeEmbedder(dim)
+            elif spec.embedder:
+                embedder = load_object(spec.embedder)(model_name, config)
+                if not isinstance(embedder, Embedder):
+                    raise TypeError(f"{spec.embedder} must subclass codemem.embedder.Embedder")
+                _CACHE[key] = embedder
             else:
                 _CACHE[key] = SentenceTransformerEmbedder(
                     model_name,
