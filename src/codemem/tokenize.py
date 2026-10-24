@@ -8,6 +8,7 @@ with tokenchars '_') does no further splitting.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*|\d+")
 _CAMEL = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+")
@@ -20,10 +21,16 @@ STOPWORDS = frozenset(
 
 def split_identifier(ident: str) -> list[str]:
     """`revoke_session` -> [revoke, session]; `getUserById` -> [get, user, by, id]."""
+    return list(_split_identifier(ident))
+
+
+@lru_cache(maxsize=1 << 17)
+def _split_identifier(ident: str) -> tuple[str, ...]:
+    # Identifiers repeat a lot across a repo, so indexing a large one splits each only once.
     parts: list[str] = []
     for piece in ident.split("_"):
         parts.extend(p.lower() for p in _CAMEL.findall(piece))
-    return parts
+    return tuple(parts)
 
 
 def _stem(token: str) -> str:
@@ -37,7 +44,7 @@ def _stem(token: str) -> str:
 def tokenize(text: str, *, stem: bool = False, stopwords: bool = False) -> list[str]:
     tokens: list[str] = []
     for ident in _IDENT.findall(text):
-        parts = split_identifier(ident)
+        parts = _split_identifier(ident)
         tokens.extend(parts)
         full = ident.lower().strip("_")
         if len(parts) > 1 and full:
