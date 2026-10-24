@@ -2,7 +2,7 @@
 
     cd eval && uv run python ../scripts/compare_scores.py \
         results/2026-10-23-dev50-final/scores.jsonl.gz cm-bm25-code-usage \
-        $CMEVAL_HOME/runs/<run>/scores.jsonl.gz cm2-bm25-code-usage
+        $CMEVAL_HOME/runs/<run>/scores.jsonl cm2-bm25-code-usage
 
 Only tasks scored in both runs count. Differences are B - A, with cmeval's paired bootstrap 95%
 interval and two-sided Wilcoxon test (the same statistics as `cmeval report`). Token metrics
@@ -26,7 +26,8 @@ TOKENS = ("tokens_to_first", "recall@budget1000", "recall@budget4000")
 def load(path: str, system: str, iou: float | None) -> dict[tuple[str, str], dict[str, float]]:
     """(level, metric) -> task id -> value, for one system."""
     out: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
-    with gzip.open(path, "rt", encoding="utf-8") as f:
+    opener = gzip.open if path.endswith(".gz") else open  # run folders hold plain scores.jsonl
+    with opener(path, "rt", encoding="utf-8") as f:
         for line in f:
             row = json.loads(line)
             # Excluded rows carry the reason ("no gold at this level") instead of a number.

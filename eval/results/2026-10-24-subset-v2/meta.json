@@ -1,0 +1,561 @@
+{
+  "run_id": "2026-10-24-dev50-v2",
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+    "dirty": false
+  },
+  "tasks_file": "/Users/andres/Desktop/CS329M/codemem/eval/tasks/swebv-dev50.jsonl",
+  "tasks_sha256": "b327c2015aca3f74657ec92f3251d559746d3cd7864e6e2273ccc1282148e887",
+  "config_file": "/Users/andres/Desktop/CS329M/codemem/eval/configs/codemem-v2.toml",
+  "config_sha256": "16fc5c7cb4ccf2011ea4f958fcaf27992ae1d37db6441c784c799d2f2558bd14",
+  "config_text": "# codemem v2 (multi-language backend, docs/baseline-v2-diff.md). Every system here shares ONE index\n# (same index-time settings) and differs only at search time, so the variants cost one indexing run.\n# cm2-bm25 / cm2-bm25-code / cm2-bm25-code-usage mirror cm-* in baseline.toml (codemem v1).\n# Needs: uv sync --extra codemem\n\n[[system]]\nname = \"cm2-bm25\"\nadapter = \"codemem\"\nsignals = [\"bm25\"]\nconfig = { device = \"auto\" }\n\n[[system]]\nname = \"cm2-bm25-code\"\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\"]\nconfig = { device = \"auto\" }\n\n[[system]]\nname = \"cm2-bm25-code-usage\"\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\" }\n\n# Search-time variants of the full system.\n[[system]]\nname = \"cm2-full-fn\"  # functions and methods only (no class or block results)\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\", kinds = [\"function\", \"method\"] }\n\n[[system]]\nname = \"cm2-full-tests-down\"  # test chunks keep half their fused score (like grep-fn-plus tests_last, softer)\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\", test_weight = 0.5 }\n\n[[system]]\nname = \"cm2-full-no-tests\"  # test chunks never returned\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\", test_weight = 0.0 }\n\n[[system]]\nname = \"cm2-full-v1-bm25\"  # v1 BM25 weights (name 10, signature 5, body 1; no path or doc field)\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\", bm25 = { weights = [10, 5, 1] } }\n",
+  "split": "dev",
+  "index_mode": "update",
+  "k": 50,
+  "systems": [
+    {
+      "name": "cm2-bm25",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "cb3ea3ab111f1d5b",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25"
+        ],
+        "index_key": "cb3ea3ab111f1d5b",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            3.0,
+            5.0,
+            2.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "kinds": null,
+          "test_weight": 1.0,
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm2-bm25-code",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "cb3ea3ab111f1d5b",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code"
+        ],
+        "index_key": "cb3ea3ab111f1d5b",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            3.0,
+            5.0,
+            2.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "kinds": null,
+          "test_weight": 1.0,
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm2-bm25-code-usage",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "cb3ea3ab111f1d5b",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "cb3ea3ab111f1d5b",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            3.0,
+            5.0,
+            2.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "kinds": null,
+          "test_weight": 1.0,
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm2-full-fn",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "cb3ea3ab111f1d5b",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "cb3ea3ab111f1d5b",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            3.0,
+            5.0,
+            2.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "kinds": [
+            "function",
+            "method"
+          ],
+          "test_weight": 1.0,
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm2-full-tests-down",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "cb3ea3ab111f1d5b",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "cb3ea3ab111f1d5b",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            3.0,
+            5.0,
+            2.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "kinds": null,
+          "test_weight": 0.5,
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm2-full-no-tests",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "cb3ea3ab111f1d5b",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "cb3ea3ab111f1d5b",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            3.0,
+            5.0,
+            2.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "kinds": null,
+          "test_weight": 0.0,
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    },
+    {
+      "name": "cm2-full-v1-bm25",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "cb3ea3ab111f1d5b",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "cb3ea3ab111f1d5b",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true
+            },
+            "summary": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": false
+            }
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10,
+            5,
+            1
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "rrf_k": 60,
+          "rrf_weights": {},
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 1000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "kinds": null,
+          "test_weight": 1.0,
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 400
+        }
+      }
+    }
+  ],
+  "machine": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "processor": "arm",
+    "python": "3.11.2"
+  },
+  "started": "2026-10-24T06:59:04+00:00",
+  "sessions": [
+    {
+      "started": "2026-10-24T06:59:04+00:00",
+      "cmeval_git": {
+        "sha": "31c0f990d38054b5ed041d881516af59c03db247",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.6.2-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.2"
+      }
+    }
+  ],
+  "status": "done",
+  "filters": {
+    "repos": [
+      "psf/requests",
+      "pallets/flask",
+      "mwaskom/seaborn",
+      "pytest-dev/pytest"
+    ],
+    "limit_per_repo": null
+  },
+  "ended": "2026-10-24T08:35:52+00:00",
+  "error": null,
+  "searched": 91,
+  "skipped": 0
+}

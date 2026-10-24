@@ -57,14 +57,28 @@ Two warnings frame everything:
 - **Non-target code crowds results.**
   - On the fixture, a test helper class (`FakeUser`) became a callee of the test that mentions "disabled user". It took rank 2, and `revoke_session` fell from 4 to 7.
   - On `requests`, exception classes (`ConnectTimeout`, `RetryError`) outrank `HTTPAdapter.send` for "retry a request when the connection fails".
-  - Down-weighting tests or showing only functions restores the order. The dev50 run quantifies it (search-time variants in `eval/configs/codemem-v2.toml`).
+  - Down-weighting tests or showing only functions restores the order. On 13 dev tasks, halving the scores of tests, classes and blocks made 4 tasks better at function level and none worse, so it is now the default ([baseline-v2-diff.md](baseline-v2-diff.md) §5.3).
 - **Long issues are noisy queries.**
   - Median issue length on dev50 is 1,444 characters, and the longest is 24,769 (stack traces, logs, code).
   - BM25 ORs every token, and the embedder truncates the query at 1,024 tokens.
   - Ideas 2 and 3 (query-side compression) both target this.
 
-*This section is updated with the per-task failure analysis of the v2 dev50 run (see
-[baseline-v2-diff.md](baseline-v2-diff.md)).*
+**What the 13 local dev tasks show, task by task** (v2 default; numbers in
+[baseline-v2-diff.md](baseline-v2-diff.md) §5.3).
+
+- Of 12 tasks with function gold, v2 puts a gold function in the top 10 for 8, and every gold function for 7 (success@10 0.583).
+- The 4 misses (seaborn-3069, flask-5014, pytest-5787, pytest-7324) and one near-miss (pytest-10081) fall into four patterns. Each points at an idea below.
+
+| Pattern | Tasks (rank of the first gold function) | What happened | Idea that targets it |
+|---|---|---|---|
+| **The issue names the fix site, and retrieval still misses it** | seaborn-3069: the issue says *"Probably straightforward to do in `Plotter._finalize_figure`"*, a gold function. It is not in the top 50 of v2, and not in BM25's either. pytest-7324: the reproducer calls `Expression.compile("False")`, in the gold file. It ranks 16. | In an issue of 1,187 characters, BM25 splits the dotted name into common words (`plotter`, `finalize`, `figure`), and the dense query is about scales. | Idea 2: route dotted names, stack frames and error strings to an exact symbol lookup that fusion cannot bury. |
+| **The issue describes a symptom; the fix sits elsewhere** | seaborn-3069: `Nominal._setup` ranks 2, but the fix is in its caller `Plotter._setup_scales` (rank 48). pytest-5787: the chained-exception *display* code ranks top, but the fix is in report *serialization* (`BaseReport._to_json` / `_from_json`, not in the top 50). pytest-7324: the issue is about a compiler crash; the fix is in the parser's `not_expr`. | The retriever finds the code that the issue talks about. The fix is in a caller, a producer or a serializer of that code. | Idea 1: anchors, i.e. what callers and tests say about a function. Also a 1-hop expansion of the top hits along call edges (the callers of `Nominal._setup` include `Plotter._setup_scales`), and the reranker of idea 2. |
+| **Tests that reproduce the issue outrank the code** | pytest-10081: three `test_unittest.py` tests took ranks 1, 3 and 5. Without weights the gold `TestCaseFunction.runtest` ranked 16; with tests ×0.5 it ranks 7. pytest-5787: 4 of the top 6 were tests. | A reproducing test shares the issue's words and code snippets. | Tests ×0.5 (now the default). Idea 1 treats a test as an anchor of the code it calls, not as a competitor. |
+| **The class and its siblings compete with the method** | flask-5014, *"Require a non-empty name for Blueprints"*: the class `Blueprint` ranked 1 and three of its methods 2–4. The gold `Blueprint.__init__` ranked 24 without weights and 17 with classes ×0.5. | The skeleton and every method match "Blueprint". Nothing says the check belongs in the constructor. | A reranker that reads the code (idea 2); several vectors per function (idea 3), so a long constructor is matched by its validation lines. |
+
+Two cautions:
+- These are 13 tasks from small repos. The full dev50 will show whether the same patterns dominate.
+- The first pattern is the cheapest to fix: exact lookup needs no model. It is also where a tuned grep baseline is strongest, so it is the first thing to build (§11).
 
 ---
 
@@ -424,7 +438,7 @@ FAISS is derived. So the whole grid runs from one embedding pass:
 
 | When | Do | Decide |
 |---|---|---|
-| Week of Oct 26 | dev50 v2 results; window and header ablations (E-A0); test-weight / kinds defaults | v2 defaults (decisions D12) |
+| Week of Oct 26 | full dev50 v2 results on a fast machine (confirms the weights chosen on 13 tasks); window and header ablations (E-A0); exact-lookup routing first (§1: the cheapest fix) | v2 defaults (decisions D12) |
 | Oct 27 checkpoint | report v2 vs MVP vs grep; this proposal | which two ideas to pursue first |
 | Oct 27 – Nov 9 | idea 2 (routing signals) + idea 1 step 1 (call sites, tests, commits); E-A1, E-A2 | is multi-vector worth GPU time? (E-A2 gate) |
 | Nov 10 – 23 | idea 4 training on GPU (cross-repo LoRA + Matryoshka); E-A3; idea 6 grid; highlights metric | the paper's main claim |
