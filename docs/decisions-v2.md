@@ -23,8 +23,29 @@ code.
 | D15 | **Test detection follows common conventions**, not the MVP's "any folder named test". | `django/test/` and `sympy/testing/` are library code, and the eval agrees. | `LanguageSpec.test_dirs` / `top_test_dirs`. |
 | D16 | **float16 embeddings on GPUs (CUDA, MPS); overflowing rows are recomputed in float32.** | Roughly halves memory and time. The dtype is part of the embedder key, so fp16 and fp32 vectors never mix. | `dtype = "float32"`. |
 | D17 | **Long-function cards show the best window's lines, focused on the line sharing most query words.** | An agent should read the matching part first. This is a cheap first step towards Exa-style highlights. | Card rendering only; the hit's lines stay the whole function (the eval grades those). |
+| D18 | **Result kinds and tests are weighted, not only filtered** (`kind_weights`, `test_weight`). | Classes, blocks and test code are useful context, but they are rarely what an issue is about. On the fixture and on `requests` they crowded out the target functions. A weight pushes them down without hiding them. The default values are chosen on dev (below). | `test_weight = 1.0` and `kind_weights = {class = 1.0, block = 1.0}` turn the weights off. |
 
 ## Dev50 choices (D12)
 
-Pending the local dev50 run with `eval/configs/codemem-v2.toml`; filled in by
-[baseline-v2-diff.md](baseline-v2-diff.md) once scores are in.
+**Chosen on 13 dev tasks, not the full 50.** These are the four small repos (requests, pytest,
+seaborn, flask); the full dev50 does not fit on the local M1. All numbers and the hand-off
+commands are in [baseline-v2-diff.md](baseline-v2-diff.md) §5.3. **The choices are provisional
+until the full dev50 confirms them.** The test split was not touched.
+
+| Setting | v2 default | Evidence (13 tasks, against no weights) | Not chosen |
+|---|---|---|---|
+| `test_weight` | 0.5 | Alone it is never worse on any task; function R@10 0.500 → 0.625. | 0 (drop tests): 3 tasks worse at function level, because a filter reorders the remaining chunks before fusion. |
+| `kind_weights` | `{class = 0.5, block = 0.5}` | Together with tests ×0.5: 2, 2 and 4 tasks better at file, class and function level, none worse; function MRR 0.386 → 0.410. | 0.3 for all three: ties with 0.5, so the milder value won. Functions only: the best means, but 1 task worse at file and class level, and agents would lose class and module context. |
+| `kinds` | every kind | as above | `["function", "method"]` stays a variant (`cm2-full-fn`). |
+| BM25 weights | name 10, path 3, signature 5, doc 2, body 1 | v1's 10/5/1 is within one task of it. | v1's weights: dev50 is all Python, so it cannot show the value of the path and doc fields for other languages. |
+
+**How the choice was made:**
+- Only settings with a reason known before the run were tried: crowding by tests, classes and blocks, seen on the fixture and on `requests`.
+- Each setting had few values (0.5, 0.3).
+- A setting that loses no task beat one with a better mean.
+- Every kind stays visible to agents.
+- Between tied values, the milder one won.
+
+**In the eval configs** the values are pinned per system: `cm2-full` is the default, and the
+`cm2-bm25*` systems are unweighted. A system name therefore keeps its meaning if these defaults
+change.

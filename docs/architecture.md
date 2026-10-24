@@ -176,11 +176,10 @@ For the query *"Disabled users stay logged in"*:
 1. **BM25.** The query is tokenized the same way the code was (identifiers split, whole identifiers kept). FTS5 ranks chunks, with matches in the name worth most, then the signature, then the path, the doc and the body.
 2. **Vectors.** The query is embedded once per model. Each vector type returns its top chunks. A chunk with several windows counts its best window.
 3. **Fusion.** Reciprocal rank fusion (RRF): every list gives each chunk `1 / (60 + rank)`, and the sums decide.
-4. **Filters** (optional):
-   - `path_prefix`
-   - `kinds` (for example only functions and methods)
-   - `languages`
-   - `test_weight` (0 drops test code; 0.5 halves its score)
+4. **Weights and filters.**
+   - By default, the fused score of test code, classes and blocks is halved (`test_weight = 0.5`, `kind_weights = {class = 0.5, block = 0.5}`). They are useful context, but rarely what a query is about, and on dev they crowded out the target functions. A weight moves only the chunks it targets, so nothing is hidden (decisions-v2.md, D12).
+   - Optional filters: `path_prefix`, `kinds` (for example only functions and methods), `languages`, and `test_weight = 0` (drops test code).
+   - A filter removes chunks from every signal's list *before* fusion, which can reorder the rest. A weight applies after fusion. So prefer weights unless something must never be shown.
 5. **Cards.** Ties are ordered by location, never by internal ids, so the same code gives the same order on every machine. Each result becomes a short card:
 
 ```

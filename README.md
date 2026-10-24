@@ -78,7 +78,7 @@ walk source files (9 languages; respects .gitignore; skips vendored/generated/mi
      shared cache; stored as float16 rows in SQLite, searched through a derived FAISS index
   -> SQLite: chunks, FTS5 (5 weighted BM25 fields), calls/edges, vectors
 search: BM25 top-N + vector top-N per vector type (a chunk scores by its best window)
-  -> RRF (k=60) -> filters (kinds, languages, tests) -> result cards
+  -> RRF (k=60) -> weights (tests, classes, blocks x0.5) and filters (kinds, languages) -> cards
 ```
 
 - **Incremental updates** re-chunk only changed files (content hash, mtime pre-check), rebuild
@@ -144,7 +144,8 @@ code_header = true           # path / enclosing-scope header above embedded code
 window_chars = 3000          # longer code is split into windows (default from max_seq_length)
 vector_cache = "global"      # global | off (reuse vectors across indexes)
 kinds = ["function", "method"]  # optional search-time filter; default: every kind
-test_weight = 1.0            # search-time: multiply test chunks' scores (0 drops them)
+test_weight = 0.5            # search-time: multiply test chunks' scores (0 drops them, 1 = no weight)
+kind_weights = { class = 0.5, block = 0.5 }  # search-time; a table here is merged over these defaults
 
 [vectors.code]
 model = "jinaai/jina-code-embeddings-0.5b"
@@ -194,10 +195,13 @@ cd eval && uv sync --extra codemem
 uv run cmeval run --tasks tasks/swebv-dev50.jsonl --config configs/codemem-v2.toml --run-id my-run
 uv run cmeval score my-run            # --tokens estimate if no ANTHROPIC_API_KEY
 uv run cmeval report my-run --baseline cm2-bm25 \
-    --primary cm2-bm25-code --primary cm2-bm25-code-usage
+    --primary cm2-bm25-code --primary cm2-full
 ```
 
-`configs/codemem-v2.toml` holds search-time variants that share one index.
+`configs/codemem-v2.toml` holds search-time variants that share one index: `cm2-full` is
+codemem's default, and `cm2-bm25*` are the unweighted signal ablations. Each system pins its
+weights, so a name keeps its meaning if the defaults change.
+`configs/codemem-v2-weights.toml` holds the weightings the defaults were chosen from.
 `configs/codemem-v2-ablations.toml` holds index-time ablations, each with its own index.
 `configs/baseline-v2.toml` adds the grep baselines (they need ripgrep).
 To compare two scored runs task by task:

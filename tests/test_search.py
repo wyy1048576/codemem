@@ -51,6 +51,7 @@ def test_a_tie_at_the_cut_is_kept_whole():
 
 def test_same_code_gives_the_same_order_with_other_chunk_ids(sample_repo, tmp_path, fake_config, recorder):
     fake_config.code_header = False  # without the path header, copies of code embed identically: real ties
+    fake_config.test_weight, fake_config.kind_weights = 1.0, {}  # weights would split some of those ties
     factory = lambda m, c: recorder  # noqa: E731
     first = Store(tmp_path / "first")
     Indexer(sample_repo, first, fake_config, embedder_factory=factory).update()
@@ -233,3 +234,13 @@ def test_kind_weights_push_kinds_down(index):
         from codemem.config import config_from_dict
 
         config_from_dict({"kind_weights": {"klass": 0.5}})
+
+
+def test_default_weights_and_how_a_config_overrides_them():
+    from codemem.config import Config, config_from_dict
+
+    assert Config().test_weight == 0.5 and Config().kind_weights == {"class": 0.5, "block": 0.5}
+    # A config's table is merged over the defaults, so naming one kind keeps the other defaults.
+    assert config_from_dict({"kind_weights": {"class": 1.0}}).kind_weights == {"class": 1.0, "block": 0.5}
+    plain = config_from_dict({"test_weight": 1.0, "kind_weights": {"class": 1.0, "block": 1.0}})
+    assert plain.test_weight == 1.0 and set(plain.kind_weights.values()) == {1.0}

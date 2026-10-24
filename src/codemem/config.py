@@ -41,6 +41,10 @@ DEFAULT_IGNORE = (
 BM25_FIELDS = ("name", "path", "signature", "doc", "body")
 DEVICES = ("auto", "cpu", "xpu", "cuda", "mps")
 DTYPES = ("auto", "float32", "float16", "bfloat16")
+# Search-time score multipliers, chosen on dev (docs/decisions-v2.md, D12): test code, class
+# skeletons and top-level blocks are useful context but rarely what a query is about.
+DEFAULT_TEST_WEIGHT = 0.5
+DEFAULT_KIND_WEIGHTS = {"class": 0.5, "block": 0.5}
 
 
 @dataclass
@@ -87,10 +91,11 @@ class Config:
     window_overlap_lines: int = 3
     max_block_lines: int = 200
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
-    # search-time result filters (the eval adapter can set them per system)
+    # search-time result filters and weights (the eval adapter can set them per system)
     kinds: list[str] | None = None  # None = every kind; e.g. ["function", "method"]
-    test_weight: float = 1.0  # multiplies the fused score of test chunks; 0 drops them
-    kind_weights: dict[str, float] = field(default_factory=dict)  # e.g. {"class": 0.5}; missing kinds 1.0
+    test_weight: float = DEFAULT_TEST_WEIGHT  # multiplies the fused score of test chunks; 0 drops them
+    # multiplies the fused score of chunks of a kind; a config's table is merged over the defaults
+    kind_weights: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_KIND_WEIGHTS))
     steering: str = "light"  # none | light | strong
     preview_lines: int = 12
     preview_chars: int = 800
@@ -222,6 +227,8 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         max_usage_items=usage.get("max_items"),
         include_commits=usage.get("include_commits"),
     )
+    if flat["kind_weights"] is not None:  # `{ class = 1.0 }` keeps the default block weight
+        flat["kind_weights"] = {**DEFAULT_KIND_WEIGHTS, **flat["kind_weights"]}
     for key, value in flat.items():
         if value is not None:
             setattr(cfg, key, value)
