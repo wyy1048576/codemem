@@ -692,8 +692,14 @@ class Store:
         return self.index_dir / f"vec_{vec_type}.json"
 
     def vec_types(self) -> list[str]:
-        """Vector types that have stored vectors."""
-        return [r[0] for r in self.conn.execute("SELECT DISTINCT vec_type FROM vectors ORDER BY vec_type")]
+        """Vector types that have stored vectors (one index probe per known type: search calls this)."""
+        known = [r[0][len("vec."):-len(".full_dim")] for r in self.conn.execute(
+            "SELECT key FROM meta WHERE key LIKE 'vec.%.full_dim'"
+        )]
+        return sorted(
+            t for t in known
+            if self.conn.execute("SELECT 1 FROM vectors WHERE vec_type = ? LIMIT 1", (t,)).fetchone()
+        )
 
     def _epoch(self, vec_type: str) -> int:
         return int(self.get_meta(f"vec.{vec_type}.epoch", 0))
@@ -808,6 +814,8 @@ class Store:
             def apply() -> None:
                 with self._vec_lock:
                     ti = self._types.get(vec_type)
+                    if ti is not None and ti.epoch == epoch:
+                        return  # a reader already reloaded it after the commit
                     if ti is None or ti.epoch != epoch - 1:
                         # Not loaded yet, or it missed a change: load it from the committed rows
                         # (which include these), so save_vectors() can persist it.
@@ -832,8 +840,8 @@ class Store:
             def apply() -> None:
                 with self._vec_lock:
                     ti = self._types.get(vec_type)
-                    if ti is None:
-                        return
+                    if ti is None or ti.epoch == epoch:
+                        return  # loaded lazily on first use, or a reader already reloaded it
                     if ti.epoch != epoch - 1:
                         self._types.pop(vec_type, None)
                         return
