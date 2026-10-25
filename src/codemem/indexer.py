@@ -354,6 +354,7 @@ class Indexer:
         self._rules: IgnoreRules | None = None
         self._claimed: set[int] = set()  # queued chunk ids a stage-B batch of this process is embedding
         self._claim_lock = threading.Lock()
+        self._model_lock = threading.Lock()  # one model call at a time; a search waits only up to its budget
 
     @contextmanager
     def _locked(self) -> Iterator[None]:
@@ -521,9 +522,12 @@ class Indexer:
         return self._cache
 
     # ---- stage A: structure
-    def structure(self, stats: IndexStats, *, full: bool = False, paths: Iterable[str | Path] | None = None) -> None:
+    def structure(
+        self, stats: IndexStats, *, full: bool = False, paths: Iterable[str | Path] | None = None,
+    ) -> set[int] | None:
         """Apply changed files to chunks, BM25 rows, calls and links, and queue the chunks whose
-        texts may have changed. `paths` limits the check to those files (and folders)."""
+        texts may have changed. `paths` limits the check to those files (and folders). Returns
+        the queued chunk ids, or None when everything was queued."""
         store, cfg = self.store, self.config
         with self._locked():
             tiers = self._changed_tiers()
@@ -584,9 +588,11 @@ class Indexer:
                     stats.relinked += len(callers)
                 stats.edges = store.edge_count()
 
+                queued: set[int] | None
                 if full or tiers or any(reset) or self._commits_moved():
                     store.mark_all_dirty(seq)
                     stats.queued += store.dirty_count()
+                    queued = None
                 else:
                     # Code texts: every chunk of a changed file. Usage texts: those, plus whatever
                     # they called before or call now, plus every callee whose callers changed.
@@ -595,6 +601,7 @@ class Indexer:
                     dirty -= gone
                     store.mark_dirty(dirty, seq)
                     stats.queued += len(dirty)
+                    queued = dirty
                 stats.files_changed += len(parsed)
                 stats.files_deleted += len(scan.deleted)
                 stats.files_skipped += len(scan.skipped)
@@ -607,6 +614,7 @@ class Indexer:
                     store.set_meta("last_scan_at", scan_started)
                     store.set_meta("coverage", scan.coverage)
             stats.add_time("write_chunks", time.perf_counter() - t)
+        return queued
 
     def _relink(
         self, old_defs: dict[tuple[str, str], set[int]], new_defs: dict[tuple[str, str], set[int]],
@@ -687,7 +695,8 @@ class Indexer:
             if batch is None:
                 return True
             try:
-                self._compute(batch, stats)
+                if not self._compute(batch, stats, deadline):
+                    return False  # the model stayed busy past the deadline; the batch stays queued
                 self._put(batch, stats)
             finally:
                 with self._claim_lock:
@@ -760,20 +769,28 @@ class Indexer:
                 work[vec_type] = tw
         return _Batch(seqs, work, time.perf_counter() - t)
 
-    def _compute(self, batch: _Batch, stats: IndexStats) -> None:
-        """Run the model on the texts nothing else could provide. No lock is held."""
+    def _compute(self, batch: _Batch, stats: IndexStats, deadline: float | None = None) -> bool:
+        """Run the model on the texts nothing else could provide. The write lock is not held, so
+        structure updates go on meanwhile. False if the model stayed busy past `deadline`."""
         stats.add_time("build_texts", batch.build_time)
         cache = self._vector_cache()
         for tw in batch.work.values():
             missing = sorted(tw.missing, key=lambda h: len(tw.text_of[h]), reverse=True)  # less padding per batch
             for start in range(0, len(missing), _EMBED_GROUP):
                 group = missing[start : start + _EMBED_GROUP]
-                t = time.perf_counter()
-                vecs = tw.embedder.embed_documents([tw.text_of[h] for h in group])
-                stats.add_time("embed", time.perf_counter() - t)
+                timeout = -1 if deadline is None else max(0.0, deadline - time.monotonic())
+                if not self._model_lock.acquire(timeout=timeout):
+                    return False
+                try:
+                    t = time.perf_counter()
+                    vecs = tw.embedder.embed_documents([tw.text_of[h] for h in group])
+                    stats.add_time("embed", time.perf_counter() - t)
+                finally:
+                    self._model_lock.release()
                 if cache is not None:
                     cache.put_many(tw.key, group, vecs)
                 tw.vectors.update(zip(group, vecs))
+        return True
 
     def _put(self, batch: _Batch, stats: IndexStats) -> None:
         """Store the batch's vectors, for chunks that were not queued again meanwhile."""

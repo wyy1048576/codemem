@@ -1252,6 +1252,16 @@ class Store:
             return True
         return False
 
+    def skipped_files(self, limit: int = 10) -> dict[str, Any]:
+        """Files kept out of the index, by reason, with a few examples (largest first)."""
+        c = self.conn
+        by_reason = {r[0]: r[1] for r in c.execute("SELECT reason, COUNT(*) FROM files WHERE status = 'skipped' GROUP BY reason")}
+        examples = [
+            {"path": r[0], "reason": r[1], "size": r[2]}
+            for r in c.execute("SELECT path, reason, size FROM files WHERE status = 'skipped' ORDER BY size DESC LIMIT ?", (limit,))
+        ]
+        return {"by_reason": by_reason, "examples": examples}
+
     def counts(self) -> dict[str, Any]:
         c = self.conn
         by_kind = {r[0]: r[1] for r in c.execute("SELECT kind, COUNT(*) FROM chunks GROUP BY kind")}

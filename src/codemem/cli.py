@@ -148,7 +148,7 @@ def cmd_watch(args) -> int:
     stats = svc.update()
     if stats:
         _print_stats(stats, False)
-    svc.start_watcher()
+    svc.start(prewarm=False)
     print("watching for changes (Ctrl+C to stop)", file=sys.stderr)
     seen = svc.last_stats
     try:

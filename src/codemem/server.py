@@ -61,12 +61,8 @@ def run_stdio(repo: Path | str | None = None, index_dir: Path | str | None = Non
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="codemem %(levelname)s %(message)s")
     service = CodememService(repo, index_dir=index_dir)
     log.info("codemem MCP server for %s (index %s)", service.repo_root, service.index_dir)
-    # Catch-up / first index runs in the background so the handshake isn't blocked.
-    service.start_background_update()
-    try:
-        service.start_watcher()
-    except Exception:
-        log.exception("file watcher failed to start; index will only refresh on restart")
+    # The catch-up (or the first index) runs in the background, so the handshake isn't blocked.
+    service.start()
     try:
         build_server(service).run("stdio")
     finally:

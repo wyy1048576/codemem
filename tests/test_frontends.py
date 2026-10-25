@@ -56,13 +56,23 @@ def test_status_reports_staleness(service, sample_repo):
     assert info["stale"]["changed_files"] == 1 and info["models"]["code"]["model"] == "fake:64"
 
 
-def test_concurrent_update_requests_coalesce(service):
-    service._update_lock.acquire()
-    try:
-        assert service.update() is None  # busy -> queued, not run in parallel
-        assert service._pending.is_set()
-    finally:
-        service._update_lock.release()
+def test_concurrent_updates_both_run_and_return_stats(service):
+    """An update that finds another one running waits and runs: it never returns None, which the
+    eval adapter treats as a failed update."""
+    import threading
+
+    results = []
+
+    def run():
+        results.append(service.update())
+        service.store.close_thread_conn()
+
+    threads = [threading.Thread(target=run) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert len(results) == 2 and all(r is not None for r in results)
 
 
 def test_watcher_reindexes_after_save(service, sample_repo):
@@ -77,16 +87,89 @@ def test_watcher_reindexes_after_save(service, sample_repo):
     assert hits[0].qualname == "record_audit_event"
 
 
-def test_watcher_ignores_non_python_and_skip_dirs(service, sample_repo):
+def test_watcher_ignores_non_code_and_skip_dirs(service, sample_repo):
     service.update()
     calls = []
-    service.request_update = lambda: calls.append(1)
+    service.notify = lambda paths, reconcile=False: calls.append((paths, reconcile))
     service.start_watcher()
     time.sleep(0.3)
     (sample_repo / "notes.txt").write_text("hello")
     (sample_repo / "build" / "x.py").write_text("x = 1")
-    time.sleep(1.0)
+    time.sleep(1.5)
     assert calls == []
+    (sample_repo / "auth" / "audit.py").write_text("def audit():\n    pass\n")
+    assert _wait_for(lambda: calls)
+    assert calls[0] == ({"auth/audit.py"}, False)  # the path itself, not a scan of the repo
+
+
+def test_search_right_after_a_save_sees_the_edit(service, sample_repo):
+    """The freshness contract: a search applies every save made before it, with no waiting."""
+    service.update()
+    service.start(prewarm=False)
+    time.sleep(0.3)
+    (sample_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+    resp = service.search("enforce_login_quota", k=3)  # immediately: no sleep before searching
+    assert resp.results and resp.results[0].qualname == "enforce_login_quota"
+    assert resp.freshness.complete
+
+
+def test_an_ignore_rule_change_reconciles(service, sample_repo):
+    service.update()
+    service.start(prewarm=False)
+    assert service.store.get_chunk_by_key("auth/db.py::Table") is not None
+    gi = sample_repo / ".gitignore"
+    gi.write_text(gi.read_text() + "auth/db.py\n")
+    assert _wait_for(lambda: service.store.get_chunk_by_key("auth/db.py::Table") is None)
+
+
+def test_a_config_change_reaches_the_index(service, sample_repo):
+    service.update()
+    service.start(prewarm=False)
+    (sample_repo / ".codemem.toml").write_text("code_header = false\n")
+    assert _wait_for(lambda: (service.store.get_meta("index_settings") or {}).get("code_header") is False)
+    assert _wait_for(lambda: service.store.dirty_count() == 0)
+    assert service.indexer.verify() == []
+
+
+def test_a_git_branch_switch_reconciles(service, sample_repo):
+    import subprocess
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(sample_repo), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    git("add", "-A")
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "base")
+    git("checkout", "-qb", "feature")
+    (sample_repo / "auth" / "feature.py").write_text("def new_feature():\n    pass\n")
+    git("add", "-A")
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "feature")
+    service.update()
+    service.start(prewarm=False)
+    time.sleep(0.3)
+    git("checkout", "-q", "-")  # back to the first branch: feature.py disappears
+    assert _wait_for(lambda: service.store.get_chunk_by_key("auth/feature.py::new_feature") is None)
+
+
+def test_refresh_reports_what_changed(service, sample_repo):
+    service.update()
+    (sample_repo / "auth" / "extra.py").write_text("def extra():\n    pass\n")
+    out = service.refresh(timeout=30)
+    assert out["files_changed"] == 1 and out["pending"] == 0 and out["texts_embedded"] >= 1
+
+
+def test_the_search_indexes_are_written_once_the_index_is_quiet(service, sample_repo, monkeypatch):
+    import codemem.service as svc_mod
+
+    monkeypatch.setattr(svc_mod, "SAVE_AFTER_IDLE", 0.3)
+    service.update()
+    faiss = service.index_dir / "vec_code.faiss"
+    before = faiss.stat().st_mtime_ns
+    service.start(prewarm=False)
+    time.sleep(0.3)
+    (sample_repo / "auth" / "late.py").write_text("def late_save():\n    pass\n")
+    assert _wait_for(lambda: service.store.get_chunk_by_key("auth/late.py::late_save") is not None)
+    assert _wait_for(lambda: faiss.stat().st_mtime_ns != before and not service.store.vectors_unsaved())
 
 
 # ---------------------------------------------------------------- CLI

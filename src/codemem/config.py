@@ -100,7 +100,8 @@ class Config:
     steering: str = "light"  # none | light | strong
     preview_lines: int = 12
     preview_chars: int = 800
-    debounce_ms: int = 400
+    debounce_ms: int = 500  # start an update once saves stop for this long ...
+    debounce_max_wait_ms: int = 2000  # ... or at the latest this long after the first save
 
     def enabled_vec_types(self) -> list[str]:
         return [name for name, v in self.vectors.items() if v.enabled]
@@ -202,6 +203,7 @@ _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
     "window_overlap_lines", "max_block_lines", "vector_cache", "kinds", "test_weight", "kind_weights",
+    "debounce_ms", "debounce_max_wait_ms",
 )
 
 

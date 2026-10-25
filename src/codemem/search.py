@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
 import numpy as np
 
@@ -60,6 +61,7 @@ class SearchResponse:
     signals: list[str]
     results: list[ResultCard]
     timings: dict[str, float] = field(default_factory=dict)
+    freshness: Any = None  # set by CodememService.search: what the index could not include yet
 
     def to_dict(self) -> dict:
         return {
