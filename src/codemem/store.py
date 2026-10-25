@@ -1253,12 +1253,14 @@ class Store:
         return False
 
     def skipped_files(self, limit: int = 10) -> dict[str, Any]:
-        """Files kept out of the index, by reason, with a few examples (largest first)."""
+        """Files kept out of the index (or only partly parsed), by reason, with a few examples."""
         c = self.conn
-        by_reason = {r[0]: r[1] for r in c.execute("SELECT reason, COUNT(*) FROM files WHERE status = 'skipped' GROUP BY reason")}
+        by_reason = {r[0]: r[1] for r in c.execute("SELECT reason, COUNT(*) FROM files WHERE reason != '' GROUP BY reason")}
         examples = [
             {"path": r[0], "reason": r[1], "size": r[2]}
-            for r in c.execute("SELECT path, reason, size FROM files WHERE status = 'skipped' ORDER BY size DESC LIMIT ?", (limit,))
+            for r in c.execute(
+                "SELECT path, reason, size FROM files WHERE reason != '' ORDER BY status = 'ok', size DESC LIMIT ?", (limit,)
+            )
         ]
         return {"by_reason": by_reason, "examples": examples}
 

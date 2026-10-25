@@ -361,6 +361,12 @@ class _Walker:
             )
 
 
+class Chunks(list):
+    """The chunks of one file; `parse_errors` says tree-sitter could only partly parse it."""
+
+    parse_errors: bool = False
+
+
 def chunk_source(
     source: bytes | str, path: str, language: str | None = None, *, max_block_lines: int = MAX_BLOCK_LINES
 ) -> list[Chunk]:
@@ -378,4 +384,6 @@ def chunk_source(
     lines = split_lines(data.decode("utf-8", errors="replace"))
     walker = _Walker(spec, path, lines, root, max_block_lines)
     walker.module(root, [])
-    return walker.chunks
+    out = Chunks(walker.chunks)
+    out.parse_errors = root.has_error
+    return out

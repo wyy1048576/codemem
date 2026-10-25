@@ -72,6 +72,30 @@ def format_status(info: dict[str, Any]) -> str:
             f"stale: {stale['changed_files']} changed, {stale['deleted_files']} deleted"
             + (", git HEAD moved" if stale["head_moved"] else "")
         )
+    if info.get("pending_chunks") or info.get("pending_files"):
+        lines.append(f"pending: {info.get('pending_files', 0)} files, {info.get('pending_chunks', 0)} chunks to embed")
+    if "watching" in info:
+        lines.append("watching for changes" if info["watching"] else "not watching (scanning on a timer or on request)")
+    lines.extend(format_coverage(info))
     if info.get("error"):
         lines.append(f"error: {info['error']}")
     return "\n".join(lines)
+
+
+def format_coverage(info: dict[str, Any]) -> list[str]:
+    """What the index leaves out, and why, so nothing is missed silently."""
+    out: list[str] = []
+    skipped = info.get("skipped_files") or {}
+    if by_reason := skipped.get("by_reason"):
+        parts = ", ".join(f"{n} {reason.replace('_', ' ')}" for reason, n in sorted(by_reason.items()))
+        out.append(f"not indexed or partly parsed: {parts}")
+        for ex in skipped.get("examples", [])[:5]:
+            out.append(f"  {ex['path']} ({ex['reason'].replace('_', ' ')}, {ex['size'] / 1e6:.1f} MB)")
+    cov = info.get("coverage") or {}
+    if cov.get("not_code_files"):
+        exts = ", ".join(f"{ext} {n}" for ext, n in (cov.get("not_code_by_extension") or {}).items())
+        out.append(f"not code (no supported language): {cov['not_code_files']} files ({exts})")
+    if cov.get("ignored_files") or cov.get("skipped_dirs"):
+        dirs = ", ".join(f"{d} {n}" for d, n in (cov.get("skipped_dirs") or {}).items())
+        out.append(f"ignored: {cov.get('ignored_files', 0)} files; skipped folders: {dirs or 'none'}")
+    return out

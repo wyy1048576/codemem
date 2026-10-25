@@ -82,7 +82,7 @@ class Config:
     max_defs_per_name: int = 5
     max_usage_items: int = 20
     include_commits: bool = False
-    max_file_size: int = 1_000_000
+    max_file_size: int = 10_000_000  # larger files are recorded as skipped (too_large), never silently
     ignore: list[str] = field(default_factory=list)  # extra gitignore-style patterns
     use_default_ignore: bool = True  # also skip DEFAULT_IGNORE (vendored, generated, minified)
     skip_generated: bool = True  # skip files marked "Code generated ... DO NOT EDIT" or "@generated"

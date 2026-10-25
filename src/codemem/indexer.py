@@ -671,8 +671,9 @@ class Indexer:
             store.upsert_chunk(chunk)
         store.delete_chunks([c.chunk_id for c in old.values()])
         stats.chunks_deleted += len(old)
-        store.upsert_file(state.rel, digest, state.mtime, state.size, language, "ok")
-        if getattr(chunks, "parse_errors", False):
+        partial = bool(getattr(chunks, "parse_errors", False))
+        store.upsert_file(state.rel, digest, state.mtime, state.size, language, "ok", "parse_errors" if partial else "")
+        if partial:
             stats.parse_errors.append(state.rel)
 
     # ---- stage B: vectors
