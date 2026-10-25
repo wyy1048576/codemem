@@ -1,0 +1,67 @@
+# Candidate repos for fresh tasks (F4). `cmeval repo-stats --candidates configs/fresh-candidates.toml`
+# measures them. None of them is a SWE-bench repo. codemem reads Python only, so only the
+# Python repos give evidence for codemem vs. grep; the others are for the "not supported" view.
+
+[[repo]]
+name = "home-assistant/core"
+note = "very large, all Python"
+
+[[repo]]
+name = "vllm-project/vllm"
+note = "Python, C++, CUDA"
+
+[[repo]]
+name = "huggingface/transformers"
+note = "large, active"
+
+[[repo]]
+name = "pytorch/pytorch"
+note = "Python and C++, huge"
+
+[[repo]]
+name = "apache/airflow"
+note = "Python"
+
+[[repo]]
+name = "ansible/ansible"
+note = "Python"
+
+[[repo]]
+name = "getsentry/sentry"
+note = "Python and TypeScript"
+
+[[repo]]
+name = "odoo/odoo"
+note = "Python and JavaScript"
+
+[[repo]]
+name = "pandas-dev/pandas"
+note = "Python and Cython"
+
+[[repo]]
+name = "ray-project/ray"
+note = "Python and C++"
+
+[[repo]]
+name = "python/cpython"
+note = "C and Python"
+
+[[repo]]
+name = "saltstack/salt"
+note = "Python"
+
+[[repo]]
+name = "kubernetes/kubernetes"
+note = "Go, huge, vendored code"
+
+[[repo]]
+name = "microsoft/vscode"
+note = "TypeScript, huge"
+
+[[repo]]
+name = "backstage/backstage"
+note = "TypeScript, plugin architecture"
+
+[[repo]]
+name = "godotengine/godot"
+note = "C++, large engine"

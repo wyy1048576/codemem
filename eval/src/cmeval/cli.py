@@ -14,7 +14,6 @@ MAX_PROBLEMS_SHOWN = 50
 
 # Commands that exist in the plan but are not built yet.
 PLANNED = {
-    "collect": "collect fresh tasks from GitHub issues and fixes",
     "review": "review tasks by hand",
 }
 
@@ -198,6 +197,101 @@ def cmd_compare(args) -> int:
     return 0
 
 
+def cmd_repo_stats(args) -> int:
+    from dataclasses import asdict
+    from datetime import date, timedelta
+
+    from .collect.repo_stats import Candidate, RepoStatsError, collect_stats, load_candidates, render_markdown
+    from .files import now, write_json, write_text_atomic
+    from .github import GitHub, GitHubError
+    from .paths import default_results_dir
+
+    try:
+        candidates = [Candidate(name) for name in args.repo or []]
+        if args.candidates:
+            candidates += load_candidates(args.candidates)
+        if not candidates:
+            print("give --candidates FILE or one or more --repo OWNER/NAME", file=sys.stderr)
+            return 1
+        since = date.fromisoformat(args.since)
+        # Default: yesterday, so every day in the range is complete and a cached answer stays right.
+        until = date.fromisoformat(args.until) if args.until else date.today() - timedelta(days=1)
+        gh = GitHub(refresh=args.refresh)
+        results = collect_stats(gh, candidates, since, until, functions=args.functions,
+                                min_python_share=args.min_python_share,
+                                progress=lambda message: print(message, file=sys.stderr, flush=True))
+    except ValueError as exc:  # a bad date
+        print(f"repo-stats: {exc}", file=sys.stderr)
+        return 1
+    except (RepoStatsError, GitHubError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    markdown = render_markdown(results, since, until)
+    out = args.out or default_results_dir() / f"{date.today().isoformat()}-repo-stats"
+    out.mkdir(parents=True, exist_ok=True)
+    write_text_atomic(out / "stats.md", markdown)
+    write_json(out / "stats.json", {
+        "created": now(), "since": since.isoformat(), "until": until.isoformat(),
+        "api_calls": gh.api_calls, "cache_hits": gh.cache_hits,
+        "repos": [asdict(r) for r in results],
+    })
+    print(markdown)
+    print(f"{out}: stats.md and stats.json written ({gh.api_calls} API calls, {gh.cache_hits} from the cache)",
+          file=sys.stderr)
+    return 0
+
+
+def cmd_collect(args) -> int:
+    from .collect.candidates import (CollectError, collect_candidates, load_settings, render_funnel,
+                                     write_candidates)
+    from .collect.tasks_build import build_tasks, write_task_set
+    from .github import GitHub, GitHubError
+    from .paths import collect_dir, default_tasks_dir
+    from .repos import RepoError, slug
+
+    def progress(message: str) -> None:
+        print(message, file=sys.stderr, flush=True)
+
+    try:
+        settings = load_settings(args.config)
+    except FileNotFoundError:
+        print(f"{args.config}: no such file", file=sys.stderr)
+        return 1
+    except CollectError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    repos = [r.name for r in settings.repos]
+    if args.repo:
+        unknown = [r for r in args.repo if r.lower() not in {name.lower() for name in repos}]
+        if unknown:
+            print(f"not in {args.config}: {', '.join(unknown)}", file=sys.stderr)
+            return 1
+        repos = [name for name in repos if name.lower() in {r.lower() for r in args.repo}]
+    gh = GitHub(refresh=args.refresh, progress=progress)
+    funnels, tasks = [], []
+    try:
+        for repo in repos:
+            candidates, funnel = collect_candidates(gh, repo, settings, progress=progress)
+            funnels.append(funnel)
+            if not args.dry_run:
+                tasks += build_tasks(gh, candidates, settings, funnel, progress=progress)
+                write_candidates(collect_dir() / settings.name / slug(repo), candidates, funnel)
+    except (GitHubError, RepoError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print(f"# {settings.name}: {settings.since} to {settings.until}\n")
+    print(render_funnel(funnels))
+    if args.dry_run:
+        where = "dry run (GitHub steps only), nothing written"
+    else:
+        out = args.out or default_tasks_dir() / f"{settings.name}.jsonl"
+        write_task_set(out, tasks, funnels, settings, args.config)
+        where = f"{out}: {len(tasks)} tasks; candidates and funnels in {collect_dir() / settings.name}"
+    print(f"{where} ({gh.api_calls} API calls, {gh.cache_hits} from the cache, {gh.retries} retries)",
+          file=sys.stderr)
+    return 0
+
+
 def cmd_planned(args) -> int:
     print(f"cmeval {args.command}: not built yet", file=sys.stderr)
     return 2
@@ -268,6 +362,27 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("systems", help="check a system config and list its systems")
     p.add_argument("file", type=Path)
     p.set_defaults(func=cmd_systems)
+
+    p = sub.add_parser("collect", help="collect fresh candidates: merged PRs, their linked issue, and the query")
+    p.add_argument("config", type=Path, help="collection config (.toml) with [collect] and [[repo]] tables")
+    p.add_argument("--repo", action="append", default=None, help="only this repo of the config; repeatable")
+    p.add_argument("--dry-run", action="store_true", help="GitHub steps only (no clone); print the funnel, write nothing")
+    p.add_argument("--refresh", action="store_true", help="ask GitHub again instead of using cached answers")
+    p.add_argument("--out", type=Path, default=None, help="task file (default: eval/tasks/<config name>.jsonl)")
+    p.set_defaults(func=cmd_collect)
+
+    p = sub.add_parser("repo-stats", help="size, PR funnel, and code counts of candidate repos for fresh tasks")
+    p.add_argument("--candidates", type=Path, default=None, help="TOML file with [[repo]] tables (name, note)")
+    p.add_argument("--repo", action="append", default=None, help="owner/name; repeatable")
+    p.add_argument("--since", default="2026-07-01", help="first merge day (default 2026-07-01, the cutoff)")
+    p.add_argument("--until", default=None, help="last merge day (default: yesterday)")
+    p.add_argument("--functions", action="store_true",
+                   help="also shallow-clone each Python repo and count what codemem indexes")
+    p.add_argument("--min-python-share", type=float, default=0.3,
+                   help="clone only repos with at least this share of Python bytes (default 0.3)")
+    p.add_argument("--refresh", action="store_true", help="ask GitHub again instead of using cached answers")
+    p.add_argument("--out", type=Path, default=None, help="folder (default: eval/results/<today>-repo-stats)")
+    p.set_defaults(func=cmd_repo_stats)
 
     for name, help_text in PLANNED.items():
         p = sub.add_parser(name, help=f"{help_text} (not built yet)")

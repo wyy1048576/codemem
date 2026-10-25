@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from .paths import repos_dir, worktrees_dir
@@ -61,6 +62,17 @@ def ensure_clone(repo: str, url: str | None = None) -> Path:
     return path
 
 
+def shallow_clone(repo: str, branch: str, dest: Path, url: str | None = None) -> str:
+    """Check out only the newest commit of one branch into dest (no history). Returns its sha.
+
+    Much smaller than a full clone. For numbers about today's code only; the collector and the
+    runner need the full clone from ensure_clone.
+    """
+    _git("clone", "--depth", "1", "--single-branch", "--branch", branch, "--no-tags", "--quiet",
+         "-c", "core.autocrlf=false", url or f"https://github.com/{repo}.git", str(dest))
+    return _git("rev-parse", "HEAD", cwd=dest).stdout.strip()
+
+
 def has_commit(repo: str, sha: str) -> bool:
     clone = clone_path(repo)
     if not clone.exists():
@@ -99,6 +111,56 @@ def read_file(repo: str, commit: str, path: str) -> str | None:
             return None
         raise RepoError(f"git show {commit}:{path} failed: {stderr.strip()}")
     return proc.stdout.decode("utf-8", "replace")
+
+
+def parents(repo: str, sha: str) -> list[str]:
+    """The parent commits of a commit, first parent first."""
+    ensure_commit(repo, sha)
+    return _git("rev-list", "--parents", "-n", "1", sha, cwd=clone_path(repo)).stdout.split()[1:]
+
+
+def ancestor(repo: str, sha: str, n: int) -> str:
+    """The full sha of `sha~n` (n first-parent steps back)."""
+    return _git("rev-parse", "--verify", f"{sha}~{n}^{{commit}}", cwd=clone_path(repo)).stdout.strip()
+
+
+def subjects(repo: str, sha: str, n: int) -> list[str]:
+    """First lines of the messages of `sha` and its n - 1 first-parent ancestors, oldest first."""
+    out = _git("log", "--first-parent", f"-n{n}", "--format=%s", sha, cwd=clone_path(repo)).stdout
+    return out.splitlines()[::-1]
+
+
+def diff(repo: str, old: str, new: str) -> str:
+    """Unified diff from old to new (renames found), the way git prints it. Needs no worktree."""
+    ensure_commit(repo, old)
+    ensure_commit(repo, new)
+    proc = _git("-c", "core.quotepath=false", "diff", "-M", "--no-color", "--no-ext-diff", old, new,
+                cwd=clone_path(repo), text=False)
+    return proc.stdout.decode("utf-8", "replace")
+
+
+def tracked_files(repo: str, commit: str) -> list[str]:
+    """Every file path in the tree of a commit (no worktree needed)."""
+    ensure_commit(repo, commit)
+    proc = _git("-c", "core.quotepath=false", "ls-tree", "-r", "--name-only", commit, cwd=clone_path(repo), text=False)
+    return proc.stdout.decode("utf-8", "replace").splitlines()
+
+
+def apply_check(repo: str, base: str, patch: str) -> str | None:
+    """None if the patch applies cleanly to the tree of `base`, else git's message.
+
+    It uses a temporary index file, so it works in the bare clone and changes nothing.
+    """
+    ensure_commit(repo, base)
+    with tempfile.TemporaryDirectory() as tmp:
+        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C", "GIT_INDEX_FILE": str(Path(tmp) / "index")}
+        clone = clone_path(repo)
+        tree = subprocess.run(["git", "read-tree", base], cwd=clone, env=env, capture_output=True)
+        if tree.returncode != 0:
+            raise RepoError(f"git read-tree {base} failed: {tree.stderr.decode('utf-8', 'replace').strip()}")
+        proc = subprocess.run(["git", "apply", "--check", "--cached", "-"], cwd=clone, env=env,
+                              input=patch.encode("utf-8"), capture_output=True)
+    return None if proc.returncode == 0 else proc.stderr.decode("utf-8", "replace").strip()
 
 
 def head(worktree: Path) -> str:

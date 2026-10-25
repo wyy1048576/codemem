@@ -1,0 +1,265 @@
+{
+ "_note": "Trimmed real search page from home-assistant/core (2026-07-01..07). Issue bodies cut to 400 characters. PRs 900001-900005 are changed copies of PR 175897: issue in another repo, issue opened after the merge, 25 changed files, body that is only a hidden comment plus a short line, deleted author.",
+ "data": {
+  "search": {
+   "issueCount": 10,
+   "pageInfo": {
+    "hasNextPage": false,
+    "endCursor": null
+   },
+   "nodes": [
+    {
+     "number": 175843,
+     "url": "https://github.com/home-assistant/core/pull/175843",
+     "createdAt": "2026-07-07T09:24:49Z",
+     "mergedAt": "2026-07-07T13:05:13Z",
+     "baseRefName": "dev",
+     "changedFiles": 1,
+     "author": {
+      "__typename": "User",
+      "login": "epenet"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 0,
+      "nodes": []
+     }
+    },
+    {
+     "number": 175861,
+     "url": "https://github.com/home-assistant/core/pull/175861",
+     "createdAt": "2026-07-07T12:26:49Z",
+     "mergedAt": "2026-07-07T12:44:52Z",
+     "baseRefName": "dev",
+     "changedFiles": 2,
+     "author": {
+      "__typename": "User",
+      "login": "RaHehl"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 1,
+      "nodes": [
+       {
+        "number": 175644,
+        "url": "https://github.com/home-assistant/core/issues/175644",
+        "createdAt": "2026-07-04T22:50:16Z",
+        "body": "### The problem\n\nAfter upgrading to 2027.7.1 my Unifi Protect integration fails to load. When looking at the logs it appears to be related to the linecrossing_basic enum my instance uses for some cameras.\n\n### What version of Home Assistant Core has the issue?\n\ncore-2026.7.1\n\n### What was the last working version of Home Assistant Core?\n\ncore-2026.6.4\n\n### What type of installation are you running",
+        "repository": {
+         "nameWithOwner": "home-assistant/core"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 175427,
+     "url": "https://github.com/home-assistant/core/pull/175427",
+     "createdAt": "2026-07-03T02:41:55Z",
+     "mergedAt": "2026-07-03T08:30:31Z",
+     "baseRefName": "dev",
+     "changedFiles": 4,
+     "author": {
+      "__typename": "Bot",
+      "login": "renovate"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 0,
+      "nodes": []
+     }
+    },
+    {
+     "number": 175805,
+     "url": "https://github.com/home-assistant/core/pull/175805",
+     "createdAt": "2026-07-06T20:31:41Z",
+     "mergedAt": "2026-07-07T10:49:58Z",
+     "baseRefName": "dev",
+     "changedFiles": 2,
+     "author": {
+      "__typename": "User",
+      "login": "mback2k"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 2,
+      "nodes": [
+       {
+        "number": 169792,
+        "url": "https://github.com/home-assistant/core/issues/169792",
+        "createdAt": "2026-05-05T06:06:23Z",
+        "body": "### The problem\n\nwhen I connect ha to my WMS WebControl pro the HA logs start to fill up and after just a few hours I must reboot my WMS WebControl pro to be able to controll the devices from both the wms app and from HA. If i disable the HA intergration the wms app works fine and WMS WebControl pro  does not need to be rebooted.\nI have 8 zip screens.\n\nI have added example of the logs in the log p",
+        "repository": {
+         "nameWithOwner": "home-assistant/core"
+        }
+       },
+       {
+        "number": 3,
+        "url": "https://github.com/mback2k/pywmspro/issues/3",
+        "createdAt": "2026-06-29T20:37:43Z",
+        "body": "Hi Marc,\n\nI have a unfortunately not precisely reproducible behavior:\nSometimes, when I want to manually control my blinds (I have a Zigbee Dimmer light Switch remote which triggers in HA the blind-controls like tilt open/close or move up/down), they react one or two times and then they don\u2019t react anymore for several minutes. During this time, I cannot control ANY blind via Homeassistant. But: wh",
+        "repository": {
+         "nameWithOwner": "mback2k/pywmspro"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 175885,
+     "url": "https://github.com/home-assistant/core/pull/175885",
+     "createdAt": "2026-07-07T17:21:31Z",
+     "mergedAt": "2026-07-07T21:03:14Z",
+     "baseRefName": "dev",
+     "changedFiles": 2,
+     "author": {
+      "__typename": "User",
+      "login": "bdraco"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 1,
+      "nodes": [
+       {
+        "number": 175695,
+        "url": "https://github.com/home-assistant/core/issues/175695",
+        "createdAt": "2026-07-05T17:08:14Z",
+        "body": "### The problem\n\nThe docstring for the entity registry's async_get_entity_id method has recently been revised to clarify its usage.\n\nSince the parameters are subject to misinterpretation, we recommend carefully verifying usage according to the following method signature:\n\n```python\n    def async_get_entity_id(\n        self, domain: str, platform: str, unique_id: str\n    ) -> str | None:\n        \"\"",
+        "repository": {
+         "nameWithOwner": "home-assistant/core"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 900001,
+     "url": "https://github.com/home-assistant/core/pull/175897",
+     "createdAt": "2026-07-07T19:17:30Z",
+     "mergedAt": "2026-07-07T21:14:25Z",
+     "baseRefName": "dev",
+     "changedFiles": 4,
+     "author": {
+      "__typename": "User",
+      "login": "agners"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 1,
+      "nodes": [
+       {
+        "number": 125038,
+        "url": "https://github.com/home-assistant/core/issues/125038",
+        "createdAt": "2024-09-01T21:42:53Z",
+        "body": "### The problem\r\n\r\nThe following error is reported at midnight occasionally:\r\n```\r\nLogger: homeassistant.components.iotawatt.coordinator\r\nSource: helpers/update_coordinator.py:354\r\nintegration: IoTaWatt (documentation, issues)\r\nFirst occurred: 00:00:00 (1 occurrences)\r\nLast logged: 00:00:00\r\n\r\nUnexpected error fetching 10.1.1.250 data\r\nTraceback (most recent call last):\r\n  File \"/usr/src/homeassis",
+        "repository": {
+         "nameWithOwner": "home-assistant/frontend"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 900002,
+     "url": "https://github.com/home-assistant/core/pull/175897",
+     "createdAt": "2026-07-07T19:17:30Z",
+     "mergedAt": "2026-07-07T21:14:25Z",
+     "baseRefName": "dev",
+     "changedFiles": 4,
+     "author": {
+      "__typename": "User",
+      "login": "agners"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 1,
+      "nodes": [
+       {
+        "number": 125038,
+        "url": "https://github.com/home-assistant/core/issues/125038",
+        "createdAt": "2026-08-01T00:00:00Z",
+        "body": "### The problem\r\n\r\nThe following error is reported at midnight occasionally:\r\n```\r\nLogger: homeassistant.components.iotawatt.coordinator\r\nSource: helpers/update_coordinator.py:354\r\nintegration: IoTaWatt (documentation, issues)\r\nFirst occurred: 00:00:00 (1 occurrences)\r\nLast logged: 00:00:00\r\n\r\nUnexpected error fetching 10.1.1.250 data\r\nTraceback (most recent call last):\r\n  File \"/usr/src/homeassis",
+        "repository": {
+         "nameWithOwner": "home-assistant/core"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 900003,
+     "url": "https://github.com/home-assistant/core/pull/175897",
+     "createdAt": "2026-07-07T19:17:30Z",
+     "mergedAt": "2026-07-07T21:14:25Z",
+     "baseRefName": "dev",
+     "changedFiles": 25,
+     "author": {
+      "__typename": "User",
+      "login": "agners"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 1,
+      "nodes": [
+       {
+        "number": 125038,
+        "url": "https://github.com/home-assistant/core/issues/125038",
+        "createdAt": "2024-09-01T21:42:53Z",
+        "body": "### The problem\r\n\r\nThe following error is reported at midnight occasionally:\r\n```\r\nLogger: homeassistant.components.iotawatt.coordinator\r\nSource: helpers/update_coordinator.py:354\r\nintegration: IoTaWatt (documentation, issues)\r\nFirst occurred: 00:00:00 (1 occurrences)\r\nLast logged: 00:00:00\r\n\r\nUnexpected error fetching 10.1.1.250 data\r\nTraceback (most recent call last):\r\n  File \"/usr/src/homeassis",
+        "repository": {
+         "nameWithOwner": "home-assistant/core"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 900004,
+     "url": "https://github.com/home-assistant/core/pull/175897",
+     "createdAt": "2026-07-07T19:17:30Z",
+     "mergedAt": "2026-07-07T21:14:25Z",
+     "baseRefName": "dev",
+     "changedFiles": 4,
+     "author": {
+      "__typename": "User",
+      "login": "agners"
+     },
+     "closingIssuesReferences": {
+      "totalCount": 1,
+      "nodes": [
+       {
+        "number": 125038,
+        "url": "https://github.com/home-assistant/core/issues/125038",
+        "createdAt": "2024-09-01T21:42:53Z",
+        "body": "<!-- xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx -->\nIt does not work.",
+        "repository": {
+         "nameWithOwner": "home-assistant/core"
+        }
+       }
+      ]
+     }
+    },
+    {
+     "number": 900005,
+     "url": "https://github.com/home-assistant/core/pull/175897",
+     "createdAt": "2026-07-07T19:17:30Z",
+     "mergedAt": "2026-07-07T21:14:25Z",
+     "baseRefName": "dev",
+     "changedFiles": 4,
+     "author": null,
+     "closingIssuesReferences": {
+      "totalCount": 1,
+      "nodes": [
+       {
+        "number": 125038,
+        "url": "https://github.com/home-assistant/core/issues/125038",
+        "createdAt": "2024-09-01T21:42:53Z",
+        "body": "### The problem\r\n\r\nThe following error is reported at midnight occasionally:\r\n```\r\nLogger: homeassistant.components.iotawatt.coordinator\r\nSource: helpers/update_coordinator.py:354\r\nintegration: IoTaWatt (documentation, issues)\r\nFirst occurred: 00:00:00 (1 occurrences)\r\nLast logged: 00:00:00\r\n\r\nUnexpected error fetching 10.1.1.250 data\r\nTraceback (most recent call last):\r\n  File \"/usr/src/homeassis",
+        "repository": {
+         "nameWithOwner": "home-assistant/core"
+        }
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "rateLimit": {
+   "cost": 1,
+   "remaining": 4900,
+   "resetAt": "2026-10-24T05:00:00Z"
+  }
+ }
+}

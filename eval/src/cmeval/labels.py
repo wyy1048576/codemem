@@ -30,7 +30,8 @@ from . import repos
 from .patches import PatchMismatch, align_file_diff, apply_file_diff, parse_patch, split_lines
 from .tasks import Gold, Span, Unretrievable
 
-LABELER_VERSION = "cmeval-labels/2"
+# 2: added lines are placed in the fixed file (4ec55f4). 3: Cython files (.pyx, .pxd) count as code.
+LABELER_VERSION = "cmeval-labels/3"
 
 
 class LabelError(ValueError):

@@ -7,6 +7,7 @@ texts (those stay in `CMEVAL_HOME/runs/<run id>/`, outside git).
 |---|---|
 | `2026-10-23-dev50-final/` | First full dev run: 50 SWE-bench Verified tasks, 6 systems. The grep systems ran at `c6b2933`; the 3 codemem systems come from run `2026-10-23-dev50` (codemem `d5c2013`), merged with `cmeval merge`. Dev split: the numbers guide development and are not final results. |
 | `2026-10-23-b4b/` | The update vs. rebuild check (Decision 5) at the codemem code of the dev run: PASS. |
+| `2026-10-23-repo-stats/` | `cmeval repo-stats --functions` on the 16 candidate repos for fresh tasks (`configs/fresh-candidates.toml`), merges from 2026-07-01 to 2026-10-22. `stats.md` has the tables; `stats.json` has all numbers. Used to choose the repos for F4. |
 
 Files in a run folder:
 
