@@ -13,7 +13,9 @@ from pathlib import Path
 from mcp.server.mcpserver import MCPServer
 
 from . import __version__, prompts
-from .render import format_chunk, format_results, format_status
+from .render import format_chunk, format_refresh, format_results, format_status, freshness_note
+from .schema import KINDS
+from .search import TEST_FILTERS
 from .service import CodememService
 
 log = logging.getLogger(__name__)
@@ -28,8 +30,15 @@ def build_server(service: CodememService) -> MCPServer:
     )
 
     @server.tool(name="search_code", description=prompts.tool_description("search_code", steering))
-    def search_code(query: str, k: int = 10, path_prefix: str | None = None) -> str:
+    def search_code(
+        query: str, k: int = 10, path_prefix: str | None = None, kinds: list[str] | None = None,
+        tests: str = "include",
+    ) -> str:
         k = max(1, min(int(k), 50))
+        if unknown := [kind for kind in kinds or [] if kind not in KINDS]:
+            return f"Unknown kinds {unknown}; choose from {list(KINDS)}."
+        if tests not in TEST_FILTERS:
+            return f"tests must be one of {', '.join(TEST_FILTERS)}."
         notice = ""
         if service.state == "indexing":
             notice = prompts.indexing_notice(service.progress) + "\n\n"
@@ -37,8 +46,14 @@ def build_server(service: CodememService) -> MCPServer:
             return "The codemem index is not available yet." + (
                 f" Last error: {service.last_error}" if service.last_error else ""
             )
-        resp = service.search(query, k=k, path_prefix=path_prefix)
-        return notice + format_results(resp)
+        resp = service.search(
+            query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
+        )
+        fresh = resp.freshness
+        notes = [freshness_note(fresh, service.store.pending_paths() if fresh is not None and fresh.pending_chunks else (0, []))]
+        if resp.models_loading:
+            notes.append(prompts.models_loading_notice())
+        return notice + format_results(resp) + "".join(f"\n\n{n}" for n in notes if n)
 
     @server.tool(name="get_chunk", description=prompts.tool_description("get_chunk", steering))
     def get_chunk(ref: str) -> str:
@@ -46,6 +61,10 @@ def build_server(service: CodememService) -> MCPServer:
         if d is None:
             return f"No indexed function matches {ref!r}. Use a chunk id, path:line, or path::qualname."
         return format_chunk(d)
+
+    @server.tool(name="refresh_index", description=prompts.tool_description("refresh_index", steering))
+    def refresh_index() -> str:
+        return format_refresh(service.refresh(timeout=60))
 
     @server.tool(name="index_status", description=prompts.tool_description("index_status", steering))
     def index_status() -> str:
@@ -61,12 +80,8 @@ def run_stdio(repo: Path | str | None = None, index_dir: Path | str | None = Non
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="codemem %(levelname)s %(message)s")
     service = CodememService(repo, index_dir=index_dir)
     log.info("codemem MCP server for %s (index %s)", service.repo_root, service.index_dir)
-    # Catch-up / first index runs in the background so the handshake isn't blocked.
-    service.start_background_update()
-    try:
-        service.start_watcher()
-    except Exception:
-        log.exception("file watcher failed to start; index will only refresh on restart")
+    # The catch-up (or the first index) runs in the background, so the handshake isn't blocked.
+    service.start()
     try:
         build_server(service).run("stdio")
     finally:

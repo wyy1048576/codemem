@@ -59,6 +59,7 @@ def test_build_and_search(repo, tmp_path):
     assert hits[0].text.startswith("1. ") and hits[1].text.startswith("2. ")  # MCP card, real rank number
     assert "[id " in hits[0].text and "bm25=" not in hits[0].text  # no debug ranks in what the agent sees
     assert set(hits[0].extra["signals"]) == {"bm25", "code", "usage"}
+    assert revoke.extra["language"] == "python" and revoke.extra["kind"] == "method"
 
 
 def test_signals_select_what_is_searched(repo, tmp_path):
@@ -75,6 +76,13 @@ def test_index_key_depends_on_index_time_settings_only():
     assert CodememRetriever(config={**FAKE, "rrf": {"weights": {"bm25": 2.0}}, "bm25": {"weights": [1, 1, 1]}}).index_key() == base
     assert CodememRetriever(config={**FAKE, "embedding_dim": 32}).index_key() != base
     assert CodememRetriever(config={"vectors": {"code": {"model": "fake:16"}, "usage": {"model": "fake"}}}).index_key() != base
+
+
+def test_v2_index_time_settings_change_the_key_and_search_time_ones_do_not():
+    base = CodememRetriever(config=FAKE).index_key()
+    assert CodememRetriever(config={**FAKE, "code_header": False}).index_key() != base
+    assert CodememRetriever(config={**FAKE, "languages": ["python"]}).index_key() != base
+    assert CodememRetriever(config={**FAKE, "kinds": ["function", "method"], "test_weight": 0.5}).index_key() == base
 
 
 def test_systems_with_one_key_share_one_service(repo, tmp_path):

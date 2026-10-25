@@ -1,0 +1,54 @@
+# codemem v2 (multi-language backend, docs/architecture.md). Every system here shares ONE index
+# (same index-time settings) and differs only at search time, so the variants cost one indexing run.
+# cm2-bm25 / cm2-bm25-code / cm2-bm25-code-usage mirror cm-* in baseline.toml (codemem v1, which had
+# no weights): they are the signal ablations, without search-time weights.
+#
+# Every system pins its search-time weights, so a name keeps its meaning if codemem's defaults
+# change. The v2 defaults (docs/decisions.md, D18) equal cm2-full; v3 makes them neutral (D24). Runs made before the defaults
+# changed (2026-10-24-dev50-v2) had no weights in any system: there, cm2-full-* meant the variant
+# of cm2-bm25-code-usage, and cm2-full-tests-down was test_weight 0.5 alone.
+# Needs: uv sync --extra codemem
+
+[[system]]
+name = "cm2-bm25"
+adapter = "codemem"
+signals = ["bm25"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+[[system]]
+name = "cm2-bm25-code"
+adapter = "codemem"
+signals = ["bm25", "code"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+[[system]]
+name = "cm2-bm25-code-usage"  # all three signals, no weights
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+# codemem v2 as agents get it: all signals, tests / classes / blocks at half weight (the defaults).
+[[system]]
+name = "cm2-full"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 } }
+
+# Search-time variants of cm2-full.
+[[system]]
+name = "cm2-full-fn"  # functions and methods only (no class or block results)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", kinds = ["function", "method"], test_weight = 0.5 }
+
+[[system]]
+name = "cm2-full-no-tests"  # test chunks never returned
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.0, kind_weights = { class = 0.5, block = 0.5 } }
+
+[[system]]
+name = "cm2-full-v1-bm25"  # v1 BM25 weights (name 10, signature 5, body 1; no path or doc field)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 }, bm25 = { weights = [10, 5, 1] } }

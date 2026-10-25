@@ -6,4 +6,7 @@ __pycache__/
 /build/
 *.egg-info/
 .codemem-index/
+.cache/
+.codemem-home/
+.eval-data/
 .DS_Store

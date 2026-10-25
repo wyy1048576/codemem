@@ -1,0 +1,40 @@
+# codemem v3 (docs/architecture.md). Every system shares ONE index (same index-time settings) and
+# differs only at search time, so the variants cost one indexing run. Each system pins its weights
+# and its BM25 query rule, so a name keeps its meaning if the defaults change.
+# Needs: uv sync --extra codemem
+
+[[system]]
+name = "cm3-bm25"
+adapter = "codemem"
+signals = ["bm25"]
+config = { device = "auto", test_weight = 1.0, kind_weights = {}, bm25 = { query_terms = 32, common_share = 0.0 } }
+
+[[system]]
+name = "cm3-bm25-code"
+adapter = "codemem"
+signals = ["bm25", "code"]
+config = { device = "auto", test_weight = 1.0, kind_weights = {}, bm25 = { query_terms = 32, common_share = 0.0 } }
+
+[[system]]
+name = "cm3-full"  # the v3 default: neutral weights (D24); BM25 queries drop stopwords (D32)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = {}, bm25 = { query_terms = 32, common_share = 0.0 } }
+
+[[system]]
+name = "cm3-full-v2-weights"  # v2's default weights: tests, classes and blocks keep half their score
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 }, bm25 = { query_terms = 32, common_share = 0.0 } }
+
+[[system]]
+name = "cm3-full-all-words"  # BM25 queries keep every word, stopwords too, as v2 did
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = {}, bm25 = { query_terms = 0 } }
+
+[[system]]
+name = "cm3-full-drop-common"  # opt-in: a long query also drops words in over 5% of chunks (faster)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = {}, bm25 = { query_terms = 32, common_share = 0.05 } }

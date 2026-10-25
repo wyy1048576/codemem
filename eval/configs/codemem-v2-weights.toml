@@ -1,0 +1,52 @@
+# Search-time weightings of codemem v2's full system (bm25 + code + usage). All share one index,
+# so with a warm vector cache this config costs no embedding at all. Used on dev to choose the
+# v2 defaults (docs/decisions.md, D18 and §4): how much to push down tests, classes and blocks.
+# Every system pins all weights (a kind left out would take codemem's default weight).
+
+[[system]]
+name = "cm2-ref"  # no weights: every kind, tests at full weight
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+[[system]]
+name = "cm2-t05"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 1.0, block = 1.0 } }
+
+[[system]]
+name = "cm2-t05-c05"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 0.5, block = 1.0 } }
+
+[[system]]
+name = "cm2-t05-c05-b05"  # the v2 defaults since 2026-10-24
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 } }
+
+[[system]]
+name = "cm2-t03-c03-b03"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.3, kind_weights = { class = 0.3, block = 0.3 } }
+
+[[system]]
+name = "cm2-fn-t05"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", kinds = ["function", "method"], test_weight = 0.5 }
+
+[[system]]
+name = "cm2-t0"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+[[system]]
+name = "cm2-t05-v1bm25"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 1.0, block = 1.0 }, bm25 = { weights = [10, 5, 1] } }

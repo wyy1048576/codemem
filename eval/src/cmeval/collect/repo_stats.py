@@ -84,7 +84,9 @@ class CodeStats:
     lines: int = 0
     functions: int = 0
     methods: int = 0
-    file_headers: int = 0
+    classes: int = 0
+    blocks: int = 0  # top-level code (codemem v2+)
+    file_headers: int = 0  # codemem v1's module-header chunks (v2+ has blocks instead)
     skipped_large: int = 0  # files over codemem's max_file_size
     chunks: int = 0
     embed_hours: float = 0.0
@@ -158,7 +160,7 @@ def code_stats(repo: str, branch: str, *, url: str | None = None,
     try:
         from codemem.chunker import chunk_source
         from codemem.config import Config
-        from codemem.indexer import walk_python_files
+        from codemem.indexer import walk_source_files
     except ImportError:
         raise RepoStatsError("code numbers need codemem: run `uv sync --extra codemem` in eval/") from None
 
@@ -174,8 +176,8 @@ def code_stats(repo: str, branch: str, *, url: str | None = None,
             raise RepoStatsError(f"{repo}: {exc}") from None
         checkout_bytes = sum(p.stat().st_size for p in root.rglob("*") if p.is_file() and ".git" not in p.parts)
         stats = CodeStats(commit=commit, checkout_mb=round(checkout_bytes / 1e6, 1))
-        config = Config()
-        files = walk_python_files(root, config)
+        config = Config(languages=["python"])  # codemem walks nine languages; these stats count Python
+        files = walk_source_files(root, config)
         progress(f"{repo}: chunking {len(files)} Python files")
         chunker_log = logging.getLogger("codemem.chunker")
         old_level = chunker_log.level
@@ -194,8 +196,10 @@ def code_stats(repo: str, branch: str, *, url: str | None = None,
                         stats.functions += 1
                     elif chunk.kind == "method":
                         stats.methods += 1
-                    elif chunk.kind == "file_header":
-                        stats.file_headers += 1
+                    elif chunk.kind == "class":
+                        stats.classes += 1
+                    elif chunk.kind == "block":
+                        stats.blocks += 1
         finally:
             chunker_log.setLevel(old_level)
         stats.embed_hours = round(stats.chunks / CHUNKS_PER_SECOND / 3600, 2)
