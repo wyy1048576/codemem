@@ -33,6 +33,7 @@ class Python(LanguageSpec):
     extensions = (".py", ".pyi")
     grammar_module = "tree_sitter_python"
     line_comment = "#"
+    docstring_in_code = True
     function_types = frozenset({"function_definition"})
     class_types = frozenset({"class_definition"})
     transparent_types = frozenset({
@@ -77,10 +78,9 @@ class Python(LanguageSpec):
         ]
         return "\n".join(clean_comment(text_of(c)) for c in own).strip()
 
+    def module_docstring(self, root: Node) -> str:
+        """The module docstring (the first statement is a string)."""
+        return _docstring(root)
+
     def is_test_definition(self, defn: Definition, attached: list[Node]) -> bool:
         return defn.name.startswith("test_") or defn.name == "test"
-
-
-def module_docstring(root: Node) -> str:
-    """The module docstring (first statement is a string), for the first code block."""
-    return _docstring(root)

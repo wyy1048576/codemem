@@ -158,12 +158,23 @@ class LanguageSpec:
         sig = " ".join(raw.decode("utf-8", errors="replace").split())
         return sig.removesuffix("{").rstrip() if sig.endswith("{") else sig
 
+    # One rule for every language: the comment block directly above a definition is its doc text.
+    # Most languages write their docs there, so it is the `docstring`. A language whose docstring
+    # sits inside the definition (Python) sets `docstring_in_code`: the code text already holds
+    # that docstring, and the comments above go to `lead_comment`. Texts and keyword rows read
+    # whichever field holds the comments above, so a new language only declares its syntax.
+    docstring_in_code: bool = False
+
     def docstring(self, defn: Definition, comments: list[Node]) -> str:
-        """Leading doc comments by default (Python reads its docstring instead)."""
+        """The doc comments above the definition (an in-code docstring where `docstring_in_code`)."""
         return "\n".join(clean_comment(text_of(c)) for c in comments).strip()
 
     def lead_comment(self, defn: Definition, comments: list[Node]) -> str:
-        """Comment lines above the definition that `docstring` does not already hold (Python only)."""
+        """The comments above the definition, where `docstring` holds an in-code docstring instead."""
+        return ""
+
+    def module_docstring(self, root: Node) -> str:
+        """The file's own docstring, kept with its first block of code (Python's module docstring)."""
         return ""
 
     # ---- tests

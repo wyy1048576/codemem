@@ -82,20 +82,33 @@ def format_status(info: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+_REASONS = {"too_large": "too large", "parse_errors": "with parse errors"}  # the rest read as they are
+
+
+def _size(n: int) -> str:
+    return f"{n / 1e6:.1f} MB" if n >= 1e6 else f"{n / 1e3:.1f} KB"
+
+
+def _files(n: int) -> str:
+    return f"{n} file" if n == 1 else f"{n} files"
+
+
 def format_coverage(info: dict[str, Any]) -> list[str]:
     """What the index leaves out, and why, so nothing is missed silently."""
     out: list[str] = []
     skipped = info.get("skipped_files") or {}
     if by_reason := skipped.get("by_reason"):
-        parts = ", ".join(f"{n} {reason.replace('_', ' ')}" for reason, n in sorted(by_reason.items()))
+        parts = ", ".join(f"{n} {_REASONS.get(reason, reason)}" for reason, n in sorted(by_reason.items()))
         out.append(f"not indexed or partly parsed: {parts}")
         for ex in skipped.get("examples", [])[:5]:
-            out.append(f"  {ex['path']} ({ex['reason'].replace('_', ' ')}, {ex['size'] / 1e6:.1f} MB)")
+            out.append(f"  {ex['path']} ({_REASONS.get(ex['reason'], ex['reason'])}, {_size(ex['size'])})")
     cov = info.get("coverage") or {}
-    if cov.get("not_code_files"):
-        exts = ", ".join(f"{ext} {n}" for ext, n in (cov.get("not_code_by_extension") or {}).items())
-        out.append(f"not code (no supported language): {cov['not_code_files']} files ({exts})")
-    if cov.get("ignored_files") or cov.get("skipped_dirs"):
-        dirs = ", ".join(f"{d} {n}" for d, n in (cov.get("skipped_dirs") or {}).items())
-        out.append(f"ignored: {cov.get('ignored_files', 0)} files; skipped folders: {dirs or 'none'}")
+    if n := cov.get("not_code_files"):
+        by_ext = cov.get("not_code_by_extension") or {}
+        exts = ", ".join(f"{'no extension' if e == '(none)' else e} {k}" for e, k in by_ext.items())
+        out.append(f"not code (no supported language): {_files(n)} ({exts})")
+    dirs = cov.get("skipped_dirs") or {}
+    if cov.get("ignored_files") or dirs:
+        folders = ", ".join(f"{n} by ignore rules" if d == "(ignored)" else f"{d} {n}" for d, n in dirs.items())
+        out.append(f"ignored: {_files(cov.get('ignored_files', 0))}; skipped folders: {folders or 'none'}")
     return out

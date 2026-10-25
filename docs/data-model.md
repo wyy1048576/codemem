@@ -133,7 +133,7 @@ A chunk is what a search returns and what the eval grades by its lines.
 | `start_line`, `end_line` | 1-based, inclusive (§3.4) | `19`, `20` |
 | `signature` | the definition's text up to its body, on one line | `def revoke_session(session_id):` |
 | `docstring` | Python: the docstring. Other languages: the comment block right above (markers stripped) | |
-| `lead_comment` **(v3)** | Python only: the `#` comment lines directly above the definition (no blank line between), markers stripped. Before v3 these were dropped | `Revoke one session; used on logout.` |
+| `lead_comment` **(v3)** | in languages whose docstring is inside the definition (the spec's `docstring_in_code`; Python today): the comment lines directly above the definition (no blank line between), markers stripped. Elsewhere those comments are the `docstring`. Before v3, Python dropped them | `Revoke one session; used on logout.` |
 | `code` | the exact source lines `start_line..end_line` | |
 | `skeleton` | classes only: header plus one line per member (field text or method signature) | `class Table:\n    def insert(self, key, value):` |
 | `content_hash` | sha256 of `code`, first 20 hex chars | |
@@ -168,7 +168,8 @@ independently.
   - attributes (Rust `#[test]`);
   - `export`, `template <…>`, and the whole `const f = …` statement.
 - **Leading comments are never in the range,** in any language (Python too, in v3). Their text
-  goes to `docstring` (other languages) or `lead_comment` (Python). A 15-line kernel-doc comment
+  goes to `docstring`, or to `lead_comment` where the docstring is inside the code (Python). One
+  rule for every language: a new language only declares its comment syntax. A 15-line kernel-doc comment
   above a 5-line function would otherwise halve the IoU.
 - **A node that ends at column 0 ends on the previous line** (the labeler's rule). Examples:
   `#define X 1\n`, `///` comments.
@@ -235,7 +236,8 @@ Each vector type is embedded separately into its own vector set, and its signal 
 on and off at search time (`--signals bm25,code,usage`).
 
 **`code`:** a context header in the language's comment syntax, then the doc text, then the code.
-The doc text is the doc comment outside Python, or **(v3)** the `lead_comment` in Python. A class
+The doc text is the comment block above the definition: its `docstring`, or **(v3)** its
+`lead_comment` where the docstring is inside the code (Python). A class
 uses its outline instead of its code.
 
 ```

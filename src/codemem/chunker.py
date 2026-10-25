@@ -21,7 +21,6 @@ from collections.abc import Iterable, Iterator
 from tree_sitter import Node
 
 from .languages import LanguageSpec, get_language, language_for_path
-from .languages.python import module_docstring
 from .languages.spec import Container, Definition, end_row, text_of
 from .schema import BLOCK_QUALNAME, Chunk, make_key, text_hash
 
@@ -54,10 +53,8 @@ class _Walker:
         self.chunks: list[Chunk] = []
         self.keys: dict[str, int] = {}
         self.test_file = spec.is_test_path(path)
-        self.module_doc_row: int | None = None
-        if spec.name == "python" and module_docstring(root):
-            self.module_doc_row = root.named_children[0].start_point[0]
-        self.module_doc = module_docstring(root) if self.module_doc_row is not None else ""
+        self.module_doc = spec.module_docstring(root)
+        self.module_doc_row: int | None = root.named_children[0].start_point[0] if self.module_doc else None
 
     # ---- keys
     def unique_key(self, base: str) -> str:

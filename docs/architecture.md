@@ -76,7 +76,7 @@ function through every stage.
 |---|---|---|---|---|
 | 1 | Watcher | `watcher.py`, `service.py` | turn file events into a set of changed paths; trigger updates | v3 works: changed paths, quiet period and maximum wait, git branch switches, polling fallback. Catch-up before every search: the search hands pending saves to the writer and waits at most its limit; `get_chunk` waits for stage A; background embedding gives way to searches and new saves at its next model call; model calls are sized by text length |
 | 2 | Indexer | `indexer.py` | one update function for the first build, reconciles and single saves | v3 works: two stages and a persistent queue, the exact usage ripple, settings tiers, verify mode. Inside a changed file, only new or changed chunks are relinked and re-checked; moved ones get a line-number update |
-| 3 | Chunker | `languages/`, `chunker.py` | functions, methods, classes and blocks in nine languages | works; v3 fixes done (Python comments, huge statements split by content). To do: one comment rule for every language |
+| 3 | Chunker | `languages/`, `chunker.py` | functions, methods, classes and blocks in nine languages | works; v3 fixes done: Python comments, huge statements split by content, and one comment rule for every language (a new language only declares its comment syntax) |
 | 4 | Call graph | `callgraph.py` | link each call to the definitions of that name | works |
 | 5 | Texts | `texts.py` | what gets embedded: code with a context header, usage (callers, tests) | works; v3 window fixes done |
 | 6 | Embedder | `embedder.py`, `vectorcache.py` | local model by default; any OpenAI-compatible API (v3) | local works; the OpenAI-compatible API is phase 2 |

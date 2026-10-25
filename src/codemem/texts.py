@@ -17,6 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .callgraph import is_test_caller
+from .languages import LANGUAGES
 from .schema import BLOCK_QUALNAME, Chunk
 
 _SIGNATURE_CHARS = 120  # a later window's header names its definition, cut to this length
@@ -106,9 +107,10 @@ def _header_lines(chunk: Chunk, part_label: str = "") -> list[str]:
 
 
 def _doc_lines(chunk: Chunk) -> list[str]:
-    """Comments above a definition sit outside its code span, so the code text lacks them: the doc
-    comment in most languages, the leading `#` comment in Python (whose docstring is in the code)."""
-    doc = chunk.lead_comment if chunk.language == "python" else chunk.docstring
+    """Comments above a definition sit outside its code span, so the code text lacks them. They
+    are its docstring, or its `lead_comment` where the docstring is inside the code (Python)."""
+    spec = LANGUAGES.get(chunk.language)
+    doc = chunk.lead_comment if spec is not None and spec.docstring_in_code else chunk.docstring
     if not doc:
         return []
     prefix = _comment_prefix(chunk)
