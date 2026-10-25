@@ -61,10 +61,13 @@ def test_graphql_errors_raise_and_are_not_cached(tmp_path):
     assert gh.graphql("query { bad }") == {"ok": True}  # asked again: the error was not stored
 
 
-def test_low_rate_limit_stops(tmp_path):
+def test_low_rate_limit_stops_but_the_cached_answer_does_not(tmp_path):
     runner = FakeRunner({"data": {"search": {}, "rateLimit": {"remaining": 10}}})
     with pytest.raises(GitHubError, match="rate limit"):
         make_gh(tmp_path, runner).graphql("query { search }")
+    # After the reset, the same request comes from the cache; its old "remaining" must not stop the run.
+    assert make_gh(tmp_path, runner).graphql("query { search }") == {"search": {}, "rateLimit": {"remaining": 10}}
+    assert len(runner.calls) == 1
 
 
 def test_text_that_is_not_json_raises(tmp_path):
@@ -124,3 +127,12 @@ def test_missing_parts_allowed_only_when_asked(tmp_path):
     assert gh.graphql("query { a }", allow_missing=True) == {"repository": {"i1": None}}
     with pytest.raises(GitHubError, match="no issue 1"):
         make_gh(tmp_path / "b", FakeRunner(answer)).graphql("query { a }")
+
+
+def test_time_out_inside_an_answer_is_tried_again(tmp_path):
+    timeout = {"data": None, "errors": [{"message": "Something went wrong while executing your query. "
+                                                    "This may be the result of a timeout."}]}
+    runner, waits = FakeRunner(timeout, {"data": {"ok": True}}), []
+    gh = GitHub(runner=runner, cache_dir=tmp_path, min_interval=0, sleep=waits.append)
+    assert gh.graphql("query { big }") == {"ok": True}
+    assert len(runner.calls) == 2 and waits == [15]

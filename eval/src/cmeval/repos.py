@@ -155,7 +155,9 @@ def apply_check(repo: str, base: str, patch: str) -> str | None:
     with tempfile.TemporaryDirectory() as tmp:
         env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "LC_ALL": "C", "GIT_INDEX_FILE": str(Path(tmp) / "index")}
         clone = clone_path(repo)
-        subprocess.run(["git", "read-tree", base], cwd=clone, env=env, check=True, capture_output=True)
+        tree = subprocess.run(["git", "read-tree", base], cwd=clone, env=env, capture_output=True)
+        if tree.returncode != 0:
+            raise RepoError(f"git read-tree {base} failed: {tree.stderr.decode('utf-8', 'replace').strip()}")
         proc = subprocess.run(["git", "apply", "--check", "--cached", "-"], cwd=clone, env=env,
                               input=patch.encode("utf-8"), capture_output=True)
     return None if proc.returncode == 0 else proc.stderr.decode("utf-8", "replace").strip()

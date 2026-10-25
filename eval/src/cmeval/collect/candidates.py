@@ -147,7 +147,7 @@ def collect_candidates(gh: GitHub, repo: str, settings: Settings, *,
     opened = people = 0
     since = settings.since.isoformat()
     for pr in prs:
-        if pr["createdAt"][:10] < since:  # phase 2 runs Claude on these tasks: its training data ends before `since`
+        if pr["createdAt"][:10] < since:  # phase 2 runs agents on these tasks; their training data ends before `since`
             funnel.drop(pr, "opened_after_cutoff", f"fix PR opened before the start date ({pr['createdAt'][:10]})")
             continue
         opened += 1

@@ -18,8 +18,9 @@ from ..patches import parse_patch, split_lines, split_patch
 from ..repos import RepoError
 from ..files import now, write_json
 from ..tasks import Fix, Issue, Task, assign_split, save_tasks, validate
-from .candidates import FUNNEL_STEPS, Candidate, Funnel, Settings
+from .candidates import FUNNEL_STEPS, GIT_STEPS, Candidate, Funnel, Settings
 
+GIT_KEYS = tuple(key for key, _ in GIT_STEPS)
 BATCH_SIZE = 50
 MAX_PR_FILES = 100  # one page of the files connection; such PRs are far over the code-file limit anyway
 
@@ -77,11 +78,6 @@ def patch_paths(patch: str) -> set[str]:
     return {change.new_path or change.old_path for change in parse_patch(patch)}
 
 
-def code_size(code_patch: str) -> tuple[int, int]:
-    changes = parse_patch(code_patch)
-    return len(changes), sum(c.added + c.removed for c in changes)
-
-
 def gold_file_stats(repo: str, base: str, paths: list[str]) -> tuple[int, int]:
     """(bytes, lines) of the largest gold file at the base commit."""
     biggest = (0, 0)
@@ -91,27 +87,51 @@ def gold_file_stats(repo: str, base: str, paths: list[str]) -> tuple[int, int]:
     return biggest
 
 
-def candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] | None) -> Task:
-    """One task, or Skip with the funnel step and the reason."""
+def candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] | None,
+                      py_files: Callable[[str, str], int] | None = None) -> Task:
+    """One task, or Skip with the funnel step and the reason.
+
+    A git error on this candidate becomes a Skip of the step it happened in, so one bad
+    candidate does not stop the collection of the others.
+    """
+    step = [GIT_KEYS[0]]  # the step in progress, updated by _candidate_to_task
+    try:
+        return _candidate_to_task(cand, settings, pr_files, py_files or count_py_files, step)
+    except RepoError as exc:
+        raise Skip(step[0], f"git error ({str(exc)[:80]})") from None
+
+
+def count_py_files(repo: str, commit: str) -> int:
+    """Python files in the repo at a commit (the repo size tag)."""
+    return sum(1 for path in repos.tracked_files(repo, commit) if path.endswith(".py"))
+
+
+def _candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] | None,
+                       py_files: Callable[[str, str], int], step: list[str]) -> Task:
     repo = cand.repo
     base, merge_type = merge_base(repo, cand)
-    full = repos.diff(repo, base, cand.merge_commit)
-    if pr_files is None:
+    step[0] = "files_match"
+    if pr_files is None:  # before the diff: such PRs are big, and their diff is slow
         raise Skip("files_match", f"more than {MAX_PR_FILES} files")
+    full = repos.diff(repo, base, cand.merge_commit)
     ours = patch_paths(full)
     if ours != set(pr_files):
         raise Skip("files_match", f"file list differs ({len(ours ^ set(pr_files))} paths)")
     parts = split_patch(full)
     code = parts["code"]
+    step[0] = "applies"
     if code and (message := repos.apply_check(repo, base, code)):
         raise Skip("applies", f"patch does not apply ({message.splitlines()[0][:80]})")
-    n_files, n_lines = code_size(code) if code else (0, 0)
+    step[0] = "size_ok"
+    changes = parse_patch(code) if code else []
+    n_files, n_lines = len(changes), sum(c.added + c.removed for c in changes)
     if n_files == 0:
         raise Skip("size_ok", "no code files")
     if n_files > settings.max_code_files:
         raise Skip("size_ok", f"too many code files ({n_files})")
     if n_lines > settings.max_code_lines:
         raise Skip("size_ok", f"too many changed lines ({n_lines})")
+    step[0] = "labeled"
     try:
         label = label_at_commit(repo, base, code)
     except LabelError as exc:
@@ -120,7 +140,7 @@ def candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] |
         raise Skip("labeled", "only new files")
 
     gold = set(label.gold.files)
-    languages = sorted({c.language for c in parse_patch(code) if c.old_path in gold and c.language})
+    languages = sorted({c.language for c in changes if c.old_path in gold and c.language})
     biggest_bytes, biggest_lines = gold_file_stats(repo, base, label.gold.files)
     owner, name = repo.split("/")
     task_id = f"{owner}__{name}-{cand.pr_number}"
@@ -146,7 +166,7 @@ def candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] |
             "max_gold_file_bytes": biggest_bytes,
             "max_gold_file_lines": biggest_lines,
             # repo size at this task's commit, for the small / medium / large groups in the report
-            "repo_py_files": sum(1 for path in repos.tracked_files(repo, base) if path.endswith(".py")),
+            "repo_py_files": py_files(repo, base),
         },
         labeler=LABELER_VERSION,
     )
@@ -160,25 +180,30 @@ def build_tasks(gh: GitHub, candidates: list[Candidate], settings: Settings, fun
                 progress: Callable[[str], None] = lambda message: None) -> list[Task]:
     """Tasks for one repo's candidates. Fills the git steps of the funnel."""
     if not candidates:
-        for key in ("base_found", "files_match", "applies", "size_ok", "labeled"):
-            funnel.counts[key] = 0
+        funnel.counts.update(dict.fromkeys(GIT_KEYS, 0))
         return []
     repo = candidates[0].repo
     progress(f"{repo}: clone (once) and PR file lists")
     repos.ensure_clone(repo)
     files = fetch_pr_files(gh, repo, [c.pr_number for c in candidates])
-    order = ("base_found", "files_match", "applies", "size_ok", "labeled")
-    passed = dict.fromkeys(order, 0)
+    sizes: dict[str, int] = {}  # tasks that share a base commit share the repo size
+
+    def py_files(repo_: str, commit: str) -> int:
+        if commit not in sizes:
+            sizes[commit] = count_py_files(repo_, commit)
+        return sizes[commit]
+
+    passed = dict.fromkeys(GIT_KEYS, 0)
     tasks = []
     for i, cand in enumerate(candidates, start=1):
         try:
-            tasks.append(candidate_to_task(cand, settings, files.get(cand.pr_number)))
-            reached = len(order)
+            tasks.append(candidate_to_task(cand, settings, files.get(cand.pr_number), py_files))
+            reached = len(GIT_KEYS)
         except Skip as skip:
             step, reason = skip.args
-            funnel.drops.append({"pr": cand.pr_number, "step": step, "reason": reason})
-            reached = order.index(step)
-        for key in order[:reached]:
+            funnel.drop({"number": cand.pr_number}, step, reason)
+            reached = GIT_KEYS.index(step)
+        for key in GIT_KEYS[:reached]:
             passed[key] += 1
         if i % 100 == 0 or i == len(candidates):
             progress(f"{repo}: {i} of {len(candidates)} candidates checked, {len(tasks)} tasks")

@@ -238,3 +238,24 @@ def test_apply_check_on_the_bare_clone(history):
     bad = good.replace("-        return self.data[key]", "-        return self.items[key]")
     assert repos.apply_check(REMOTE_REPO, base, good) is None
     assert "patch does not apply" in repos.apply_check(REMOTE_REPO, base, bad)
+
+
+def test_a_git_error_drops_only_that_candidate(history, tmp_path, monkeypatch):
+    remote, _ = history
+    fix = remote.commit({"pkg/core.py": CORE_FIXED}, "Fix Store.get (#7)")
+    other = remote.commit({"pkg/core.py": CORE_FIXED + "\n\nY = 2\n"}, "Add Y (#9)")
+    real_diff = repos.diff
+
+    def diff(repo, old, new):
+        if new == other:
+            raise repos.RepoError("git diff failed: bad object")
+        return real_diff(repo, old, new)
+
+    monkeypatch.setattr(repos, "diff", diff)
+    runner, _ = files_runner({7: ["pkg/core.py"], 9: ["pkg/core.py"]})
+    gh = GitHub(runner=runner, cache_dir=tmp_path / "cache", min_interval=0)
+    funnel = Funnel(repo=REMOTE_REPO, base_branch="main", since="2026-07-01", until="2026-10-22")
+    tasks = build_tasks(gh, [candidate(fix), candidate(other, pr=9)], settings(), funnel)
+    assert [t.id for t in tasks] == ["acme__demo-7"]
+    assert funnel.drops == [{"pr": 9, "step": "files_match", "reason": "git error (git diff failed: bad object)"}]
+    assert funnel.counts["base_found"] == 2 and funnel.counts["files_match"] == 1

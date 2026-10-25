@@ -95,45 +95,53 @@ class GitHub:
             return [e for e in response.get("errors") or []
                     if not (allow_missing and e.get("type") == "NOT_FOUND")]
 
-        response = self._cached("graphql", query, variables, ["api", "graphql", "--input", "-"], body,
-                                keep=lambda r: not errors(r))
+        response, cached = self._cached("graphql", query, variables, ["api", "graphql", "--input", "-"], body,
+                                        keep=lambda r: not errors(r))
         if errors(response):
             messages = "; ".join(e.get("message", str(e)) for e in errors(response))
             raise GitHubError(f"GraphQL errors: {messages}")
         data = response.get("data") or {}
         remaining = (data.get("rateLimit") or {}).get("remaining")
-        if remaining is not None and remaining < MIN_REMAINING:
+        # Only a live answer tells how many points are left now; a cached one tells the past.
+        if not cached and remaining is not None and remaining < MIN_REMAINING:
             raise GitHubError(f"GraphQL rate limit almost used up ({remaining} points left); run again after the reset")
         return data
 
     def rest(self, path: str):
         """The parsed JSON of a REST GET, for example rest("repos/home-assistant/core")."""
-        return self._cached("rest", path, None, ["api", path], None, keep=lambda r: True)
+        return self._cached("rest", path, None, ["api", path], None, keep=lambda r: True)[0]
 
     def _cached(self, kind: str, request: str, variables: dict | None, args: list[str], stdin: str | None,
-                keep: Callable[[object], bool]):
+                keep: Callable[[object], bool]) -> tuple[object, bool]:
+        """(response, True if it came from the cache)."""
         path = self.cache_dir / f"{cache_key(kind, request, variables)}.json"
         if path.exists() and not self.refresh:
             self.cache_hits += 1
-            return json.loads(path.read_text(encoding="utf-8"))["response"]
-        out = self._call(args, stdin)
-        try:
-            response = json.loads(out)
-        except json.JSONDecodeError:
-            raise GitHubError(f"gh {' '.join(args[:2])} returned text that is not JSON: {out[:200]!r}") from None
+            return json.loads(path.read_text(encoding="utf-8"))["response"], True
+        response = self._call(args, stdin)
         if keep(response):  # never cache an error answer
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             write_json(path, {"kind": kind, "request": request, "variables": variables, "response": response})
-        return response
+        return response, False
 
-    def _call(self, args: list[str], stdin: str | None) -> str:
+    def _call(self, args: list[str], stdin: str | None):
+        """The parsed answer of one live call, with retries for short failures."""
         for attempt in range(1, self.tries + 1):
             wait = self._last_call + self.min_interval - time.monotonic()
             if wait > 0:
-                time.sleep(wait)
+                self.sleep(wait)
             self._last_call = time.monotonic()
             try:
                 out = self.runner(args, stdin)
+                try:
+                    response = json.loads(out)
+                except json.JSONDecodeError:
+                    raise GitHubError(f"gh {' '.join(args[:2])} returned text that is not JSON: {out[:200]!r}") from None
+                # GitHub can also report a time-out inside an answer ("Something went wrong ... timeout").
+                errors = response.get("errors") if isinstance(response, dict) else None
+                messages = [e.get("message", "") for e in errors or [] if e.get("type") != "NOT_FOUND"]
+                if any(_TRANSIENT_RE.search(m) for m in messages):
+                    raise GitHubError(f"GraphQL errors: {'; '.join(messages)}")
             except GitHubError as exc:
                 if attempt == self.tries or not _TRANSIENT_RE.search(str(exc)):
                     raise
@@ -143,5 +151,5 @@ class GitHub:
                 self.sleep(pause)
                 continue
             self.api_calls += 1
-            return out
+            return response
         raise AssertionError("unreachable")
