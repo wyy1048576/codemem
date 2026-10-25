@@ -75,7 +75,7 @@ function through every stage.
 | # | Component | Module | Job | Status |
 |---|---|---|---|---|
 | 1 | Watcher | `watcher.py`, `service.py` | turn file events into a set of changed paths; trigger updates | v3 works: changed paths, quiet period and maximum wait, git branch switches, polling fallback, catch-up before every search. To do (decided Oct 25): a search hands pending saves to the writer instead of applying them itself; the writer checks for new saves after every batch; model calls sized by text length; `get_chunk` catches up too |
-| 2 | Indexer | `indexer.py` | one update function for the first build, reconciles and single saves | v3 works: two stages and a persistent queue, the exact usage ripple, settings tiers, verify mode. To do: inside a changed file, re-check only the chunks that changed (huge files) |
+| 2 | Indexer | `indexer.py` | one update function for the first build, reconciles and single saves | v3 works: two stages and a persistent queue, the exact usage ripple, settings tiers, verify mode. Inside a changed file, only new or changed chunks are relinked and re-checked; moved ones get a line-number update |
 | 3 | Chunker | `languages/`, `chunker.py` | functions, methods, classes and blocks in nine languages | works; v3 fixes done (Python comments, huge statements split by content). To do: one comment rule for every language |
 | 4 | Call graph | `callgraph.py` | link each call to the definitions of that name | works |
 | 5 | Texts | `texts.py` | what gets embedded: code with a context header, usage (callers, tests) | works; v3 window fixes done |
@@ -300,17 +300,27 @@ save. **Stage A**, in one SQLite transaction:
 1. **Find the changed files.** For the watcher's paths, or by scanning everything, compare size
    and date, then the content hash.
 2. **Remember their old state:** chunk ids, the names they define, and their outgoing links.
-3. **Re-chunk** those files, and match old and new chunks by key (`path::qualname`). Unchanged
-   chunks keep their ids.
+3. **Re-chunk** those files, and match old and new chunks by key (`path::qualname`):
+   - identical chunks are left alone;
+   - chunks that only moved (same content, new lines, say after a line was added above them)
+     get their line numbers shifted, and nothing else;
+   - new and changed chunks are written in full.
+
+   If moved chunks changed their order (functions swapped), they count as changed: usage texts
+   list callers by line.
 4. **Relink only what can change:**
-   - the calls made by the changed files' chunks;
+   - the calls made by new or changed chunks;
    - every call anywhere to a name that was added or removed (this includes the 5-definitions
      limit).
 5. **Queue the chunks whose texts may have changed** (`dirty_texts`: a chunk id and the commit's
    sequence number):
-   - every chunk of the changed files;
-   - what they call, before and after the edit;
+   - the new or changed chunks;
+   - what they call, and what deleted chunks called (their usage texts list them);
    - any chunk whose callers changed.
+
+   So the work follows the edit, not the file: a one-character edit in a 50,000-function file
+   queues 1 chunk (it queued all 50,000 before Oct 25). What remains is parsing the file
+   (1.2 s for 2.3 MB), which needs tree-sitter's incremental parsing to avoid (parked).
 
 **Stage B**, in batches; the write lock is not held while the model runs:
 

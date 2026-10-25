@@ -99,6 +99,7 @@ class IndexStats:
     chunks_added: int = 0
     chunks_updated: int = 0
     chunks_deleted: int = 0
+    chunks_moved: int = 0  # unchanged chunks whose line numbers shifted (nothing else is rewritten)
     edges: int = 0
     relinked: int = 0  # chunks whose outgoing calls were resolved again
     queued: int = 0  # chunks whose texts were queued for stage B
@@ -285,14 +286,27 @@ def _exists_exactly(path: Path) -> bool:
 # --------------------------------------------------------------------------- indexer
 
 
-def _stored_fields(c: Chunk) -> tuple:
-    """Every chunk field the store keeps, except its id. Equal tuples mean nothing to write: a
-    chunk whose lines, parent (a `#2` key renumbered) or language (a `.h` file now read as C++)
-    changed must be rewritten, or an updated index would differ from a rebuilt one."""
+def _content_fields(c: Chunk) -> tuple:
+    """Every chunk field the store keeps except its id and its position. A chunk whose parent (a
+    `#2` key renumbered) or language (a `.h` file now read as C++) changed must be rewritten, or an
+    updated index would differ from a rebuilt one. Texts depend on these fields only."""
     return (
         c.key, c.path, c.language, c.kind, c.subkind, c.name, c.qualname, c.class_name, c.parent_key,
-        c.start_line, c.end_line, c.signature, c.docstring, c.lead_comment, c.content_hash, c.skeleton, c.is_test,
+        c.signature, c.docstring, c.lead_comment, c.content_hash, c.skeleton, c.is_test,
     )
+
+
+def _moved_by(prev: Chunk, chunk: Chunk) -> int | None:
+    """How many lines a chunk moved (0: not at all), when moving is all that changed; None if more
+    changed. Same content means its calls moved by as many lines too."""
+    delta = chunk.start_line - prev.start_line
+    if chunk.end_line - prev.end_line != delta or _content_fields(prev) != _content_fields(chunk):
+        return None
+    return delta
+
+
+def _order(chunks: Iterable[Chunk], keys: set[str]) -> list[str]:
+    return [c.key for c in sorted(chunks, key=lambda c: (c.start_line, c.key)) if c.key in keys]
 
 
 def _family(language: str) -> str:
@@ -579,21 +593,28 @@ class Indexer:
                 reset = [store.ensure_vec_type(v, e.key, cfg.embedding_dim) for v, e in embedders.items()]
                 affected = [s.rel for s, *_ in parsed] + scan.deleted + [s.rel for s, *_ in scan.skipped]
                 old = store.chunks_for_paths(affected)
-                old_ids = {c.chunk_id for c in old}
-                old_callees = {b for _, b in store.edges_from(old_ids)}
+                old_by_path: dict[str, list[Chunk]] = defaultdict(list)
+                for c in old:
+                    old_by_path[c.path].append(c)
+                old_edges = store.edges_from({c.chunk_id for c in old})
+                changed: set[int] = set()  # new or changed chunks: relinked, and their texts re-checked
+                gone: set[int] = set()
                 for state, prev in scan.touched:
                     store.upsert_file(state.rel, prev.content_hash, state.mtime, state.size, prev.language, prev.status, prev.reason)
                 for rel in scan.deleted:
-                    stats.chunks_deleted += len(store.delete_file(rel))
+                    gone.update(store.delete_file(rel))
                 for state, digest, language, reason in scan.skipped:
                     log.info("skipping %s: %s", state.rel, reason)
-                    stats.chunks_deleted += len(store.delete_file(state.rel))
+                    gone.update(store.delete_file(state.rel))
                     store.upsert_file(state.rel, digest, state.mtime, state.size, language, "skipped", reason)
+                stats.chunks_deleted += len(gone)
                 for state, digest, language, chunks in parsed:
-                    self._apply_file(state, digest, language, chunks, stats)
-                new = store.chunks_for_paths([s.rel for s, *_ in parsed])
-                new_ids = {c.chunk_id for c in new}
-                gone = old_ids - new_ids
+                    now_changed, now_gone = self._apply_file(
+                        state, digest, language, chunks, old_by_path.get(state.rel, []), stats
+                    )
+                    changed |= now_changed
+                    gone |= now_gone
+                new = [c for *_, chunks in parsed for c in chunks]
 
                 if full or "links" in tiers:
                     edges = resolve_edges(store.definitions(), store.all_calls(), cfg.max_defs_per_name)
@@ -601,7 +622,7 @@ class Indexer:
                     stats.relinked += store.counts()["chunks"]
                     changed_edges: set[tuple[int, int]] = set()
                 else:
-                    callers, changed_edges = self._relink(_definitions(old), _definitions(new), new_ids, gone)
+                    callers, changed_edges = self._relink(_definitions(old), _definitions(new), changed, gone)
                     stats.relinked += len(callers)
                 stats.edges = store.edge_count()
 
@@ -611,9 +632,10 @@ class Indexer:
                     stats.queued += store.dirty_count()
                     queued = None
                 else:
-                    # Code texts: every chunk of a changed file. Usage texts: those, plus whatever
-                    # they called before or call now, plus every callee whose callers changed.
-                    dirty = new_ids | old_callees | {b for _, b in store.edges_from(new_ids)}
+                    # New or changed chunks (their code texts), what they call (each one's usage
+                    # text lists them), what deleted chunks called, and every chunk whose callers
+                    # changed. Identical chunks, and chunks that only moved, keep their texts.
+                    dirty = changed | {b for a, b in old_edges if a in gone} | {b for _, b in store.edges_from(changed)}
                     dirty |= {b for _, b in changed_edges}
                     dirty -= gone
                     store.mark_dirty(dirty, seq)
@@ -635,11 +657,12 @@ class Indexer:
 
     def _relink(
         self, old_defs: dict[tuple[str, str], set[int]], new_defs: dict[tuple[str, str], set[int]],
-        new_ids: set[int], gone: set[int],
+        changed_ids: set[int], gone: set[int],
     ) -> tuple[set[int], set[tuple[int, int]]]:
-        """Resolve again the calls that can have a new target: every call made by the changed files'
-        chunks, and every call anywhere to a name whose set of definitions changed. Returns the
-        relinked callers and the edges that appeared or disappeared."""
+        """Resolve again the calls that can have a new target: every call made by a new or changed
+        chunk, and every call anywhere to a name whose set of definitions changed. (A chunk whose
+        content is unchanged calls the same names, so only the second rule can move its links.)
+        Returns the relinked callers and the edges that appeared or disappeared."""
         store, limit = self.store, self.config.max_defs_per_name
         changed = {k for k in old_defs.keys() | new_defs.keys() if old_defs.get(k, set()) != new_defs.get(k, set())}
         relevant: set[tuple[str, str]] = set()
@@ -652,7 +675,7 @@ class Indexer:
                 before = now - len(new_defs.get(key, ())) + len(old_defs.get(key, ()))
                 if now <= limit or before <= limit:  # above the limit both times: no links either way
                     relevant.add(key)
-        callers = set(new_ids)
+        callers = set(changed_ids)
         if relevant:
             callers |= {c for c, name, fam in store.calls_to_names({n for _, n in relevant}) if (fam, name) in relevant}
         callers -= gone
@@ -673,25 +696,51 @@ class Indexer:
             store.conn.execute("DELETE FROM meta WHERE key IN ('index_settings', 'last_scan_at')")
         store.save_vectors()
 
-    def _apply_file(self, state: FileState, digest: str, language: str, chunks: list[Chunk], stats: IndexStats) -> None:
+    def _apply_file(
+        self, state: FileState, digest: str, language: str, chunks: list[Chunk], old_chunks: list[Chunk],
+        stats: IndexStats,
+    ) -> tuple[set[int], set[int]]:
+        """Write one re-chunked file, matching old and new chunks by key: new and changed chunks are
+        written, chunks that only moved get their line numbers shifted, identical ones are left
+        alone. Returns the ids of the new or changed chunks and of the deleted ones."""
         store = self.store
-        old = {c.key: c for c in store.chunks_for_path(state.rel)}
+        old = {c.key: c for c in old_chunks}
+        changed: set[int] = set()
+        moved: list[tuple[Chunk, int]] = []
         for chunk in chunks:
             prev = old.pop(chunk.key, None)
+            delta = _moved_by(prev, chunk) if prev is not None else None
+            if delta is not None:
+                chunk.chunk_id = prev.chunk_id
+                if delta:
+                    moved.append((chunk, delta))
+                continue
             if prev is None:
                 stats.chunks_added += 1
-            elif _stored_fields(prev) == _stored_fields(chunk):
-                chunk.chunk_id = prev.chunk_id
-                continue
             else:
                 stats.chunks_updated += 1
-            store.upsert_chunk(chunk)
-        store.delete_chunks([c.chunk_id for c in old.values()])
-        stats.chunks_deleted += len(old)
+            chunk.chunk_id = store.upsert_chunk(chunk)
+            changed.add(chunk.chunk_id)
+        if moved:
+            kept = {c.key for c in chunks} & {c.key for c in old_chunks}
+            if _order(old_chunks, kept) != _order(chunks, kept):
+                # Definitions were reordered. Usage texts list callers by line, so the moved chunks
+                # are rewritten and re-checked like changed ones.
+                for chunk, _ in moved:
+                    store.upsert_chunk(chunk)
+                    changed.add(chunk.chunk_id)
+                stats.chunks_updated += len(moved)
+            else:
+                store.move_chunks([(c.chunk_id, c.start_line, c.end_line, d) for c, d in moved])
+                stats.chunks_moved += len(moved)
+        gone = {c.chunk_id for c in old.values()}
+        store.delete_chunks(gone)
+        stats.chunks_deleted += len(gone)
         partial = bool(getattr(chunks, "parse_errors", False))
         store.upsert_file(state.rel, digest, state.mtime, state.size, language, "ok", "parse_errors" if partial else "")
         if partial:
             stats.parse_errors.append(state.rel)
+        return changed, gone
 
     # ---- stage B: vectors
     def embed_pending(

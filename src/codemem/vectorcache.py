@@ -39,7 +39,8 @@ class VectorCache:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()
-        self._all: list[sqlite3.Connection] = []
+        # Every thread's connection, with its thread: close() must not close one a running thread uses.
+        self._all: dict[int, tuple[threading.Thread, sqlite3.Connection]] = {}
         self._lock = threading.Lock()
         self._conn().executescript(_SCHEMA)
 
@@ -51,7 +52,7 @@ class VectorCache:
             conn.execute("PRAGMA synchronous=NORMAL")
             self._local.conn = conn
             with self._lock:
-                self._all.append(conn)
+                self._all[id(conn)] = (threading.current_thread(), conn)
         return conn
 
     def get_many(self, embedder: str, hashes: Iterable[str]) -> dict[str, np.ndarray]:
@@ -90,11 +91,15 @@ class VectorCache:
         return self._conn().execute("SELECT COUNT(*) FROM cache WHERE embedder = ?", (embedder,)).fetchone()[0]
 
     def close(self) -> None:
+        """Close this thread's connection and those of threads that have ended. A thread that is
+        still running keeps its own: closing it under that thread's query crashes the process."""
+        me = threading.current_thread()
         with self._lock:
-            for conn in self._all:
-                try:
-                    conn.close()
-                except sqlite3.ProgrammingError:
-                    pass
-            self._all.clear()
-        self._local = threading.local()
+            done = [k for k, (thread, _) in self._all.items() if thread is me or not thread.is_alive()]
+            conns = [self._all.pop(k)[1] for k in done]
+        for conn in conns:
+            try:
+                conn.close()
+            except sqlite3.ProgrammingError:
+                pass
+        self._local.conn = None

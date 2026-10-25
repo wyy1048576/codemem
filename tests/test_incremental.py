@@ -217,10 +217,28 @@ def huge_statement(r):
         return False
 
 
+def shift_lines(r):
+    """Blank lines above everything: every chunk of the file moves, nothing else changes."""
+    if not r.has("auth/db.py"):
+        return False
+    r.write("auth/db.py", "\n\n" + r.read("auth/db.py"))
+
+
+def reorder_functions(r):
+    """Two functions with the same callee change places. Their content is unchanged, but the
+    callee's usage text lists its callers by line."""
+    a = "def first(token):\n    return revoke_session(token)\n"
+    b = "def second(token):\n    revoke_session(token)\n    return None\n"
+    if r.has("auth/order.py") and r.read("auth/order.py").startswith(a):
+        r.write("auth/order.py", b + "\n\n" + a)
+    else:
+        r.write("auth/order.py", a + "\n\n" + b)
+
+
 EDITS = [
     body_edit, rename_definition_only, rename_everywhere, add_caller, remove_caller, move_function, delete_file,
     add_file, crowd_a_name, uncrowd_a_name, comment_edit, duplicate_names, ignore_a_file, generated_marker,
-    header_flips_c_to_cpp, touch_only, huge_statement,
+    header_flips_c_to_cpp, touch_only, huge_statement, shift_lines, reorder_functions,
 ]
 
 

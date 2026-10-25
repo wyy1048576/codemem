@@ -358,3 +358,47 @@ def test_searches_during_writes_never_see_a_half_patched_index(tmp_path):
         t.join()
     assert errors == [] and _in_sync(s, "code")
     s.close()
+
+
+def _while_another_thread_holds_its_connection(open_conn, close, use):
+    """Another thread takes its connection (as it does at the start of a query), then `close`
+    runs. That connection must stay usable: closing it mid-query crashes the process."""
+    import threading
+
+    took, closed, result = threading.Event(), threading.Event(), {}
+
+    def other():
+        conn = open_conn()
+        took.set()
+        closed.wait(5)
+        try:
+            result["value"] = use(conn)
+        except Exception as e:  # what the old close() caused: "Cannot operate on a closed database"
+            result["error"] = repr(e)
+
+    t = threading.Thread(target=other)
+    t.start()
+    assert took.wait(5)
+    close()
+    closed.set()
+    t.join(5)
+    assert "error" not in result, result["error"]
+
+
+def test_closing_the_store_leaves_a_running_thread_its_connection(tmp_path):
+    s = Store(tmp_path / "idx")
+    _while_another_thread_holds_its_connection(
+        lambda: s.conn, s.close, lambda conn: conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+    )
+    assert s.get_meta("schema_version") == SCHEMA_VERSION  # the closing thread can still use the store
+
+
+def test_closing_the_vector_cache_leaves_a_running_thread_its_connection(tmp_path):
+    from codemem.vectorcache import VectorCache
+
+    cache = VectorCache(tmp_path / "cache.db")
+    _while_another_thread_holds_its_connection(
+        cache._conn, cache.close, lambda conn: conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+    )
+    cache.put_many("e", ["h"], np.ones((1, 4), dtype=np.float32))
+    assert cache.count("e") == 1

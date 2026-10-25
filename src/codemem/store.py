@@ -417,7 +417,9 @@ class Store:
         self._vec_lock = threading.RLock()
         self._save_lock = threading.Lock()
         self._types: dict[str, _TypeIndex] = {}
-        self._all_conns: list[sqlite3.Connection] = []
+        # Every thread's connection, with its thread: close() must not close one a running thread uses.
+        self._all_conns: dict[int, tuple[threading.Thread, sqlite3.Connection]] = {}
+        self._conns_lock = threading.Lock()
         self._open_schema()
 
     def _schema_version(self) -> int | None:
@@ -468,7 +470,8 @@ class Store:
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=-65536")  # up to 64 MB of pages per connection, as used
             self._local.conn = conn
-            self._all_conns.append(conn)
+            with self._conns_lock:
+                self._all_conns[id(conn)] = (threading.current_thread(), conn)
         return conn
 
     @contextmanager
@@ -523,18 +526,24 @@ class Store:
         conn = getattr(self._local, "conn", None)
         if conn is not None:
             self._local.conn = None
-            if conn in self._all_conns:
-                self._all_conns.remove(conn)
+            with self._conns_lock:
+                self._all_conns.pop(id(conn), None)
             conn.close()
 
     def close(self) -> None:
-        for conn in self._all_conns:
+        """Close this thread's connection and those of threads that have ended. A thread that is
+        still running keeps its own: closing a connection under another thread's query crashes the
+        process (they are opened with check_same_thread=False). It closes with that thread."""
+        me = threading.current_thread()
+        with self._conns_lock:
+            done = [k for k, (thread, _) in self._all_conns.items() if thread is me or not thread.is_alive()]
+            conns = [self._all_conns.pop(k)[1] for k in done]
+        for conn in conns:
             try:
                 conn.close()
             except sqlite3.ProgrammingError:
                 pass
-        self._all_conns.clear()
-        self._local = threading.local()
+        self._local.conn = None
 
     # ---- meta
     def get_meta(self, key: str, default: Any = None) -> Any:
@@ -571,6 +580,17 @@ class Store:
         self.delete_chunks(ids)
         self.conn.execute("DELETE FROM files WHERE path = ?", (path,))
         return ids
+
+    def move_chunks(self, moves: Sequence[tuple[int, int, int, int]]) -> None:
+        """Chunks whose content is unchanged but whose lines moved: (chunk id, new start line, new
+        end line, lines moved). Only the line numbers change: of the chunk, and of its calls (0 is
+        "line unknown" and stays 0). Keyword rows, links and vectors hold no line numbers."""
+        self.conn.executemany(
+            "UPDATE chunks SET start_line = ?, end_line = ? WHERE chunk_id = ?", [(s, e, i) for i, s, e, _ in moves]
+        )
+        self.conn.executemany(
+            "UPDATE calls SET line = line + ? WHERE caller_id = ? AND line > 0", [(d, i) for i, _, _, d in moves]
+        )
 
     # ---- chunks
     def upsert_chunk(self, chunk: Chunk) -> int:
