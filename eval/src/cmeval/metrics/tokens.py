@@ -29,9 +29,10 @@ DEFAULT_MODEL = "claude-opus-5-5"
 BUDGETS = (500, 1000, 2000, 4000, 8000)
 KEYCHAIN_SERVICE = "anthropic-api-key"
 CHARS_PER_TOKEN = 3.5  # rough estimate only; never reported
-# count_tokens has a requests-per-minute limit for each organization. Some accounts allow only
-# 100 per minute (seen 2026-10-23), so stay under that unless told otherwise (CMEVAL_TOKEN_RPM).
-DEFAULT_RPM = 90
+# count_tokens has a requests-per-minute limit for each organization. The project key allows
+# 3,000 or more (12,000 requests in 36 seconds with no refusal, 2026-10-24). Some accounts allow
+# only 100 per minute (seen 2026-10-23): for such a key, set CMEVAL_TOKEN_RPM=90.
+DEFAULT_RPM = 3000
 
 
 def configured_rpm() -> int:
