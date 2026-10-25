@@ -109,3 +109,18 @@ def test_clones_never_convert_line_endings(remote):
     remote.git("--git-dir", str(clone), "config", "core.autocrlf", "true")  # an older clone, or a changed setting
     repos.ensure_clone(REPO)
     assert remote.git("--git-dir", str(clone), "config", "core.autocrlf") == "false"
+
+
+def test_crlf_file_under_an_lf_rule_is_clean_and_keeps_its_bytes(remote):
+    # The file is committed with CRLF first; the LF rule comes later, as in home-assistant.
+    remote.commit({"crlf.py": "a = 1\r\nb = 2\r\n"})
+    (remote.root / ".gitattributes").write_text("*.py text eol=lf\n")
+    remote.git("add", ".gitattributes")  # only this file: "add -A" would store crlf.py again with LF
+    remote.git("commit", "-q", "-m", "LF rule")
+    sha = remote.git("rev-parse", "HEAD")
+    live = checkout(REPO, remote.shas[0], name="run1")
+    move_to(live, sha)
+    assert (live / "crlf.py").read_bytes() == b"a = 1\r\nb = 2\r\n"
+    assert repos.is_clean(live)
+    move_to(live, remote.shas[0])  # the runner can move on
+    assert (repos.clone_path(REPO) / "info" / "attributes").read_text() == repos.RAW_ATTRIBUTES
