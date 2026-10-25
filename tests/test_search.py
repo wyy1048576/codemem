@@ -5,7 +5,7 @@ import pytest
 from codemem.config import VectorConfig
 from codemem.indexer import Indexer
 from codemem.schema import Chunk
-from codemem.search import _pick_top, name_hits, query_names, rrf, search
+from codemem.search import _pick_top, rrf, search
 from codemem.store import Store
 
 QUERY = "disabled users stay logged in"
@@ -118,7 +118,7 @@ def test_end_to_end_nl_query_found_via_usage(index):
     usage_only = search(store, QUERY, cfg, k=3, signals=["usage"], embedder_factory=factory)
     assert "revoke_session" in _quals(usage_only)
     resp = search(store, QUERY, cfg, k=10, debug=True, embedder_factory=factory)
-    assert resp.signals == ["bm25", "name", "code", "usage"]
+    assert resp.signals == ["bm25", "code", "usage"]
     assert "revoke_session" in _quals(resp)
     card = next(r for r in resp.results if r.qualname == "revoke_session")
     assert card.ranks.get("usage") is not None and "bm25" not in card.ranks
@@ -133,80 +133,6 @@ def test_exact_identifier_query_ranks_first(index):
     store, cfg, factory = index
     resp = search(store, "get_user_by_id", cfg, k=5, embedder_factory=factory)
     assert resp.results[0].qualname == "get_user_by_id"
-
-
-# ---- name signal
-
-
-def test_query_names_spots_identifiers_dotted_names_and_word_runs():
-    # Word runs are candidates too; they only matter if a function has that name.
-    assert query_names("why does merge_setting() drop None?") == ["why_does", "merge_setting", "drop_none"]
-    assert query_names("getUserById and HTTPAdapter") == ["getUserById", "HTTPAdapter"]
-    assert query_names("requests.sessions.Session.send fails") == [
-        "requests.sessions.Session.send", "sessions.Session.send", "Session.send",
-    ]
-    assert query_names("get user by id") == ["get_user_by_id", "get_user_by", "get_user", "user_by_id", "user_by", "by_id"]
-    assert query_names("proxy") == [] and query_names("") == []  # one plain word is not a name
-    assert "_private" in query_names("_private helper")
-
-
-@pytest.fixture
-def uncalled(sample_repo, tmp_path, fake_config, recorder):
-    """The fixture repo plus a function nobody calls and a name defined 6 times."""
-    (sample_repo / "auth" / "audit.py").write_text(
-        'def record_audit_event(evt):\n    """Write one audit row for a session change."""\n    return evt\n',
-        encoding="utf-8", newline="\n",
-    )
-    for i in range(6):
-        (sample_repo / f"helpers_{i}.py").write_text("def common_helper(x):\n    return x\n", encoding="utf-8", newline="\n")
-    store = Store(tmp_path / "index")
-    factory = lambda m, c: recorder  # noqa: E731
-    Indexer(sample_repo, store, fake_config, embedder_factory=factory).update()
-    yield store, fake_config, factory
-    store.close()
-
-
-def test_function_without_callers_wins_its_exact_name(uncalled):
-    store, cfg, factory = uncalled
-    for query in ("record_audit_event", "record audit event", "where is record_audit_event called"):
-        resp = search(store, query, cfg, k=5, debug=True, embedder_factory=factory)
-        top = resp.results[0]
-        assert top.qualname == "record_audit_event" and top.ranks["name"] == 1, query
-        assert "usage" not in top.ranks  # no callers, so no usage vector: the case RRF used to lose
-    assert all(r.ranks.get("name") is None for r in resp.results[1:])
-
-
-def test_dotted_name_matches_the_method_even_if_its_name_is_a_plain_word(uncalled):
-    store, cfg, factory = uncalled
-    resp = search(store, "Table.find", cfg, k=3, debug=True, embedder_factory=factory)
-    assert (resp.results[0].qualname, resp.results[0].ranks["name"]) == ("Table.find", 1)
-    assert name_hits(store, "find", cfg) == []  # the bare plain word pins nothing
-
-
-def test_names_defined_too_often_are_not_pinned(uncalled):
-    store, cfg, _ = uncalled
-    assert len(store.definitions_named(["common_helper"])) == 6 > cfg.max_defs_per_name
-    assert name_hits(store, "common_helper", cfg) == []
-    cfg.max_defs_per_name = 6
-    hits = name_hits(store, "common_helper", cfg)
-    assert [store.get_chunk(i).path for i in hits] == [f"helpers_{i}.py" for i in range(6)]  # by location
-
-
-def test_name_signal_respects_path_prefix(uncalled):
-    store, cfg, factory = uncalled
-    resp = search(store, "record_audit_event", cfg, k=5, path_prefix="api/", embedder_factory=factory)
-    assert "record_audit_event" not in _quals(resp)
-
-
-def test_without_the_name_signal_ranking_is_unchanged(uncalled):
-    """Eval systems that list their signals keep their numbers. Weight 0 is the same as no signal."""
-    store, cfg, factory = uncalled
-    query = "record audit event for a session"
-    without = search(store, query, cfg, k=10, signals=["bm25", "code", "usage"], embedder_factory=factory)
-    cfg.rrf_weights = {"name": 0.0}
-    zero = search(store, query, cfg, k=10, embedder_factory=factory)
-    assert [(r.chunk_id, r.score) for r in without.results] == [(r.chunk_id, r.score) for r in zero.results]
-    assert "name" not in without.signals
 
 
 def test_signal_selection_and_validation(index):

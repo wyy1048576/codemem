@@ -11,21 +11,18 @@ SERVER_NAME = "codemem"
 _SEARCH_CODE = {
     "none": (
         "Search this repository's functions by natural-language or identifier query. "
-        "Returns ranked functions with file:line, signature and a short preview. Functions the "
-        "query names exactly come first."
+        "Returns ranked functions with file:line, signature and a short preview."
     ),
     "light": (
         "Use search_code to locate code relevant to an issue, bug or feature, especially when you "
         "don't know exact identifiers. Returns ranked functions with file:line, signature and a "
-        "short preview. A function named exactly in the query (`merge_setting`, `Session.send`) "
-        "comes first. Prefer this over grep for exploratory search; use grep for exact strings."
+        "short preview. Prefer this over grep for exploratory search; use grep for exact strings."
     ),
     "strong": (
         "Use search_code FIRST to locate code relevant to an issue, bug or feature, especially when "
         "you don't know exact identifiers. It combines keyword and semantic search over every "
         "function, including who calls it and which tests cover it, and returns ranked functions "
-        "with file:line. A function named exactly in the query (`merge_setting`, `Session.send`) "
-        "comes first. Always try this before grep/find for exploratory search; use grep only for "
+        "with file:line. Always try this before grep/find for exploratory search; use grep only for "
         "exact strings. Then call get_chunk on promising results instead of reading whole files."
     ),
 }

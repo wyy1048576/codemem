@@ -71,7 +71,7 @@ class CodememRetriever:
         # config_from_dict only: no ~/.codemem/config.toml, no .codemem.toml, no env vars.
         self.config = config_from_dict(config or {})
         if self.signals is not None:
-            usable = {"bm25", "name", *self.config.enabled_vec_types()}
+            usable = {"bm25", *self.config.enabled_vec_types()}
             unknown = [s for s in self.signals if s not in usable]
             if unknown or not self.signals:
                 raise RetrieverError(

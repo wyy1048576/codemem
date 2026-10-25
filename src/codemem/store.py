@@ -519,21 +519,6 @@ class Store:
             out.setdefault(r[0], []).append(Ref(r[1], r[2], r[3], r[4], r[5]))
         return out
 
-    def definitions_named(self, names: Iterable[str]) -> list[tuple[int, str, str, str, int]]:
-        """(chunk_id, name, qualname, path, start_line) of every function or method with one of these bare names."""
-        names = list(dict.fromkeys(names))
-        out: list[tuple[int, str, str, str, int]] = []
-        for start in range(0, len(names), 500):
-            batch = names[start : start + 500]
-            marks = ",".join("?" * len(batch))
-            rows = self.conn.execute(
-                "SELECT chunk_id, name, qualname, path, start_line FROM chunks "
-                f"WHERE kind != 'file_header' AND name IN ({marks})",
-                batch,
-            )
-            out.extend((r[0], r[1], r[2], r[3], r[4]) for r in rows)
-        return out
-
     def inbound_by_file(self) -> dict[str, tuple[int, int]]:
         """path -> (other files calling into it, calls from those files). Same-file calls don't count."""
         rows = self.conn.execute(

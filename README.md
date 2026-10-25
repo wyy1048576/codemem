@@ -36,7 +36,7 @@ codemem status
 |---|---|
 | `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--write-agent-notes] [--dry-run] [-y]` | Register with agents, then index |
 | `codemem index [PATH] [--full] [--json]` | Build or incrementally update the index |
-| `codemem search QUERY [-k 10] [--signals bm25,name,code,usage] [--path-prefix DIR] [--json] [--debug]` | Search |
+| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--json] [--debug]` | Search |
 | `codemem status [PATH] [--json]` | Counts, models, indexed commit, staleness |
 | `codemem watch [PATH]` | Foreground watcher: re-index on save |
 | `codemem mcp [PATH]` | MCP server over stdio (what agents launch) |
@@ -81,18 +81,12 @@ walk .py files (respects .gitignore) -> tree-sitter chunks (one per function/met
   -> call graph (name heuristic) -> texts per chunk: code, usage (callers/tests)
   -> embed each text type into its own FAISS index (jina-code-embeddings-0.5b)
   -> SQLite: chunks, FTS5 (pre-tokenized, weighted BM25), calls/edges, embedding hashes
-search: BM25 top-N + exact-name hits + vector top-N per enabled set -> RRF (k=60) -> result cards
+search: BM25 top-N + vector top-N per enabled set -> RRF (k=60) -> result cards
 ```
 
 - **Incremental updates** re-chunk only changed files (content hash, mtime pre-check), rebuild
   all texts, and re-embed only the texts whose hash changed. Renaming a caller therefore
   refreshes the callee's usage vector and leaves its code vector alone.
-- **Exact names:** the `name` signal finds functions the query names exactly: `merge_setting`,
-  `Session.send`, or plain words that join into one ("merge setting"). Single plain words don't
-  count, and names defined more than `max_defs_per_name` times are skipped. Its default RRF
-  weight (100) puts those functions first. Without it, a function with no callers (no usage
-  vector) loses exact-name queries to functions that all three other signals rank moderately.
-  `[rrf] weights = { name = 1.0 }` makes it an ordinary vote.
 - **Ablations:** pick the signals per query (`--signals bm25,usage`). Each vector set can be
   enabled or disabled, or given its own model, in the config.
 - **Crash safety:** each `vec_<type>.faiss` has an `ids.json` sidecar. If an update is
