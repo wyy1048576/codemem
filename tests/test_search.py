@@ -245,7 +245,7 @@ def test_default_weights_are_neutral_and_a_config_can_set_them():
     assert config_from_dict({"kind_weights": {"class": 0.5}}).kind_weights == {"class": 0.5}
 
 
-def test_long_queries_keep_their_rarest_words_for_bm25(index):
+def test_bm25_queries_drop_stopwords_and_optionally_common_words(index):
     from codemem.search import bm25_match
 
     store, cfg, _ = index
@@ -253,10 +253,11 @@ def test_long_queries_keep_their_rarest_words_for_bm25(index):
     assert bm25_match(store, "the", cfg) == '"the"'  # only stopwords: kept after all
     filler = " ".join(f"zzword{i}" for i in range(40))  # words no chunk has
     long_q = f"{filler} revoke session user table insert delete login logout token disable"
+    assert "zzword0" in bm25_match(store, long_q, cfg)  # by default nothing else is dropped
+    cfg.bm25_common_share = 0.5  # opt-in, for a long query: words the index lacks, and very common ones
     words = bm25_match(store, long_q, cfg).split(" OR ")
-    assert not any("zzword" in w for w in words)  # 51 words, so the long-query rule applied
-    assert '"revoke"' in words and len(words) <= cfg.bm25_query_terms
     docs = store.term_doc_counts(w.strip('"') for w in words)
-    assert all(docs.get(w.strip('"')) for w in words)  # every kept word is in the index
-    cfg.bm25_query_terms = 0  # v2: every word, stopwords too
+    total = store.chunk_total()
+    assert '"revoke"' in words and all(0 < docs.get(w.strip('"'), 0) <= 0.5 * total for w in words)
+    cfg.bm25_common_share, cfg.bm25_query_terms = 0.0, 0  # v2: every word, stopwords too
     assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "the" OR "session"'

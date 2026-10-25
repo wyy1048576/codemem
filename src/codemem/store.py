@@ -883,6 +883,13 @@ class Store:
         return sorted(self.get_chunks(ids).values(), key=lambda c: (c.path, c.start_line))
 
     # ---- BM25
+    def chunk_total(self) -> int:
+        """How many chunks the keyword index holds (its small per-row table, not `chunks`)."""
+        try:
+            return self.conn.execute("SELECT COUNT(*) FROM fts_docsize").fetchone()[0]
+        except sqlite3.OperationalError:
+            return self.conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+
     def term_doc_counts(self, terms: Iterable[str]) -> dict[str, int]:
         """How many chunks hold each term, from the FTS vocabulary (no posting lists are read)."""
         out: dict[str, int] = {}

@@ -109,7 +109,10 @@ class Config:
     bm25_weights: tuple[float, ...] = (10.0, 3.0, 5.0, 2.0, 1.0)
     bm25_stem: bool = False
     bm25_stopwords: bool = False
-    bm25_query_terms: int = 32  # search-time: a query keeps its rarest words, stopwords dropped; 0 = all (v2)
+    bm25_query_terms: int = 32  # search-time: queries drop stopwords; 0 = keep every word (v2)
+    bm25_common_share: float = 0.0  # opt-in: a query over bm25_query_terms words also drops words in more
+    # than this share of chunks: a 250-word query on vLLM takes 0.11 s instead of 0.36 s, but on the dev
+    # tasks keyword-only file MRR fell from 0.453 to 0.378 at 0.05 (docs/decisions.md, D32)
     rrf_k: int = 60
     rrf_weights: dict[str, float] = field(default_factory=dict)  # signal -> weight, default 1.0
     candidates: int = 50  # top-N per signal before RRF
@@ -264,6 +267,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         bm25_stem=bm25.get("stem"),
         bm25_stopwords=bm25.get("stopwords"),
         bm25_query_terms=bm25.get("query_terms"),
+        bm25_common_share=bm25.get("common_share"),
         rrf_k=rrf.get("k"),
         rrf_weights=rrf.get("weights"),
         max_defs_per_name=usage.get("max_defs_per_name"),

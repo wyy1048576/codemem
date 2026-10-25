@@ -192,20 +192,23 @@ TEST_FILTERS = ("include", "exclude", "only")
 
 
 def bm25_match(store: Store, query: str, config: Config) -> str | None:
-    """The query's words for BM25 (decisions D32): stopwords dropped (a query of stopwords only
-    keeps them), and of a long query only the `bm25_query_terms` words fewest chunks have. Common
-    words add almost nothing to the score, but their long posting lists made a 250-word query
-    take 0.6 s on vLLM. Words the index lacks match nothing, so they go too. The index is
-    unchanged. `bm25_query_terms = 0` keeps every word, as v2 did."""
+    """The query's words for BM25 (decisions D32). Stopwords are dropped (a query of stopwords
+    only keeps them). A long query, over `bm25_query_terms` words, also drops the words the index
+    lacks and the words more than `bm25_common_share` of chunks contain: their long posting lists
+    made a 250-word query take 0.6 s on vLLM, and they weigh almost nothing. Rare words are not
+    preferred: in an issue text they are often noise (versions, URLs, the reporter's own names),
+    and keeping only the 32 rarest cost keyword search a third of its file MRR on the dev tasks.
+    `bm25_query_terms = 0` keeps every word, as v2 did. The index is unchanged."""
     limit = config.bm25_query_terms
     if limit <= 0:
         return fts_or(tokenize(query, stem=config.bm25_stem, stopwords=config.bm25_stopwords))
     words = list(dict.fromkeys(tokenize(query, stem=config.bm25_stem, stopwords=True)))
     if not words:
         words = list(dict.fromkeys(tokenize(query, stem=config.bm25_stem, stopwords=False)))
-    if len(words) > limit:
+    if len(words) > limit and config.bm25_common_share > 0:
         docs = store.term_doc_counts(words)
-        words = sorted((w for w in words if docs.get(w)), key=lambda w: (docs[w], w))[:limit]
+        most = config.bm25_common_share * max(store.chunk_total(), 1)
+        words = [w for w in words if 0 < docs.get(w, 0) <= most] or words
     return fts_or(words)
 
 

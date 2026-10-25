@@ -121,7 +121,8 @@ model = "jinaai/jina-code-embeddings-0.5b"
 enabled = false              # slot only
 
 [bm25]
-query_terms = 32             # search-time: a query keeps its 32 rarest words, stopwords dropped; 0 = all
+query_terms = 32             # search-time: queries drop stopwords (0 = keep every word, as v2)
+common_share = 0.0           # opt-in: a query over 32 words also drops words in more than this share of chunks (faster, less accurate)
 weights = [10.0, 3.0, 5.0, 2.0, 1.0]   # name, path, signature, doc, body (v1 triples accepted)
 [rrf]
 k = 60
