@@ -122,9 +122,10 @@ def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...]
     try:
         texts = sorted({h["text"] for name in lines for line in lines[name] for h in line["hits"]})
         status.stage("counting tokens")
-        status.total(len(texts), "texts")
+        countable = sum(1 for t in texts if t)  # an empty text has 0 tokens and is not counted
+        status.total(countable, "texts")
         counts = dict(zip(texts, counter.count(texts)))
-        status.set_done(len(texts))
+        status.set_done(countable)
         overhead = counter.overhead if isinstance(counter, AnthropicCounter) else None
     finally:
         if own_counter and isinstance(counter, AnthropicCounter):

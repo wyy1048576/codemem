@@ -8,6 +8,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import __version__
+from .dashboard import DEFAULT_PORT
 from .tasks import TaskError, load_tasks
 
 MAX_PROBLEMS_SHOWN = 50
@@ -111,7 +112,7 @@ def cmd_run(args) -> int:
             print(f"run {args.run_id}: {exc}", file=sys.stderr)
             status.fail(str(exc))
             return 1
-        status.result(searched=summary.searched, already_done=summary.skipped, index_calls=summary.index_calls)
+        status.result(searches=summary.searched, searches_already_done=summary.skipped, index_calls=summary.index_calls)
     print(f"run {args.run_id}: {summary.run_dir}")
     print(f"  {summary.tasks} tasks x {summary.systems} systems: {summary.searched} searches done, "
           f"{summary.skipped} already done, {summary.index_calls} index calls, {summary.seconds:.1f} s")
@@ -244,6 +245,10 @@ def cmd_repo_stats(args) -> int:
         try:
             results = collect_stats(gh, candidates, since, until, functions=args.functions,
                                     min_python_share=args.min_python_share, progress=progress, status=status)
+        except ValueError as exc:  # a bad value from GitHub, as before the status file
+            print(f"repo-stats: {exc}", file=sys.stderr)
+            status.fail(str(exc))
+            return 1
         except (RepoStatsError, GitHubError) as exc:
             print(exc, file=sys.stderr)
             status.fail(str(exc))
@@ -428,7 +433,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_repo_stats)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
-    p.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")
+    p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
     p.add_argument("--open", action="store_true", help="open the page in the web browser")
     p.set_defaults(func=cmd_dashboard)
 

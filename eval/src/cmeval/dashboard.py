@@ -21,11 +21,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .paths import status_dir
-from .status import pid_alive, read_all
+from .status import STALE_SECONDS, is_over, read_all
 
 DEFAULT_PORT = 8765
 RECENT = 10  # finished, failed, or stopped jobs shown under the running ones
-STALE_SECONDS = 60  # a running job with no update for this long has stopped (killed, or the machine slept)
+LOCAL_HOSTS = {"127.0.0.1", "localhost"}
 STATIC = Path(__file__).parent / "static"
 FILES = {
     "/": ("dashboard.html", "text/html; charset=utf-8"),
@@ -34,21 +34,12 @@ FILES = {
 }
 
 
-def _age(job: dict, now: datetime) -> float | None:
-    try:
-        return (now - datetime.fromisoformat(job["updated"])).total_seconds()
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
 def job_view(job: dict, now: datetime) -> dict:
-    """The job as the page shows it. A "running" job whose process is gone, or that has not
-    written for STALE_SECONDS, is shown as "stopped". The file itself is not changed."""
+    """The job as the page shows it. A "running" job that is over (status.is_over: its process is
+    gone, or it has not written for STALE_SECONDS) is shown as "stopped". The file is not changed."""
     view = dict(job)
-    if job.get("state") == "running":
-        age = _age(job, now)
-        if not pid_alive(int(job.get("pid") or 0)) or age is None or age > STALE_SECONDS:
-            view["state"] = "stopped"
+    if job.get("state") == "running" and is_over(job, now):
+        view["state"] = "stopped"
     return view
 
 
@@ -69,6 +60,13 @@ def make_server(port: int = DEFAULT_PORT, folder: Path | None = None) -> Threadi
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802 - the name http.server asks for
+            # A web page on another site can point its own name at 127.0.0.1 (DNS rebinding) and then
+            # read this server as if it were that site. The browser still sends that site's name in
+            # Host, so only the local names are answered.
+            host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
+            if host not in LOCAL_HOSTS:
+                self._send(403, "text/plain; charset=utf-8", b"forbidden: open the dashboard as 127.0.0.1 or localhost\n")
+                return
             path = self.path.split("?", 1)[0]
             if path == "/api/jobs":
                 body = json.dumps(jobs_payload(folder)).encode("utf-8")

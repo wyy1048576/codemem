@@ -314,6 +314,7 @@ def test_status_counts_tasks_and_repos(setup):
         run(tasks_file, config_file, "r1", limit_per_repo=2, status=status)
     data = json.loads(status.path.read_text())
     assert (data["state"], data["done"], data["total"], data["unit"]) == ("done", 2, 2, "tasks")
+    assert data["retries"] is None  # a run has no retry count; the page shows "-"
     assert data["parts"] == {"acme/demo": {"done": 2, "total": 2}}
     with JobStatus("run", "r1", interval=60) as status:  # resume: 2 done before, 1 new
         run(tasks_file, config_file, "r1", status=status)
@@ -327,6 +328,6 @@ def test_cli_run_writes_a_status_file(setup, capsys):
     assert main(["run", "--tasks", str(tasks_file), "--config", str(smoke), "--run-id", "cli1"]) == 0
     assert main(["run", "--tasks", str(tasks_file), "--config", str(smoke), "--run-id", "bad id"]) == 1
     jobs = {job["name"]: job for job in read_all(status_dir())}
-    assert jobs["cli1"]["state"] == "done" and jobs["cli1"]["result"]["searched"] == 6
+    assert jobs["cli1"]["state"] == "done" and jobs["cli1"]["result"]["searches"] == 6
     assert "[repo 1/1] acme/demo  task 3/3  acme__demo-1" in jobs["cli1"]["log"]
     assert jobs["bad id"]["state"] == "failed" and "run id" in jobs["bad id"]["error"]

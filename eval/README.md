@@ -63,7 +63,8 @@ The page at `http://127.0.0.1:8765/` shows each running job: its stage, a progre
 
 - Each job writes one status file in `CMEVAL_HOME/status/` every 2 seconds. The newest 20 finished files are kept.
 - The dashboard only reads these files. It cannot change or stop a job. It listens on 127.0.0.1 only.
-- A job shows as "stopped" when its process is gone or it has not written for 60 seconds (for example after `kill -9`, or when the machine sleeps).
+- A job shows as "stopped" when its process is gone or it has not written for 60 seconds (for example after `kill -9`, or when the machine sleeps). A job that spends more than 60 seconds in one call of a C library that holds Python's lock could also show as "stopped" until the call ends.
+- The page answers only to the names 127.0.0.1 and localhost, so a web page from another site cannot read it.
 - A failed status write never stops a job. The run files (`meta.json` and the results) stay the record.
 - Jobs started from a cmeval commit before the dashboard write no status file, so they do not show.
 

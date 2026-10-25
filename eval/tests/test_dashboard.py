@@ -83,6 +83,18 @@ def test_server_routes(server):
     assert info.value.code == 404
 
 
+def test_server_refuses_other_host_names(server):
+    url, _ = server
+    port = url.rsplit(":", 1)[1]
+    request = urllib.request.Request(url + "/api/jobs", headers={"Host": f"evil.example:{port}"})
+    with pytest.raises(urllib.error.HTTPError) as info:
+        urllib.request.urlopen(request, timeout=5)
+    assert info.value.code == 403
+    request = urllib.request.Request(url + "/api/jobs", headers={"Host": f"localhost:{port}"})
+    with urllib.request.urlopen(request, timeout=5) as response:
+        assert response.status == 200
+
+
 def test_server_has_no_route_that_writes(server):
     url, _ = server
     request = urllib.request.Request(url + "/api/jobs", data=b"{}", method="POST")

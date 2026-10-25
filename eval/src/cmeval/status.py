@@ -10,7 +10,7 @@ change a job. The job's own files (meta.json, results) stay the record.
 File <job>-<UTC start, to the millisecond>-<pid>.json:
     job, name, argv, pid, started, updated, ended, state ("running", "done", "failed"), error,
     stage, done, total, unit, rate (units per minute), eta_seconds, parts {name: {done, total}},
-    retries, result {key: value}, log (the last progress lines)
+    retries (None if the job has no retry count), result {key: value}, log (the last progress lines)
 """
 
 from __future__ import annotations
@@ -26,13 +26,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .files import now, write_json
+from .files import now, write_text_atomic
 from .paths import status_dir
 
 WRITE_INTERVAL = 2.0  # seconds between writes
 KEEP_FINISHED = 20  # finished status files kept; older ones are deleted when a job starts
 LOG_LINES = 10
 RATE_WINDOW = 300.0  # the speed is measured over the last 5 minutes of this session
+STALE_SECONDS = 60  # a running job with no write for this long is over (killed, or the machine slept)
+TMP_MAX_AGE = 3600  # seconds; a temp file this old is left from a write that was stopped
 
 
 def pid_alive(pid: int) -> bool:
@@ -121,7 +123,7 @@ class JobStatus(NullStatus):
             "job": job, "name": name, "argv": sys.argv[1:], "pid": os.getpid(),
             "started": started.isoformat(timespec="milliseconds"), "updated": None, "ended": None,
             "state": "running", "error": None, "stage": "", "done": 0, "total": None, "unit": None,
-            "rate": None, "eta_seconds": None, "parts": {}, "retries": 0, "result": {}, "log": [],
+            "rate": None, "eta_seconds": None, "parts": {}, "retries": None, "result": {}, "log": [],
         }
 
     # ---- context manager
@@ -144,7 +146,7 @@ class JobStatus(NullStatus):
         with self._lock:
             if exc_type is not None:
                 self.data["state"] = "failed"
-                self.data["error"] = f"{exc_type.__name__}: {exc}".rstrip(": ")
+                self.data["error"] = f"{exc_type.__name__}: {exc}" if str(exc) else exc_type.__name__
             elif self.data["state"] == "running":
                 self.data["state"] = "done"
             self.data["ended"] = now()
@@ -163,6 +165,8 @@ class JobStatus(NullStatus):
 
     def total(self, n: int, unit: str | None = None) -> None:
         with self._lock:
+            if self._session_done == 0:
+                self._base = (self.clock(), 0)  # the speed starts with the counted work, not with the setup
             self.data["total"] = n
             if unit is not None:
                 self.data["unit"] = unit
@@ -234,8 +238,8 @@ class JobStatus(NullStatus):
                 rate, eta = self._speed() if self.data["state"] == "running" else (self.data["rate"], None)
                 self.data.update(updated=now(), rate=None if rate is None else round(rate, 2),
                                  eta_seconds=None if eta is None else round(eta), log=list(self._log))
-                snapshot = json.loads(json.dumps(self.data, default=str))
-            write_json(self.path, snapshot)
+                text = json.dumps(self.data, indent=2, ensure_ascii=False, default=str) + "\n"
+            write_text_atomic(self.path, text)
         except Exception:  # noqa: BLE001 - a view only; the job goes on
             pass
 
@@ -256,13 +260,29 @@ def read_all(folder: Path | None = None) -> list[dict]:
     return jobs
 
 
-def finished(job: dict) -> bool:
-    """True if the job will not change again: it ended, or its process is gone."""
-    return job.get("state") != "running" or not pid_alive(int(job.get("pid") or 0))
+def is_over(job: dict, now: datetime | None = None) -> bool:
+    """True if the job will not change again: it ended, its process is gone, or it has not written
+    for STALE_SECONDS (killed, or the machine slept). The dashboard and prune use this one rule."""
+    if job.get("state") != "running":
+        return True
+    if not pid_alive(int(job.get("pid") or 0)):
+        return True
+    try:
+        updated = datetime.fromisoformat(job["updated"])
+    except (KeyError, TypeError, ValueError):
+        return True
+    return ((now or datetime.now(timezone.utc)) - updated).total_seconds() > STALE_SECONDS
 
 
 def prune(folder: Path, keep: int = KEEP_FINISHED) -> None:
-    """Delete finished status files beyond the newest `keep`. Running jobs are never deleted."""
-    done = [job for job in read_all(folder) if finished(job)]
-    for job in done[keep:]:
+    """Delete finished status files beyond the newest `keep`, and old temp files from stopped writes.
+    Running jobs are never deleted."""
+    over = [job for job in read_all(folder) if is_over(job)]
+    for job in over[keep:]:
         (folder / job["file"]).unlink(missing_ok=True)
+    for tmp in folder.glob("*.json.tmp"):
+        try:
+            if time.time() - tmp.stat().st_mtime > TMP_MAX_AGE:
+                tmp.unlink()
+        except OSError:
+            pass
