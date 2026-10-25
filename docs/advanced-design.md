@@ -1,16 +1,96 @@
 # Advanced design: where codemem goes after the baseline
 
-**Status:** proposal only. Nothing here is implemented. It builds on the v2 baseline
-([architecture.md](architecture.md), [data-model.md](data-model.md)) and is evaluated with
-Andrew's harness (`eval/`).
+**Status:** proposal only; nothing here is implemented. It builds on the v3 core
+([architecture.md](architecture.md), [data-model.md](data-model.md)), which comes first, and is
+evaluated with Andrew's harness (`eval/`).
 
 **Inputs:**
-- a sweep of all 47 Exa blog posts (Oct 23, 2026), adding to the earlier `EXA_NOTES.md`
-- the multi-vector and code-retrieval literature up to Oct 2026
-- the dev50 results of the MVP
-- what the v2 work showed
+- all 47 Exa blog posts (Oct 23, 2026), summarized in [exa.md](exa.md);
+- the multi-vector and code-retrieval literature up to Oct 2026;
+- the dev50 results of the MVP;
+- what the v2 work showed.
 
 Numbers from papers are as reported there; anything marked *(est.)* is my own arithmetic.
+
+---
+
+## Research questions (from the project plan)
+
+**The question.** Using Exa's ideas, how **smart** (accurate) and how **cheap** (small, fast,
+few tokens) can a local code search tool get at finding the code a coding agent needs?
+
+**Why it's open.**
+- **Embedders are trained for the wrong task.** They learn to match docstrings to code, but agents
+  search with bug reports or a few keywords.
+  - Qwen3-Embedding-8B scores 71.7 nDCG@10 on classic code search, but 20.3 when finding the code
+    edited for an issue (CORE-Bench).
+  - Short keyword queries drive embedders to near zero (CoREB), so keyword search must stay in the
+    mix.
+- **Training on the right task matters more than size.** A 137M embedder fine-tuned on issues
+  (SweRankEmbed-Small) puts the right function in its top 10 for 74.5% of SWE-bench Lite issues.
+  The same-size CodeRankEmbed gets 58.8%, and BM25 gets 36.9%.
+- **When done right, it helps agents.**
+  - A code index raised the resolve rate from 45.3% to 50.4% and cut the cost per solved task
+    from $2.92 to $2.30, compared with ripgrep ("Code Isn't Memory").
+  - Semantic search helped small agents: file-level F1 34.5 vs 18.8 with grep.
+- **Tools that already exist:**
+  - claude-context (−39% tokens on 30 tasks);
+  - Semble (CPU-only static embeddings + BM25);
+  - ColGREP / LateOn-Code (multi-vector + trigram search);
+  - ck, mgrep, Serena.
+
+  Most use general-purpose embedders and measure informally. The tool isn't new; the research is.
+
+| RQ | Question | Hypothesis (thresholds to agree as a team) |
+|---|---|---|
+| RQ1, accuracy | Do usage context (call sites, tests, commits) and Exa-style multi-signal retrieval beat the hybrid baseline and grep on Recall@k and MRR? Which parts contribute most? | H1: usage fields add ≥ 3 points of function Acc@5 over code-only, mostly on vague issues. H2: per-repo training (next-reference prediction, idea 4) adds ≥ 3 more |
+| RQ2, tokens and a cheap index | How many tokens does an agent spend before reaching the right code, with codemem vs grep? How small and fast can the index get before it misses? | H3: 256 numbers × 1 bit with rescoring keeps ≥ 98% of full accuracy at ≥ 30× less memory; a static first pass cuts CPU indexing time ≥ 10× at ≤ 2 points of accuracy |
+| RQ3, time | Query, indexing and update latency (save → searchable); does end-to-end task time drop? | a query under about 0.5 s and an update under about 1 s on a laptop (the v3 core's targets) |
+| Final check (H4) | Real agents, same budget, only the tool changes: grep alone vs grep + codemem | the same or better localization at a lower billed cost (tokens, turns, cost, whether the agent opened the right files) |
+
+**Evaluation plan.**
+- **Metrics:**
+  - Recall@k, Acc@k (all gold in the top k), Precision@k, MRR, at function and file level;
+  - tokens (`tokens_to_first`, recall@budget);
+  - latency (p50, p95; indexing; save → searchable);
+  - for agent runs: tokens, billed cost, turns, and how often the agent used the tool.
+- **Two query styles:**
+  - the full issue text, which is what benchmarks use;
+  - short agent-style queries of 3–8 words, which is what agents type, and where embedders break.
+
+  Today's eval has only the first. The second is the change highlighted in
+  [decisions.md](decisions.md) §3.
+- **Benchmarks:**
+
+  | Benchmark | Languages | Use |
+  |---|---|---|
+  | SWE-bench Lite / Verified (dev50 in use) | Python | the main set; sanity check against SweRank's numbers |
+  | LocBench | Python | newer, less contaminated |
+  | SWE-bench Multilingual | 9 | other languages |
+  | Multi-SWE-bench (flash) | 7 | other languages |
+  | SWE-PolyBench Verified | 4 | other languages |
+  | CORE-Bench | many | issue-to-edit, large |
+  | CoIR / CodeSearchNet | 6+ | quick embedder sanity checks only |
+  | Exa WebCode (Highlights, RAG) | docs | stretch: plug our retriever into Exa's harness |
+
+- **Baselines:**
+  - the grep agent, BM25 and the dev-tuned grep;
+  - CodeRankEmbed, SweRankEmbed-Small, Qwen3-Embedding-0.6B;
+  - Semble, LateOn-Code / ColGREP, SPLADE-Code, claude-context.
+- **Rules:**
+  - mine pairs, tests and commits only from before the issue's commit;
+  - check SweRank's training repos against ours;
+  - a memory filter (drop tasks a model solves from the issue alone);
+  - bootstrap CIs;
+  - change only the tool between runs.
+- **Agent harness:** mini-SWE-agent with codemem as a command; `claude --bare -p --output-format
+  json`; `codex exec --json`. A 10-task pilot first, then a hard spending cap.
+
+**Risks:**
+- **RQ1 gains turn out small.** That's still a result, and RQ2 stands on its own.
+- **SweRankEmbed-Small is non-commercial.** Ship an MIT or Apache model.
+- **Contamination.** Use LocBench, newer sets and the memory filter.
+- **Agents ignore the tool.** Use instructions, and measure adoption.
 
 ---
 
@@ -57,14 +137,14 @@ Two warnings frame everything:
 - **Non-target code crowds results.**
   - On the fixture, a test helper class (`FakeUser`) became a callee of the test that mentions "disabled user". It took rank 2, and `revoke_session` fell from 4 to 7.
   - On `requests`, exception classes (`ConnectTimeout`, `RetryError`) outrank `HTTPAdapter.send` for "retry a request when the connection fails".
-  - Down-weighting tests or showing only functions restores the order. On 13 dev tasks, halving the scores of tests, classes and blocks made 4 tasks better at function level and none worse, so it is now the default ([baseline-v2-diff.md](baseline-v2-diff.md) §5.3).
+  - Down-weighting tests or showing only functions restores the order. On 13 dev tasks, halving the scores of tests, classes and blocks made 4 tasks better at function level and none worse, so it became v2's default. v3 makes the default neutral again, because that gain came from the eval never counting tests as answers ([decisions.md](decisions.md), D24). Grouping results is the alternative being considered (decisions §3).
 - **Long issues are noisy queries.**
   - Median issue length on dev50 is 1,444 characters, and the longest is 24,769 (stack traces, logs, code).
   - BM25 ORs every token, and the embedder truncates the query at 1,024 tokens.
   - Ideas 2 and 3 (query-side compression) both target this.
 
 **What the 13 local dev tasks show, task by task** (v2 default; numbers in
-[baseline-v2-diff.md](baseline-v2-diff.md) §5.3).
+[decisions.md](decisions.md) §4).
 
 - Of 12 tasks with function gold, v2 puts a gold function in the top 10 for 8, and every gold function for 7 (success@10 0.583).
 - The 4 misses (seaborn-3069, flask-5014, pytest-5787, pytest-7324) and one near-miss (pytest-10081) fall into four patterns. Each points at an idea below.
@@ -73,7 +153,7 @@ Two warnings frame everything:
 |---|---|---|---|
 | **The issue names the fix site, and retrieval still misses it** | seaborn-3069: the issue says *"Probably straightforward to do in `Plotter._finalize_figure`"*, a gold function. It is not in the top 50 of v2, and not in BM25's either. pytest-7324: the reproducer calls `Expression.compile("False")`, in the gold file. It ranks 16. | In an issue of 1,187 characters, BM25 splits the dotted name into common words (`plotter`, `finalize`, `figure`), and the dense query is about scales. | Idea 2: route dotted names, stack frames and error strings to an exact symbol lookup that fusion cannot bury. |
 | **The issue describes a symptom; the fix sits elsewhere** | seaborn-3069: `Nominal._setup` ranks 2, but the fix is in its caller `Plotter._setup_scales` (rank 48). pytest-5787: the chained-exception *display* code ranks top, but the fix is in report *serialization* (`BaseReport._to_json` / `_from_json`, not in the top 50). pytest-7324: the issue is about a compiler crash; the fix is in the parser's `not_expr`. | The retriever finds the code that the issue talks about. The fix is in a caller, a producer or a serializer of that code. | Idea 1: anchors, i.e. what callers and tests say about a function. Also a 1-hop expansion of the top hits along call edges (the callers of `Nominal._setup` include `Plotter._setup_scales`), and the reranker of idea 2. |
-| **Tests that reproduce the issue outrank the code** | pytest-10081: three `test_unittest.py` tests took ranks 1, 3 and 5. Without weights the gold `TestCaseFunction.runtest` ranked 16; with tests ×0.5 it ranks 7. pytest-5787: 4 of the top 6 were tests. | A reproducing test shares the issue's words and code snippets. | Tests ×0.5 (now the default). Idea 1 treats a test as an anchor of the code it calls, not as a competitor. |
+| **Tests that reproduce the issue outrank the code** | pytest-10081: three `test_unittest.py` tests took ranks 1, 3 and 5. Without weights the gold `TestCaseFunction.runtest` ranked 16; with tests ×0.5 it ranks 7. pytest-5787: 4 of the top 6 were tests. | A reproducing test shares the issue's words and code snippets. | Tests ×0.5 (v2's default; neutral in v3, see decisions D24). Idea 1 treats a test as an anchor of the code it calls, not as a competitor. |
 | **The class and its siblings compete with the method** | flask-5014, *"Require a non-empty name for Blueprints"*: the class `Blueprint` ranked 1 and three of its methods 2–4. The gold `Blueprint.__init__` ranked 24 without weights and 17 with classes ×0.5. | The skeleton and every method match "Blueprint". Nothing says the check belongs in the constructor. | A reranker that reads the code (idea 2); several vectors per function (idea 3), so a long constructor is matched by its validation lines. |
 
 Two cautions:
@@ -493,7 +573,8 @@ FAISS is derived. So the whole grid runs from one embedding pass:
 
 | When | Do | Decide |
 |---|---|---|
-| Week of Oct 26 | full dev50 v2 results on a fast machine (confirms the weights chosen on 13 tasks); window and header ablations (E-A0); exact-lookup routing first (§1: the cheapest fix) | v2 defaults (decisions D12) |
+| First | the v3 core: incremental updates, freshness, coverage, API embedders, MCP ([architecture.md](architecture.md) §8); a regression check on the existing dev tasks | nothing: robustness first |
+| Then | the vague-question eval (decisions §3); full dev50 on a fast machine; window and header ablations (E-A0); exact-lookup routing (§1: the cheapest fix) | defaults for v3 tuning |
 | Oct 27 checkpoint | report v2 vs MVP vs grep; this proposal | which two ideas to pursue first |
 | Oct 27 – Nov 9 | idea 2 (routing signals) + idea 1 step 1 (call sites, tests, commits); E-A1, E-A2 | is multi-vector worth GPU time? (E-A2 gate) |
 | Nov 10 – 23 | idea 4 training on GPU (cross-repo LoRA + Matryoshka); E-A3; idea 6 grid; highlights metric | the paper's main claim |
@@ -551,6 +632,22 @@ FAISS is derived. So the whole grid runs from one embedding pass:
 - SPLADE-Code (2603.22008)
 - Code Isn't Memory (2606.22417)
 - Small Agents with Semantic Search (2610.05099)
+
+**Industry and tools**
+- [Cursor: semantic search](https://cursor.com/blog/semsearch) (+12.5% agent accuracy) and [secure codebase indexing](https://cursor.com/blog/secure-codebase-indexing)
+- [B. Cherny on Claude Code dropping RAG for agentic search](https://x.com/bcherny/status/2017824286489383315)
+- [Codex: prefer `rg`](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/prompts/base_instructions/default.md); [semantic index request #5181](https://github.com/openai/codex/issues/5181)
+- [claude-context](https://github.com/zilliztech/claude-context)
+- [Semble](https://github.com/MinishLab/semble)
+- [ColGREP / LateOn-Code](https://github.com/lightonai/next-plaid/blob/main/colgrep/README.md)
+
+**More code retrieval and maintenance**
+- Meta-RAG on large codebases (2508.02611)
+- RepoDoc, incremental documentation (2604.26523)
+- Anchor-DR, anchor text → page training (2305.05834)
+- Craswell et al. 2001, anchor text for site finding
+- Ye et al. 2014, per-project learning to rank for bug localization
+- [LocBench](https://huggingface.co/datasets/czlll/Loc-Bench_V1)
 
 **Training**
 - NV-Embed (2405.17428)

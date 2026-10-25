@@ -41,7 +41,7 @@ DEFAULT_IGNORE = (
 BM25_FIELDS = ("name", "path", "signature", "doc", "body")
 DEVICES = ("auto", "cpu", "xpu", "cuda", "mps")
 DTYPES = ("auto", "float32", "float16", "bfloat16")
-# Search-time score multipliers, chosen on dev (docs/decisions-v2.md, D12): test code, class
+# Search-time score multipliers, chosen on dev (docs/decisions.md, D18): test code, class
 # skeletons and top-level blocks are useful context but rarely what a query is about.
 DEFAULT_TEST_WEIGHT = 0.5
 DEFAULT_KIND_WEIGHTS = {"class": 0.5, "block": 0.5}

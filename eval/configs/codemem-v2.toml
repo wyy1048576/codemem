@@ -1,10 +1,10 @@
-# codemem v2 (multi-language backend, docs/baseline-v2-diff.md). Every system here shares ONE index
+# codemem v2 (multi-language backend, docs/architecture.md). Every system here shares ONE index
 # (same index-time settings) and differs only at search time, so the variants cost one indexing run.
 # cm2-bm25 / cm2-bm25-code / cm2-bm25-code-usage mirror cm-* in baseline.toml (codemem v1, which had
 # no weights): they are the signal ablations, without search-time weights.
 #
 # Every system pins its search-time weights, so a name keeps its meaning if codemem's defaults
-# change. The defaults (docs/decisions-v2.md, D12) equal cm2-full. Runs made before the defaults
+# change. The v2 defaults (docs/decisions.md, D18) equal cm2-full; v3 makes them neutral (D24). Runs made before the defaults
 # changed (2026-10-24-dev50-v2) had no weights in any system: there, cm2-full-* meant the variant
 # of cm2-bm25-code-usage, and cm2-full-tests-down was test_weight 0.5 alone.
 # Needs: uv sync --extra codemem

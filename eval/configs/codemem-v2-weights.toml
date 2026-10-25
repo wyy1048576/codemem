@@ -1,6 +1,6 @@
 # Search-time weightings of codemem v2's full system (bm25 + code + usage). All share one index,
 # so with a warm vector cache this config costs no embedding at all. Used on dev to choose the
-# v2 defaults (docs/decisions-v2.md, D12): how much to push down tests, classes and blocks.
+# v2 defaults (docs/decisions.md, D18 and §4): how much to push down tests, classes and blocks.
 # Every system pins all weights (a kind left out would take codemem's default weight).
 
 [[system]]

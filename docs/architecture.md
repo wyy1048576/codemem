@@ -1,25 +1,49 @@
-# How codemem works (v2)
+# How codemem works
 
 codemem is a local code search tool for coding agents. You point it at a repository. It cuts
-every source file into functions, classes and top-level code blocks, and remembers three things
-about each one:
+every source file into functions, classes and blocks of top-level code, and remembers three
+things about each one:
 - its words (keyword search)
 - its meaning (embeddings)
 - who calls it (call graph)
 
-An agent then asks it questions in plain words over MCP, or a script asks over the CLI. It gets
-back a short ranked list of places in the code. Everything runs on your machine.
+An agent asks it questions in plain words over MCP, or a script asks over the CLI. It gets back a
+short ranked list of places in the code. Everything runs on your machine unless you choose an
+embedding API.
 
-This page walks through the whole system with one example. Exact record formats are in
-[data-model.md](data-model.md). What changed from the Week 1 MVP, and why, is in
-[baseline-v2-diff.md](baseline-v2-diff.md). Research directions are in
-[advanced-design.md](advanced-design.md).
+**Status.** This page describes the **v3 design**. It is being built on branch
+`andre/backend-v3`. The table in §2 says which parts already work. Exact record formats and the
+contracts with the MCP tools and the eval are in [data-model.md](data-model.md). Constants and why
+they have their values are in [decisions.md](decisions.md). Research directions are in
+[advanced-design.md](advanced-design.md), and what we take from Exa is in [exa.md](exa.md).
 
 ---
 
-## The running example
+## 1. Why it exists
 
-The agent gets the issue *"Disabled users stay logged in"*. The fix belongs in this function:
+**The gap.**
+- Claude Code and Codex search code with grep. Claude Code tried semantic search and dropped it,
+  citing security, privacy, staleness and reliability. Codex has an open feature request for it.
+- Cursor kept its semantic index and reports +12.5% agent accuracy, best when used together with
+  grep.
+- The worries that sank semantic search (privacy, stale results, setup) are design problems, and
+  codemem is built around them: local by default, fresh within a second, one-command setup.
+
+**What it is for.** Vague, feature-level questions in a codebase you don't know well:
+- "I want to add login auth but have no idea where to start."
+- "I want to add OCR to my pipeline. It doesn't support image upload yet."
+
+Keyword search fails on these, because the question shares no words with the code. grep takes
+many tries. codemem should find the relevant functions in one or two calls. **grep stays the tool
+for exact strings;** codemem works next to it, not instead of it.
+
+**How we judge it.** Three axes, the same as the project's research questions:
+- **accuracy:** does it find the right functions?
+- **tokens:** does the agent read less to get there?
+- **time:** are queries fast, and is an edit searchable within about a second?
+
+**The running example.** The agent gets the issue *"Disabled users stay logged in"*. The fix
+belongs in this function in the sample repo (`tests/fixtures/sample_repo`):
 
 ```python
 # auth/sessions.py
@@ -27,257 +51,395 @@ def revoke_session(session_id):          # lines 19-20
     db.sessions.delete(session_id)
 ```
 
-`grep` for the issue's words fails: `revoke_session` contains none of them. Its neighbours do.
-`disable_user()` calls it, and the test `test_disabled_user_loses_sessions` tests it. We follow
-this function through every stage.
+`grep` for the issue's words fails: `revoke_session` contains none of them. Its neighbours do:
+`disable_user()` calls it, and `test_disabled_user_loses_sessions` tests it. We follow this
+function through every stage.
 
 ---
 
-## The pipeline at a glance
+## 2. The system at a glance
 
 ```
-           INDEX (once, then only what changed)                        SEARCH (per query)
+          INDEX AND FRESHNESS (only what changed)                         SEARCH (per query)
 
- repo ─► 1 find files ─► 2 chunk ─► 3 call graph ─► 4 texts ─► 5 embed ─► 6 store
-                                                                            ▲
- agent ── "disabled users stay logged in" ─► MCP / CLI ─► 7 search ─────────┘ ─► ranked cards
-                                                  ▲
- file saved ─► 8 watcher ─► incremental update ───┘
+ file saved ─► 1 watcher ─► dirty files ─► 2 incremental update          agent: "where are
+                                │            ├─ 3 chunk (tree-sitter)    sessions revoked?"
+   startup / every 5 min /      │            ├─ 4 link calls                   │
+   refresh_index ─► reconcile ──┘            ├─ 5 build texts                  ▼
+                                             ├─ 6 embed (local or API)   MCP / CLI ─► service
+                                             └─ 7 store (SQLite + FAISS)    │  catch up first
+                                                           ▲                ▼
+                                                           └──────── 8 search ─► ranked cards
 ```
 
-| Stage | Module | One line |
-|---|---|---|
-| 1 find files | `indexer.walk_source_files` | every file in a supported language, minus ignored, vendored, generated |
-| 2 chunk | `languages/`, `chunker.py` | tree-sitter splits a file into functions, methods, classes, blocks |
-| 3 call graph | `callgraph.py` | link each call to the definitions of that name |
-| 4 texts | `texts.py` | the text to embed per chunk: code with a context header; usage (callers, tests) |
-| 5 embed | `embedder.py`, `vectorcache.py` | jina-code-embeddings, only for texts never embedded before |
-| 6 store | `store.py` | SQLite holds everything; FAISS is a derived search index |
-| 7 search | `search.py`, `render.py` | BM25 + vector search per text type, fused with RRF, rendered as cards |
-| 8 freshness | `watcher.py`, `service.py` | re-index only the files that changed, about a second after a save |
+| # | Component | Module | Job | Status |
+|---|---|---|---|---|
+| 1 | Watcher | `watcher.py`, `service.py` | turn file events into a set of changed paths; trigger updates | v2 works (but drops the paths); v3 changes in progress |
+| 2 | Indexer | `indexer.py` | one update function for the first build, reconciles and single saves | v2 works (whole-repo work on every save); v3 incremental in progress |
+| 3 | Chunker | `languages/`, `chunker.py` | functions, methods, classes and blocks in nine languages | works; v3 fixes in progress (§5) |
+| 4 | Call graph | `callgraph.py` | link each call to the definitions of that name | works |
+| 5 | Texts | `texts.py` | what gets embedded: code with a context header, usage (callers, tests) | works; v3 window fixes in progress |
+| 6 | Embedder | `embedder.py`, `vectorcache.py` | local model by default; any OpenAI-compatible API (v3) | local works; API in progress |
+| 7 | Store | `store.py` | SQLite holds everything; FAISS is a derived search index | works; v3 lazy saves in progress |
+| 8 | Search | `search.py`, `render.py` | BM25 + one vector search per text type, merged by rank, rendered as cards | works; v3 catch-up and query clean-up in progress |
+| 9 | Front-ends | `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP tools for agents; CLI for people and scripts | works; v3 tool changes in progress |
+
+**Product shape** (unchanged since Week 1):
+- One local Python package and one command, `codemem`, for both the CLI and the MCP server.
+- The core library holds all logic; the MCP server and the CLI are thin front-ends over
+  `CodememService`.
+- While a session runs, the MCP server owns the index and the watcher. A long-running daemon could
+  come later, and nothing in the core assumes otherwise.
+- It works on Windows, macOS and Linux.
 
 ---
 
-## 1. Finding files
+## 3. Finding files, and not missing any
 
-`walk_source_files` walks the repository. It keeps every file whose extension belongs to a
-supported language. There are nine:
-- Python
-- JavaScript, TypeScript, TSX
-- Go, Java, Rust
-- C, C++ (with CUDA `.cu`)
+`walk_source_files` walks the repository and keeps every file whose extension belongs to a
+supported language. There are nine: Python, JavaScript, TypeScript, TSX, Go, Java, Rust, C and
+C++ (with CUDA `.cu`). A `.h` file is C unless it uses C++ syntax.
 
-A `.h` file is C unless it uses C++ syntax.
+**Skipped by name:**
+- paths in `.gitignore` (nested ones too);
+- folders like `.git`, `node_modules`, `.venv`, `build`, `dist`;
+- vendored or generated paths: `vendor/`, `*.min.js`, `*_pb2.py`, `*.pb.go`.
 
-**It never reads:**
-- files `.gitignore` excludes (nested ones too)
-- `.git`, `node_modules`, `.venv`, `build`, `dist` and similar folders
-- vendored or generated paths: `vendor/`, `*.min.js`, `*_pb2.py`, `*.pb.go` (`use_default_ignore = false` turns this off)
-- files over 1 MB, and binary files
+**Read, then skipped by content:**
+- binary files (a NUL byte in the first 8 KB);
+- files marked `Code generated … DO NOT EDIT` or `@generated`;
+- minified JS/TS (any line over 5,000 characters).
 
-**It reads, then skips:** files that say `Code generated … DO NOT EDIT` or `@generated`, and
-minified JS/TS. The file is recorded as `skipped` so it is not re-read on the next scan.
+**Coverage (v3).** No file is skipped silently:
+- The size cap rises from 1 MB to 10 MB.
+- Every skipped file is stored with its reason: too large, generated, minified or binary.
+- The walk also counts ignored files and non-code files by extension (`.md`, `.yaml`, …).
+- `index_status` and `codemem status` show all of it. For example: "6,235 indexed · 3 skipped
+  (2 generated, 1 too large: vllm/x.py 12 MB) · 410 not code (.md 220, .yaml 120, …)".
 
-*Example:* `auth/sessions.py` is Python. It is new, so it goes to the chunker. On a later run,
-an unchanged mtime and size means it is not even read.
+*Example:* `auth/sessions.py` is Python. It is new, so it goes to the chunker. Later, an
+unchanged size and modification time mean it is not even read.
 
-## 2. Chunking
+## 4. Chunking
 
-tree-sitter parses the file into a syntax tree. A small **language spec** for each language
-(`languages/python.py`, `go.py`, `c_family.py`, …) says which tree nodes are functions, classes
-and namespaces, how to read their names, and which nodes are calls. One generic **walker**
-(`chunker.py`) walks the tree in three modes:
+tree-sitter (one engine, one official grammar per language) parses each file into a syntax tree.
+A small **language spec** per language (`languages/python.py`, `go.py`, `c_family.py`, …) says
+which tree nodes are functions, classes and namespaces, how to read their names, and which nodes
+are calls and tests. One generic **walker** (`chunker.py`) follows the same rules for every
+language:
 
-- **Module or namespace body.** Definitions become chunks. Runs of other statements between them become **block** chunks (imports, constants, `if __name__ == "__main__":`).
-- **Class body.** Methods become chunks. Every member contributes one line to the class's **skeleton**: `class Table:`, `def insert(self, key, value):`, …
-- **Function body.** Only nested named definitions become chunks (`expire_old.is_old`). Lambdas and callbacks stay part of the function.
+1. A function or a class becomes a chunk.
+2. A namespace-like wrapper (C++ `namespace`, Rust `mod` and `impl`, TS `namespace`) is not a
+   chunk. Its name becomes a prefix of the names inside it (`auth.SessionManager.ExpireOld`).
+3. Runs of other top-level statements (imports, constants, script code) become **block** chunks
+   of at most 200 lines.
+4. In a class, each method becomes its own chunk, and the other lines go into the class's
+   **outline** (its skeleton).
+5. In a function, only nested named functions become chunks. Lambdas and callbacks stay part of
+   the parent.
+6. Every call's name and line is recorded for the call graph.
 
 Wrappers that hold definitions are opened: `if TYPE_CHECKING:`, `try/except ImportError`,
-`#ifdef`, `extern "C" {}`. C++ namespaces, Rust `mod`/`impl` and TS `namespace` add a qualifier
-to the names inside.
+`#ifdef`, `extern "C" {}`.
 
 *Example:* `auth/sessions.py` gives:
-- a block (lines 1–5: the docstring and imports)
-- functions `new_token`, `create_session` and `revoke_session` (lines 19–20)
-- class `Session` with its method `Session.__init__`
+- a block (lines 1–5: the docstring and imports);
+- the functions `new_token`, `create_session` and `revoke_session` (lines 19–20);
+- the class `Session` and its method `Session.__init__`.
 
-`revoke_session` is stored with its signature, its code, its key
-`auth/sessions.py::revoke_session`, and its calls: `["delete"]` (from `db.sessions.delete(...)`).
+`revoke_session` is stored with its signature, code, key `auth/sessions.py::revoke_session`, and
+its calls: `["delete"]`, from `db.sessions.delete(...)`.
 
-The same story in Go (`func (m *Manager) ExpireOld`), TypeScript (`export const disableUser = async () => {}`)
-or C (`static int *revoke_session(struct session *s)`) produces the same kinds of chunks. See
-`tests/test_languages.py` and the per-language table in data-model.md.
+**Length.**
+- Functions and classes have no length cap; the syntax decides.
+- A long function is still one chunk. Only its *embedding* is split into windows (§6).
+- Blocks are capped at 200 lines.
 
-## 3. The call graph
+**v3 changes:**
+- **Python comments directly above a definition become its doc text.** Today they are dropped.
+  Other languages already do this. Line ranges stay the same, because the eval's labeler excludes
+  comments.
+- **Blocks over 200 lines are split by lines,** even inside one statement. Today one giant
+  statement stays one block: a 1,668-line dict in `vllm/envs.py`.
 
-Every call a chunk makes is stored as a callee **name**. After each update, names are linked
-to the functions, methods and classes that define them, within one language family (C with C++,
-JavaScript with TypeScript). A name defined more than five times (`get`, `run`) is ignored, because
-it would link everything to everything.
+## 5. The call graph, and usage
 
-*Example:* `disable_user` calls `revoke_session`, and `logout` calls it too. The test
-`test_disabled_user_loses_sessions` calls `disable_user`. These edges feed stage 4.
+Every call a chunk makes is stored as a callee **name**. Names are linked to the functions,
+methods and classes that define them, within one language family (C with C++, JavaScript with
+TypeScript). A name defined more than five times (`get`, `run`) is ignored, because it would link
+everything to everything.
 
-This is a deliberately simple baseline heuristic, isolated in `callgraph.resolve_edges` so a
-smarter resolver (imports, scopes) can replace it.
+Each link is one row (caller → callee), so both directions are cheap to read:
+- `get_chunk` shows a chunk's callers and callees, so the agent can navigate.
+- The **usage text** lists a chunk's callers and tests, and is embedded for search (§6).
 
-## 4. Texts
+*Example:* `disable_user` and `logout` call `revoke_session`, and
+`test_disabled_user_loses_sessions` calls it too.
 
-Each chunk gets one text per **vector type**. Each type becomes its own vector set, so search can
-use them separately:
+This is a deliberately simple heuristic, isolated in `callgraph.resolve_edges`, so that a resolver
+using imports and scopes can replace it later.
 
-- **code.**
-  - A two-line header gives the embedder the context that raw code lacks: the file path, and the enclosing class or namespace.
-  - Then, outside Python, the doc comment (it sits above the code span). Then the code.
-  - A class embeds its skeleton, not its full code: its methods are already chunks of their own.
-- **usage.** Who calls the chunk and which tests reach it. This is the "anchor text" idea from web search: what others say about a page often describes it better than the page itself.
+## 6. Texts and embeddings
 
+Each chunk gets one text per **vector type**. Each type is embedded and searched separately;
+they are never mixed into one vector.
+
+- **code:** a context header, then the code.
+  - The header gives the embedder what raw code lacks: the file path and the enclosing class or
+    namespace.
+  - Outside Python, the doc comment comes next.
+  - A class embeds its outline, not its full code, because its methods are chunks of their own.
+- **usage:** who calls the chunk and which tests reach it. This is the "anchor text" idea from
+  web search: what others say about a page often describes it better than the page itself.
   ```
   revoke_session in auth/sessions.py
   called by logout in api/routes.py
   called by disable_user in auth/users.py
   tested by test_disabled_user_loses_sessions in tests/test_users.py
   ```
-- **summary.** A slot for LLM summaries. Not built yet.
+  Only chunks that something calls or tests have one. On vLLM that's 35k of 102k chunks.
+- **summary:** an empty slot for LLM summaries. It is switched off and produces nothing.
 
-A code text longer than the embedder reads well (about 3,000 characters for 1,024 tokens) is
-split into overlapping **windows** of whole lines. Each window is its own vector. The MVP cut such
-texts off silently, so the end of a long function could never be found by meaning.
+**Windows.**
+- A code text longer than the model reads well (about 3,000 characters for 1,024 tokens) is split
+  into windows of whole lines, overlapping by 3 lines.
+- Each window is one more vector of the same chunk. The chunk scores by its best window, and the
+  card shows that window's lines.
+- On vLLM, 95.4% of chunks fit in one window.
+- **v3:** every window after the first names its function in its header (today windows 2..n
+  don't). Windows are also split evenly, so a 126-line function becomes three windows of about 42
+  lines instead of 64 + 63 + 5.
 
-## 5. Embedding
+**Embedding.** Before calling the model, codemem looks a text's hash up in this index, then in a
+shared **vector cache** on disk (`~/.codemem/cache/vectors.db`). That cache holds every text ever
+embedded on the machine, so rebuilds, branch switches, undos and other commits of the same repo
+cost no model calls.
 
-The default model is `jinaai/jina-code-embeddings-0.5b` (896 dimensions). It uses separate task
-prompts for queries and for code. On a GPU (CUDA, or MPS on a Mac) it runs in float16.
+| Provider | When | Notes |
+|---|---|---|
+| **local** (default) | always available | `jinaai/jina-code-embeddings-0.5b`, 896 numbers per vector, float16 on a GPU (CUDA or Apple MPS), float32 on CPU; separate task prompts for queries and code |
+| **openai** (v3) | opt-in, in the config | any OpenAI-compatible endpoint (Nebius, OpenAI, Together, a self-hosted vLLM or TEI server, Ollama). The key comes from an environment variable. Batching, parallel requests, retries, and an optional shorter vector size |
 
-**codemem only embeds texts it has never seen.** Every text has a hash, and before calling the
-model it looks the hash up:
-1. in this index (the same text elsewhere in the repo)
-2. in a shared **vector cache** (`~/.codemem/cache/vectors.db`, also used by other indexes and earlier builds)
+The same model always embeds both the index and the queries. The cache key includes the provider,
+model and settings, so vectors from different setups never mix. Remote embedding sends code to
+the provider, so it is never on by default, and `index_status` says when it is on.
 
-Rebuilding an index, or indexing a different commit of the same repo, therefore embeds only what
-is new. Texts are embedded longest first, so each batch has similar lengths and wastes less padding.
+## 7. Storage
 
-*Example:* the first index embeds `revoke_session`'s code and usage texts. Adding a blank line
-above it changes neither text (texts contain no line numbers), so nothing is re-embedded.
+One folder per index, by default `~/.codemem/indexes/<repo>-<hash of the repo path>/`:
+- **`index.db`** (SQLite) holds everything:
+  - files and chunks;
+  - a 5-field BM25 index (name, path, signature, doc, body);
+  - calls and links;
+  - every vector, as a float16 row.
+- **`vec_code.faiss` and `vec_usage.faiss`** are exact search indexes **derived** from those rows.
+  If one is missing, stale or corrupt, it is rebuilt from the rows without the model (2 s on
+  vLLM).
 
-## 6. Storing
+**Why SQLite plus FAISS, and not a vector database.**
+- Nothing to install or run.
+- Most of what we store is not vectors, and it needs lookups, joins and keyword search.
+- Transactions keep each update atomic.
+- The stored vectors are the source of truth, so FAISS can always be rebuilt, and compression
+  experiments need no re-embedding.
 
-One folder per index (default `~/.codemem/indexes/<repo>-<hash>/`):
-- **`index.db`** (SQLite) holds everything: files, chunks, a 5-field BM25 index (name, path, signature, doc, body), calls, edges, and every vector as a float16 row.
-- **`vec_code.faiss` and `vec_usage.faiss`** are exact inner-product search indexes **derived** from those rows. If one is missing, stale or corrupt, it is rebuilt from the rows in seconds, without the model.
-- **Matryoshka truncation** (`embedding_dim = 256`) is applied when this index is built, so changing it re-embeds nothing.
+The vector index sits behind a small interface (`VectorStore`), so it can be swapped for Qdrant,
+an HNSW index or another engine later. Exact search takes about 10 ms for 109k vectors.
 
-One process writes at a time (a lock file). Searches keep working during updates (SQLite WAL).
+**Consistency.** SQLite has real transactions; FAISS doesn't. Three rules keep FAISS correct:
+1. FAISS changes are applied only after the SQLite commit.
+2. Its version number (the epoch) is updated last.
+3. It is trusted only when its version matches SQLite's.
 
-## 7. Searching
+A crash therefore costs at most a rebuild, never wrong results. One process writes at a time (a
+lock file), and searches keep working during updates (SQLite WAL).
 
-For the query *"Disabled users stay logged in"*:
+## 8. Freshness: the v3 core
 
-1. **BM25.** The query is tokenized the same way the code was (identifiers split, whole identifiers kept). FTS5 ranks chunks, with matches in the name worth most, then the signature, then the path, the doc and the body.
-2. **Vectors.** The query is embedded once per model. Each vector type returns its top chunks. A chunk with several windows counts its best window.
-3. **Fusion.** Reciprocal rank fusion (RRF): every list gives each chunk `1 / (60 + rank)`, and the sums decide.
-4. **Weights and filters.**
-   - By default, the fused score of test code, classes and blocks is halved (`test_weight = 0.5`, `kind_weights = {class = 0.5, block = 0.5}`). They are useful context, but rarely what a query is about, and on dev they crowded out the target functions. A weight moves only the chunks it targets, so nothing is hidden (decisions-v2.md, D12).
-   - Optional filters: `path_prefix`, `kinds` (for example only functions and methods), `languages`, and `test_weight = 0` (drops test code).
-   - A filter removes chunks from every signal's list *before* fusion, which can reorder the rest. A weight applies after fusion. So prefer weights unless something must never be shown.
-5. **Cards.** Ties are ordered by location, never by internal ids, so the same code gives the same order on every machine. Each result becomes a short card:
+**What v2 does.** After each save, the watcher waits 0.4 s, then runs a full update that does
+four things over the whole repo:
+- checks every file;
+- relinks every call;
+- rebuilds every text to compare hashes;
+- rewrites the FAISS files.
+
+It re-embeds only changed texts, but the rest costs 8 s per save on vLLM, and 6.8 s with nothing
+changed. A search in the meantime sees the old index.
+
+**v3, in one picture:**
 
 ```
-1. auth/sessions.py:19-20  revoke_session  [id 17]
+ file saved ──▶ watcher ──▶ dirty set {paths}       (in memory; a crash loses nothing:
+                               │                     the startup reconcile finds the same files)
+             ┌─────────────────┴───────────────────┐
+             ▼                                     ▼
+   background: 0.5 s after the last      search: apply the dirty set first
+   save (at most every 2 s while           (2 s budget), then answer
+   saves keep coming)                              │
+             └──────────────▶ incremental update ◀─┘
+                       (changed files + exact usage ripple)
+
+ safety nets: startup reconcile · reconcile every 5 min · refresh_index tool · polling fallback
+```
+
+**The guarantee.** A search reflects every file saved before it started. The one exception is
+embeddings for a huge edit that doesn't fit in the 2 s budget, such as a whole-repo reformat. Then
+keywords and links are already current, and the results say which files are still being embedded.
+
+**The incremental update.** It is one function for the first build, a reconcile and a single
+save:
+1. **Find the changed files.** For the watcher's paths, or by scanning everything, compare size
+   and date, then the content hash.
+2. **Remember their old state:** chunk ids, the names they define, and their outgoing links.
+3. **Re-chunk** those files, and match old and new chunks by key (`path::qualname`). Unchanged
+   chunks keep their ids.
+4. **Relink only what can change:**
+   - the calls made by the changed files' chunks;
+   - every call anywhere to a name that was added or removed (this includes the 5-definitions
+     limit).
+5. **Rebuild only the dirty texts:**
+   - code texts of the new or changed chunks;
+   - usage texts of the changed files' chunks, of what they call (before and after the edit), and
+     of any chunk whose callers changed.
+6. **Embed what's missing,** code texts first.
+7. **Patch FAISS in memory,** and write it to disk later (after 30 s idle, on shutdown, and on
+   `refresh_index`).
+
+**Why the ripple is small.** A usage text lists a chunk's *callers*. So a change in file A
+reaches only the usage texts of what A calls. The functions that call A don't change: their code
+is their own, and their usage lists their own callers.
+
+*Measured:* renaming `revoke_session` to `end_session` across 4 files re-embedded 9 of 33 texts.
+Only one of them, `Table.delete`'s usage, sat outside the changed files.
+
+**Verify mode.** The old global recomputation stays as a check (`codemem index --verify` and the
+tests). It reports any difference between the incremental result and a from-scratch result.
+
+**What can go wrong, and what happens:**
+
+| Situation | What happens |
+|---|---|
+| a search during an update | SQLite readers see the state before or after a transaction, never half |
+| a crash at any point | SQLite rolls back; FAISS is rebuilt if its version is behind; the startup reconcile re-finds pending files |
+| two agent sessions on one repo | the lock file serializes writers; a search waits only up to its budget |
+| a file changes while being indexed | its event lands in the dirty set again |
+| `.gitignore`, `.codemem.toml` or the git branch changes | a full reconcile |
+| a chunker or settings upgrade | stored settings differ from the current ones, so the index is rebuilt (cheap with the cache) |
+| OS file events don't work (network drives, WSL, Linux watch limits) | a warning, then a reconcile every 10 s |
+
+## 9. Search
+
+For the query *"disabled users stay logged in"* (measured on the sample repo):
+
+1. **BM25.** The query is split into words the same way the code was. SQLite's FTS5 ranks the
+   chunks that share words: a match in a name counts most, then signature, path, doc and body.
+   `revoke_session` shares no word, so it is not found here. The test is, by its name.
+2. **Vectors.** The query is embedded once, then compared with every code vector and, separately,
+   every usage vector. `revoke_session` is 10th by code and 2nd by usage.
+3. **Merge by rank (RRF).** Each list adds 1 / (60 + rank) to a chunk's score. Ranks, not raw
+   scores, are merged, because BM25 and dot products aren't comparable.
+4. **Filters and weights.**
+   - Filters: `path_prefix`, `kinds`, `languages`, tests. They apply inside each list.
+   - **v3: weights are neutral by default.** v2 halved tests, classes and blocks, which our eval
+     rewarded only because tests are never its answers.
+5. **Cards.** Ties are ordered by location, so the order is the same on every machine. Each
+   result becomes a short card: location, name, id, signature and a few lines. A long function
+   shows its best window.
+
+```
+3. auth/sessions.py:19-20  revoke_session  [id 14]
    def revoke_session(session_id):
    |     db.sessions.delete(session_id)
 ```
 
-*Example:* BM25 alone cannot find `revoke_session`, since no words are shared. But its usage
-text mentions `disable_user` and `test_disabled_user_loses_sessions`, so the usage vectors rank
-it high, and RRF carries it into the top results.
+**v3 latency fix.** BM25 joins every query word with OR, so a 250-word query took 1.1 s on vLLM.
+The query now drops stopwords and keeps at most the 32 rarest words. The index is unchanged.
 
-For a long function the card adds `best 245-302` and shows the lines that match the query, not
-the top of the function.
-
-## 8. Keeping the index fresh
-
-`Indexer.update()` is the only way to index. A full build is an update over an empty index.
-Each update:
-1. Finds changed files by mtime and size, then by content hash.
-2. Re-chunks only those files, and matches old and new chunks by **key** (`path::qualname`). Unchanged chunks keep their ids.
-3. Recomputes the call graph (cheap) and every text, and stores vectors only for texts whose hash changed.
-
-So renaming `disable_user` re-embeds:
-- the renamed function
-- `revoke_session`'s **usage** text (its caller's name changed)
-
-and not `revoke_session`'s code.
-
-- **The watcher** (watchdog) calls this about 0.4 s after the last save.
-- **The MCP server** runs a catch-up update at startup, in the background: the handshake is never blocked, and search answers "indexing, X% done" until it finishes.
-
-## 9. Front-ends: how an agent uses it
-
-One command provides both the CLI and the MCP server:
+## 10. Front-ends: how an agent uses it
 
 | Command | Purpose |
 |---|---|
-| `codemem init --agents claude,cursor,codex` | registers the MCP server (`.mcp.json`, `.cursor/mcp.json`, a printed Codex snippet), then indexes |
-| `codemem index` / `search` / `status` / `watch` | for humans, scripts and debugging (`--json`, `--debug` for per-signal ranks) |
+| `codemem init --agents claude,cursor,codex` | registers the MCP server, then builds the index |
+| `codemem index` / `search` / `status` / `watch` | for people, scripts and debugging (`--json`, `--debug`) |
 | `codemem mcp` | what agents launch, over stdio |
-| `codemem languages` | lists supported languages and extensions |
+| `codemem languages` | supported languages and extensions |
 
-The MCP server exposes three tools:
-- `search_code(query, k, path_prefix)`
-- `get_chunk(ref)`: full code plus callers and callees. A long class returns its skeleton and member list.
-- `index_status()`
+**MCP tools:**
 
-All agent-facing wording (tool descriptions, server instructions, notes for `CLAUDE.md`) lives in
-`prompts.py`, at three steering strengths for the agent study.
+| Tool | Does |
+|---|---|
+| `search_code(query, k=10, path_prefix, kinds, tests)` | ranked cards; catches up on pending edits first (v3: `kinds`, `tests`) |
+| `get_chunk(ref)` | full code plus callers and callees; a long class gives its outline and members |
+| `index_status()` | ready or indexing, counts, freshness, coverage, embedder |
+| `refresh_index()` (v3) | full reconcile now; for after `git checkout` or `git pull` |
 
-## 10. How the eval harness uses it
+**Steering.** All agent-facing wording (tool descriptions, server instructions, notes for
+`CLAUDE.md`) lives in `prompts.py`, at three strengths: `none`, `light`, `strong`. Getting
+agents to use the tool at all is the real adoption problem. So the text stays short (server
+instructions under 2,048 characters, outputs well under 10k tokens), and the agent study measures
+how often agents call it.
 
-The eval harness (`eval/`, cmeval) talks to codemem only through
-`eval/src/cmeval/adapters/codemem.py`:
-- it builds or updates an index for each task's commit
-- it searches with each task's issue text
-- it grades the returned **line ranges** against the fix
+**Portability (v3).**
+- **Launch command.** `codemem init` writes one that works however codemem was installed: the
+  `codemem` command if it's on PATH, otherwise `python -m codemem mcp`.
+- **No first-use stall.** `init` downloads the model with a progress bar.
+- **Logs never go to stdout,** which carries only protocol messages.
+- **Tool names stay stable.**
 
-Things that keep this honest:
-- **Index sharing.** `Config.index_settings()` lists every setting that changes the index. Systems that differ only in search-time settings (signals, filters, weights) share one index. Systems that differ in anything else get their own.
-- **Determinism.** Updates and rebuilds must give the same results (the harness checks this). Ties never depend on ids.
-- **Fair ruler.** The harness's gold labeler is a separate implementation, so a codemem bug cannot hide itself.
+## 11. How the eval uses it
 
-Configs:
-- `eval/configs/codemem-v2.toml`: v2's search-time variants, one index
-- `eval/configs/codemem-v2-ablations.toml`: index-time ablations
-- `eval/configs/baseline-v2.toml`: everything, plus the grep baselines
+The eval (`eval/`, Andrew's `cmeval`) talks to codemem only through
+`eval/src/cmeval/adapters/codemem.py`. For each task it:
+1. builds or updates an index at the task's commit;
+2. searches with the issue text;
+3. grades the returned line ranges against the fix.
 
-## 11. Performance notes
+Three things keep it fair:
+- **Index sharing:** `Config.index_settings()` lists every setting that changes the index, and
+  systems share an index only when those are equal.
+- **Update vs rebuild:** the B4 check requires both to give the same results.
+- **An independent ruler:** the labeler is a separate implementation, so a codemem bug can't hide
+  itself.
 
-- **Indexing time is almost all embedding.** Chunking and SQLite take seconds even for large repos.
-- **Large repos** (vLLM, Kubernetes, the Linux kernel) need a CUDA GPU for the first build: a 0.5B model on an M1 runs roughly one function every few hundredths of a second. Updates after that are small.
-- **Speed knobs** while developing:
-  - `embedding_dim` (search speed and memory)
-  - `max_seq_length` (indexing speed)
-  - the vector cache (rebuilds)
-  - `CODEMEM_MODEL=fake` (no model at all)
-- **Search** costs one query embedding (about 30–100 ms on a laptop GPU) plus exact vector search, which is fast below about a million vectors.
+**v3 doesn't change the eval.** One change is highlighted for later: today's queries are whole
+issue texts and its answers are bug fixes, so it can't show the vague-question use case (§1).
+The contract is in [data-model.md](data-model.md) §12.
 
-## 12. Module map
+## 12. Performance
+
+Measured on the M1 laptop (jina 0.5B on the GPU). vLLM: 6,235 files, 102k chunks, 145k vectors.
+
+| | v2 (measured) | v3 target |
+|---|---|---|
+| save → searchable, one-function edit, vLLM | 8 s + queueing | < 1 s |
+| update with nothing changed, vLLM | 6.8 s | < 0.5 s |
+| search, 10-word query, vLLM | 0.27 s (embedding the query: 0.15 s) | < 0.3 s |
+| search, 250-word query, vLLM | 1.64 s (BM25: 1.1 s) | < 0.7 s |
+| exact vector search, 109k vectors | 9–10 ms | same |
+| full build, `requests` (801 chunks) | 224 s (the MVP: 469 s) | same |
+| rebuild with a warm vector cache | no model calls | same |
+
+**Indexing is almost all embedding.** On the M1 that's about 0.2 s per text, so the first build
+of a large repo needs a CUDA GPU or an embedding API. Updates after that are small.
+
+## 13. Module map
 
 | Module | Role |
 |---|---|
-| `config.py` | settings, paths, `index_settings()`, defaults for ignore rules |
+| `config.py` | settings, paths, `index_settings()`, ignore defaults |
 | `schema.py` | the `Chunk` record |
-| `languages/` | one spec per language + registry (`language_for_path`, `supported_languages`) |
+| `languages/` | one spec per language, plus the registry |
 | `chunker.py` | the generic tree-sitter walker |
 | `tokenize.py` | code-aware tokenization, shared by indexing and queries |
 | `callgraph.py` | name-based call resolution (replaceable) |
 | `texts.py` | text builders (`code`, `usage`, `summary` slot) and windows |
-| `embedder.py` | `Embedder` interface, jina via sentence-transformers, `FakeEmbedder` |
-| `vectorcache.py` | the shared content-addressed vector cache |
-| `store.py` | SQLite + derived FAISS, filters, recovery |
-| `indexer.py` | full and incremental updates |
+| `embedder.py` | the `Embedder` interface: local sentence-transformers, API (v3), fake for tests |
+| `vectorcache.py` | the shared vector cache |
+| `store.py` | SQLite and the derived FAISS, filters, recovery |
+| `indexer.py` | the one update function |
 | `search.py`, `render.py` | hybrid search and cards |
-| `service.py` | long-lived owner of an index: background updates, progress, watcher |
-| `watcher.py` | watchdog + debounce |
+| `service.py` | long-lived owner of one index: updates, freshness, watcher |
+| `watcher.py` | file events, debounced |
 | `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP server, CLI, agent-facing text, agent registration |
 
 ## Glossary
@@ -285,13 +447,15 @@ Configs:
 | Term | Meaning |
 |---|---|
 | **chunk** | one searchable unit: a function, method, class or block of top-level code |
-| **block** | consecutive top-level statements between definitions (imports, constants, module code) |
-| **skeleton** | a class's outline: its header plus one line per member |
-| **vector type** | one kind of text that gets embedded (`code`, `usage`); each is its own vector set |
-| **part / window** | one embedded piece of a long text; a chunk scores by its best part |
+| **block** | consecutive top-level statements between definitions (imports, constants, script code) |
+| **skeleton / outline** | a class's header plus one line per member |
+| **vector type** | one kind of embedded text (`code`, `usage`); each is its own vector set |
+| **window / part** | one embedded piece of a long text; a chunk scores by its best one |
+| **dirty set** | files changed since the last update, not yet indexed |
+| **reconcile** | a scan of the whole repo (sizes and dates, then hashes) that finds changed files |
 | **BM25** | keyword ranking: shared words count, rare words count more |
 | **embedding** | a list of numbers capturing meaning, so similar meanings are close even with no shared words |
-| **RRF** | reciprocal rank fusion: merges ranked lists by summing `1 / (60 + rank)` |
-| **Matryoshka** | embeddings whose first numbers work on their own, so vectors can be shortened |
-| **embedder key** | the identity of an embedding space (model, prompt, length, dtype, device) |
+| **RRF** | reciprocal rank fusion: merges ranked lists by summing 1 / (60 + rank) |
+| **epoch** | the version number that tells whether a FAISS index matches SQLite |
+| **embedder key** | the identity of an embedding space (provider, model, settings) |
 | **MCP** | the protocol coding agents use to call tools |
