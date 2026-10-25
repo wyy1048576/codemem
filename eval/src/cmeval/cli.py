@@ -83,23 +83,35 @@ def cmd_systems(args) -> int:
     return 0
 
 
+def _printer(status):
+    """Progress on stderr, as before, and the same lines in the job's status file."""
+    def progress(message: str) -> None:
+        print(message, file=sys.stderr, flush=True)
+        status.log(message)
+    return progress
+
+
 def cmd_run(args) -> int:
     from .repos import RepoError
     from .retriever import RetrieverError
     from .run import RunError, run
+    from .status import JobStatus
     from .systems import SystemsError
     from .tasks import TaskError
 
-    try:
-        summary = run(
-            args.tasks, args.config, args.run_id,
-            split=args.split, repo_filter=args.repo, limit_per_repo=args.limit_per_repo,
-            index_mode=args.index_mode, k=args.k, keep_indexes=args.keep_indexes,
-            progress=lambda message: print(message, file=sys.stderr, flush=True),
-        )
-    except (RunError, SystemsError, TaskError, RetrieverError, RepoError, FileNotFoundError) as exc:
-        print(f"run {args.run_id}: {exc}", file=sys.stderr)
-        return 1
+    with JobStatus("run", args.run_id) as status:
+        try:
+            summary = run(
+                args.tasks, args.config, args.run_id,
+                split=args.split, repo_filter=args.repo, limit_per_repo=args.limit_per_repo,
+                index_mode=args.index_mode, k=args.k, keep_indexes=args.keep_indexes,
+                progress=_printer(status), status=status,
+            )
+        except (RunError, SystemsError, TaskError, RetrieverError, RepoError, FileNotFoundError) as exc:
+            print(f"run {args.run_id}: {exc}", file=sys.stderr)
+            status.fail(str(exc))
+            return 1
+        status.result(searched=summary.searched, already_done=summary.skipped, index_calls=summary.index_calls)
     print(f"run {args.run_id}: {summary.run_dir}")
     print(f"  {summary.tasks} tasks x {summary.systems} systems: {summary.searched} searches done, "
           f"{summary.skipped} already done, {summary.index_calls} index calls, {summary.seconds:.1f} s")
@@ -109,15 +121,20 @@ def cmd_run(args) -> int:
 def cmd_score(args) -> int:
     from .metrics.tokens import TokenCountError
     from .score import DEFAULT_IOUS, ScoreError, score
+    from .status import JobStatus
     from .tasks import TaskError
 
-    try:
-        summary = score(args.run, tokens=args.tokens, ious=tuple(args.iou) if args.iou else DEFAULT_IOUS, tasks_file=args.tasks,
-                        warn=lambda message: print(f"warning: {message}", file=sys.stderr),
-                        progress=lambda message: print(message, file=sys.stderr, flush=True))
-    except (ScoreError, TokenCountError, TaskError) as exc:
-        print(f"score {args.run}: {exc}", file=sys.stderr)
-        return 1
+    with JobStatus("score", Path(args.run).name) as status:
+        progress = _printer(status)
+        try:
+            summary = score(args.run, tokens=args.tokens, ious=tuple(args.iou) if args.iou else DEFAULT_IOUS,
+                            tasks_file=args.tasks, warn=lambda message: progress(f"warning: {message}"),
+                            progress=progress, status=status)
+        except (ScoreError, TokenCountError, TaskError) as exc:
+            print(f"score {args.run}: {exc}", file=sys.stderr)
+            status.fail(str(exc))
+            return 1
+        status.result(tasks_scored=summary.tasks_scored, rows=summary.rows, estimate=summary.estimate)
 
     def fmt(value, digits=3):
         return "-" if value is None else f"{value:.{digits}f}"

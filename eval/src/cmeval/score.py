@@ -27,6 +27,7 @@ from .metrics.tokens import BUDGETS, AnthropicCounter, TokenCounter, make_counte
 from .files import now, read_jsonl, sha256_file, write_json, write_text_atomic
 from .paths import runs_dir
 from .retriever import Hit
+from .status import NullStatus
 from .tasks import Task, load_tasks
 
 DEFAULT_IOUS = (0.5, 0.3, 0.7)
@@ -86,7 +87,9 @@ def _check_ious(ious: tuple[float, ...]) -> tuple[float, ...]:
 def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...] = DEFAULT_IOUS,
           tasks_file: str | Path | None = None,
           counter: TokenCounter | None = None, warn: Callable[[str], None] = lambda message: None,
-          progress: Callable[[str], None] = lambda message: None) -> ScoreSummary:
+          progress: Callable[[str], None] = lambda message: None, status: NullStatus | None = None) -> ScoreSummary:
+    status = status or NullStatus()
+    status.stage("loading the run")
     run_dir = resolve_run(run)
     ious = _check_ious(tuple(ious))
     try:
@@ -115,10 +118,13 @@ def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...]
 
     # ---- tokens: every unique hit text, counted once
     own_counter = counter is None
-    counter = counter or make_counter(tokens, warn, progress)
+    counter = counter or make_counter(tokens, warn, progress, status)
     try:
         texts = sorted({h["text"] for name in lines for line in lines[name] for h in line["hits"]})
+        status.stage("counting tokens")
+        status.total(len(texts), "texts")
         counts = dict(zip(texts, counter.count(texts)))
+        status.set_done(len(texts))
         overhead = counter.overhead if isinstance(counter, AnthropicCounter) else None
     finally:
         if own_counter and isinstance(counter, AnthropicCounter):
@@ -127,6 +133,7 @@ def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...]
     # ---- per task rows
     rows: list[dict] = []
     for name, granularity, _ in systems:
+        status.stage(f"scoring {name}")
         for line in lines[name]:
             task = tasks.get(line["task_id"])
             if task is None:
@@ -149,6 +156,7 @@ def score(run: str | Path, *, tokens: str = "anthropic", ious: tuple[float, ...]
                                  "metric": metric, "value": None if value is None else round(value, 6)}
                                 for metric, value in values.items())
 
+    status.stage("writing files")
     write_text_atomic(run_dir / "scores.jsonl", "".join(json.dumps(row) + "\n" for row in rows))
 
     # ---- summary
