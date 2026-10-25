@@ -116,7 +116,7 @@ built.
 | **File-level cards** for "where do I start" questions. | Today a file ranks by its best chunk. | The vague-question eval (below). |
 | **A vague-question eval** (highlighted, Andrew's area): one sentence per dev task in a user's voice, written from the issue only, with the same gold; the feature-request tasks as the closest match. | v3 doesn't change the eval (D25). | Needed before tuning, otherwise tuning keeps optimizing for issue texts. |
 | **Tuning:** RRF k, per-list weights, BM25 field weights, candidates. | Tuning on today's eval would optimize for issue texts. | The vague-question eval. |
-| **Embedding model comparison** (jina 0.5B and 1.5B, Qwen3-Embedding 0.6B/4B/8B, voyage-code-3). | Needs the API embedder (v3) and the vague-question eval. | The first tuning experiment. |
+| **Embedding model comparison** (jina 0.5B and 1.5B, Qwen3-Embedding 0.6B/4B/8B, voyage-code-3), **with the window size** (`max_seq_length` 1k, 2k, 4k, 8k tokens, whole functions). | Needs the API embedder (v3) and the vague-question eval. Both models read 32k tokens; the 1,024 cap is for laptop speed, and through an API the tokens cost the same either way. Only about 5% of vLLM's chunks are long enough to be affected. | The first tuning experiment. Keep 1,024 until then. |
 | **PyTorch as an optional extra** (D27). | Needs a one-line eval change. | Andrew's agreement. |
 | **Vector cache cleanup:** the cache only grows (about 4.5 KB per vector). | Small so far: 123 MB. | A "last used" date per entry, then a size cap. |
 
