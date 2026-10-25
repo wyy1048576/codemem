@@ -304,26 +304,29 @@ def test_another_process_writes_and_this_one_catches_up(tmp_path):
     a.close(), b.close()
 
 
-def test_a_saved_index_with_other_ids_is_not_trusted(tmp_path):
-    """A note with the current epoch on a file holding older vectors (two processes saving at once)
-    must not be loaded: the ids are compared, not only the count."""
+def test_a_saved_index_is_reconciled_with_the_rows(tmp_path):
+    """A file saved at an older epoch (another process, a crash, a lazy save), even under a newer
+    note, is brought up to the committed rows by vector id: it serves exactly what a rebuild would."""
     s = Store(tmp_path / "idx")
     _seed(s, ["one", "two"])
     s.save_vectors()
     old_faiss = (tmp_path / "idx" / "vec_code.faiss").read_bytes()
-    with s.transaction():
-        row = s.vector_rows("code")
-    vid = next(iter(row.values()))[0]
+    vid = next(iter(s.vector_rows("code").values()))[0]
     s.delete_vectors("code", [vid])
     _seed(s, ["three"], seed=2)  # same count as before, different ids
     s.save_vectors()
-    note = json.loads((tmp_path / "idx" / "vec_code.json").read_text())
     s.close()
-    (tmp_path / "idx" / "vec_code.faiss").write_bytes(old_faiss)  # older data, newer note
+    (tmp_path / "idx" / "vec_code.faiss").write_bytes(old_faiss)  # older data under a newer note
     s2 = Store(tmp_path / "idx")
-    assert s2._load_saved("code", note["epoch"], note["dim"]) is None
-    assert _in_sync(s2, "code")  # rebuilt from the rows instead
+    assert _in_sync(s2, "code")
+    q = _vecs(1, seed=2)[0]
+    hits = [(h.chunk_id, round(h.score, 5)) for h in s2.vector_search("code", q, 3)]
     s2.close()
+    for f in (tmp_path / "idx").glob("vec_code.*"):
+        f.unlink()
+    s3 = Store(tmp_path / "idx")  # no saved file: a full rebuild from the rows
+    assert [(h.chunk_id, round(h.score, 5)) for h in s3.vector_search("code", q, 3)] == hits
+    s3.close()
 
 
 def test_searches_during_writes_never_see_a_half_patched_index(tmp_path):

@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS chunks (
 CREATE INDEX IF NOT EXISTS chunks_path ON chunks(path);
 CREATE INDEX IF NOT EXISTS chunks_name ON chunks(name);
 CREATE INDEX IF NOT EXISTS chunks_parent ON chunks(parent_key);
+-- Covers caller lookups (usage texts), so they never read the pages that hold code.
+CREATE INDEX IF NOT EXISTS chunks_ref ON chunks(chunk_id, path, start_line, qualname, name, kind, is_test);
 CREATE TABLE IF NOT EXISTS calls (caller_id INTEGER NOT NULL, callee_name TEXT NOT NULL, line INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS calls_caller ON calls(caller_id);
 CREATE INDEX IF NOT EXISTS calls_callee ON calls(callee_name);
@@ -462,6 +464,7 @@ class Store:
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA cache_size=-65536")  # up to 64 MB of pages per connection, as used
             self._local.conn = conn
             self._all_conns.append(conn)
         return conn
@@ -716,17 +719,26 @@ class Store:
         self.conn.execute("DELETE FROM edges")
         self.conn.executemany("INSERT INTO edges(caller_id, callee_id) VALUES(?, ?)", sorted(edges))
 
-    def caller_refs(self, ids: Iterable[int] | None = None) -> dict[int, list[Ref]]:
-        """callee id -> its callers, for every chunk or only for `ids`."""
+    def caller_refs(self, ids: Iterable[int] | None = None, limit: int | None = None) -> dict[int, list[Ref]]:
+        """callee id -> its callers, for every chunk or only for `ids`. With `limit`, at most that
+        many test callers and that many other callers per callee, the first in (path, line,
+        qualname, kind) order: all a usage text can show (a name like `append` gathers thousands)."""
         out: dict[int, list[Ref]] = {}
-        sql = (
-            "SELECT e.callee_id, c.chunk_id, c.qualname, c.name, c.path, c.start_line, c.is_test, c.kind "
+        inner = (
+            "SELECT e.callee_id, c.chunk_id, c.qualname, c.name, c.path, c.start_line, c.is_test, c.kind, "
+            "ROW_NUMBER() OVER (PARTITION BY e.callee_id, c.is_test "
+            "ORDER BY c.path, c.start_line, c.qualname, c.kind) AS rn "
             "FROM edges e JOIN chunks c ON c.chunk_id = e.caller_id"
         )
+        keep = "rn <= ?" if limit is not None else "1"
+        lim = (limit,) if limit is not None else ()
         if ids is None:
-            queries = [(sql, ())]
+            queries = [(f"SELECT * FROM ({inner}) WHERE {keep}", lim)]
         else:
-            queries = [(f"{sql} WHERE e.callee_id IN ({','.join('?' * len(b))})", tuple(b)) for b in _batches(list(ids))]
+            queries = [
+                (f"SELECT * FROM ({inner} WHERE e.callee_id IN ({','.join('?' * len(b))})) WHERE {keep}", (*b, *lim))
+                for b in _batches(sorted(set(ids)))
+            ]
         for query, params in queries:
             for r in self.conn.execute(query, params):
                 out.setdefault(r[0], []).append(Ref(r[1], r[2], r[3], r[4], r[5], bool(r[6]), r[7]))
@@ -1056,12 +1068,17 @@ class Store:
 
     def _catch_up(self, ti: _TypeIndex, vec_type: str, epoch: int) -> None:
         """Bring an in-memory index to the committed rows by their ids. Vector rows never change in
-        place (a new vector is a new row), so the set of ids says everything."""
+        place (a new vector is a new row, and AUTOINCREMENT never reuses an id), so the set of ids
+        says everything."""
         now = {r[0] for r in self.conn.execute("SELECT vector_id FROM vectors WHERE vec_type = ?", (vec_type,))}
         have = set(ti.owner)
         ti.remove(have - now)
-        new = sorted(now - have)
-        for batch in _batches(new, 4096):
+        self._add_rows(ti, now - have)
+        ti.epoch = epoch
+        ti.dirty = True
+
+    def _add_rows(self, ti: _TypeIndex, vector_ids: Iterable[int]) -> None:
+        for batch in _batches(sorted(vector_ids), 4096):
             rows = self.conn.execute(
                 "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors "
                 f"WHERE vector_id IN ({','.join('?' * len(batch))})",
@@ -1070,8 +1087,6 @@ class Store:
             if rows:
                 ti.add([r[0] for r in rows], [(r[1], r[2], r[3], r[4], r[5]) for r in rows],
                        np.stack([from_blob(r[7], r[6]) for r in rows]))
-        ti.epoch = epoch
-        ti.dirty = True
 
     def _owner_rows(self, vec_type: str) -> list[tuple[int, tuple[int, int, int, int, int]]]:
         rows = self.conn.execute(
@@ -1080,26 +1095,36 @@ class Store:
         return [(r[0], (r[1], r[2], r[3], r[4], r[5])) for r in rows]
 
     def _load_saved(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex | None:
+        """The saved index file, reconciled with the committed rows by vector id: vectors whose
+        row is gone are dropped, rows the file lacks are added. Rows never change in place, so
+        this is exact whichever epoch the file was saved at (another process, a crash, a save
+        that is behind), and it costs only the difference instead of a full rebuild."""
         note_path, faiss_path = self._note_path(vec_type), self._faiss_path(vec_type)
         if not (note_path.is_file() and faiss_path.is_file()):
             return None
         try:
             note = json.loads(note_path.read_text("utf-8"))
-            if note.get("epoch") != epoch or note.get("dim") != dim:
+            if note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder"):
                 return None
             store = FaissVectorStore.load(faiss_path)
         except Exception:  # corrupt or partial file: rebuild from the rows
             log.exception("could not load %s; rebuilding it from the stored vectors", faiss_path)
             return None
+        if store.dim != dim:
+            return None
         ti = _TypeIndex(dim, epoch)
         ti.store = store
-        for vid, row in self._owner_rows(vec_type):
-            ti.owner[vid] = row
-            ti.by_chunk[row[0]].append(vid)
-        # The same ids, not just as many: a file saved by another process at an older epoch, with
-        # a newer note, must not be trusted (rows never change in place, so equal ids = equal vectors).
-        if set(ti.owner) != store.ids():
-            return None
+        rows = dict(self._owner_rows(vec_type))
+        in_file = store.ids()
+        stale = in_file - rows.keys()
+        if stale:
+            store.remove(stale)
+        for vid in in_file & rows.keys():
+            ti.owner[vid] = rows[vid]
+            ti.by_chunk[rows[vid][0]].append(vid)
+        missing = rows.keys() - in_file
+        self._add_rows(ti, missing)
+        ti.dirty = bool(stale or missing)
         return ti
 
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:

@@ -705,7 +705,7 @@ class Indexer:
             if head:
                 commits = {rel: git_commit_subjects(self.root, rel, head) for rel in sorted(paths)}
         return BuildContext(
-            callers=self.store.caller_refs(ids),
+            callers=self.store.caller_refs(ids, limit=cfg.max_usage_items),
             commits=commits,
             max_items=cfg.max_usage_items,
             code_header=cfg.code_header,
