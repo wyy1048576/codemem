@@ -534,5 +534,8 @@ A redesign must keep all of this, or change the adapter together with Andrew:
 - **(v3) The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`,
   `api_key_env`, `dimensions`, `query_prefix`, `document_prefix`, `batch_size` and
   `max_concurrency`.
-  - Everything except the key's name and the query prefix is index-time.
-  - The key itself is read from the named environment variable and is never stored.
+  - Index-time (in `index_settings()` as `embedding`, only for an API provider, so local indexes
+    keep their settings): provider, model, base URL, dimensions, document prefix.
+  - Search-time or operational: the key's variable name, the query prefix, `batch_size`,
+    `max_concurrency`, `timeout_s`.
+  - The key itself is read from the named environment variable at each request and is never stored.

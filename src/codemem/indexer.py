@@ -65,6 +65,7 @@ _SETTING_TIERS = {
     "text_format": "texts", "max_seq_length": "texts", "code_header": "texts", "window_chars": "texts",
     "window_overlap_lines": "texts", "max_usage_items": "texts", "include_commits": "texts",
     "max_defs_per_name": "links",
+    "embedding": "vectors",  # another API provider, model or dimensions: re-embed
 }
 
 

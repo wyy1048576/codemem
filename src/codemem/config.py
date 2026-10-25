@@ -15,7 +15,7 @@ import hashlib
 import logging
 import os
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +55,37 @@ class VectorConfig:
     enabled: bool = True
 
 
+@dataclass
+class EmbeddingConfig:
+    """Where embeddings come from (docs/decisions.md, D26). `local` runs the model on this machine:
+    the default, private, offline and free. `openai` calls any OpenAI-compatible `/embeddings` API
+    (Nebius, OpenAI, Together, a self-hosted vLLM or TEI server, Ollama), with `model` for every
+    vector type, for documents and queries alike. The API key is read from the environment
+    variable `api_key_env` names, never from a file; remote embedding sends code to the provider."""
+
+    provider: str = "local"  # local | openai
+    model: str = ""  # the API's model name (required for openai)
+    base_url: str = ""  # e.g. https://api.studio.nebius.com/v1 (required for openai)
+    api_key_env: str = ""  # environment variable holding the key; empty = no key (a local server)
+    dimensions: int | None = None  # shorter vectors, for models trained for it (Qwen3-Embedding)
+    query_prefix: str = ""  # an instruction before each query (instruction-tuned models want one)
+    document_prefix: str = ""  # before each document
+    batch_size: int = 64  # texts per request
+    max_concurrency: int = 4  # requests in flight
+    timeout_s: float = 60.0  # per request
+
+    @property
+    def remote(self) -> bool:
+        return self.provider != "local"
+
+    def index_settings(self) -> dict[str, Any]:
+        """What changes the stored vectors: not the key's variable, the query prefix or request sizes."""
+        return {
+            "provider": self.provider, "model": self.model, "base_url": self.base_url,
+            "dimensions": self.dimensions, "document_prefix": self.document_prefix,
+        }
+
+
 def _default_vectors() -> dict[str, VectorConfig]:
     return {
         "code": VectorConfig(),
@@ -68,6 +99,7 @@ def _default_vectors() -> dict[str, VectorConfig]:
 class Config:
     device: str = "auto"  # auto | cpu | xpu | cuda | mps
     vectors: dict[str, VectorConfig] = field(default_factory=_default_vectors)
+    embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     embedding_dim: int | None = None  # Matryoshka truncation, applied when searching; None = full dim
     dtype: str = "auto"  # auto = float16 on cuda/mps, float32 on cpu
     batch_size: int = 16
@@ -127,7 +159,7 @@ class Config:
 
     def index_settings(self) -> dict[str, Any]:
         """Every setting that changes what an index stores. Equal settings -> an equal index."""
-        return {
+        settings = {
             "text_format": TEXT_FORMAT_VERSION,
             "chunker": CHUNKER_VERSION,
             "vectors": {name: {"model": self.model_id(name)} for name in self.enabled_vec_types()},
@@ -150,6 +182,9 @@ class Config:
             "window_overlap_lines": self.window_overlap_lines,
             "max_block_lines": self.max_block_lines,
         }
+        if self.embedding.remote:  # absent for the local model, so local indexes keep their settings
+            settings["embedding"] = self.embedding.index_settings()
+        return settings
 
 
 def codemem_home() -> Path:
@@ -250,6 +285,15 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
     cfg.bm25_weights5()  # validates the length
+    emb = dict(raw.get("embedding") or {})
+    known = {f.name for f in fields(EmbeddingConfig)}
+    if unknown := sorted(set(emb) - known):
+        raise ValueError(f"unknown [embedding] settings {unknown}; choose from {sorted(known)}")
+    cfg.embedding = EmbeddingConfig(**emb)
+    if cfg.embedding.provider not in {"local", "openai"}:
+        raise ValueError(f"[embedding] provider must be local|openai, got {cfg.embedding.provider!r}")
+    if cfg.embedding.remote and not (cfg.embedding.model and cfg.embedding.base_url):
+        raise ValueError("[embedding] provider = openai needs model and base_url")
     if cfg.languages is not None:
         from .languages import supported_languages
 

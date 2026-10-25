@@ -64,6 +64,9 @@ def format_status(info: dict[str, Any]) -> str:
     lines.append(f"vectors: {json.dumps(info['vectors'])}")
     for vec_type, m in info["models"].items():
         lines.append(f"  {vec_type}: {m['model']} (dim {m['dim']})")
+    emb = info.get("embedding") or {}
+    if emb.get("provider", "local") != "local":
+        lines.append(f"embeddings: remote, {emb.get('model')} at {emb.get('host')} (code is sent there to be embedded)")
     lines.append(f"indexed commit: {info['indexed_commit'] or '-'}")
     if "age_seconds" in info:
         lines.append(f"last indexed: {info['age_seconds']:.0f}s ago")

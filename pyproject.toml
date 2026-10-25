@@ -42,5 +42,6 @@ packages = ["src/codemem"]
 testpaths = ["tests"]
 markers = [
     "model: needs the real jina embedding model (downloads ~1 GB); deselected by default",
+    "api: calls a real embedding API (needs its key in the environment); deselected by default",
 ]
-addopts = "-m 'not model'"
+addopts = "-m 'not model and not api'"

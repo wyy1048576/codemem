@@ -128,12 +128,20 @@ the named environment variable and never stored:
 
 ```toml
 [embedding]
-provider = "openai"
-model = "Qwen/Qwen3-Embedding-8B"
+provider = "openai"                 # local (default) | openai = any OpenAI-compatible /embeddings API
+model = "Qwen/Qwen3-Embedding-8B"   # used for every vector type, documents and queries alike
 base_url = "https://api.studio.nebius.com/v1"   # from your provider's docs
-api_key_env = "NEBIUS_API_KEY"
-dimensions = 1024
+api_key_env = "NEBIUS_API_KEY"      # the key is read from this variable, never stored; "" = no key
+dimensions = 1024                   # optional: shorter vectors (Qwen3-Embedding-8B returns 4,096)
+query_prefix = "Instruct: Given a code search request, retrieve the relevant code\nQuery: "
+batch_size = 64                     # texts per request
+max_concurrency = 4                 # requests in flight
 ```
+
+Remote embedding sends your code to the provider; `codemem status` says so. Retries with backoff
+cover rate limits and server errors. With the API, `[vectors.*] model` is not used. The API
+client needs `httpx`, which codemem's own environment has (through its dependencies); install it
+if your environment lacks it. A smoke test against Nebius: `NEBIUS_API_KEY=… uv run pytest -m api`.
 
 Other notes:
 - **Changing settings.** Changing a vector type's model re-embeds only that vector set. Changing

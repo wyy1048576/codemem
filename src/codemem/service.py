@@ -23,6 +23,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .config import Config, default_index_dir, find_repo_root, load_config
 from .embedder import make_embedder
@@ -45,6 +46,14 @@ _BATCH = 64  # queued chunks per embedding batch outside a build (new edits wait
 # Characters per model call outside a build: about 0.6 s on an M1, so a search waits at most that
 # long for the background writer's current call. A build uses bigger calls, for speed.
 _CALL_CHARS = 3000
+
+
+def _model_of(embedder_key: str | None) -> str | None:
+    """The model in an embedder key: `jina…|doc|L1024|…` or `api:<host>|<model>|dims=…`."""
+    if not embedder_key:
+        return None
+    parts = embedder_key.split("|")
+    return parts[1] if embedder_key.startswith("api:") and len(parts) > 1 else parts[0]
 
 
 @dataclass
@@ -501,9 +510,14 @@ class CodememService:
             "repo": str(self.repo_root),
             "index_dir": str(self.index_dir),
             **store.counts(),
+            "embedding": (
+                {"provider": self.config.embedding.provider, "model": self.config.embedding.model,
+                 "host": urlparse(self.config.embedding.base_url).netloc or self.config.embedding.base_url}
+                if self.config.embedding.remote else {"provider": "local"}
+            ),
             "models": {
                 v: {
-                    "model": (store.get_meta(f"vec.{v}.embedder") or "").split("|", 1)[0] or None,
+                    "model": _model_of(store.get_meta(f"vec.{v}.embedder")),
                     "embedder": store.get_meta(f"vec.{v}.embedder"),
                     "dim": store.vector_dim(v),
                 }

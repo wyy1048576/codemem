@@ -1,4 +1,5 @@
-"""Embedder interface, the sentence-transformers (jina) embedder and FakeEmbedder.
+"""Embedder interface: the local sentence-transformers (jina) embedder, any OpenAI-compatible
+embeddings API, and FakeEmbedder.
 
 Callers only see `embed_documents` / `embed_queries`; task prompts/prefixes are
 handled here. All outputs are float32, L2-normalized, shape (n, dim), at the model's full
@@ -14,14 +15,19 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import threading
+import time
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any
+from urllib.parse import urlparse
 
 import numpy as np
 
-from .config import Config
+from .config import Config, EmbeddingConfig
 from .tokenize import tokenize
 
 log = logging.getLogger(__name__)
@@ -232,18 +238,148 @@ class SentenceTransformerEmbedder(Embedder):
         return np.stack([self._queries[t] for t in texts]) if texts else np.zeros((0, self.dim), dtype=np.float32)
 
 
+class OpenAIEmbedder(Embedder):
+    """Any OpenAI-compatible `/embeddings` endpoint: Nebius, OpenAI, Together, a self-hosted vLLM
+    or TEI server, Ollama. Texts go in requests of `batch_size`, up to `max_concurrency` at once.
+    Rate limits (429), server errors (5xx) and dropped connections are retried with backoff;
+    other errors fail at once, with the provider's message. The key is read from the environment
+    variable `api_key_env` at each request and never stored."""
+
+    RETRIES = 6
+    BACKOFF_S = 1.0  # first wait between retries; doubles, up to 30 s
+
+    def __init__(self, cfg: EmbeddingConfig):
+        self.cfg = cfg
+        self.model_name = cfg.model
+        self._dim: int | None = None
+        self._client: Any = None
+        self._lock = threading.Lock()
+        self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
+
+    @property
+    def host(self) -> str:
+        return urlparse(self.cfg.base_url).netloc or self.cfg.base_url
+
+    @property
+    def key(self) -> str:
+        prefix = self.cfg.document_prefix
+        doc = hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:8] if prefix else "0"
+        return f"api:{self.host}|{self.model_name}|dims={self.cfg.dimensions or 'full'}|doc={doc}"
+
+    @property
+    def dim(self) -> int:
+        if self._dim is None:
+            self._dim = int(self._request(["dimension check"]).shape[1])
+        return self._dim
+
+    def _http(self) -> Any:
+        with self._lock:
+            if self._client is None:
+                try:
+                    import httpx
+                except ImportError as e:  # codemem's own dependencies bring it; a bare environment may not
+                    raise RuntimeError("API embeddings need the httpx package: pip install httpx") from e
+                self._client = httpx.Client(timeout=self.cfg.timeout_s)
+            return self._client
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self.cfg.api_key_env:
+            key = os.environ.get(self.cfg.api_key_env)
+            if not key:
+                raise RuntimeError(
+                    f"[embedding] api_key_env is {self.cfg.api_key_env!r}, but that environment variable is not set"
+                )
+            headers["Authorization"] = f"Bearer {key}"
+        return headers
+
+    def _request(self, texts: list[str]) -> np.ndarray:
+        import httpx
+
+        client = self._http()
+        url = self.cfg.base_url.rstrip("/") + "/embeddings"
+        body: dict[str, Any] = {"model": self.model_name, "input": texts}
+        if self.cfg.dimensions:
+            body["dimensions"] = self.cfg.dimensions
+        delay = self.BACKOFF_S
+        for attempt in range(self.RETRIES):
+            last = attempt == self.RETRIES - 1
+            try:
+                r = client.post(url, json=body, headers=self._headers())
+            except httpx.TransportError as e:  # a timeout, or a refused or dropped connection
+                if last:
+                    raise RuntimeError(f"embedding request to {self.host} failed: {e}") from e
+                time.sleep(delay)
+                delay = min(delay * 2, 30.0)
+                continue
+            if r.status_code == 429 or r.status_code >= 500:
+                if last:
+                    raise RuntimeError(f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}")
+                time.sleep(_retry_after(r) or delay)
+                delay = min(delay * 2, 30.0)
+                continue
+            if r.status_code >= 400:
+                raise RuntimeError(f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}")
+            data = sorted(r.json()["data"], key=lambda d: d["index"])
+            vecs = np.asarray([d["embedding"] for d in data], dtype=np.float32)
+            if vecs.ndim != 2 or len(vecs) != len(texts):
+                raise RuntimeError(f"{self.host} returned {len(vecs)} embeddings for {len(texts)} texts")
+            return l2_normalize(vecs)
+        raise AssertionError("unreachable")
+
+    def _embed(self, texts: Sequence[str], prefix: str) -> np.ndarray:
+        if not texts:
+            return np.zeros((0, self.dim), dtype=np.float32)
+        inputs = [prefix + t for t in texts]
+        size = max(1, self.cfg.batch_size)
+        batches = [inputs[i : i + size] for i in range(0, len(inputs), size)]
+        if len(batches) == 1:
+            return self._request(batches[0])
+        with ThreadPoolExecutor(max_workers=max(1, self.cfg.max_concurrency)) as pool:
+            return np.vstack(list(pool.map(self._request, batches)))
+
+    def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
+        return self._embed(texts, self.cfg.document_prefix)
+
+    def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
+        """Queries are cached: a repeated query costs no request."""
+        missing = [t for t in dict.fromkeys(texts) if t not in self._queries]
+        if missing:
+            for text, vec in zip(missing, self._embed(missing, self.cfg.query_prefix)):
+                self._queries[text] = vec
+                if len(self._queries) > _QUERY_CACHE_SIZE:
+                    self._queries.popitem(last=False)
+        return np.stack([self._queries[t] for t in texts]) if texts else np.zeros((0, self.dim), dtype=np.float32)
+
+
+def _retry_after(response: Any) -> float | None:
+    """The server's Retry-After, in seconds (capped at a minute), when it sends one."""
+    try:
+        return min(float(response.headers.get("retry-after", "")), 60.0)
+    except ValueError:
+        return None
+
+
 _CACHE: dict[tuple, Embedder] = {}
 _CACHE_LOCK = threading.Lock()
 
 
 def make_embedder(model_name: str, config: Config) -> Embedder:
-    """Build (or reuse) the embedder for a model name. `fake` / `fake:<dim>` -> FakeEmbedder."""
-    key = (model_name, config.device, config.dtype, config.batch_size, config.max_seq_length)
+    """Build (or reuse) the embedder for a model name. `fake` / `fake:<dim>` -> FakeEmbedder. With
+    `[embedding] provider = "openai"`, every other model name means the API's `[embedding] model`."""
+    fake = model_name == "fake" or model_name.startswith("fake:")
+    emb = config.embedding
+    if emb.remote and not fake:
+        key: tuple = ("api", *(getattr(emb, f) for f in emb.__dataclass_fields__))
+    else:
+        key = (model_name, config.device, config.dtype, config.batch_size, config.max_seq_length)
     with _CACHE_LOCK:
         if key not in _CACHE:
-            if model_name == "fake" or model_name.startswith("fake:"):
+            if fake:
                 dim = int(model_name.split(":", 1)[1]) if ":" in model_name else 64
                 _CACHE[key] = FakeEmbedder(dim)
+            elif emb.remote:
+                _CACHE[key] = OpenAIEmbedder(emb)
             else:
                 _CACHE[key] = SentenceTransformerEmbedder(
                     model_name,
