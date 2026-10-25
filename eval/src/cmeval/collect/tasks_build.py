@@ -16,6 +16,7 @@ from ..github import GitHub
 from ..labels import LABELER_VERSION, LabelError, identifier_in_query, label_at_commit
 from ..patches import parse_patch, split_lines, split_patch
 from ..repos import RepoError
+from ..status import NullStatus
 from ..files import now, write_json
 from ..tasks import Fix, Issue, Task, assign_split, save_tasks, validate
 from .candidates import FUNNEL_STEPS, GIT_STEPS, Candidate, Funnel, Settings
@@ -177,8 +178,9 @@ def _candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] 
 
 
 def build_tasks(gh: GitHub, candidates: list[Candidate], settings: Settings, funnel: Funnel, *,
-                progress: Callable[[str], None] = lambda message: None) -> list[Task]:
+                progress: Callable[[str], None] = lambda message: None, status: NullStatus | None = None) -> list[Task]:
     """Tasks for one repo's candidates. Fills the git steps of the funnel."""
+    status = status or NullStatus()
     if not candidates:
         funnel.counts.update(dict.fromkeys(GIT_KEYS, 0))
         return []
@@ -195,6 +197,7 @@ def build_tasks(gh: GitHub, candidates: list[Candidate], settings: Settings, fun
 
     passed = dict.fromkeys(GIT_KEYS, 0)
     tasks = []
+    status.part(repo, len(candidates))
     for i, cand in enumerate(candidates, start=1):
         try:
             tasks.append(candidate_to_task(cand, settings, files.get(cand.pr_number), py_files))
@@ -205,6 +208,7 @@ def build_tasks(gh: GitHub, candidates: list[Candidate], settings: Settings, fun
             reached = GIT_KEYS.index(step)
         for key in GIT_KEYS[:reached]:
             passed[key] += 1
+        status.part(repo, len(candidates), i)  # candidates checked; the job's own count is repos
         if i % 100 == 0 or i == len(candidates):
             progress(f"{repo}: {i} of {len(candidates)} candidates checked, {len(tasks)} tasks")
     funnel.counts.update(passed)

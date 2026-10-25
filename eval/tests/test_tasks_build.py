@@ -231,6 +231,21 @@ def test_build_tasks_fills_the_git_steps_and_writes_the_set(history, tmp_path):
     assert meta["stats"]["merge_types"] == {"squash": 1} and meta["config"] == "fresh-t.toml"
 
 
+def test_build_tasks_reports_candidates_checked(history, tmp_path):
+    from cmeval.status import JobStatus
+
+    remote, _ = history
+    fix = remote.commit({"pkg/core.py": CORE_FIXED}, "Fix Store.get (#7)")
+    docs = remote.commit({"docs/a.rst": "a\n"}, "docs (#8)")
+    runner, _ = files_runner({7: ["pkg/core.py"], 8: ["docs/a.rst"]})
+    gh = GitHub(runner=runner, cache_dir=tmp_path / "cache", min_interval=0)
+    funnel = Funnel(repo=REMOTE_REPO, base_branch="main", since="2026-07-01", until="2026-10-22")
+    with JobStatus("collect", "fresh-t", folder=tmp_path / "status", interval=60) as status:
+        build_tasks(gh, [candidate(fix), candidate(docs, pr=8)], settings(), funnel, status=status)
+    assert status.data["parts"] == {REMOTE_REPO: {"done": 2, "total": 2}}
+    assert status.data["done"] == 0  # the job's own count is repos; the CLI advances it
+
+
 def test_apply_check_on_the_bare_clone(history):
     remote, base = history
     fixed = remote.commit({"pkg/core.py": CORE_FIXED}, "fix")

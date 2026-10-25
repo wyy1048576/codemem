@@ -222,6 +222,7 @@ def cmd_repo_stats(args) -> int:
     from .files import now, write_json, write_text_atomic
     from .github import GitHub, GitHubError
     from .paths import default_results_dir
+    from .status import JobStatus
 
     try:
         candidates = [Candidate(name) for name in args.repo or []]
@@ -233,16 +234,21 @@ def cmd_repo_stats(args) -> int:
         since = date.fromisoformat(args.since)
         # Default: yesterday, so every day in the range is complete and a cached answer stays right.
         until = date.fromisoformat(args.until) if args.until else date.today() - timedelta(days=1)
-        gh = GitHub(refresh=args.refresh)
-        results = collect_stats(gh, candidates, since, until, functions=args.functions,
-                                min_python_share=args.min_python_share,
-                                progress=lambda message: print(message, file=sys.stderr, flush=True))
     except ValueError as exc:  # a bad date
         print(f"repo-stats: {exc}", file=sys.stderr)
         return 1
-    except (RepoStatsError, GitHubError) as exc:
-        print(exc, file=sys.stderr)
-        return 1
+    with JobStatus("repo-stats", f"{since} to {until}") as status:
+        progress = _printer(status)
+        gh = GitHub(refresh=args.refresh, progress=progress)
+        status.retries(lambda: gh.retries)
+        try:
+            results = collect_stats(gh, candidates, since, until, functions=args.functions,
+                                    min_python_share=args.min_python_share, progress=progress, status=status)
+        except (RepoStatsError, GitHubError) as exc:
+            print(exc, file=sys.stderr)
+            status.fail(str(exc))
+            return 1
+        status.result(repos=len(results), api_calls=gh.api_calls, cache_hits=gh.cache_hits)
     markdown = render_markdown(results, since, until)
     out = args.out or default_results_dir() / f"{date.today().isoformat()}-repo-stats"
     out.mkdir(parents=True, exist_ok=True)
@@ -253,8 +259,8 @@ def cmd_repo_stats(args) -> int:
         "repos": [asdict(r) for r in results],
     })
     print(markdown)
-    print(f"{out}: stats.md and stats.json written ({gh.api_calls} API calls, {gh.cache_hits} from the cache)",
-          file=sys.stderr)
+    print(f"{out}: stats.md and stats.json written ({gh.api_calls} API calls, {gh.cache_hits} from the cache, "
+          f"{gh.retries} retries)", file=sys.stderr)
     return 0
 
 
@@ -265,9 +271,7 @@ def cmd_collect(args) -> int:
     from .github import GitHub, GitHubError
     from .paths import collect_dir, default_tasks_dir
     from .repos import RepoError, slug
-
-    def progress(message: str) -> None:
-        print(message, file=sys.stderr, flush=True)
+    from .status import JobStatus
 
     try:
         settings = load_settings(args.config)
@@ -284,18 +288,29 @@ def cmd_collect(args) -> int:
             print(f"not in {args.config}: {', '.join(unknown)}", file=sys.stderr)
             return 1
         repos = [name for name in repos if name.lower() in {r.lower() for r in args.repo}]
-    gh = GitHub(refresh=args.refresh, progress=progress)
-    funnels, tasks = [], []
-    try:
-        for repo in repos:
-            candidates, funnel = collect_candidates(gh, repo, settings, progress=progress)
-            funnels.append(funnel)
-            if not args.dry_run:
-                tasks += build_tasks(gh, candidates, settings, funnel, progress=progress)
-                write_candidates(collect_dir() / settings.name / slug(repo), candidates, funnel)
-    except (GitHubError, RepoError) as exc:
-        print(exc, file=sys.stderr)
-        return 1
+    with JobStatus("collect", settings.name) as status:
+        progress = _printer(status)
+        gh = GitHub(refresh=args.refresh, progress=progress)
+        status.retries(lambda: gh.retries)
+        status.total(len(repos), "repos")
+        funnels, tasks, n_candidates = [], [], 0
+        try:
+            for number, repo in enumerate(repos, start=1):
+                status.stage(f"repo {number}/{len(repos)}: {repo}, search PRs and issues")
+                candidates, funnel = collect_candidates(gh, repo, settings, progress=progress)
+                funnels.append(funnel)
+                n_candidates += len(candidates)
+                if not args.dry_run:
+                    status.stage(f"repo {number}/{len(repos)}: {repo}, check candidates")
+                    tasks += build_tasks(gh, candidates, settings, funnel, progress=progress, status=status)
+                    write_candidates(collect_dir() / settings.name / slug(repo), candidates, funnel)
+                status.advance()
+        except (GitHubError, RepoError) as exc:
+            print(exc, file=sys.stderr)
+            status.fail(str(exc))
+            return 1
+        status.result(candidates=n_candidates, tasks=None if args.dry_run else len(tasks), api_calls=gh.api_calls,
+                      cache_hits=gh.cache_hits)
     print(f"# {settings.name}: {settings.since} to {settings.until}\n")
     print(render_funnel(funnels))
     if args.dry_run:
@@ -315,7 +330,7 @@ def cmd_dashboard(args) -> int:
     try:
         serve(args.port, open_browser=args.open, progress=lambda message: print(message, file=sys.stderr, flush=True))
     except OSError as exc:  # for example the port is in use
-        print(f"dashboard: {exc}", file=sys.stderr)
+        print(f"dashboard: {exc} (port {args.port}; another one: --port {args.port + 1})", file=sys.stderr)
         return 1
     return 0
 

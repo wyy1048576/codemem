@@ -61,7 +61,7 @@ def test_repo_stats_writes_tables_and_json(tmp_path, monkeypatch, capsys):
         return json.dumps(empty_page if args[1] == "graphql" else answers[args[1]])
 
     real = cmeval.github.GitHub
-    monkeypatch.setattr(cmeval.github, "GitHub", lambda refresh=False: real(runner=runner, min_interval=0))
+    monkeypatch.setattr(cmeval.github, "GitHub", lambda refresh=False, progress=None: real(runner=runner, min_interval=0))
     out = tmp_path / "stats"
     code = main(["repo-stats", "--repo", "acme/demo", "--since", "2026-07-01", "--until", "2026-07-02", "--out", str(out)])
     assert code == 0
@@ -109,3 +109,48 @@ def test_collect_dry_run_writes_nothing_and_full_run_writes(tmp_path, monkeypatc
 
     assert main(["collect", str(config), "--repo", "other/repo"]) == 1
     assert "not in" in capsys.readouterr().err
+
+    from cmeval.paths import status_dir
+    from cmeval.status import read_all
+
+    dry, full = sorted((job for job in read_all(status_dir()) if job["job"] == "collect"), key=lambda job: job["started"])
+    assert (full["name"], full["state"], full["done"], full["total"], full["unit"]) == ("fresh-t", "done", 1, 1, "repos")
+    assert full["result"]["tasks"] == 0 and dry["result"]["tasks"] is None
+
+
+def test_repo_stats_status_shows_retries_and_failures(tmp_path, monkeypatch, capsys):
+    import json
+
+    import cmeval.github
+    from cmeval.github import GitHubError
+    from cmeval.paths import status_dir
+    from cmeval.status import read_all
+
+    answers = {
+        "repos/acme/demo": {"default_branch": "main", "size": 1000, "archived": False},
+        "repos/acme/demo/languages": {"Python": 2000},
+    }
+    empty_page = {"data": {"search": {"issueCount": 0, "nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}},
+                           "rateLimit": {"remaining": 4000}}}
+    failures = ["gh api failed: HTTP 502"]  # the first call fails once, then works
+
+    def runner(args, stdin):
+        if failures:
+            raise GitHubError(failures.pop())
+        if args[1] == "repos/gone/repo":
+            raise GitHubError("gh api failed: HTTP 404")
+        return json.dumps(empty_page if args[1] == "graphql" else answers[args[1]])
+
+    real = cmeval.github.GitHub
+    monkeypatch.setattr(cmeval.github, "GitHub",
+                        lambda refresh=False, progress=None: real(runner=runner, min_interval=0, sleep=lambda s: None,
+                                                                  progress=progress))
+    args = ["--since", "2026-07-01", "--until", "2026-07-02", "--out", str(tmp_path / "stats")]
+    assert main(["repo-stats", "--repo", "acme/demo", *args]) == 0
+    assert "trying again" in capsys.readouterr().err  # retry messages are no longer lost
+    assert main(["repo-stats", "--repo", "gone/repo", *args]) == 1
+    good, bad = sorted(read_all(status_dir()), key=lambda job: job["started"])
+    assert (good["job"], good["name"], good["state"], good["done"], good["total"]) == \
+        ("repo-stats", "2026-07-01 to 2026-07-02", "done", 1, 1)
+    assert good["retries"] == 1 and any("trying again" in line for line in good["log"])
+    assert bad["state"] == "failed" and "HTTP 404" in bad["error"]
