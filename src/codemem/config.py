@@ -102,7 +102,7 @@ class Config:
     preview_chars: int = 800
     debounce_ms: int = 500  # start an update once saves stop for this long ...
     debounce_max_wait_ms: int = 2000  # ... or at the latest this long after the first save
-    catchup_budget_ms: int = 2500  # a search first applies and embeds pending edits for at most this long
+    catchup_budget_ms: int = 4000  # a search first applies and embeds pending edits for at most this long
 
     def enabled_vec_types(self) -> list[str]:
         return [name for name, v in self.vectors.items() if v.enabled]

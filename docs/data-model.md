@@ -465,7 +465,7 @@ The tool names stay stable, so other front-ends and versions can be compared.
 
 **Freshness contract (v3).** `search_code` first applies every edit the watcher has seen,
 including any the background writer is still applying, then embeds the queue (newest edits first)
-for at most `catchup_budget_ms` (2.5 s), then searches. If the budget runs out, keyword and link
+for at most `catchup_budget_ms` (4 s), then searches. If the budget runs out, keyword and link
 results are current, and a note (phase 2) names the files whose vectors are still being computed.
 
 **stdout carries only MCP messages;** logs go to stderr.

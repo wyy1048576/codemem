@@ -276,7 +276,7 @@ changed. A search in the meantime sees the old index.
    background writer: 0.5 s after the     search: first apply every save seen so far
    last save (at most every 2 s while     (waiting for any the writer is applying),
    saves keep coming)                     then embed the queue, newest edits first,
-             │                            for at most 2.5 s; then answer
+             │                            for at most 4 s; then answer
              └──────────────┬───────────────────────┘
                             ▼
    stage A, structure (milliseconds): chunks, keywords, calls, links, and the queue of
@@ -289,7 +289,7 @@ changed. A search in the meantime sees the old index.
 
 **The guarantee.** A search reflects every file saved before it started: keywords and links
 always, and ranking by meaning whenever the queue fits in the catch-up budget
-(`catchup_budget_ms`, 2.5 s). That covers ordinary edits: a one-function edit took 0.11–0.17 s
+(`catchup_budget_ms`, 4 s). That covers ordinary edits: a one-function edit took 0.11–0.17 s
 with the real model on the sample repo. A bigger change (a branch switch, a reformat) gets what
 fits, newest edits first, and the response counts what is still queued (shown to the agent from
 phase 2). While a chunk has no vector yet, it can only score through keywords, so it ranks lower
