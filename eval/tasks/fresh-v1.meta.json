@@ -1,0 +1,347 @@
+{
+  "config": "fresh-v1.toml",
+  "since": "2026-07-01",
+  "until": "2026-10-22",
+  "settings": {
+    "min_body_chars": 100,
+    "extra_bots": [],
+    "max_code_files": 5,
+    "max_code_lines": 200
+  },
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "1587a1134552be9ce807ecefdf0bb2ceaa039d35",
+    "dirty": false
+  },
+  "labeler": "cmeval-labels/2",
+  "created": "2026-10-25T01:57:08+00:00",
+  "funnel_steps": [
+    {
+      "key": "merged",
+      "text": "merged into the default branch in the date range"
+    },
+    {
+      "key": "opened_after_cutoff",
+      "text": "the fix PR was opened on or after the start date (its code was not public before)"
+    },
+    {
+      "key": "not_bot",
+      "text": "author is not a bot"
+    },
+    {
+      "key": "one_link",
+      "text": "links exactly one issue in the same repo (GitHub's list or the SWE-bench regex)"
+    },
+    {
+      "key": "is_issue",
+      "text": "the link is an issue that exists (not a PR)"
+    },
+    {
+      "key": "issue_before_pr",
+      "text": "the issue was opened before the fix PR (not written after the fix)"
+    },
+    {
+      "key": "body_ok",
+      "text": "body (as of when the fix PR was opened) has the minimum length"
+    },
+    {
+      "key": "no_leak",
+      "text": "query does not name the fix PR or a fix commit"
+    },
+    {
+      "key": "base_found",
+      "text": "base commit found from the merge type (Decision 7)"
+    },
+    {
+      "key": "files_match",
+      "text": "our patch touches exactly the PR's files"
+    },
+    {
+      "key": "applies",
+      "text": "the code patch applies at the base commit"
+    },
+    {
+      "key": "size_ok",
+      "text": "1 to max_code_files code files and at most max_code_lines changed code lines"
+    },
+    {
+      "key": "labeled",
+      "text": "labeled, with at least one gold file that exists at the base commit"
+    }
+  ],
+  "repos": {
+    "home-assistant/core": {
+      "base_branch": "dev",
+      "counts": {
+        "merged": 7828,
+        "opened_after_cutoff": 7530,
+        "not_bot": 7300,
+        "one_link": 1214,
+        "is_issue": 1211,
+        "issue_before_pr": 1202,
+        "body_ok": 1202,
+        "no_leak": 1202,
+        "base_found": 1202,
+        "files_match": 1199,
+        "applies": 1199,
+        "size_ok": 756,
+        "labeled": 756
+      },
+      "link_methods": {
+        "both": 1185,
+        "regex": 5,
+        "list": 12
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 298,
+        "bot author": 230,
+        "no linked issue": 6037,
+        "several linked issues": 49,
+        "link is a PR, not an issue": 3,
+        "issue opened after the fix PR": 9,
+        "too many changed lines": 22,
+        "no code files": 394,
+        "too many code files": 27,
+        "file list differs": 3
+      }
+    },
+    "pandas-dev/pandas": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 1346,
+        "opened_after_cutoff": 1257,
+        "not_bot": 1193,
+        "one_link": 497,
+        "is_issue": 495,
+        "issue_before_pr": 494,
+        "body_ok": 492,
+        "no_leak": 492,
+        "base_found": 492,
+        "files_match": 491,
+        "applies": 491,
+        "size_ok": 352,
+        "labeled": 352
+      },
+      "link_methods": {
+        "both": 481,
+        "list": 10,
+        "regex": 1
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 89,
+        "no linked issue": 666,
+        "bot author": 64,
+        "several linked issues": 30,
+        "link is a PR, not an issue": 2,
+        "short body": 2,
+        "issue opened after the fix PR": 1,
+        "no code files": 120,
+        "too many code files": 10,
+        "too many changed lines": 9,
+        "more than 100 files": 1
+      }
+    },
+    "vllm-project/vllm": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 5344,
+        "opened_after_cutoff": 4978,
+        "not_bot": 4978,
+        "one_link": 507,
+        "is_issue": 488,
+        "issue_before_pr": 466,
+        "body_ok": 466,
+        "no_leak": 465,
+        "base_found": 465,
+        "files_match": 465,
+        "applies": 465,
+        "size_ok": 381,
+        "labeled": 381
+      },
+      "link_methods": {
+        "both": 435,
+        "list": 19,
+        "regex": 11
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 366,
+        "no linked issue": 4459,
+        "several linked issues": 12,
+        "link is a PR, not an issue": 19,
+        "issue opened after the fix PR": 22,
+        "leak": 1,
+        "no code files": 33,
+        "too many changed lines": 18,
+        "too many code files": 33
+      }
+    },
+    "apache/airflow": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 2978,
+        "opened_after_cutoff": 2762,
+        "not_bot": 2552,
+        "one_link": 326,
+        "is_issue": 320,
+        "issue_before_pr": 316,
+        "body_ok": 315,
+        "no_leak": 315,
+        "base_found": 315,
+        "files_match": 313,
+        "applies": 313,
+        "size_ok": 230,
+        "labeled": 229
+      },
+      "link_methods": {
+        "list": 254,
+        "both": 59,
+        "regex": 2
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 216,
+        "no linked issue": 2224,
+        "bot author": 210,
+        "several linked issues": 2,
+        "issue opened after the fix PR": 4,
+        "short body": 1,
+        "link is a PR, not an issue": 6,
+        "too many changed lines": 18,
+        "no code files": 35,
+        "too many code files": 30,
+        "more than 100 files": 2,
+        "only new files": 1
+      }
+    },
+    "ray-project/ray": {
+      "base_branch": "master",
+      "counts": {
+        "merged": 1343,
+        "opened_after_cutoff": 1211,
+        "not_bot": 1211,
+        "one_link": 229,
+        "is_issue": 227,
+        "issue_before_pr": 221,
+        "body_ok": 221,
+        "no_leak": 221,
+        "base_found": 221,
+        "files_match": 221,
+        "applies": 221,
+        "size_ok": 146,
+        "labeled": 145
+      },
+      "link_methods": {
+        "both": 218,
+        "list": 3
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 132,
+        "no linked issue": 980,
+        "several linked issues": 2,
+        "issue opened after the fix PR": 6,
+        "link is a PR, not an issue": 2,
+        "no code files": 32,
+        "too many code files": 31,
+        "too many changed lines": 12,
+        "only new files": 1
+      }
+    },
+    "python/cpython": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 1780,
+        "opened_after_cutoff": 1549,
+        "not_bot": 1542,
+        "one_link": 144,
+        "is_issue": 143,
+        "issue_before_pr": 141,
+        "body_ok": 139,
+        "no_leak": 139,
+        "base_found": 139,
+        "files_match": 139,
+        "applies": 139,
+        "size_ok": 89,
+        "labeled": 89
+      },
+      "link_methods": {
+        "both": 104,
+        "list": 33,
+        "regex": 2
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 231,
+        "no linked issue": 1395,
+        "bot author": 7,
+        "several linked issues": 3,
+        "issue opened after the fix PR": 2,
+        "short body": 2,
+        "issue not found": 1,
+        "no code files": 42,
+        "too many code files": 6,
+        "too many changed lines": 2
+      }
+    },
+    "huggingface/transformers": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 1203,
+        "opened_after_cutoff": 1122,
+        "not_bot": 1085,
+        "one_link": 174,
+        "is_issue": 172,
+        "issue_before_pr": 168,
+        "body_ok": 168,
+        "no_leak": 168,
+        "base_found": 168,
+        "files_match": 162,
+        "applies": 162,
+        "size_ok": 132,
+        "labeled": 132
+      },
+      "link_methods": {
+        "both": 164,
+        "list": 3,
+        "regex": 1
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 81,
+        "no linked issue": 907,
+        "bot author": 37,
+        "several linked issues": 4,
+        "issue opened after the fix PR": 4,
+        "link is a PR, not an issue": 2,
+        "too many code files": 25,
+        "more than 100 files": 6,
+        "no code files": 4,
+        "too many changed lines": 1
+      }
+    }
+  },
+  "stats": {
+    "tasks": 2084,
+    "tasks_per_repo": {
+      "apache/airflow": 229,
+      "home-assistant/core": 756,
+      "huggingface/transformers": 132,
+      "pandas-dev/pandas": 352,
+      "python/cpython": 89,
+      "ray-project/ray": 145,
+      "vllm-project/vllm": 381
+    },
+    "mean_gold_files": 1.5,
+    "mean_gold_classes": 0.98,
+    "mean_gold_functions": 1.93,
+    "share_no_gold_function": 0.155,
+    "share_module_level_change": 0.515,
+    "share_partial_labels": 0.088,
+    "share_identifier_in_query": 0.62,
+    "share_with_unretrievable_functions": 0.234,
+    "tasks_per_split": {
+      "dev": 399,
+      "test": 1685
+    },
+    "share_gold_all_python": 0.914,
+    "merge_types": {
+      "squash": 2084
+    }
+  }
+}
