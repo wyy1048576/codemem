@@ -56,10 +56,11 @@ repo file ──► File row (status + reason)
 
 | Record | One per | Notes |
 |---|---|---|
-| File | file the walk saw that has a supported extension | skipped files included, with a reason (v3) |
+| File | file the walk saw that has a supported extension | skipped files included, with a reason; partly parsed files are marked too (v3) |
 | Chunk | thing a search can return | |
 | Edge | caller–callee pair | |
 | Vector row | embedded text part | |
+| Queue row **(v3)** | chunk whose texts may be out of date | the to-do list from stage A to stage B (`dirty_texts`, §8) |
 | FAISS | vector type | rebuildable at any time from the vector rows |
 
 ---
@@ -73,7 +74,7 @@ repo file ──► File row (status + reason)
 | `content_hash` | sha256 of the bytes, first 20 hex chars | `9f2c…` |
 | `mtime`, `size` | the quick pre-check: equal mtime and size means unchanged, so the file isn't read | |
 | `status` | `ok` or `skipped` | `ok` |
-| `reason` **(v3)** | for `skipped`: `too_large`, `generated`, `minified` or `binary` | `too_large` |
+| `reason` **(v3)** | for `skipped`: `too_large`, `generated`, `minified` or `binary`; for `ok`: `parse_errors` when tree-sitter could only partly parse the file (what it recovered is indexed) | `too_large` |
 
 **Which files are read:**
 - Every extension of a supported language (`codemem languages`).
@@ -354,7 +355,8 @@ to the columns **by position**, so the column order in the table, in `upsert_chu
 
 ```
 <index dir>/                         default ~/.codemem/indexes/<repo>-<hash8 of the repo path>/
-  index.db                           SQLite (WAL): meta, files, chunks, fts (+ fts_vocab, v3), calls, edges, vectors
+  index.db                           SQLite (WAL): meta, files, chunks, fts (+ fts_vocab, v3), calls, edges, vectors,
+                                     dirty_texts (v3: the queue)
   vec_code.faiss, vec_code.json      derived exact search index + {epoch, dim, count, embedder}
   vec_usage.faiss, vec_usage.json
   write.lock                         one writer at a time (OS file lock)
@@ -366,6 +368,8 @@ $CODEMEM_HOME/cache/vectors.db       shared vector cache: (embedder, text_hash) 
 - `repo_path`, `indexed_commit`, `indexed_at`;
 - `codemem_version`, `index_settings`, `last_update` (the last `IndexStats`);
 - `coverage` **(v3)**: ignored and non-code counts;
+- `last_scan_at` **(v3)**: when the last full check started (files saved within 2 s of it are re-hashed next time);
+- `dirty_seq` **(v3)**: the queue's sequence number, one per stage-A commit;
 - per vector type: `vec.<type>.embedder`, `vec.<type>.full_dim`, `vec.<type>.dim_setting`,
   `vec.<type>.epoch`.
 
@@ -381,21 +385,32 @@ it doesn't own.
 - **FAISS is derived. It is kept correct by three rules:**
   1. every transaction that changes a vector type's rows bumps `vec.<type>.epoch`;
   2. the in-memory index is patched only after the commit, and its epoch is set last;
-  3. a saved `vec_<type>.faiss` is used only if its `.json` epoch equals `meta` and its vector
-     count equals the row count. Otherwise it is rebuilt from the rows.
+  3. **(v3)** an index that is behind catches up by vector id: vector rows never change in place
+     (a new vector is a new row, and ids are never reused), so the ids missing on either side are
+     the whole difference. This applies to a saved `vec_<type>.faiss` (used if its dim and embedder
+     match, whatever epoch it was saved at) and to another process's writes. In v2 any mismatch
+     rebuilt the index from all rows.
 - **Saving FAISS:**
   - the data file is written first and its note second, each by atomic rename;
   - **(v3)** the MCP server saves lazily (after 30 s idle, on shutdown, on refresh), while the CLI
     and the blocking `update()` save at once;
   - **(v3)** the index is copied while holding the lock and written after releasing it, so
     searches don't wait.
+- **(v3) The queue (`dirty_texts`: chunk id, sequence number).** Stage A writes a row for every
+  chunk whose texts may have changed, in the same transaction as the change. Stage B rebuilds those
+  texts, embeds the changed ones, and deletes a row only if its number is unchanged (a chunk edited
+  again meanwhile stays queued). A crash between the stages leaves the rows, so the next start
+  finishes the work. "Is anything pending?" is a count of this table.
 - **(v3) Settings check:** at each update, `meta.index_settings` is compared with the current
-  `Config.index_settings()`, and any difference rebuilds the index. A chunker or text change would
+  `Config.index_settings()`. A difference redoes only what that setting affects (decisions D23):
+  vectors (re-embed that type), texts (rebuild every text, re-embed the changed ones), links
+  (relink every call), or a rebuild (chunker version, file selection, BM25 tokenization, block
+  size; vectors of unchanged texts come back from the cache). A chunker or text change would
   otherwise never reach files that don't change.
 - **What goes wrong, and what happens:**
-  - A crash before saving, a corrupt file, or another process writing: the search index is rebuilt
-    from the rows on next use. No model call, no re-embedding.
-  - A process sees an epoch change made by another process: it reloads before searching.
+  - A crash before saving: the saved file is behind and catches up by id at the next load. A corrupt
+    or missing file is rebuilt from the rows. No model call, no re-embedding, either way.
+  - A process sees an epoch change made by another process: it catches up by id before searching.
 - **Large deletions** give pages back to the OS (`auto_vacuum = INCREMENTAL`).
 
 ---
@@ -421,7 +436,8 @@ What stays the same when code changes, and what is recomputed:
 | Version | Where | Bump it when | Effect |
 |---|---|---|---|
 | `SCHEMA_VERSION` (3 in v3) | `store.py` | tables or columns change | an older index is wiped and rebuilt, with a warning (cheap with the vector cache) |
-| `TEXT_FORMAT_VERSION` (3 in v3) | `config.py` | a text builder's output changes | part of `index_settings()`, so the index is rebuilt (v3) and the eval keeps the indexes apart |
+| `CHUNKER_VERSION` (2 in v3) | `config.py` | chunking changes (kinds, ranges, keys, calls) | part of `index_settings()`: the index is rebuilt, with vectors of unchanged texts from the cache |
+| `TEXT_FORMAT_VERSION` (3 in v3) | `config.py` | a text builder's output changes | part of `index_settings()`: every text is rebuilt and the changed ones re-embedded, and the eval keeps the indexes apart |
 | embedder key | `embedder.py` | automatic | the vector type with a new key is re-embedded |
 
 `Config.index_settings()` lists every index-time setting. The eval adapter hashes it into its

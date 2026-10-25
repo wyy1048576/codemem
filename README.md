@@ -11,9 +11,9 @@ unless you choose an embedding API.
 fails on these and grep takes many tries. codemem works next to grep (which stays the tool for
 exact strings), not instead of it.
 
-**Status:** the v3 core (incremental updates, freshness, coverage, API embeddings, MCP changes) is
-being built on branch `andre/backend-v3`. [docs/architecture.md](docs/architecture.md) §2 says
-which parts already work.
+**Status:** on branch `andre/backend-v3`, the v3 core works: incremental updates, a fresh index
+before every search, and a record of every file that isn't indexed. API embeddings and the MCP tool
+changes come next. [docs/architecture.md](docs/architecture.md) §2 has the status of each part.
 
 | Doc | For |
 |---|---|

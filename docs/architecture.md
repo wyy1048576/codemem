@@ -74,15 +74,15 @@ function through every stage.
 
 | # | Component | Module | Job | Status |
 |---|---|---|---|---|
-| 1 | Watcher | `watcher.py`, `service.py` | turn file events into a set of changed paths; trigger updates | v2 works (but drops the paths); v3 changes in progress |
-| 2 | Indexer | `indexer.py` | one update function for the first build, reconciles and single saves | v2 works (whole-repo work on every save); v3 incremental in progress |
-| 3 | Chunker | `languages/`, `chunker.py` | functions, methods, classes and blocks in nine languages | works; v3 fixes in progress (§5) |
+| 1 | Watcher | `watcher.py`, `service.py` | turn file events into a set of changed paths; trigger updates | v3 works: changed paths, quiet period and maximum wait, git branch switches, polling fallback, catch-up before every search. To do (decided Oct 25): a search hands pending saves to the writer instead of applying them itself; the writer checks for new saves after every batch; model calls sized by text length; `get_chunk` catches up too |
+| 2 | Indexer | `indexer.py` | one update function for the first build, reconciles and single saves | v3 works: two stages and a persistent queue, the exact usage ripple, settings tiers, verify mode. To do: inside a changed file, re-check only the chunks that changed (huge files) |
+| 3 | Chunker | `languages/`, `chunker.py` | functions, methods, classes and blocks in nine languages | works; v3 fixes done (Python comments, huge statements split by content). To do: one comment rule for every language |
 | 4 | Call graph | `callgraph.py` | link each call to the definitions of that name | works |
-| 5 | Texts | `texts.py` | what gets embedded: code with a context header, usage (callers, tests) | works; v3 window fixes in progress |
-| 6 | Embedder | `embedder.py`, `vectorcache.py` | local model by default; any OpenAI-compatible API (v3) | local works; API in progress |
-| 7 | Store | `store.py` | SQLite holds everything; FAISS is a derived search index | works; v3 lazy saves in progress |
-| 8 | Search | `search.py`, `render.py` | BM25 + one vector search per text type, merged by rank, rendered as cards | works; v3 catch-up done, query clean-up to do |
-| 9 | Front-ends | `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP tools for agents; CLI for people and scripts | works; v3 tool changes in progress |
+| 5 | Texts | `texts.py` | what gets embedded: code with a context header, usage (callers, tests) | works; v3 window fixes done |
+| 6 | Embedder | `embedder.py`, `vectorcache.py` | local model by default; any OpenAI-compatible API (v3) | local works; the OpenAI-compatible API is phase 2 |
+| 7 | Store | `store.py` | SQLite holds everything; FAISS is a derived search index | works; v3 queue, catch-up by vector id and lazy saves done |
+| 8 | Search | `search.py`, `render.py` | BM25 + one vector search per text type, merged by rank, rendered as cards | works; v3 catch-up done; query clean-up and neutral weights are phase 2 |
+| 9 | Front-ends | `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP tools for agents; CLI for people and scripts | works; v3 tool changes (`refresh_index`, filters, freshness note, `init`) are phase 2 |
 
 **Product shape** (unchanged since Week 1):
 - One local Python package and one command, `codemem`, for both the CLI and the MCP server.
@@ -344,7 +344,7 @@ tests). It reports any difference between the incremental result and a from-scra
 | a git checkout is still writing files | updates wait for it (up to 10 s; a search only up to its budget, then it reports those files as pending) |
 | a file changes while being indexed | its event lands in the dirty set again |
 | `.gitignore`, `.codemem.toml` or the git branch changes | a full reconcile |
-| a chunker or settings upgrade | stored settings differ from the current ones, so the index is rebuilt (cheap with the cache) |
+| a chunker or settings upgrade | stored settings differ from the current ones; only what the setting affects is redone: vectors, texts, links, or a rebuild with vectors from the cache (D23) |
 | OS file events don't work (network drives, WSL, Linux watch limits) | a warning, then a reconcile every 10 s |
 
 ## 9. Search
