@@ -450,19 +450,26 @@ The contract is in [data-model.md](data-model.md) §12.
 ## 12. Performance
 
 Measured on the M1 laptop (jina 0.5B on the GPU). vLLM: 6,235 files, 102k chunks, 145k vectors.
+The update timings use the fake model, so they are codemem's own work. The real model adds about
+0.1 s per changed text: a one-function edit has one. Data: `docs/benchmarks/2026-10-24-vllm-freshness-v2.json`,
+`2026-10-25-vllm-freshness-v3.json`, `2026-10-25-vllm-search-latency-v3.json`.
 
-| | v2 (measured) | v3 target |
-|---|---|---|
-| save → searchable, one-function edit, vLLM | 8 s + queueing | < 1 s |
-| update with nothing changed, vLLM | 6.8 s | < 0.5 s |
-| search, 10-word query, vLLM | 0.27 s (embedding the query: 0.15 s) | < 0.3 s |
-| search, 250-word query, vLLM | 1.64 s (BM25: 1.1 s) | < 0.7 s |
-| exact vector search, 109k vectors | 9–10 ms | same |
-| full build, `requests` (801 chunks) | 224 s (the MVP: 469 s) | same |
-| rebuild with a warm vector cache | no model calls | same |
+| | v2 | v3 target | v3 measured (Oct 25) |
+|---|---|---|---|
+| one-function edit until searchable, vLLM | 8.5 s, plus waiting | < 1 s | **0.48 s** for the first edit in a process, **0.11 s** after (18 chunks queued, 2 relinked) |
+| update with nothing changed (a full check), vLLM | 9.5 s | < 0.5 s | **0.54 s**; a save never runs one |
+| search, 10-word query, vLLM | 0.27 s | < 0.3 s | **0.115 s** (BM25 40 ms, the query's embedding 49 ms, vectors 23 ms) |
+| search, 250-word query, vLLM | 1.64 s (BM25: 1.1 s) | < 0.7 s | **0.63 s** (BM25 0.39 s, the query's embedding 0.21 s) |
+| save, then search, through MCP, sample repo, real model | the old index for up to 9 s | | **0.13–0.4 s**, edit included |
+| the first MCP search after startup (the model loads in about 7 s) | waited for the model | | at most 4 s: keywords and a note |
+| FAISS save | 2.2 s on every update, blocking searches | lazy | 0.93 s, after 30 s idle, off the search path |
+| full build, vLLM, fake model | 72 s | same | 72 s |
+| eval: 13 dev tasks, update mode | 1 h 37 min | | 82 s for 6 systems, every vector from the shared cache |
+| full build, `requests` (801 chunks), real model | 224 s (the MVP: 469 s) | same | not re-measured |
 
-**Indexing is almost all embedding.** On the M1 that's about 0.2 s per text, so the first build
-of a large repo needs a CUDA GPU or an embedding API. Updates after that are small.
+**Indexing is almost all embedding.** The local model embeds about 8.5 texts per second on the M1
+(0.02 s for a short function, 0.5 s for a long one), so the first build of a large repo (vLLM:
+145k texts, about 5 hours) needs a CUDA GPU or an embedding API. Updates after that are small.
 
 ## 13. Module map
 

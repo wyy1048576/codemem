@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "codemem": "0.2.0",
+    "machine": "arm64",
+    "python": "3.11.2",
+    "repo": ".cache/repos/vllm",
+    "file": "vllm/v1/core/sched/scheduler.py",
+    "model": "fake:896",
+    "update_with_paths": false
+  },
+  "results": {
+    "full build": {
+      "wall_s": 72.025,
+      "files_changed": 6235,
+      "embedded": {
+        "code": 109272,
+        "usage": 35167
+      },
+      "model_embedded": {
+        "code": 109212,
+        "usage": 34936
+      },
+      "chunks_added": 102114,
+      "chunks_updated": 0,
+      "timings": {
+        "scan": 1.353,
+        "chunk": 17.031,
+        "write_chunks": 12.931,
+        "build_texts": 6.294,
+        "embed": 18.437,
+        "write_vectors": 14.778,
+        "total": 71.766
+      }
+    },
+    "no-op update (scan)": {
+      "wall_s": 9.491,
+      "files_changed": 0,
+      "embedded": {
+        "code": 0,
+        "usage": 0
+      },
+      "model_embedded": {
+        "code": 0,
+        "usage": 0
+      },
+      "chunks_added": 0,
+      "chunks_updated": 0,
+      "timings": {
+        "scan": 0.405,
+        "chunk": 0.0,
+        "write_chunks": 3.365,
+        "build_texts": 5.582,
+        "embed": 0.0,
+        "write_vectors": 0.0,
+        "total": 9.461
+      }
+    },
+    "load the search indexes (once per process)": {
+      "wall_s": 0.0
+    },
+    "one-function edit (scan)": {
+      "wall_s": 8.474,
+      "files_changed": 1,
+      "embedded": {
+        "code": 1,
+        "usage": 0
+      },
+      "model_embedded": {
+        "code": 1,
+        "usage": 0
+      },
+      "chunks_added": 0,
+      "chunks_updated": 35,
+      "timings": {
+        "scan": 0.335,
+        "chunk": 0.023,
+        "write_chunks": 2.342,
+        "build_texts": 4.721,
+        "embed": 0.0,
+        "write_vectors": 0.901,
+        "total": 8.447
+      }
+    },
+    "undo (scan)": {
+      "wall_s": 7.095,
+      "files_changed": 1,
+      "embedded": {
+        "code": 1,
+        "usage": 0
+      },
+      "model_embedded": {
+        "code": 1,
+        "usage": 0
+      },
+      "chunks_added": 0,
+      "chunks_updated": 35,
+      "timings": {
+        "scan": 0.317,
+        "chunk": 0.021,
+        "write_chunks": 2.246,
+        "build_texts": 3.709,
+        "embed": 0.0,
+        "write_vectors": 0.639,
+        "total": 7.07
+      }
+    },
+    "save the search indexes": {
+      "wall_s": 0.0
+    }
+  }
+}

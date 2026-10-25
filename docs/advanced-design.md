@@ -144,7 +144,7 @@ Two warnings frame everything:
   - Ideas 2 and 3 (query-side compression) both target this.
 
 **What the 13 local dev tasks show, task by task** (v2 default; numbers in
-[decisions.md](decisions.md) §4).
+[decisions.md](decisions.md) §5).
 
 - Of 12 tasks with function gold, v2 puts a gold function in the top 10 for 8, and every gold function for 7 (success@10 0.583).
 - The 4 misses (seaborn-3069, flask-5014, pytest-5787, pytest-7324) and one near-miss (pytest-10081) fall into four patterns. Each points at an idea below.

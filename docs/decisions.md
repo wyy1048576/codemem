@@ -124,7 +124,38 @@ built.
 
 ---
 
-## 4. Evidence behind the v2 choices
+## 4. Evidence behind the v3 choices
+
+The same 13 small-repo dev tasks as §5 (requests 5, pytest 5, seaborn 2, flask 1), on the M1,
+with the same model. Run `eval/results/2026-10-25-subset-v3/` (codemem `96bc2bc`,
+`eval/configs/codemem-v3.toml`). With 12 or 13 tasks, one task moves MRR by up to 0.08: **read
+these as indicative only.** The full dev50 (Andrew's machine or a GPU) decides.
+
+| | MVP | v2, no weights | v2 default (weights) | **v3 default** | v3 with v2's weights |
+|---|---|---|---|---|---|
+| file MRR | 0.520 | 0.546 | 0.555 | **0.620** | 0.622 |
+| class MRR | 0.333 | 0.391 | 0.400 | **0.503** | 0.505 |
+| function MRR | 0.355 | 0.386 | 0.410 | **0.397** | 0.410 |
+| function R@10 | 0.417 | 0.500 | 0.625 | **0.500** | 0.625 |
+
+- **Against grep, task by task** (grep's rows from the Oct 23 dev50 run, which covers these tasks):
+  - grep-fn-plus, the tuned grep baseline: v3 is about level (file MRR +0.079, class +0.055,
+    function MRR −0.011, function R@10 −0.014; none significant);
+  - grep-fn: v3 is far ahead (file MRR +0.367, p = 0.010; function R@10 +0.292);
+  - grep: file MRR +0.456 (p = 0.002).
+- **The machinery, with the same weights:** v3 equals or beats v2 everywhere (file MRR +0.067,
+  class +0.105, function MRR and R@10 equal).
+- **Neutral weights (D24)** cost one task's function R@10 here (0.625 → 0.500) and about 0.01
+  MRR. The eval's answers are never tests, which is why the weights won on it.
+- **The BM25 query rule (D32):**
+  - stopwords only keeps keyword-only accuracy (file MRR 0.460 → 0.453), and the full system is
+    better with it than with every word (0.526 → 0.620);
+  - the first v3 rule, the 32 rarest words, cut keyword-only file MRR to 0.291;
+  - dropping words in over 5% of chunks: keyword-only 0.378, full system 0.631.
+- **Speed:** 13 tasks × 6 systems took 82 s, with every vector from the shared cache. v2's
+  subset run took 1 h 37 min.
+
+## 5. Evidence behind the v2 choices
 
 These are the 13 small-repo dev tasks (requests 5, pytest 5, seaborn 2, flask 1), run on the M1
 with the same model as the MVP. With 12 tasks at function level, one task moving changes function
