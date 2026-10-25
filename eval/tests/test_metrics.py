@@ -112,6 +112,17 @@ def test_anthropic_counter_subtracts_overhead_and_caches(tmp_path):
     assert again.count(["one two three"]) == [3] and again.client.calls == []  # cache and overhead on disk
 
 
+def test_anthropic_counter_reports_counts_to_the_status(tmp_path):
+    from cmeval.status import JobStatus
+
+    with JobStatus("score", "r1", folder=tmp_path / "status", interval=60) as status:
+        AnthropicCounter(client=FakeClient(), cache_dir=tmp_path, rpm=0, status=status).count(["one", "two", "", "one"])
+        assert status.data["done"] == 2  # unique texts that are not empty
+    with JobStatus("score", "r2", folder=tmp_path / "status", interval=60) as again:
+        AnthropicCounter(client=FakeClient(), cache_dir=tmp_path, rpm=0, status=again).count(["one", "three"])
+        assert again.data["done"] == 2 and again._session_done == 1  # "one" came from the cache
+
+
 def test_anthropic_counter_error_is_clear_and_has_no_key(tmp_path):
     counter = AnthropicCounter(client=FakeClient(fail=True), cache_dir=tmp_path)
     with pytest.raises(TokenCountError, match="--tokens estimate"):
@@ -222,6 +233,15 @@ def test_counts_that_finish_after_a_failure_are_kept(tmp_path):
     again = AnthropicCounter(client=FakeClient(), cache_dir=tmp_path, rpm=0)
     again._overhead = 7
     assert again.count(["good one", "good two", "good three"]) == [2, 2, 2] and again.client.calls == []
+
+
+def test_default_rpm_is_the_project_key_limit(monkeypatch):
+    from cmeval.metrics.tokens import configured_rpm
+
+    monkeypatch.delenv("CMEVAL_TOKEN_RPM", raising=False)
+    assert configured_rpm() == 3000
+    monkeypatch.setenv("CMEVAL_TOKEN_RPM", "90")
+    assert configured_rpm() == 90
 
 
 def test_bad_rpm_setting_is_a_clear_error(monkeypatch, tmp_path):

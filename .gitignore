@@ -9,3 +9,4 @@ __pycache__/
 .cache/
 .codemem-home/
 .eval-data/
+.DS_Store

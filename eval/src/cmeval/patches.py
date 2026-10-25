@@ -16,6 +16,7 @@ FILE_CLASSES = ("code", "test", "other")
 
 LANGUAGE_BY_EXT = {
     ".py": "python", ".pyi": "python",
+    ".pyx": "cython", ".pxd": "cython",  # pandas, ray: code fixes that codemem cannot read yet
     ".go": "go",
     ".c": "c", ".h": "c",
     ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
