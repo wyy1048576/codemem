@@ -114,16 +114,17 @@ def test_search_right_after_a_save_sees_the_edit(service, sample_repo):
 
 
 class _SlowModel:
-    """The fake model, slowed to 10 ms per text, so an embedding backlog takes real time."""
+    """The fake model, slowed per text (10 ms by default) and per character, so an embedding
+    backlog takes real time."""
 
-    def __init__(self, inner):
-        self.inner = inner
+    def __init__(self, inner, per_text=0.01, per_char=0.0):
+        self.inner, self.per_text, self.per_char = inner, per_text, per_char
 
     def __getattr__(self, name):
         return getattr(self.inner, name)
 
     def embed_documents(self, texts):
-        time.sleep(0.01 * len(texts))
+        time.sleep(self.per_text * len(texts) + self.per_char * sum(map(len, texts)))
         return self.inner.embed_documents(texts)
 
 
@@ -198,6 +199,80 @@ def test_a_search_embeds_its_own_edit_first(slow_service, sample_repo):
     quota = svc.store.get_chunk_by_key("auth/quota.py::enforce_login_quota")
     assert quota is not None and not svc.store.dirty_seqs([quota.chunk_id])  # its vectors are in
     assert svc.store.dirty_count() > 0  # while the older work is still queued
+
+
+def test_a_search_does_not_wait_past_its_limit_for_a_slow_stage_a(slow_service, sample_repo, monkeypatch):
+    """Stage A of a huge file (or during a checkout) can take seconds. The search hands the save to
+    the writer instead of applying it itself, waits at most its limit, and says what is pending."""
+    svc = slow_service
+    svc.update()
+    svc.start(prewarm=False)
+    time.sleep(0.3)
+    structure = svc.indexer.structure
+
+    def slow_structure(stats, **kw):
+        if kw.get("paths"):
+            time.sleep(1.5)
+        return structure(stats, **kw)
+
+    monkeypatch.setattr(svc.indexer, "structure", slow_structure)
+    (sample_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+    t = time.monotonic()
+    resp = svc.search("enforce_login_quota", k=3)
+    assert time.monotonic() - t < 1.0  # the 0.3 s limit, not the 1.5 s stage A
+    assert not resp.freshness.complete and resp.freshness.pending_files > 0
+    assert _wait_for(lambda: svc.store.get_chunk_by_key("auth/quota.py::enforce_login_quota") is not None)
+
+
+def test_get_chunk_right_after_a_save_shows_the_new_code(service, sample_repo):
+    service.update()
+    service.start(prewarm=False)
+    time.sleep(0.3)
+    p = sample_repo / "auth" / "sessions.py"
+    p.write_text(p.read_text().replace("db.sessions.delete(session_id)", "db.sessions.delete(session_id)  # revoked"))
+    d = service.get_chunk("auth/sessions.py::revoke_session")  # immediately: no sleep
+    assert d is not None and "# revoked" in d["code"]
+
+
+def test_the_writer_applies_new_saves_during_a_long_embedding(slow_service, sample_repo):
+    """During a backlog (600 texts, 6 s of model time), a new save's structure is in after the
+    quiet period and one model call, not after the writer's 5 s embedding step."""
+    svc = slow_service
+    svc.update()
+    svc.start(prewarm=False)
+    time.sleep(0.3)
+    many = "\n\n".join(f"def helper_{i}(x):\n    return x * {i} + {i * 7}\n" for i in range(600))
+    (sample_repo / "auth" / "many.py").write_text(many)
+    assert _wait_for(lambda: svc.store.dirty_count() > 0)  # applied; the writer is embedding it
+    time.sleep(0.3)
+    (sample_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+    t = time.monotonic()
+    assert _wait_for(lambda: svc.store.get_chunk_by_key("auth/quota.py::enforce_login_quota") is not None)
+    assert time.monotonic() - t < 2.0
+
+
+def test_long_texts_do_not_push_a_search_past_its_limit(sample_repo, tmp_path, fake_env):
+    """One model call of 16 long texts took 7 s on the M1. Calls are sized by length, and a call the
+    model's measured speed says would end past the limit isn't started."""
+    (sample_repo / ".codemem.toml").write_text("catchup_budget_ms = 1000\n")
+    svc = CodememService(
+        sample_repo, index_dir=tmp_path / "idx",
+        embedder_factory=lambda m, c: _SlowModel(make_embedder(m, c), per_text=0.0, per_char=0.0002),
+    )
+    try:
+        svc.update()
+        svc.start(prewarm=False)
+        time.sleep(0.3)
+        body = "\n".join(f"    step_{j} = handle(request, {j})" for j in range(90))  # about 3,000 characters
+        (sample_repo / "auth" / "long.py").write_text(
+            "\n\n".join(f"def long_{i}(request):\n{body}\n    return step_0\n" for i in range(12))
+        )
+        t = time.monotonic()
+        resp = svc.search("long_3", k=3)
+        assert time.monotonic() - t < 2.0  # the 1 s limit plus at most one 0.6 s call (12 texts: 7 s)
+        assert not resp.freshness.complete
+    finally:
+        svc.close()
 
 
 def test_an_ignore_rule_change_reconciles(service, sample_repo):

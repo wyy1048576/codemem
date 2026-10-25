@@ -309,6 +309,22 @@ def _order(chunks: Iterable[Chunk], keys: set[str]) -> list[str]:
     return [c.key for c in sorted(chunks, key=lambda c: (c.start_line, c.key)) if c.key in keys]
 
 
+def _model_calls(hashes: list[str], text_of: dict[str, str], size: int, chars: int | None) -> Iterator[list[str]]:
+    """Consecutive runs of at most `size` texts and, if set, `chars` characters (a longer text
+    goes alone): one model call each."""
+    run: list[str] = []
+    total = 0
+    for h in hashes:
+        n = len(text_of[h])
+        if run and (len(run) >= size or (chars is not None and total + n > chars)):
+            yield run
+            run, total = [], 0
+        run.append(h)
+        total += n
+    if run:
+        yield run
+
+
 def _family(language: str) -> str:
     spec = LANGUAGES.get(language)
     return spec.family if spec else language
@@ -370,11 +386,26 @@ class Indexer:
         self._claim_lock = threading.Lock()
         self._model_lock = threading.Lock()  # one model call at a time; a search waits only up to its budget
         self._searches = 0  # searches catching up right now: background batches hand them the model
+        self._sec_per_char: float | None = None  # the model's measured speed (moving average)
+        self._speed_warm = False  # the first call loads and warms the model: not a speed sample
+
+    def _seconds_for(self, chars: int) -> float:
+        """Estimated model time for a call of `chars` characters (0 until measured)."""
+        return chars * self._sec_per_char if self._sec_per_char is not None else 0.0
+
+    def _observe_speed(self, chars: int, seconds: float) -> None:
+        if chars <= 0:
+            return
+        if not self._speed_warm:
+            self._speed_warm = True
+            return
+        rate = seconds / chars
+        self._sec_per_char = rate if self._sec_per_char is None else 0.7 * self._sec_per_char + 0.3 * rate
 
     @contextmanager
     def searching(self) -> Iterator[None]:
-        """A search is catching up: background batches (`yield_to_searches`) stop at their next
-        model call, so the search waits for one call at most."""
+        """A search is catching up: background embedding (its `stop` asks `searches_waiting`) stops
+        at its next model call, so the search waits for one call at most."""
         with self._claim_lock:
             self._searches += 1
         try:
@@ -745,13 +776,14 @@ class Indexer:
     # ---- stage B: vectors
     def embed_pending(
         self, stats: IndexStats, *, only: Iterable[int] | None = None, deadline: float | None = None,
-        batch_chunks: int = _BATCH_CHUNKS, group: int = _EMBED_GROUP, yield_to_searches: bool = False,
+        batch_chunks: int = _BATCH_CHUNKS, group: int = _EMBED_GROUP, group_chars: int | None = None,
+        stop: Callable[[], bool] | None = None,
     ) -> bool:
         """Embed queued chunks (all of them, or only `only`), newest edits first, until the queue is
-        empty or the monotonic `deadline` passes. The deadline is checked before every model call
-        of `group` texts, so it is overshot by one call at most. With `yield_to_searches` (the
-        background writer), it also stops when a search wants the model. Returns True when nothing
-        of what was asked is left."""
+        empty, the monotonic `deadline` passes, or `stop()` says so (asked before every model call).
+        A model call holds at most `group` texts and, if set, `group_chars` characters; it isn't
+        started when the model's measured speed says it would end past the deadline. Returns True
+        when nothing of what was asked is left."""
         only = None if only is None else set(only)
         total = len(only) if only is not None else self.store.dirty_count()
         done = 0
@@ -761,13 +793,13 @@ class Indexer:
         while True:
             if deadline is not None and time.monotonic() >= deadline:
                 return False
-            if yield_to_searches and self._searches:
+            if stop is not None and stop():
                 return False
             batch = self._take(batch_chunks, only)
             if batch is None:
                 return True
             try:
-                finished = self._compute(batch, stats, deadline, group, yield_to_searches)
+                finished = self._compute(batch, stats, deadline, group, group_chars, stop)
                 self._put(batch, stats)  # a batch cut short stores the chunks it finished
             finally:
                 with self._claim_lock:
@@ -844,11 +876,11 @@ class Indexer:
 
     def _compute(
         self, batch: _Batch, stats: IndexStats, deadline: float | None = None, group: int = _EMBED_GROUP,
-        yield_to_searches: bool = False,
+        group_chars: int | None = None, stop: Callable[[], bool] | None = None,
     ) -> bool:
-        """Run the model on the texts nothing else could provide, `group` texts per call. The write
-        lock is not held, so structure updates go on meanwhile. False if it stopped early (the
-        deadline passed, or a search wants the model); what it computed stays in `batch`."""
+        """Run the model on the texts nothing else could provide. The write lock is not held, so
+        structure updates go on meanwhile. False if it stopped early (`stop()`, or the next call
+        would end past the deadline); what it computed stays in `batch`."""
         stats.add_time("build_texts", batch.build_time)
         cache = self._vector_cache()
         # The model calls: newest edits first (a search cut short by its deadline has embedded the
@@ -860,21 +892,30 @@ class Indexer:
                 by_seq[max(batch.seqs[r.chunk_id] for r in tw.rows_by_hash[h])].append(h)
             for seq, hashes in by_seq.items():
                 hashes.sort(key=lambda h: len(tw.text_of[h]), reverse=True)
-                calls += [(-seq, rank, i, tw, hashes[i : i + group]) for i in range(0, len(hashes), group)]
+                runs = _model_calls(hashes, tw.text_of, group, group_chars)
+                calls += [(-seq, rank, i, tw, texts) for i, texts in enumerate(runs)]
         calls.sort(key=lambda c: c[:3])
         for *_, tw, texts in calls:
-            if yield_to_searches and self._searches:
+            if stop is not None and stop():
                 return False
+            chars = sum(len(tw.text_of[h]) for h in texts)
             if deadline is None:
                 self._model_lock.acquire()
-            elif (left := deadline - time.monotonic()) <= 0 or not self._model_lock.acquire(timeout=left):
-                return False
+            else:
+                left = deadline - time.monotonic()
+                if left <= 0 or not self._model_lock.acquire(timeout=left):
+                    return False
+                if self._seconds_for(chars) > deadline - time.monotonic():
+                    self._model_lock.release()
+                    return False  # it would end past the deadline
             try:
                 t = time.perf_counter()
                 vecs = tw.embedder.embed_documents([tw.text_of[h] for h in texts])
-                stats.add_time("embed", time.perf_counter() - t)
+                took = time.perf_counter() - t
+                stats.add_time("embed", took)
             finally:
                 self._model_lock.release()
+            self._observe_speed(chars, took)
             if cache is not None:
                 cache.put_many(tw.key, texts, vecs)
             tw.vectors.update(zip(texts, vecs))

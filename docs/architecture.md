@@ -74,7 +74,7 @@ function through every stage.
 
 | # | Component | Module | Job | Status |
 |---|---|---|---|---|
-| 1 | Watcher | `watcher.py`, `service.py` | turn file events into a set of changed paths; trigger updates | v3 works: changed paths, quiet period and maximum wait, git branch switches, polling fallback, catch-up before every search. To do (decided Oct 25): a search hands pending saves to the writer instead of applying them itself; the writer checks for new saves after every batch; model calls sized by text length; `get_chunk` catches up too |
+| 1 | Watcher | `watcher.py`, `service.py` | turn file events into a set of changed paths; trigger updates | v3 works: changed paths, quiet period and maximum wait, git branch switches, polling fallback. Catch-up before every search: the search hands pending saves to the writer and waits at most its limit; `get_chunk` waits for stage A; background embedding gives way to searches and new saves at its next model call; model calls are sized by text length |
 | 2 | Indexer | `indexer.py` | one update function for the first build, reconciles and single saves | v3 works: two stages and a persistent queue, the exact usage ripple, settings tiers, verify mode. Inside a changed file, only new or changed chunks are relinked and re-checked; moved ones get a line-number update |
 | 3 | Chunker | `languages/`, `chunker.py` | functions, methods, classes and blocks in nine languages | works; v3 fixes done (Python comments, huge statements split by content). To do: one comment rule for every language |
 | 4 | Call graph | `callgraph.py` | link each call to the definitions of that name | works |
@@ -273,10 +273,10 @@ changed. A search in the meantime sees the old index.
                                │                 the startup reconcile finds the same files)
              ┌─────────────────┴────────────────────┐
              ▼                                      ▼
-   background writer: 0.5 s after the     search: first apply every save seen so far
-   last save (at most every 2 s while     (waiting for any the writer is applying),
-   saves keep coming)                     then embed the queue, newest edits first,
-             │                            for at most 4 s; then answer
+   background writer: 0.5 s after the     search: hand every save seen so far to the
+   last save (at most every 2 s while     writer and wait for its stage A, then embed
+   saves keep coming)                     the queue, newest edits first; at most 4 s
+             │                            in all; then answer
              └──────────────┬───────────────────────┘
                             ▼
    stage A, structure (milliseconds): chunks, keywords, calls, links, and the queue of
@@ -348,8 +348,9 @@ tests). It reports any difference between the incremental result and a from-scra
 | a search during an update | SQLite readers see the state before or after a transaction, never half |
 | a crash at any point | SQLite rolls back; FAISS is rebuilt if its version is behind; the startup reconcile re-finds pending files |
 | two agent sessions on one repo | the lock file serializes writers; a search waits only up to its budget |
-| a search while the background writer is applying a save | the search waits for it, within its budget: the writer holds a lock from taking edits until they are committed |
-| a backlog of embeddings when the agent searches | the writer hands over the model at its next call; the search embeds the newest edits first and stops at its budget |
+| a search while the background writer is applying a save | the search waits for it, within its budget: every hand-over of saves is numbered, and the search waits until the writer has committed its number |
+| stage A takes longer than the budget (a huge file, a checkout still writing) | only the writer applies saves, so the search stops waiting at its budget and reports those files as pending |
+| a backlog of embeddings when the agent searches | the writer hands over the model at its next call; the search embeds the newest edits first and stops at its budget. Model calls hold at most 3,000 characters outside a build, and one isn't started if the measured model speed says it would end past the budget |
 | a crash between stage A and stage B | the queue rows were committed with the edit, so the next start embeds them |
 | a git checkout is still writing files | updates wait for it (up to 10 s; a search only up to its budget, then it reports those files as pending) |
 | a file changes while being indexed | its event lands in the dirty set again |
