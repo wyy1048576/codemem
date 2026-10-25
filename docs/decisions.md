@@ -107,7 +107,7 @@ built.
 
 | Question | Why it's parked | What would decide it |
 |---|---|---|
-| **Comments on their own between definitions** (blank lines around, no code) are dropped. | Some are real explanations; many are license headers or section banners, which would add noise. | A rule, for example "attach to the next definition if within N lines; skip license headers", checked on a few repos. |
+| **Comments on their own between definitions** (blank lines around, no code) are dropped, and so is a Python comment directly above a top-level statement. | Some are real explanations; many are license headers or section banners, which would add noise. | A rule, for example "attach to the next definition if within N lines; skip license headers", checked on a few repos. |
 | **Class-level comments** (between methods) are not in the class outline, so they are not searchable. | Outlines are meant to be short. | The same rule as above, measured on class-level results. |
 | **Callee descriptions in the caller's text** ("calls `ocr_image`: extracts text from an image"). | It may help vague questions, but edits would then ripple to callers too (D20). | An ablation in the tuning phase, with the ripple cost measured. |
 | **Non-code files** (README, docs, YAML, SQL) are not searchable. | They need a plain-text chunker and a different card. | User demand ("where is the config for X"); the coverage report shows how much is missing. |
@@ -117,7 +117,9 @@ built.
 | **A vague-question eval** (highlighted, Andrew's area): one sentence per dev task in a user's voice, written from the issue only, with the same gold; the feature-request tasks as the closest match. | v3 doesn't change the eval (D25). | Needed before tuning, otherwise tuning keeps optimizing for issue texts. |
 | **Tuning:** RRF k, per-list weights, BM25 field weights, candidates. | Tuning on today's eval would optimize for issue texts. | The vague-question eval. |
 | **Embedding model comparison** (jina 0.5B and 1.5B, Qwen3-Embedding 0.6B/4B/8B, voyage-code-3), **with the window size** (`max_seq_length` 1k, 2k, 4k, 8k tokens, whole functions). | Needs the API embedder (v3) and the vague-question eval. Both models read 32k tokens; the 1,024 cap is for laptop speed, and through an API the tokens cost the same either way. Only about 5% of vLLM's chunks are long enough to be affected. | The first tuning experiment. Keep 1,024 until then. |
-| **PyTorch as an optional extra** (D27). | Needs a one-line eval change. | Andrew's agreement. |
+| **PyTorch as an optional extra** (D27), with `httpx` as an `api` extra. | Needs a one-line eval change. Today codemem's environment gets `httpx` through its dependencies, but the eval's lacks it, so eval runs with API embeddings need it added. | Andrew's agreement. |
+| **Incremental parsing** (tree-sitter re-parses only the edited region, given the old tree). | Stage A follows the edit except for parsing: a 2.3 MB file with 50,000 functions still takes 1.2 s per save. Searches don't wait for it beyond their budget. | Repos with files that large, and how often agents edit them. |
+| **Chunks waiting for their vectors rank lower:** until embedded, a new or edited chunk scores through keywords only. | Only during a backlog that outlasts a search's budget; the note says so. | A fusion rule that treats a missing vector rank as unknown, measured on backlogs. |
 | **Vector cache cleanup:** the cache only grows (about 4.5 KB per vector). | Small so far: 123 MB. | A "last used" date per entry, then a size cap. |
 
 ---

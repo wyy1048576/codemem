@@ -327,7 +327,9 @@ Before calling the model for a text, codemem looks for `(embedder key, text_hash
    embedded on this machine and only grows.
 
 `IndexStats` reports `embedded` (vectors written for changed texts), `model_embedded`, `reused`
-and `cache_hits`. `vector_cache = "off"` (or `codemem index --no-cache`) forces cold timings.
+and `cache_hits`; and, for the structure, `chunks_added`, `chunks_updated`, `chunks_moved` (only
+their line numbers shifted, **v3**), `chunks_deleted`, `relinked` and `queued`. `vector_cache =
+"off"` (or `codemem index --no-cache`) forces cold timings.
 
 ---
 

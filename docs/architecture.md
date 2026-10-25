@@ -111,11 +111,20 @@ C++ (with CUDA `.cu`). A `.h` file is C unless it uses C++ syntax.
 - minified JS/TS (any line over 5,000 characters).
 
 **Coverage (v3).** No file is skipped silently:
-- The size cap rises from 1 MB to 10 MB.
-- Every skipped file is stored with its reason: too large, generated, minified or binary.
-- The walk also counts ignored files and non-code files by extension (`.md`, `.yaml`, …).
-- `index_status` and `codemem status` show all of it. For example: "6,235 indexed · 3 skipped
-  (2 generated, 1 too large: vllm/x.py 12 MB) · 410 not code (.md 220, .yaml 120, …)".
+- The size cap is 10 MB (it was 1 MB, which hid real hand-written files).
+- Every skipped file is stored with its reason: too large, generated, minified or binary. A file
+  tree-sitter could only partly parse is indexed from what it recovered, and marked too.
+- The walk also counts ignored files and folders, and non-code files by extension.
+- `index_status` and `codemem status` show all of it, for example:
+
+  ```
+  not indexed or partly parsed: 1 generated, 1 with parse errors, 1 too large
+    big_table.py (too large, 12.3 MB)
+    auth/models_gen.py (generated, 0.1 KB)
+    auth/broken.py (with parse errors, 0.1 KB)
+  not code (no supported language): 6 files (no extension 2, .toml 1, .yaml 1, .sql 1, .txt 1)
+  ignored: 1 file; skipped folders: build 1, node_modules 1, 1 by ignore rules
+  ```
 
 *Example:* `auth/sessions.py` is Python. It is new, so it goes to the chunker. Later, an
 unchanged size and modification time mean it is not even read.
@@ -473,7 +482,7 @@ of a large repo needs a CUDA GPU or an embedding API. Updates after that are sma
 | `search.py`, `render.py` | hybrid search and cards |
 | `service.py` | long-lived owner of one index: updates, freshness, watcher |
 | `watcher.py` | file events, debounced |
-| `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP server, CLI, agent-facing text, agent registration |
+| `server.py`, `cli.py`, `__main__.py`, `prompts.py`, `agents.py` | MCP server, CLI (also `python -m codemem`), agent-facing text, agent registration |
 
 ## Glossary
 
