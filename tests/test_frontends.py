@@ -466,7 +466,7 @@ def test_mcp_tools_end_to_end(service):
     async def run():
         async with Client(server) as client:
             tools = {t.name: t for t in (await client.list_tools()).tools}
-            assert set(tools) == {"search_code", "get_chunk", "index_status"}
+            assert set(tools) == {"search_code", "get_chunk", "index_status", "refresh_index"}
             assert tools["search_code"].description == prompts.tool_description("search_code", "light")
             assert client.instructions == prompts.server_instructions("light")
             res = await client.call_tool("search_code", {"query": "revoke session", "k": 3})
@@ -514,7 +514,7 @@ def test_mcp_stdio_subprocess(sample_repo, tmp_path, isolated_home):
         with anyio.fail_after(60):
             async with Client(params) as client:
                 tools = {t.name for t in (await client.list_tools()).tools}
-                assert tools == {"search_code", "get_chunk", "index_status"}
+                assert tools == {"search_code", "get_chunk", "index_status", "refresh_index"}
                 for _ in range(100):
                     status = (await client.call_tool("index_status", {})).content[0].text
                     if "state: ready" in status:
@@ -525,3 +525,63 @@ def test_mcp_stdio_subprocess(sample_repo, tmp_path, isolated_home):
                 assert "disable_user" in res.content[0].text
 
     anyio.run(run)
+
+
+def test_mcp_search_filters_and_refresh(service, sample_repo):
+    from mcp import Client
+
+    from codemem.server import build_server
+
+    service.update()
+    server = build_server(service)
+
+    async def run():
+        async with Client(server) as client:
+            text = (await client.call_tool("search_code", {"query": "session", "kinds": ["class"]})).content[0].text
+            assert "Session" in text and "revoke_session" not in text
+            text = (await client.call_tool("search_code", {"query": "disabled user", "tests": "only"})).content[0].text
+            assert "test_disabled_user_loses_sessions" in text and "auth/users.py" not in text
+            text = (await client.call_tool("search_code", {"query": "disabled user", "tests": "exclude"})).content[0].text
+            assert "tests/" not in text
+            assert "choose from" in (await client.call_tool("search_code", {"query": "x", "kinds": ["klass"]})).content[0].text
+            assert "tests must be" in (await client.call_tool("search_code", {"query": "x", "tests": "some"})).content[0].text
+            (sample_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+            text = (await client.call_tool("refresh_index", {})).content[0].text
+            assert "Checked every file" in text and "1 file changed" in text
+            text = (await client.call_tool("search_code", {"query": "enforce_login_quota"})).content[0].text
+            assert "enforce_login_quota" in text
+
+    anyio.run(run)
+
+
+def test_a_search_that_could_not_include_everything_says_what_is_pending():
+    from codemem.render import freshness_note
+    from codemem.service import Freshness
+
+    assert freshness_note(Freshness()) == ""
+    note = freshness_note(Freshness(pending_chunks=12), (4, ["auth/a.py", "auth/b.py", "api/c.py"]))
+    assert "12 code chunks in 4 files (auth/a.py, auth/b.py, api/c.py, ...)" in note and "grep" in note
+    assert "1 file saved moments ago" in freshness_note(Freshness(pending_files=1))
+    assert "could not confirm" in freshness_note(Freshness(unconfirmed=True))
+
+
+def test_init_falls_back_to_python_m_codemem_when_the_command_is_not_on_path(sample_repo, monkeypatch):
+    import sys
+
+    monkeypatch.setattr(agents.shutil, "which", lambda name: None)
+    (action,) = agents.plan(sample_repo, ["claude"])
+    entry = json.loads(action.content)["mcpServers"]["codemem"]
+    assert entry == {"command": sys.executable, "args": ["-m", "codemem", "mcp"]}
+
+
+def test_python_m_codemem_is_the_command_line():
+    import subprocess
+    import sys
+
+    out = subprocess.run([sys.executable, "-m", "codemem", "--version"], capture_output=True, text=True, check=True)
+    assert out.stdout.startswith("codemem ")
+
+
+def test_index_verify_compares_with_a_fresh_build(sample_repo, tmp_path, fake_env, capsys):
+    assert main(["index", str(sample_repo), "--index-dir", str(tmp_path / "idx"), "--verify"]) == 0
+    assert "the index equals a fresh build" in capsys.readouterr().out

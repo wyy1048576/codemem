@@ -187,6 +187,9 @@ def _reweigh(
     return sorted(weighed, key=lambda kv: (-kv[1], kv[0]))
 
 
+TEST_FILTERS = ("include", "exclude", "only")
+
+
 def bm25_match(store: Store, query: str, config: Config) -> str | None:
     """The query's words for BM25 (decisions D32): stopwords dropped (a query of stopwords only
     keeps them), and of a long query only the `bm25_query_terms` words fewest chunks have. Common
@@ -219,7 +222,11 @@ def search(
     languages: Sequence[str] | None = None,
     test_weight: float | None = None,
     kind_weights: dict[str, float] | None = None,
+    tests: str = "include",
 ) -> SearchResponse:
+    """`tests`: "include" (default), "exclude" or "only" test code."""
+    if tests not in TEST_FILTERS:
+        raise ValueError(f"tests must be one of {'|'.join(TEST_FILTERS)}, got {tests!r}")
     timings: dict[str, float] = {}
     t_total = time.perf_counter()
     stored_vec_types = set(store.vec_types())
@@ -237,7 +244,8 @@ def search(
         path_prefix=path_prefix or None,
         kinds=tuple(kinds) if kinds is not None else None,
         languages=tuple(languages) if languages else None,
-        exclude_tests=test_weight <= 0,
+        exclude_tests=test_weight <= 0 or tests == "exclude",
+        only_tests=tests == "only",
     )
     allowed = store.filter_ids(flt) if flt.active else None
     n = max(config.candidates, k)

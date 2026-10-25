@@ -51,9 +51,9 @@ codemem status
 
 | Command | What it does |
 |---|---|
-| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--write-agent-notes] [--dry-run] [-y]` | register with agents, then index |
-| `codemem index [PATH] [--full] [--no-cache] [--json]` | build or update the index (`--no-cache`: cold timing) |
-| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--kinds function,method] [--language go] [--exclude-tests] [--json] [--debug]` | search |
+| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--write-agent-notes] [--dry-run] [-y]` | register with agents, then index (with `--no-index`, it still downloads the model, so the first search doesn't wait) |
+| `codemem index [PATH] [--full] [--no-cache] [--verify] [--json]` | build or update the index (`--no-cache`: cold timing; `--verify`: then compare with a fresh build) |
+| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--kinds function,method] [--language go] [--tests include\|exclude\|only] [--json] [--debug]` | search |
 | `codemem status [PATH] [--json]` | counts, models, indexed commit, staleness |
 | `codemem watch [PATH]` | foreground watcher: re-index on save |
 | `codemem mcp [PATH]` | MCP server over stdio (what agents launch) |
@@ -65,12 +65,21 @@ Every command accepts `--index-dir DIR`; the eval harness uses it for per-commit
 
 - **Claude Code:** `init --agents claude` writes a project `.mcp.json`. You can also run
   `claude mcp add codemem -- codemem mcp`.
+- **No `codemem` on PATH** (installed in a virtualenv, not with `uv tool` or pipx): `init` writes
+  `<that python> -m codemem mcp` instead, which works while that environment exists.
 - **Cursor:** `init --agents cursor` writes `.cursor/mcp.json`.
 - **Codex:** `init --agents codex` prints a `~/.codex/config.toml` snippet. It never edits that
   global file.
 
-The MCP server exposes `search_code`, `get_chunk` and `index_status`; v3 adds `refresh_index`
-(data-model.md §12.1).
+The MCP server exposes four tools (data-model.md §12.1):
+- `search_code(query, k, path_prefix, kinds, tests)`: plain-language or identifier search. A note
+  says when a recent save or embedding isn't in yet.
+- `get_chunk(ref)`: one result in full, with callers and callees.
+- `index_status()`: readiness, what is still being indexed, and what isn't indexed and why.
+- `refresh_index()`: a full check now, for after `git checkout`, pull or rebase.
+
+Searches catch up on your saves first (at most `catchup_budget_ms`, 4 s), so an agent finds the
+code it just wrote.
 - **Startup:** it answers the handshake at once, and runs the catch-up (or the first full index)
   in the background.
 - **Watcher:** it starts a file watcher.

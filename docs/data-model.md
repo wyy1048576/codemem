@@ -476,10 +476,10 @@ The tool names stay stable, so other front-ends and versions can be compared.
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, **(v3)** `kinds: list[str] \| None`, **(v3)** `tests: "include" \| "exclude" \| "only"` | numbered cards: `N. path:start-end  name  [id X]`, the signature, the first doc line, up to 6 preview lines (a long function adds `best a-b`) |
+| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, **(v3)** `kinds: list[str] \| None`, **(v3)** `tests: "include" \| "exclude" \| "only"` | numbered cards: `N. path:start-end  name  [id X]`, the signature, the first doc line, up to 6 preview lines (a long function adds `best a-b`); **(v3)** a closing `Note: ...` line when the search could not include every save or embedding yet |
 | `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | full code (a long class: outline + members), plus callers and callees as `name (path:lines)` |
 | `index_status` | none | state, progress, counts, models, indexed commit, staleness; **(v3)** freshness (pending files), coverage, embedder (local or remote) |
-| `refresh_index` **(v3)** | none | runs a full reconcile now (waits up to 60 s); what changed |
+| `refresh_index` **(v3)** | none | runs a full check now (waits up to 60 s for embeddings): `Checked every file in 0.5 s: 2 files changed, ...` |
 
 **Freshness contract (v3).** `search_code` has the background writer apply every save the
 watcher has seen (stage A), then embeds the queue (newest edits first), all within

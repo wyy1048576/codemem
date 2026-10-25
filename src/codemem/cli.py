@@ -58,11 +58,19 @@ def cmd_index(args) -> int:
         svc.config.vector_cache = "off"
     try:
         print(f"indexing {svc.repo_root} -> {svc.index_dir}", file=sys.stderr)
-        stats = Indexer(
-            svc.repo_root, svc.store, svc.config, progress=_progress_printer(not args.json)
-        ).update(full=args.full)
+        indexer = Indexer(svc.repo_root, svc.store, svc.config, progress=_progress_printer(not args.json))
+        stats = indexer.update(full=args.full)
         print(file=sys.stderr)
         _print_stats(stats, args.json)
+        if getattr(args, "verify", False):
+            print("verifying: building a fresh index to compare with ...", file=sys.stderr)
+            diff = indexer.verify()
+            if diff:
+                print(f"the index differs from a fresh build ({len(diff)} differences, first ones):")
+                for line in diff[:20]:
+                    print(f"  {line}")
+                return 1
+            print("the index equals a fresh build")
     finally:
         svc.close()
     return 0
@@ -93,15 +101,26 @@ def cmd_init(args) -> int:
                 print("skipped writing agent config")
     if names and not agents.command_on_path():
         print(
-            "warning: `codemem` is not on PATH, so agents can't launch it. Install with "
-            "`uv tool install <path-or-git-url>` (or pipx).",
+            f"note: `codemem` is not on PATH, so agents start it as `{sys.executable} -m codemem`; that "
+            "works while this environment exists. `uv tool install <path-or-git-url>` (or pipx) makes "
+            "a `codemem` command instead.",
             file=sys.stderr,
         )
+    if args.no_index and not args.dry_run and not config.embedding.remote:
+        _download_model(config)  # so an agent's first search doesn't wait for a download
     if not args.no_index and not args.dry_run:
         args.full = False
         args.json = False
         return cmd_index(args)
     return 0
+
+
+def _download_model(config) -> None:
+    from .embedder import make_embedder
+
+    model = config.vectors["code"].model
+    print(f"loading the embedding model {model} (downloaded once, about 1 GB) ...", file=sys.stderr)
+    make_embedder(model, config).embed_documents(["warm up"])
 
 
 def cmd_search(args) -> int:
@@ -116,7 +135,7 @@ def cmd_search(args) -> int:
         try:
             resp = svc.search(
                 args.query, k=args.k, signals=signals, path_prefix=args.path_prefix, debug=args.debug, kinds=kinds,
-                languages=languages, test_weight=0.0 if args.exclude_tests else None,
+                languages=languages, tests="exclude" if args.exclude_tests else args.tests,
             )
         except ValueError as e:
             print(f"error: {e}", file=sys.stderr)
@@ -202,6 +221,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = common(sub.add_parser("index", help="build or update the index"))
     sp.add_argument("--full", action="store_true", help="rebuild from scratch")
+    sp.add_argument("--verify", action="store_true", help="then compare with a fresh build (slow; for checking)")
     sp.add_argument("--no-cache", action="store_true", help="don't reuse vectors from the shared cache (cold timing)")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_index)
@@ -213,7 +233,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--path-prefix", help="only results under this repo-relative path")
     sp.add_argument("--kinds", help="comma list of function,method,class,block (default: all)")
     sp.add_argument("--language", help="comma list of languages (default: all)")
-    sp.add_argument("--exclude-tests", action="store_true", help="leave test code out of the results")
+    sp.add_argument("--tests", choices=("include", "exclude", "only"), default="include", help="test code in results")
+    sp.add_argument("--exclude-tests", action="store_true", help="same as --tests exclude")
     sp.add_argument("--repo", help="repository (default: git root of the current directory)")
     sp.add_argument("--json", action="store_true")
     sp.add_argument("--debug", action="store_true", help="show per-signal ranks and timings")

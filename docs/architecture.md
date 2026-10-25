@@ -82,7 +82,7 @@ function through every stage.
 | 6 | Embedder | `embedder.py`, `vectorcache.py` | local model by default; any OpenAI-compatible API (v3) | works: local model, or any OpenAI-compatible API (batches, parallel requests, retries; tested against a fake server; a Nebius smoke test runs when `NEBIUS_API_KEY` is set) |
 | 7 | Store | `store.py` | SQLite holds everything; FAISS is a derived search index | works; v3 queue, catch-up by vector id and lazy saves done |
 | 8 | Search | `search.py`, `render.py` | BM25 + one vector search per text type, merged by rank, rendered as cards | works; v3 catch-up, query clean-up (long queries 30x faster) and neutral weights done |
-| 9 | Front-ends | `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP tools for agents; CLI for people and scripts | works; v3 tool changes (`refresh_index`, filters, freshness note, `init`) are phase 2 |
+| 9 | Front-ends | `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP tools for agents; CLI for people and scripts | works; v3 tools done: `refresh_index`, `kinds` and `tests` filters, a freshness note in results, coverage in `index_status`, `init` that works without `codemem` on PATH, `index --verify` |
 
 **Product shape** (unchanged since Week 1):
 - One local Python package and one command, `codemem`, for both the CLI and the MCP server.

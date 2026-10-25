@@ -356,10 +356,14 @@ class ChunkFilter:
     kinds: tuple[str, ...] | None = None
     languages: tuple[str, ...] | None = None
     exclude_tests: bool = False
+    only_tests: bool = False
 
     @property
     def active(self) -> bool:
-        return bool(self.path_prefix or self.kinds is not None or self.languages is not None or self.exclude_tests)
+        return bool(
+            self.path_prefix or self.kinds is not None or self.languages is not None or self.exclude_tests
+            or self.only_tests
+        )
 
     def where(self, alias: str = "c") -> tuple[str, list[Any]]:
         clauses: list[str] = []
@@ -375,6 +379,8 @@ class ChunkFilter:
             params.extend(self.languages)
         if self.exclude_tests:
             clauses.append(f"{alias}.is_test = 0")
+        if self.only_tests:
+            clauses.append(f"{alias}.is_test = 1")
         return " AND ".join(clauses) or "1", params
 
 
@@ -859,6 +865,14 @@ class Store:
 
     def dirty_count(self) -> int:
         return self.conn.execute("SELECT COUNT(*) FROM dirty_texts").fetchone()[0]
+
+    def pending_paths(self, limit: int = 3) -> tuple[int, list[str]]:
+        """How many files have queued chunks, and the `limit` with the most (for a freshness note)."""
+        rows = self.conn.execute(
+            "SELECT c.path, COUNT(*) AS n FROM dirty_texts d JOIN chunks c ON c.chunk_id = d.chunk_id "
+            "GROUP BY c.path ORDER BY n DESC, c.path"
+        ).fetchall()
+        return len(rows), [r[0] for r in rows[:limit]]
 
     def callers_of(self, chunk_id: int) -> list[Chunk]:
         ids = [r[0] for r in self.conn.execute("SELECT caller_id FROM edges WHERE callee_id = ?", (chunk_id,))]

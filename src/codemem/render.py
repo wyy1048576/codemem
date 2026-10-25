@@ -42,6 +42,38 @@ def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool =
     return "\n".join(out)
 
 
+def freshness_note(fresh: Any, pending: tuple[int, list[str]] = (0, [])) -> str:
+    """One line for the agent when a search could not include everything yet; "" when it could.
+    `pending` is (files with queued chunks, a few of them), from `Store.pending_paths()`."""
+    if fresh is None or fresh.complete:
+        return ""
+    parts = []
+    if fresh.pending_files:
+        parts.append(f"{_files(fresh.pending_files)} saved moments ago are still being indexed, so results may miss their latest edits")
+    if fresh.pending_chunks:
+        n, examples = pending
+        where = f" in {_files(n)} ({', '.join(examples)}{', ...' if n > len(examples) else ''})" if examples else ""
+        parts.append(
+            f"{fresh.pending_chunks} code chunks{where} are still being embedded: keyword matches for them are "
+            "current, ranking by meaning may be out of date"
+        )
+    if fresh.unconfirmed:
+        parts.append("codemem could not confirm it has seen your most recent saves")
+    return "Note: " + "; ".join(parts) + ". Search again in a few seconds, or use grep for those files."
+
+
+def format_refresh(out: dict[str, Any]) -> str:
+    """The result of a full check (`CodememService.refresh`), for the agent."""
+    text = (
+        f"Checked every file in {out['seconds']:.1f} s: {_files(out['files_changed'])} changed, "
+        f"{out['files_deleted']} deleted, {out['files_skipped']} skipped; chunks +{out['chunks_added']} "
+        f"~{out['chunks_updated']} -{out['chunks_deleted']}; {out['texts_embedded']} texts embedded."
+    )
+    if out.get("pending"):
+        text += f" {out['pending']} chunks are still being embedded in the background; searches work meanwhile."
+    return text
+
+
 def format_chunk(d: dict[str, Any]) -> str:
     lines = [f"{d['location']}  {d['qualname']}  [id {d['chunk_id']}]", "", d["code"], ""]
     if d.get("members"):
