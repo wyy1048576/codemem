@@ -482,8 +482,9 @@ The tool names stay stable, so other front-ends and versions can be compared.
 **Freshness contract (v3).** `search_code` has the background writer apply every save the
 watcher has seen (stage A), then embeds the queue (newest edits first), all within
 `catchup_budget_ms` (4 s), then searches. If the budget runs out, the results say what is
-pending: files not applied yet, or chunks whose vectors are still being computed (shown to the
-agent from phase 2). `get_chunk` waits for stage A only: its code, lines and links are current.
+pending: files not applied yet, chunks whose vectors are still being computed, or "unconfirmed"
+when the watcher couldn't confirm in time that it had seen every earlier save (shown to the agent
+from phase 2). `get_chunk` waits for stage A only: its code, lines and links are current.
 
 **stdout carries only MCP messages;** logs go to stderr.
 

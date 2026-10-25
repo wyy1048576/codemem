@@ -224,6 +224,27 @@ def test_a_search_does_not_wait_past_its_limit_for_a_slow_stage_a(slow_service, 
     assert _wait_for(lambda: svc.store.get_chunk_by_key("auth/quota.py::enforce_login_quota") is not None)
 
 
+def test_without_file_events_a_search_finds_saves_through_a_full_check(service, sample_repo):
+    """When the OS file watcher can't run (network drives, WSL, watch limits), a search asks for a
+    full check first, so it still includes every earlier save."""
+    service.update()
+    service.start(watch=False, prewarm=False)
+    time.sleep(0.3)
+    (sample_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+    resp = service.search("enforce_login_quota", k=3)
+    assert resp.results and resp.results[0].qualname == "enforce_login_quota"
+    assert resp.freshness.complete
+
+
+def test_a_search_says_so_when_it_cannot_confirm_every_save_was_seen(service, sample_repo, monkeypatch):
+    service.update()
+    service.start(prewarm=False)
+    time.sleep(0.3)
+    monkeypatch.setattr(service._watcher, "barrier", lambda timeout=0.25: False)  # the marker never came back
+    resp = service.search("revoke_session", k=3)
+    assert resp.freshness.unconfirmed and not resp.freshness.complete
+
+
 def test_get_chunk_right_after_a_save_shows_the_new_code(service, sample_repo):
     service.update()
     service.start(prewarm=False)

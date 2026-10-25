@@ -54,10 +54,11 @@ class Freshness:
     pending_chunks: int = 0  # queued chunks whose vectors are not computed yet
     indexing: bool = False  # the index is being built: many chunks still to embed
     pending_files: int = 0  # saved files not applied yet (still being applied, or applying failed)
+    unconfirmed: bool = False  # the watcher could not confirm in time that every earlier save was seen
 
     @property
     def complete(self) -> bool:
-        return self.pending_chunks == 0 and self.pending_files == 0
+        return self.pending_chunks == 0 and self.pending_files == 0 and not self.unconfirmed
 
 
 class CodememService:
@@ -373,21 +374,26 @@ class CodememService:
         self._ensure_worker()
         stats = IndexStats()
         with self.indexer.searching():  # the writer's embedding stops at its next model call
-            if self._watcher is not None:
-                self._watcher.barrier(timeout=min(0.25, budget))  # every earlier save has been reported
+            confirmed = True
+            if self._watcher is not None and self._watcher.alive() and not self._polling:
+                # Every earlier save has been reported once the marker's own event is back.
+                confirmed = self._watcher.barrier(timeout=min(0.25, budget))
+            else:
+                self.notify(set(), reconcile=True)  # no file events: a full check finds every save
             target = self._hand_over()
             with self._cond:
                 while self._settled < target and (left := deadline - time.monotonic()) > 0:
                     self._cond.wait(left)
                 if self._applied < target:  # still being applied (a huge file, a checkout), or it failed
-                    return Freshness(self.store.dirty_count(), pending_files=max(1, len(self._dirty) + self._applying))
+                    files = max(1, len(self._dirty) + self._applying)
+                    return Freshness(self.store.dirty_count(), pending_files=files, unconfirmed=not confirmed)
             if not embed:
-                return Freshness()
+                return Freshness(unconfirmed=not confirmed)
             pending = self.store.dirty_count()
             if pending == 0:
-                return Freshness()
-            if pending > CATCHUP_MAX_CHUNKS:
-                return Freshness(pending, indexing=True)  # a big change: report, don't wait
+                return Freshness(unconfirmed=not confirmed)
+            if pending > CATCHUP_MAX_CHUNKS:  # a big change: report, don't wait
+                return Freshness(pending, indexing=True, unconfirmed=not confirmed)
             while time.monotonic() < deadline:
                 try:
                     done = self.indexer.embed_pending(
@@ -402,7 +408,7 @@ class CodememService:
                 time.sleep(0.02)  # what is left is in the writer thread's batch, which it is handing back
         if sum(stats.embedded.values()):
             self._last_write = time.monotonic()
-        return Freshness(self.store.dirty_count())
+        return Freshness(self.store.dirty_count(), unconfirmed=not confirmed)
 
     def prewarm(self) -> None:
         """Load the embedding models and the search indexes, so the first query doesn't wait."""
