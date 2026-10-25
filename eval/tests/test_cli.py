@@ -102,8 +102,9 @@ def test_collect_dry_run_writes_nothing_and_full_run_writes(tmp_path, monkeypatc
     assert "| acme/demo | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |" in out.out and "dry run" in out.err
     assert not (collect_dir() / "fresh-t").exists()
 
-    assert main(["collect", str(config)]) == 0
+    assert main(["collect", str(config), "--out", str(tmp_path / "tasks" / "fresh-t.jsonl")]) == 0
     assert (collect_dir() / "fresh-t" / "acme__demo" / "candidates.jsonl").exists()
+    assert (tmp_path / "tasks" / "fresh-t.jsonl").exists() and (tmp_path / "tasks" / "fresh-t.meta.json").exists()
     assert (collect_dir() / "fresh-t" / "acme__demo" / "funnel.json").exists()
 
     assert main(["collect", str(config), "--repo", "other/repo"]) == 1

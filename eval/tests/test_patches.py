@@ -184,6 +184,8 @@ Binary files /dev/null and b/assets/logo.py differ
         ("src/util/strings_unittest.cc", ("test", "cpp")),
         ("include/util.hpp", ("code", "cpp")),
         ("kernel/sched.c", ("code", "c")),
+        ("pandas/_libs/tslibs/offsets.pyx", ("code", "cython")),
+        ("pandas/_libs/lib.pxd", ("code", "cython")),
         ("Tests/AppTests.swift", ("test", "swift")),
         # test/ and testing/ hold tests only at the repo top or under src/; elsewhere they can be library code
         ("django/test/testcases.py", ("code", "python")),

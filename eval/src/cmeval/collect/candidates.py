@@ -24,7 +24,7 @@ from .repo_stats import Candidate as RepoEntry
 from .repo_stats import RepoStatsError, load_candidates
 from .search import is_bot, search_merged_prs
 
-FUNNEL_STEPS = (
+GITHUB_STEPS = (
     ("merged", "merged into the default branch in the date range"),
     ("opened_after_cutoff", "the fix PR was opened on or after the start date (its code was not public before)"),
     ("not_bot", "author is not a bot"),
@@ -34,6 +34,15 @@ FUNNEL_STEPS = (
     ("body_ok", "body (as of when the fix PR was opened) has the minimum length"),
     ("no_leak", "query does not name the fix PR or a fix commit"),
 )
+# B2, in tasks_build.py: these need the full clone.
+GIT_STEPS = (
+    ("base_found", "base commit found from the merge type (Decision 7)"),
+    ("files_match", "our patch touches exactly the PR's files"),
+    ("applies", "the code patch applies at the base commit"),
+    ("size_ok", "1 to max_code_files code files and at most max_code_lines changed code lines"),
+    ("labeled", "labeled, with at least one gold file that exists at the base commit"),
+)
+FUNNEL_STEPS = GITHUB_STEPS + GIT_STEPS
 
 
 class CollectError(RuntimeError):
@@ -47,6 +56,8 @@ class Settings:
     until: date
     min_body_chars: int = 100
     extra_bots: list[str] = field(default_factory=list)
+    max_code_files: int = 5
+    max_code_lines: int = 200
     repos: list[RepoEntry] = field(default_factory=list)
 
 
@@ -60,6 +71,7 @@ class Candidate:
     base_ref: str
     merge_commit: str | None
     commit_oids: list[str]
+    commit_subjects: list[str]  # first message lines, oldest first; B2 uses them to find a rebase merge
     commits_total: int
     changed_files: int
     issue_number: int
@@ -100,7 +112,7 @@ def load_settings(path: Path) -> Settings:
     table = data.get("collect")
     if not isinstance(table, dict):
         raise CollectError(f"{path}: needs a [collect] table")
-    unknown = set(table) - {"since", "until", "min_body_chars", "extra_bots"}
+    unknown = set(table) - {"since", "until", "min_body_chars", "extra_bots", "max_code_files", "max_code_lines"}
     if unknown:
         raise CollectError(f"{path}: unknown [collect] keys: {', '.join(sorted(unknown))}")
     try:
@@ -113,11 +125,14 @@ def load_settings(path: Path) -> Settings:
         raise CollectError(f"{path}: until is before since")
     min_body = table.get("min_body_chars", 100)
     bots = table.get("extra_bots", [])
-    if not isinstance(min_body, int) or min_body < 0:
-        raise CollectError(f"{path}: min_body_chars must be a whole number")
+    limits = {key: table.get(key, default) for key, default in (("max_code_files", 5), ("max_code_lines", 200))}
+    for key, value in {"min_body_chars": min_body, **limits}.items():
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise CollectError(f"{path}: {key} must be a whole number")
     if not isinstance(bots, list) or not all(isinstance(b, str) for b in bots):
         raise CollectError(f"{path}: extra_bots must be a list of logins")
-    return Settings(name=path.stem, since=since, until=until, min_body_chars=min_body, extra_bots=bots, repos=repos)
+    return Settings(name=path.stem, since=since, until=until, min_body_chars=min_body, extra_bots=bots,
+                    repos=repos, **limits)
 
 
 def collect_candidates(gh: GitHub, repo: str, settings: Settings, *,
@@ -191,6 +206,7 @@ def collect_candidates(gh: GitHub, repo: str, settings: Settings, *,
             merged_at=pr["mergedAt"], base_ref=pr["baseRefName"],
             merge_commit=(pr.get("mergeCommit") or {}).get("oid"),
             commit_oids=[c["commit"]["oid"] for c in commits.get("nodes") or []],
+            commit_subjects=[(c["commit"]["message"].splitlines() or [""])[0] for c in commits.get("nodes") or []],
             commits_total=commits.get("totalCount", 0), changed_files=pr["changedFiles"],
             issue_number=number, issue_url=issue["url"], issue_created_at=issue["createdAt"],
             query=query, hints=hints_before(issue, pr["createdAt"], settings.extra_bots), link_method=method,
@@ -208,20 +224,28 @@ def write_candidates(out_dir: Path, candidates: list[Candidate], funnel: Funnel)
     write_json(out_dir / "funnel.json", {**asdict(funnel), "drop_reasons": funnel.drop_reasons()})
 
 
-def render_funnel(funnels: list[Funnel]) -> str:
-    lines = ["Count of PRs left after each step:", ""]
-    for i, (_, text) in enumerate(FUNNEL_STEPS, start=1):
-        lines.append(f"{i}. {text}")
-    lines += ["", "| Repo | " + " | ".join(str(i) for i in range(1, len(FUNNEL_STEPS) + 1))
-              + " | Link: list | regex | both |",
-              "|---|" + "---:|" * (len(FUNNEL_STEPS) + 3)]
-    for f in funnels:
-        methods = [f.link_methods.get(m, 0) for m in ("list", "regex", "both")]
-        lines.append(f"| {f.repo} | " + " | ".join(f"{f.counts[k]:,}" for k, _ in FUNNEL_STEPS)
-                     + " | " + " | ".join(f"{n:,}" for n in methods) + " |")
+def _table(funnels: list[Funnel], steps, first: int, extra: tuple[str, ...] = ()) -> list[str]:
+    lines = [f"{i}. {text}" for i, (_, text) in enumerate(steps, start=first)]
+    lines += ["", "| Repo | " + " | ".join(str(i) for i in range(first, first + len(steps)))
+              + "".join(f" | {name}" for name in extra) + " |",
+              "|---|" + "---:|" * (len(steps) + len(extra))]
+    rows = [(f.repo, f) for f in funnels]
+    for name, f in rows:
+        methods = [f.link_methods.get(m, 0) for m in ("list", "regex", "both")] if extra else []
+        lines.append(f"| {name} | " + " | ".join(f"{f.counts[k]:,}" for k, _ in steps)
+                     + "".join(f" | {n:,}" for n in methods) + " |")
     if len(funnels) > 1:
-        total = {k: sum(f.counts[k] for f in funnels) for k, _ in FUNNEL_STEPS}
-        methods = [sum(f.link_methods.get(m, 0) for f in funnels) for m in ("list", "regex", "both")]
-        lines.append("| **Total** | " + " | ".join(f"{total[k]:,}" for k, _ in FUNNEL_STEPS)
-                     + " | " + " | ".join(f"{n:,}" for n in methods) + " |")
+        total = [sum(f.counts[k] for f in funnels) for k, _ in steps]
+        methods = [sum(f.link_methods.get(m, 0) for f in funnels) for m in ("list", "regex", "both")] if extra else []
+        lines.append("| **Total** | " + " | ".join(f"{n:,}" for n in total) + "".join(f" | {n:,}" for n in methods) + " |")
+    return lines
+
+
+def render_funnel(funnels: list[Funnel]) -> str:
+    """The GitHub steps, and the git steps when B2 ran. Each count is the PRs left after that step."""
+    lines = ["## GitHub steps", "", "Count of PRs left after each step:", ""]
+    lines += _table(funnels, GITHUB_STEPS, 1, ("Link: list", "regex", "both"))
+    if funnels and all(f.counts[GIT_STEPS[0][0]] is not None for f in funnels):
+        lines += ["", "## Git steps (full clone)", "", "Count of PRs left after each step:", ""]
+        lines += _table(funnels, GIT_STEPS, len(GITHUB_STEPS) + 1)
     return "\n".join(lines) + "\n"

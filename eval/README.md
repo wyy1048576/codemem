@@ -30,6 +30,7 @@ Task files:
 | File | Source | Split |
 |---|---|---|
 | `tasks/swebv-dev50.jsonl` | 50 SWE-bench Verified tasks, about the same number from each of its 12 repos, labeled with cmeval's rules. `swebv-dev50.meta.json` records the dataset revision, seed, skipped rows, and label statistics. | dev |
+| `tasks/fresh-v1.jsonl` | 2,084 fresh tasks from 7 Python repos (home-assistant, vllm, pandas, airflow, ray, transformers, cpython): fixes opened and merged from 2026-07-01 to 2026-10-22, after the model cutoff. Made by `cmeval collect configs/fresh-v1.toml`. `fresh-v1.meta.json` records the settings, the funnel for each repo (13 steps, from 21,822 merged PRs), the drop reasons, and label statistics. Use tag `gold_all_python` for the main comparison (codemem reads Python only). | dev (399) and test (1,685) |
 
 Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions that the fix changed, found with tree-sitter on the code at `base_commit`.
 
@@ -41,7 +42,7 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 | `cmeval import swebench-verified [--n 50] [--seed 0]` | Sample and label SWE-bench Verified tasks (pinned dataset revision) |
 | `cmeval systems FILE` | Check a system config and list its systems (adapter, granularity, index key) |
 | `cmeval repo-stats [--candidates FILE] [--repo R ...] [--since DATE] [--until DATE] [--functions]` | Numbers for choosing repos for fresh tasks: size, languages, a PR funnel after the cutoff, and (with `--functions`) the Python files, lines, and chunks that codemem indexes, from a shallow clone. GitHub answers are cached in `CMEVAL_HOME/gh-cache`. Needs `gh` with a login. |
-| `cmeval collect CONFIG [--repo R ...] [--dry-run] [--refresh]` | Fresh candidates for each repo in a collection config (`configs/fresh-v1.toml`): merged PRs after the cutoff, their one linked issue (GitHub's list or SWE-bench's regex), and the query from the issue as it was when the fix PR was opened. Prints a funnel; writes `CMEVAL_HOME/collect/<config>/<repo>/candidates.jsonl` and `funnel.json`. Patches, labels, and task files come next. |
+| `cmeval collect CONFIG [--repo R ...] [--dry-run] [--refresh]` | Fresh candidates for each repo in a collection config (`configs/fresh-v1.toml`): merged PRs after the cutoff, their one linked issue (GitHub's list or SWE-bench's regex), and the query from the issue as it was when the fix PR was opened. Then, from the full clone: base commit and patch (Decision 7), file-list and apply checks, size filters, gold labels, split. Writes `tasks/<config>.jsonl` and its meta file, and keeps candidates and funnels in `CMEVAL_HOME/collect/`. `--dry-run`: GitHub steps only. |
 | `cmeval review` | Not built yet |
 | `cmeval run --tasks FILE --config FILE --run-id ID [--split dev\|test] [--repo R] [--limit-per-repo N] [--index-mode update\|rebuild]` | Run every system on every task; saves hits and timings (see "Run files") |
 | `cmeval score RUN [--tokens anthropic\|estimate] [--iou T ...]` | Score a run: accuracy, tokens, latency (see "Metrics") |

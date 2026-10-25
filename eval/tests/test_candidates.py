@@ -6,6 +6,8 @@ import pytest
 
 from cmeval.collect.candidates import (
     FUNNEL_STEPS,
+    GIT_STEPS,
+    GITHUB_STEPS,
     CollectError,
     Settings,
     collect_candidates,
@@ -59,8 +61,10 @@ def run(tmp_path, runner=None, **overrides):
 def test_funnel_on_recorded_pandas_prs(tmp_path):
     candidates, funnel = run(tmp_path)
     assert list(funnel.counts) == [key for key, _ in FUNNEL_STEPS]
-    assert funnel.counts == {"merged": 10, "opened_after_cutoff": 10, "not_bot": 9, "one_link": 7, "is_issue": 6,
+    github_counts = {key: funnel.counts[key] for key, _ in GITHUB_STEPS}
+    assert github_counts == {"merged": 10, "opened_after_cutoff": 10, "not_bot": 9, "one_link": 7, "is_issue": 6,
                              "issue_before_pr": 6, "body_ok": 5, "no_leak": 5}
+    assert all(funnel.counts[key] is None for key, _ in GIT_STEPS)  # B2 fills these
     by_pr = {c.pr_number: c for c in candidates}
     assert set(by_pr) == {CASES[k] for k in ("both", "list", "regex", "title_renamed", "body_edited")}
     assert by_pr[CASES["both"]].link_method == "both"
@@ -143,6 +147,7 @@ def test_write_and_render(tmp_path):
     table = render_funnel([funnel, funnel])
     assert "| pandas-dev/pandas | 10 | 10 | 9 | 7 | 6 | 6 | 5 | 5 | 2 | 1 | 2 |" in table
     assert "| **Total** | 20 |" in table
+    assert "## Git steps" not in table  # B2 did not run
 
 
 # ---- config

@@ -244,9 +244,10 @@ def cmd_repo_stats(args) -> int:
 def cmd_collect(args) -> int:
     from .collect.candidates import (CollectError, collect_candidates, load_settings, render_funnel,
                                      write_candidates)
+    from .collect.tasks_build import build_tasks, write_task_set
     from .github import GitHub, GitHubError
-    from .paths import collect_dir
-    from .repos import slug
+    from .paths import collect_dir, default_tasks_dir
+    from .repos import RepoError, slug
 
     def progress(message: str) -> None:
         print(message, file=sys.stderr, flush=True)
@@ -267,19 +268,25 @@ def cmd_collect(args) -> int:
             return 1
         repos = [name for name in repos if name.lower() in {r.lower() for r in args.repo}]
     gh = GitHub(refresh=args.refresh, progress=progress)
-    funnels = []
+    funnels, tasks = [], []
     try:
         for repo in repos:
             candidates, funnel = collect_candidates(gh, repo, settings, progress=progress)
             funnels.append(funnel)
             if not args.dry_run:
+                tasks += build_tasks(gh, candidates, settings, funnel, progress=progress)
                 write_candidates(collect_dir() / settings.name / slug(repo), candidates, funnel)
-    except GitHubError as exc:
+    except (GitHubError, RepoError) as exc:
         print(exc, file=sys.stderr)
         return 1
     print(f"# {settings.name}: {settings.since} to {settings.until}\n")
     print(render_funnel(funnels))
-    where = "dry run, nothing written" if args.dry_run else f"written to {collect_dir() / settings.name}"
+    if args.dry_run:
+        where = "dry run (GitHub steps only), nothing written"
+    else:
+        out = args.out or default_tasks_dir() / f"{settings.name}.jsonl"
+        write_task_set(out, tasks, funnels, settings, args.config)
+        where = f"{out}: {len(tasks)} tasks; candidates and funnels in {collect_dir() / settings.name}"
     print(f"{where} ({gh.api_calls} API calls, {gh.cache_hits} from the cache, {gh.retries} retries)",
           file=sys.stderr)
     return 0
@@ -359,8 +366,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("collect", help="collect fresh candidates: merged PRs, their linked issue, and the query")
     p.add_argument("config", type=Path, help="collection config (.toml) with [collect] and [[repo]] tables")
     p.add_argument("--repo", action="append", default=None, help="only this repo of the config; repeatable")
-    p.add_argument("--dry-run", action="store_true", help="print the funnel only; write nothing")
+    p.add_argument("--dry-run", action="store_true", help="GitHub steps only (no clone); print the funnel, write nothing")
     p.add_argument("--refresh", action="store_true", help="ask GitHub again instead of using cached answers")
+    p.add_argument("--out", type=Path, default=None, help="task file (default: eval/tasks/<config name>.jsonl)")
     p.set_defaults(func=cmd_collect)
 
     p = sub.add_parser("repo-stats", help="size, PR funnel, and code counts of candidate repos for fresh tasks")

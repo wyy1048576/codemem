@@ -7,6 +7,8 @@ since = "2026-07-01"  # the freshness cutoff (Opus 5.5 data ends in June 2026)
 until = "2026-10-22"
 min_body_chars = 100  # issue body without hidden comments, as of when the fix PR was opened
 extra_bots = []  # more bot logins to drop, next to the built-in list
+max_code_files = 5  # changed code files in the fix (tests and docs do not count)
+max_code_lines = 200  # added plus removed lines in those code files
 
 [[repo]]
 name = "home-assistant/core"
