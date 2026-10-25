@@ -1,6 +1,7 @@
 """Service, watcher, CLI, agent config and MCP server (all with the fake embedder)."""
 
 import json
+import threading
 import time
 
 import anyio
@@ -8,6 +9,7 @@ import pytest
 
 from codemem import agents, prompts
 from codemem.cli import main
+from codemem.embedder import make_embedder
 from codemem.service import CodememService
 
 
@@ -59,8 +61,6 @@ def test_status_reports_staleness(service, sample_repo):
 def test_concurrent_updates_both_run_and_return_stats(service):
     """An update that finds another one running waits and runs: it never returns None, which the
     eval adapter treats as a failed update."""
-    import threading
-
     results = []
 
     def run():
@@ -111,6 +111,93 @@ def test_search_right_after_a_save_sees_the_edit(service, sample_repo):
     resp = service.search("enforce_login_quota", k=3)  # immediately: no sleep before searching
     assert resp.results and resp.results[0].qualname == "enforce_login_quota"
     assert resp.freshness.complete
+
+
+class _SlowModel:
+    """The fake model, slowed to 10 ms per text, so an embedding backlog takes real time."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def embed_documents(self, texts):
+        time.sleep(0.01 * len(texts))
+        return self.inner.embed_documents(texts)
+
+
+@pytest.fixture
+def slow_service(sample_repo, tmp_path, fake_env):
+    (sample_repo / ".codemem.toml").write_text("catchup_budget_ms = 300\n")
+    svc = CodememService(
+        sample_repo, index_dir=tmp_path / "idx", embedder_factory=lambda m, c: _SlowModel(make_embedder(m, c))
+    )
+    yield svc
+    svc.close()
+
+
+_MANY = "\n\n".join(f"def helper_{i}(x):\n    return x * {i} + {i * 7}\n" for i in range(150))  # 1.5 s to embed
+
+
+def test_a_search_waits_for_edits_the_writer_is_applying(service, sample_repo, monkeypatch):
+    """Fixed bug: a save the writer thread had taken, but not committed yet, was invisible to a
+    search, which still called itself complete."""
+    service.update()
+    service.start(prewarm=False)
+    time.sleep(0.3)
+    taken = threading.Event()
+    structure = service.indexer.structure
+
+    def slow_structure(stats, **kw):
+        if threading.current_thread().name == "codemem-writer" and kw.get("paths"):
+            taken.set()
+            time.sleep(0.6)  # a big repo, or a git checkout still writing files
+        return structure(stats, **kw)
+
+    monkeypatch.setattr(service.indexer, "structure", slow_structure)
+    (sample_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+    assert taken.wait(5)  # the writer has the save and is in stage A
+    resp = service.search("enforce_login_quota", k=3)
+    assert resp.results and resp.results[0].qualname == "enforce_login_quota"
+    assert resp.freshness.complete
+
+
+def test_a_search_stops_waiting_at_its_limit(slow_service, sample_repo):
+    """Fixed bug: the limit was checked only between batches, and a search took the whole queue
+    as one batch, so a big edit kept it waiting until everything was embedded."""
+    svc = slow_service
+    svc.update()
+    svc.start(prewarm=False)
+    time.sleep(0.3)
+    (sample_repo / "auth" / "many.py").write_text(_MANY)
+    t = time.monotonic()
+    resp = svc.search("helper_7", k=10)
+    assert time.monotonic() - t < 1.0  # the 0.3 s limit, one model call (0.16 s) and the search
+    assert not resp.freshness.complete and resp.freshness.pending_chunks > 0
+    keywords = svc.search("helper_7", k=1, signals=["bm25"]).results
+    assert keywords[0].qualname == "helper_7"  # keywords are current already, vectors or not
+    assert _wait_for(lambda: svc.store.dirty_count() == 0)  # the writer embeds the rest
+    assert svc.indexer.verify() == []
+
+
+def test_a_search_embeds_its_own_edit_first(slow_service, sample_repo):
+    """While the writer works through a big change, an agent edits one function and searches:
+    the writer hands over the model at its next call, and the newest edit is embedded first."""
+    svc = slow_service
+    svc.update()
+    svc.start(prewarm=False)
+    time.sleep(0.3)
+    (sample_repo / "auth" / "many.py").write_text(_MANY)
+    assert _wait_for(lambda: svc.store.dirty_count() > 0)  # applied; the writer is embedding it
+    time.sleep(0.2)
+    (sample_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+    t = time.monotonic()
+    svc.search("enforce_login_quota", k=3)
+    assert time.monotonic() - t < 1.0
+    quota = svc.store.get_chunk_by_key("auth/quota.py::enforce_login_quota")
+    assert quota is not None and not svc.store.dirty_seqs([quota.chunk_id])  # its vectors are in
+    assert svc.store.dirty_count() > 0  # while the older work is still queued
 
 
 def test_an_ignore_rule_change_reconciles(service, sample_repo):

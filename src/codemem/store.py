@@ -810,13 +810,14 @@ class Store:
         self.conn.execute("INSERT OR REPLACE INTO dirty_texts(chunk_id, seq) SELECT chunk_id, ? FROM chunks", (seq,))
 
     def dirty_batch(self, limit: int, skip: Iterable[int] = (), only: Iterable[int] | None = None) -> dict[int, int]:
-        """Up to `limit` queued chunk ids (oldest first) -> the sequence number they were queued with."""
+        """Up to `limit` queued chunk ids -> the sequence number they were queued with. Newest edits
+        first: an agent's next search is most likely about the code it just changed."""
         skip = set(skip)
         if only is not None:
-            rows = self.dirty_seqs(only)
-            return dict(list((i, s) for i, s in sorted(rows.items()) if i not in skip)[:limit])
+            rows = sorted(self.dirty_seqs(only).items(), key=lambda r: (-r[1], r[0]))
+            return dict([(i, s) for i, s in rows if i not in skip][:limit])
         rows = self.conn.execute(
-            "SELECT chunk_id, seq FROM dirty_texts ORDER BY seq, chunk_id LIMIT ?", (limit + len(skip),)
+            "SELECT chunk_id, seq FROM dirty_texts ORDER BY seq DESC, chunk_id LIMIT ?", (limit + len(skip),)
         )
         return dict(list((r[0], r[1]) for r in rows if r[0] not in skip)[:limit])
 

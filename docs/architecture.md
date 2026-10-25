@@ -81,7 +81,7 @@ function through every stage.
 | 5 | Texts | `texts.py` | what gets embedded: code with a context header, usage (callers, tests) | works; v3 window fixes in progress |
 | 6 | Embedder | `embedder.py`, `vectorcache.py` | local model by default; any OpenAI-compatible API (v3) | local works; API in progress |
 | 7 | Store | `store.py` | SQLite holds everything; FAISS is a derived search index | works; v3 lazy saves in progress |
-| 8 | Search | `search.py`, `render.py` | BM25 + one vector search per text type, merged by rank, rendered as cards | works; v3 catch-up and query clean-up in progress |
+| 8 | Search | `search.py`, `render.py` | BM25 + one vector search per text type, merged by rank, rendered as cards | works; v3 catch-up done, query clean-up to do |
 | 9 | Front-ends | `server.py`, `cli.py`, `prompts.py`, `agents.py` | MCP tools for agents; CLI for people and scripts | works; v3 tool changes in progress |
 
 **Product shape** (unchanged since Week 1):
@@ -269,25 +269,34 @@ changed. A search in the meantime sees the old index.
 **v3, in one picture:**
 
 ```
- file saved ──▶ watcher ──▶ dirty set {paths}       (in memory; a crash loses nothing:
-                               │                     the startup reconcile finds the same files)
-             ┌─────────────────┴───────────────────┐
-             ▼                                     ▼
-   background: 0.5 s after the last      search: apply the dirty set first
-   save (at most every 2 s while           (2 s budget), then answer
-   saves keep coming)                              │
-             └──────────────▶ incremental update ◀─┘
-                       (changed files + exact usage ripple)
+ file saved ──▶ watcher ──▶ changed paths       (in memory; a crash loses nothing:
+                               │                 the startup reconcile finds the same files)
+             ┌─────────────────┴────────────────────┐
+             ▼                                      ▼
+   background writer: 0.5 s after the     search: first apply every save seen so far
+   last save (at most every 2 s while     (waiting for any the writer is applying),
+   saves keep coming)                     then embed the queue, newest edits first,
+             │                            for at most 2.5 s; then answer
+             └──────────────┬───────────────────────┘
+                            ▼
+   stage A, structure (milliseconds): chunks, keywords, calls, links, and the queue of
+       chunks whose texts may have changed (dirty_texts, in the same SQLite transaction)
+   stage B, vectors (the slow part): rebuild the queued texts, embed only the changed
+       ones, store them, clear their queue rows
 
  safety nets: startup reconcile · reconcile every 5 min · refresh_index tool · polling fallback
 ```
 
-**The guarantee.** A search reflects every file saved before it started. The one exception is
-embeddings for a huge edit that doesn't fit in the 2 s budget, such as a whole-repo reformat. Then
-keywords and links are already current, and the results say which files are still being embedded.
+**The guarantee.** A search reflects every file saved before it started: keywords and links
+always, and ranking by meaning whenever the queue fits in the catch-up budget
+(`catchup_budget_ms`, 2.5 s). That covers ordinary edits: a one-function edit took 0.11–0.17 s
+with the real model on the sample repo. A bigger change (a branch switch, a reformat) gets what
+fits, newest edits first, and the response counts what is still queued (shown to the agent from
+phase 2). While a chunk has no vector yet, it can only score through keywords, so it ranks lower
+than it will once embedded.
 
 **The incremental update.** It is one function for the first build, a reconcile and a single
-save:
+save. **Stage A**, in one SQLite transaction:
 1. **Find the changed files.** For the watcher's paths, or by scanning everything, compare size
    and date, then the content hash.
 2. **Remember their old state:** chunk ids, the names they define, and their outgoing links.
@@ -297,13 +306,20 @@ save:
    - the calls made by the changed files' chunks;
    - every call anywhere to a name that was added or removed (this includes the 5-definitions
      limit).
-5. **Rebuild only the dirty texts:**
-   - code texts of the new or changed chunks;
-   - usage texts of the changed files' chunks, of what they call (before and after the edit), and
-     of any chunk whose callers changed.
-6. **Embed what's missing,** code texts first.
-7. **Patch FAISS in memory,** and write it to disk later (after 30 s idle, on shutdown, and on
-   `refresh_index`).
+5. **Queue the chunks whose texts may have changed** (`dirty_texts`: a chunk id and the commit's
+   sequence number):
+   - every chunk of the changed files;
+   - what they call, before and after the edit;
+   - any chunk whose callers changed.
+
+**Stage B**, in batches; the write lock is not held while the model runs:
+
+6. **Rebuild the queued chunks' texts** and compare their hashes with the stored vectors. Only
+   changed texts need a vector.
+7. **Embed those:** from this index, then the shared cache, then the model. Newest edits go first.
+8. **Store the vectors** of chunks whose sequence number hasn't changed meanwhile (a chunk edited
+   again stays queued for its newest version), and clear their queue rows. Patch FAISS in memory,
+   and write it to disk later (after 30 s idle, on shutdown, and on `refresh_index`).
 
 **Why the ripple is small.** A usage text lists a chunk's *callers*. So a change in file A
 reaches only the usage texts of what A calls. The functions that call A don't change: their code
@@ -322,6 +338,10 @@ tests). It reports any difference between the incremental result and a from-scra
 | a search during an update | SQLite readers see the state before or after a transaction, never half |
 | a crash at any point | SQLite rolls back; FAISS is rebuilt if its version is behind; the startup reconcile re-finds pending files |
 | two agent sessions on one repo | the lock file serializes writers; a search waits only up to its budget |
+| a search while the background writer is applying a save | the search waits for it, within its budget: the writer holds a lock from taking edits until they are committed |
+| a backlog of embeddings when the agent searches | the writer hands over the model at its next call; the search embeds the newest edits first and stops at its budget |
+| a crash between stage A and stage B | the queue rows were committed with the edit, so the next start embeds them |
+| a git checkout is still writing files | updates wait for it (up to 10 s; a search only up to its budget, then it reports those files as pending) |
 | a file changes while being indexed | its event lands in the dirty set again |
 | `.gitignore`, `.codemem.toml` or the git branch changes | a full reconcile |
 | a chunker or settings upgrade | stored settings differ from the current ones, so the index is rebuilt (cheap with the cache) |

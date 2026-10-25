@@ -463,9 +463,10 @@ The tool names stay stable, so other front-ends and versions can be compared.
 | `index_status` | none | state, progress, counts, models, indexed commit, staleness; **(v3)** freshness (pending files), coverage, embedder (local or remote) |
 | `refresh_index` **(v3)** | none | runs a full reconcile now (waits up to 60 s); what changed |
 
-**Freshness contract (v3).** `search_code` first applies every edit the watcher has seen, within
-a 2 s budget, then searches. If the budget runs out, keyword and link results are current, and a
-note names the files whose vectors are still being computed.
+**Freshness contract (v3).** `search_code` first applies every edit the watcher has seen,
+including any the background writer is still applying, then embeds the queue (newest edits first)
+for at most `catchup_budget_ms` (2.5 s), then searches. If the budget runs out, keyword and link
+results are current, and a note (phase 2) names the files whose vectors are still being computed.
 
 **stdout carries only MCP messages;** logs go to stderr.
 

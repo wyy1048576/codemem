@@ -89,7 +89,7 @@ embedding_dim = 256          # optional Matryoshka truncation; omit for the full
 batch_size = 16
 max_seq_length = 1024
 steering = "light"           # none | light | strong  (agent-study variable)
-max_file_size = 1000000      # v3: 10 MB
+max_file_size = 10000000     # larger files are listed as skipped (too_large), never silently
 ignore = ["migrations/"]     # extra gitignore-style patterns
 use_default_ignore = true    # also skip vendor/, *.min.js, *_pb2.py, *.pb.go, ...
 skip_generated = true        # skip "Code generated ... DO NOT EDIT" / "@generated" files
@@ -100,6 +100,9 @@ vector_cache = "global"      # global | off (reuse vectors across indexes)
 kinds = ["function", "method"]  # optional search-time filter; default: every kind
 test_weight = 0.5            # search-time; v3 default: 1.0 (neutral)
 kind_weights = { class = 0.5, block = 0.5 }  # search-time; v3 default: none
+debounce_ms = 500            # the background writer starts once saves stop for this long,
+debounce_max_wait_ms = 2000  # or at the latest this long after the first save
+catchup_budget_ms = 2500     # a search first applies and embeds pending edits for at most this long
 
 [vectors.code]
 model = "jinaai/jina-code-embeddings-0.5b"

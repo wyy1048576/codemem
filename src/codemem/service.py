@@ -7,7 +7,9 @@ eval adapter re-pins `repo_root` after construction.
 Freshness (docs/architecture.md §8):
 - the watcher hands over batches of changed paths; a writer thread applies them (stage A), then
   embeds what they queued (stage B, in small batches, so new edits get applied in between);
-- `search()` first applies every edit seen so far, and embeds what they queued within a budget;
+- `search()` first applies every edit seen so far, waiting for any the writer thread is applying,
+  then embeds what is queued, newest edits first, for at most `catchup_budget_ms`. The writer
+  hands the model over to it meanwhile;
 - a reconcile (a scan of the whole repo) runs at startup, every few minutes, on `refresh()`, and
   when the ignore rules, the config or the git branch change;
 - the FAISS files are written once the index has been quiet for a while, and on close.
@@ -34,13 +36,12 @@ log = logging.getLogger(__name__)
 _LONG_CLASS_LINES = 80
 # Rough share of total work per phase, for a single progress percentage.
 _PHASE_SPAN = {"chunk": (0.0, 0.15), "embed": (0.15, 1.0), "done": (1.0, 1.0)}
-CATCHUP_BUDGET = 2.0  # seconds a search may spend applying and embedding pending edits
 CATCHUP_MAX_CHUNKS = 1000  # beyond this many queued chunks the index is being built: don't wait
 SAVE_AFTER_IDLE = 30.0  # write the FAISS files once nothing changed for this long
 RECONCILE_EVERY = 300.0  # a full scan, in case a file event was missed
 POLL_EVERY = 10.0  # the scan interval when file events don't work
 BURST_PATHS = 2000  # more changed paths than this at once: scan everything instead
-_BACKGROUND_BATCH = 64  # queued chunks per background embedding batch (new edits wait at most one)
+_BATCH = 64  # queued chunks per embedding batch outside a build (new edits wait for one at most)
 
 
 @dataclass
@@ -49,10 +50,11 @@ class Freshness:
 
     pending_chunks: int = 0  # queued chunks whose vectors are not computed yet
     indexing: bool = False  # the index is being built: many chunks still to embed
+    pending_files: int = 0  # saved files not applied yet (still being applied, or applying failed)
 
     @property
     def complete(self) -> bool:
-        return self.pending_chunks == 0
+        return self.pending_chunks == 0 and self.pending_files == 0
 
 
 class CodememService:
@@ -79,6 +81,10 @@ class CodememService:
         self._cond = threading.Condition()
         self._dirty: set[str] = set()
         self._reconcile = False
+        # Held from taking edits until their stage A is committed, so a search can wait for edits
+        # another thread has taken; `_applying` counts those edits' files meanwhile.
+        self._apply_lock = threading.Lock()
+        self._applying = 0
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._watcher: RepoWatcher | None = None
@@ -162,14 +168,14 @@ class CodememService:
         self.request_reconcile()
 
     def _take_changes(self, *, flush_watcher: bool = False) -> tuple[set[str], bool]:
-        """Pending edits. Only a search flushes the watcher's not-yet-handed-over paths: the writer
-        thread waits for the quiet period, so a burst of saves becomes one update."""
+        """Pending edits. Call it holding `_apply_lock`, and hold it until they are applied. Only a
+        search flushes the watcher's not-yet-handed-over paths: the writer thread waits for the
+        quiet period, so a burst of saves becomes one update."""
+        # The watcher first: a hand-over it has in progress lands in _dirty before we take that.
+        more, again = self._watcher.pending() if flush_watcher and self._watcher is not None else (set(), False)
         with self._cond:
-            paths, reconcile = self._dirty, self._reconcile
+            paths, reconcile = self._dirty | more, self._reconcile or again
             self._dirty, self._reconcile = set(), False
-        if flush_watcher and self._watcher is not None:
-            more, again = self._watcher.pending()
-            paths, reconcile = paths | more, reconcile or again
         return paths, reconcile
 
     def _requeue(self, paths: set[str], reconcile: bool) -> None:
@@ -177,11 +183,18 @@ class CodememService:
             self._dirty |= paths
             self._reconcile |= reconcile
 
+    def _wait_for_git(self, until: float) -> bool:
+        """Wait while a git command (checkout, merge, rebase) is writing files: index the result,
+        not the middle. False if it is still busy at `until`."""
+        while git_busy(self.repo_root):
+            if time.monotonic() >= until:
+                return False
+            time.sleep(0.1)
+        return True
+
     def _apply_changes(self, paths: set[str], reconcile: bool) -> set[int] | None:
         """Stage A for pending edits. Returns what was queued (None = everything)."""
-        deadline = time.monotonic() + 10.0
-        while git_busy(self.repo_root) and time.monotonic() < deadline:
-            time.sleep(0.1)  # a checkout is writing files: index the result, not the middle
+        self._wait_for_git(time.monotonic() + 10.0)
         stats = IndexStats()
         if reconcile:
             self._reload_config()
@@ -214,24 +227,38 @@ class CodememService:
 
     def _step(self) -> bool:
         """One unit of background work; False when there was nothing to do."""
-        paths, reconcile = self._take_changes()
+        failed = False
+        with self._apply_lock:  # a search arriving meanwhile waits until these edits are applied
+            paths, reconcile = self._take_changes()
+            if paths or reconcile:
+                self._applying = len(paths) or 1
+                first = not self.has_index()
+                self.state = "indexing" if first else "updating"
+                try:
+                    self._apply_changes(paths, reconcile)
+                    self.state = "ready" if self.has_index() else self.state
+                except Exception as e:
+                    log.exception("index update failed; will retry")
+                    self.last_error = f"{type(e).__name__}: {e}"
+                    self.state = "error" if not self.has_index() else "ready"
+                    self._requeue(paths, reconcile)
+                    failed = True
+                finally:
+                    self._applying = 0
         if paths or reconcile:
-            first = not self.has_index()
-            self.state = "indexing" if first else "updating"
-            try:
-                self._apply_changes(paths, reconcile)
-                self.state = "ready" if self.has_index() else self.state
-            except Exception as e:
-                log.exception("index update failed; will retry")
-                self.last_error = f"{type(e).__name__}: {e}"
-                self.state = "error" if not self.has_index() else "ready"
-                self._requeue(paths, reconcile)
+            if failed:
                 self._stop.wait(1.0)
             return True
         if self.store.dirty_count():
+            if self.indexer.searches_waiting:
+                self._stop.wait(0.05)  # a search is embedding what it needs: leave it the model
+                return True
             stats = IndexStats()
             try:
-                self.indexer.embed_pending(stats, deadline=time.monotonic() + 5.0, batch_chunks=_BACKGROUND_BATCH)
+                self.indexer.embed_pending(
+                    stats, deadline=time.monotonic() + 5.0, batch_chunks=_BATCH, group=self.config.batch_size,
+                    yield_to_searches=True,
+                )
             except Exception as e:
                 log.exception("embedding failed; will retry")
                 self.last_error = f"{type(e).__name__}: {e}"
@@ -277,10 +304,18 @@ class CodememService:
         `timeout`, and write the FAISS files. Returns what changed."""
         t = time.monotonic()
         stats = IndexStats()
-        self._take_changes(flush_watcher=True)  # a reconcile covers every pending path
-        self._reload_config()
-        self.indexer.reset_rules()
-        self.indexer.structure(stats)
+        with self._apply_lock:  # searches meanwhile wait for this reconcile, as for the writer's edits
+            self._take_changes(flush_watcher=True)  # a reconcile covers every pending path
+            self._applying = 1
+            try:
+                self._reload_config()
+                self.indexer.reset_rules()
+                self.indexer.structure(stats)
+            except Exception:
+                self._requeue(set(), True)  # the writer thread tries the reconcile again
+                raise
+            finally:
+                self._applying = 0
         self._last_reconcile = time.monotonic()
         self.indexer.embed_pending(stats, deadline=t + timeout)
         self.store.save_vectors()
@@ -293,31 +328,51 @@ class CodememService:
             "seconds": round(time.monotonic() - t, 2),
         }
 
-    def catch_up(self, budget: float = CATCHUP_BUDGET) -> Freshness:
-        """Apply every edit seen so far, then embed what is queued, within `budget` seconds."""
+    def catch_up(self, budget: float | None = None) -> Freshness:
+        """Apply every edit seen so far, then embed what is queued, newest edits first, for at most
+        `budget` seconds (default `catchup_budget_ms`). What doesn't fit is reported, not waited for."""
+        budget = self.config.catchup_budget_ms / 1000 if budget is None else budget
         deadline = time.monotonic() + budget
         if self._watcher is not None:
             self._watcher.barrier(timeout=min(0.25, budget))  # every earlier save has been reported
-        paths, reconcile = self._take_changes(flush_watcher=True)
-        if paths or reconcile:
-            try:
-                self._apply_changes(paths, reconcile)
-            except Exception as e:
-                log.exception("could not apply pending edits before a search")
-                self.last_error = f"{type(e).__name__}: {e}"
-                self._requeue(paths, reconcile)
+        # Stage A. Edits the writer thread has taken are applied while it holds _apply_lock, so once
+        # we hold it they are committed; every other edit seen so far is taken and applied here.
+        if not self._apply_lock.acquire(timeout=max(0.0, deadline - time.monotonic())):
+            return Freshness(self.store.dirty_count(), pending_files=self._applying or 1)
+        try:
+            paths, reconcile = self._take_changes(flush_watcher=True)
+            if (paths or reconcile) and not self._wait_for_git(deadline):
+                self._requeue(paths, reconcile)  # a checkout is still writing files
+                return Freshness(self.store.dirty_count(), pending_files=len(paths) or 1)
+            if paths or reconcile:
+                try:
+                    self._apply_changes(paths, reconcile)
+                except Exception as e:
+                    log.exception("could not apply pending edits before a search")
+                    self.last_error = f"{type(e).__name__}: {e}"
+                    self._requeue(paths, reconcile)
+                    return Freshness(self.store.dirty_count(), pending_files=len(paths) or 1)
+        finally:
+            self._apply_lock.release()
+        # Stage B. The writer thread stops at its next model call while we hold `searching()`.
         pending = self.store.dirty_count()
         if pending == 0:
             return Freshness()
         if pending > CATCHUP_MAX_CHUNKS or self.state == "indexing":
             return Freshness(pending, indexing=True)  # the index is being built: report, don't wait
         stats = IndexStats()
-        try:
-            self.indexer.embed_pending(stats, deadline=deadline, batch_chunks=pending)
-        except Exception:
-            log.exception("could not embed pending edits before a search")
-        while self.store.dirty_count() and time.monotonic() < deadline:
-            time.sleep(0.02)  # the writer thread is finishing a batch it had already taken
+        with self.indexer.searching():
+            while time.monotonic() < deadline:
+                try:
+                    done = self.indexer.embed_pending(
+                        stats, deadline=deadline, batch_chunks=_BATCH, group=self.config.batch_size
+                    )
+                except Exception:
+                    log.exception("could not embed pending edits before a search")
+                    break
+                if not done or not self.store.dirty_count():
+                    break
+                time.sleep(0.02)  # what is left is in the writer thread's batch, which it is handing back
         if sum(stats.embedded.values()):
             self._last_write = time.monotonic()
         return Freshness(self.store.dirty_count())
@@ -423,7 +478,7 @@ class CodememService:
             "indexed_at": store.get_meta("indexed_at"),
             "last_update": store.get_meta("last_update"),
             "pending_chunks": store.dirty_count(),
-            "pending_files": len(self._dirty),
+            "pending_files": len(self._dirty) + self._applying,
             "watching": self._watcher is not None and self._watcher.alive() and not self._polling,
             "coverage": store.get_meta("coverage"),
             "skipped_files": store.skipped_files(),

@@ -76,19 +76,24 @@ class Debouncer:
             self._timer.start()
 
     def flush(self) -> tuple[set[str], bool]:
-        """Take what is collected now, without waiting for the quiet period."""
+        """Take what is collected now, without waiting for the quiet period. A hand-over in
+        progress finishes first, so every path is either returned here or already delivered."""
         with self._lock:
-            if self._timer is not None:
-                self._timer.cancel()
-                self._timer = None
-            paths, reconcile = self._paths, self._reconcile
-            self._paths, self._reconcile, self._first = set(), False, None
-            return paths, reconcile
+            return self._take()
+
+    def _take(self) -> tuple[set[str], bool]:
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer = None
+        paths, reconcile = self._paths, self._reconcile
+        self._paths, self._reconcile, self._first = set(), False, None
+        return paths, reconcile
 
     def _fire(self) -> None:
-        paths, reconcile = self.flush()
-        if paths or reconcile:
-            self.fn(paths, reconcile)
+        with self._lock:  # delivered before the lock is released (see flush)
+            paths, reconcile = self._take()
+            if paths or reconcile:
+                self.fn(paths, reconcile)
 
     def cancel(self) -> None:
         self.flush()

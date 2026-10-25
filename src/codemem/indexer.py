@@ -54,7 +54,7 @@ EmbedderFactory = Callable[[str, Config], Embedder]
 
 _GENERATED = re.compile(rb"Code generated .{0,200}DO NOT EDIT|@generated\b")
 _MINIFIABLE = frozenset({"javascript", "typescript", "tsx"})
-_EMBED_GROUP = 256  # texts per model call; the model batches inside it
+_EMBED_GROUP = 256  # texts per model call in a build; the model batches inside it
 _BATCH_CHUNKS = 512  # queued chunks per stage-B batch
 _RACY_SECONDS = 2.0  # a file this close to the last scan may have changed again within its mtime tick
 
@@ -355,6 +355,23 @@ class Indexer:
         self._claimed: set[int] = set()  # queued chunk ids a stage-B batch of this process is embedding
         self._claim_lock = threading.Lock()
         self._model_lock = threading.Lock()  # one model call at a time; a search waits only up to its budget
+        self._searches = 0  # searches catching up right now: background batches hand them the model
+
+    @contextmanager
+    def searching(self) -> Iterator[None]:
+        """A search is catching up: background batches (`yield_to_searches`) stop at their next
+        model call, so the search waits for one call at most."""
+        with self._claim_lock:
+            self._searches += 1
+        try:
+            yield
+        finally:
+            with self._claim_lock:
+                self._searches -= 1
+
+    @property
+    def searches_waiting(self) -> bool:
+        return self._searches > 0
 
     @contextmanager
     def _locked(self) -> Iterator[None]:
@@ -679,10 +696,13 @@ class Indexer:
     # ---- stage B: vectors
     def embed_pending(
         self, stats: IndexStats, *, only: Iterable[int] | None = None, deadline: float | None = None,
-        batch_chunks: int = _BATCH_CHUNKS,
+        batch_chunks: int = _BATCH_CHUNKS, group: int = _EMBED_GROUP, yield_to_searches: bool = False,
     ) -> bool:
-        """Embed queued chunks (all of them, or only `only`) until the queue is empty or the
-        monotonic `deadline` passes. Returns True when nothing of what was asked is left."""
+        """Embed queued chunks (all of them, or only `only`), newest edits first, until the queue is
+        empty or the monotonic `deadline` passes. The deadline is checked before every model call
+        of `group` texts, so it is overshot by one call at most. With `yield_to_searches` (the
+        background writer), it also stops when a search wants the model. Returns True when nothing
+        of what was asked is left."""
         only = None if only is None else set(only)
         total = len(only) if only is not None else self.store.dirty_count()
         done = 0
@@ -692,16 +712,19 @@ class Indexer:
         while True:
             if deadline is not None and time.monotonic() >= deadline:
                 return False
+            if yield_to_searches and self._searches:
+                return False
             batch = self._take(batch_chunks, only)
             if batch is None:
                 return True
             try:
-                if not self._compute(batch, stats, deadline):
-                    return False  # the model stayed busy past the deadline; the batch stays queued
-                self._put(batch, stats)
+                finished = self._compute(batch, stats, deadline, group, yield_to_searches)
+                self._put(batch, stats)  # a batch cut short stores the chunks it finished
             finally:
                 with self._claim_lock:
                     self._claimed -= set(batch.seqs)
+            if not finished:
+                return False
             done += len(batch.seqs)
             if only is not None:
                 only -= set(batch.seqs)
@@ -770,36 +793,57 @@ class Indexer:
                 work[vec_type] = tw
         return _Batch(seqs, work, time.perf_counter() - t)
 
-    def _compute(self, batch: _Batch, stats: IndexStats, deadline: float | None = None) -> bool:
-        """Run the model on the texts nothing else could provide. The write lock is not held, so
-        structure updates go on meanwhile. False if the model stayed busy past `deadline`."""
+    def _compute(
+        self, batch: _Batch, stats: IndexStats, deadline: float | None = None, group: int = _EMBED_GROUP,
+        yield_to_searches: bool = False,
+    ) -> bool:
+        """Run the model on the texts nothing else could provide, `group` texts per call. The write
+        lock is not held, so structure updates go on meanwhile. False if it stopped early (the
+        deadline passed, or a search wants the model); what it computed stays in `batch`."""
         stats.add_time("build_texts", batch.build_time)
         cache = self._vector_cache()
-        for tw in batch.work.values():
-            missing = sorted(tw.missing, key=lambda h: len(tw.text_of[h]), reverse=True)  # less padding per batch
-            for start in range(0, len(missing), _EMBED_GROUP):
-                group = missing[start : start + _EMBED_GROUP]
-                timeout = -1 if deadline is None else max(0.0, deadline - time.monotonic())
-                if not self._model_lock.acquire(timeout=timeout):
-                    return False
-                try:
-                    t = time.perf_counter()
-                    vecs = tw.embedder.embed_documents([tw.text_of[h] for h in group])
-                    stats.add_time("embed", time.perf_counter() - t)
-                finally:
-                    self._model_lock.release()
-                if cache is not None:
-                    cache.put_many(tw.key, group, vecs)
-                tw.vectors.update(zip(group, vecs))
+        # The model calls: newest edits first (a search cut short by its deadline has embedded the
+        # agent's latest edit), code texts before usage texts, longest texts first (less padding).
+        calls: list[tuple[int, int, int, _TypeWork, list[str]]] = []
+        for rank, tw in enumerate(batch.work.values()):
+            by_seq: dict[int, list[str]] = defaultdict(list)
+            for h in tw.missing:
+                by_seq[max(batch.seqs[r.chunk_id] for r in tw.rows_by_hash[h])].append(h)
+            for seq, hashes in by_seq.items():
+                hashes.sort(key=lambda h: len(tw.text_of[h]), reverse=True)
+                calls += [(-seq, rank, i, tw, hashes[i : i + group]) for i in range(0, len(hashes), group)]
+        calls.sort(key=lambda c: c[:3])
+        for *_, tw, texts in calls:
+            if yield_to_searches and self._searches:
+                return False
+            if deadline is None:
+                self._model_lock.acquire()
+            elif (left := deadline - time.monotonic()) <= 0 or not self._model_lock.acquire(timeout=left):
+                return False
+            try:
+                t = time.perf_counter()
+                vecs = tw.embedder.embed_documents([tw.text_of[h] for h in texts])
+                stats.add_time("embed", time.perf_counter() - t)
+            finally:
+                self._model_lock.release()
+            if cache is not None:
+                cache.put_many(tw.key, texts, vecs)
+            tw.vectors.update(zip(texts, vecs))
         return True
 
     def _put(self, batch: _Batch, stats: IndexStats) -> None:
-        """Store the batch's vectors, for chunks that were not queued again meanwhile."""
+        """Store the batch's vectors, for chunks that have all of them (a batch cut short stores
+        what it finished; the rest stays queued) and were not queued again meanwhile."""
         store = self.store
         t = time.perf_counter()
+        complete = set(batch.seqs)
+        for tw in batch.work.values():
+            complete -= {r.chunk_id for rs in tw.rows_by_hash.values() for r in rs if r.text_hash not in tw.vectors}
+        if not complete:
+            return
         with self._locked(), store.transaction():
-            current = store.dirty_seqs(batch.seqs)
-            ok = {i for i, s in batch.seqs.items() if current.get(i) == s}
+            current = store.dirty_seqs(complete)
+            ok = {i for i in complete if current.get(i) == batch.seqs[i]}
             for vec_type, tw in batch.work.items():
                 rows = [r for rs in tw.rows_by_hash.values() for r in rs if r.chunk_id in ok]
                 if rows:

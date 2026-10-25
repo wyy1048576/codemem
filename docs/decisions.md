@@ -45,7 +45,7 @@ D11 (local commits, no push) now applies to `andre/backend-v3`.
 |---|---|---|---|
 | D19 | **One update function for the first build, reconciles and single saves.** Full and incremental updates follow the same code path, and a verify mode recomputes everything as a check. | One path to get right (Exa's exa-d: "backfills and incremental updates follow the same codepath"). The differential tests compare it with verify mode. | n/a |
 | D20 | **Usage text lists callers and tests only, not callees.** | Usage was the biggest measured gain (dev50 function MRR 0.334 → 0.423, MVP). Listing only callers keeps the ripple of an edit to one hop along outgoing calls. | Add callee lines in `build_usage` (parked experiment, §3). |
-| D21 | **Searches catch up on pending edits first, within a time budget.** | Agents search right after their own edits; waiting for the agent to finish would give the stalest index exactly then. | `catchup_budget = 0`. |
+| D21 | **Searches catch up on pending edits first, within a time budget.** | Agents search right after their own edits; waiting for the agent to finish would give the stalest index exactly then. | `catchup_budget_ms = 0` (keywords and links still catch up; nothing is embedded first). |
 | D22 | **The MCP server writes FAISS files lazily;** the CLI and the blocking `update()` still write at once. | Rewriting 520 MB per save cost 2.2 s and blocked searches. The eval measures the index size right after `update()`. | `save=True` everywhere. |
 | D23 | **Stored index settings are compared at every update; any difference rebuilds the index.** | With incremental updates, a chunker or text upgrade would otherwise never reach unchanged files. | n/a |
 | D24 | **Neutral search weights by default** (tests, classes and blocks no longer halved). | The v2 weights won on our eval only because its answers are never tests and rarely whole classes. Real questions ("add OCR to uploads") often need both. | `test_weight = 0.5`, `kind_weights = {class = 0.5, block = 0.5}`. |
@@ -58,6 +58,7 @@ D11 (local commits, no push) now applies to `andre/backend-v3`.
 | D31 | **Blocks over 200 lines are split by lines, even inside one statement.** | One 1,668-line dict was one block with 32 windows. | `chunker.flush`. |
 | D32 | **BM25 queries drop stopwords and keep at most the 32 rarest words.** The index is unchanged. | Long queries OR-ed every word: 1.1 s on vLLM for 250 words. Common words carry almost no weight anyway. | `bm25_query_terms = 0`. |
 | D33 | **The manual refresh is an MCP tool (`refresh_index`), not a skill or a hook.** | A Claude skill works only in Claude Code; an MCP tool works in every agent. Catch-up makes it rarely needed. | n/a |
+| D34 | **Searches go first.** While a search catches up, the background writer hands over the model at its next call, and the queue is embedded newest edits first. A search also waits for edits the writer has taken but not committed yet. | The agent's next search is about its own latest edit. Measured (Oct 25): a search 0.7 s after a save missed it while the writer was still applying it, and a 2 s limit took 3.1 s because it was only checked between batches. | n/a |
 
 ---
 
@@ -85,13 +86,14 @@ D11 (local commits, no push) now applies to `andre/backend-v3`.
 | result count | 10; the MCP tool caps it at 50 | `server.search_code` | inherited | hand-picked | |
 | preview | 12 lines, 800 characters | `preview_lines`, `preview_chars` | inherited | hand-picked | short cards; the eval counts their tokens |
 | quiet period / maximum wait | 0.5 s / 2 s (was 0.4 s, no maximum) | watcher | v3 | provisional | groups the writes of one action; the maximum stops a long burst from postponing indexing forever |
-| catch-up budget | 2 s | service | v3 | provisional | the structural part takes milliseconds; one-function edits need 1–3 embeddings |
+| catch-up budget | 2.5 s (was 2 s) | `catchup_budget_ms` | v3 | provisional | the structural part takes milliseconds; a one-function edit took 0.11–0.17 s with the real model (sample repo). Andre's call: an extra agent turn of grep costs more than waiting, and ripgrep itself takes 0.12 s on vLLM |
+| model call outside a build | `batch_size` texts (16) | `service`, `indexer` | v3 | hand-picked | the time limit is checked before every call, so a search overshoots it by one call at most, and waits for one background call at most |
 | periodic reconcile | every 5 minutes | service | v3 | hand-picked | catches missed events; costs one scan (0.3 s on vLLM) |
 | polling fallback | every 10 s | service | v3 | hand-picked | only when OS file events fail |
 | burst threshold | 2,000 paths, then a full reconcile | watcher | v3 | hand-picked | at that size a scan is simpler and no slower |
 | FAISS save | after 30 s idle, on shutdown, on refresh | service | v3 | hand-picked | see D22 |
 | embedding batch | 16 texts (local); 64 texts, 4 parallel requests (API) | `batch_size`, `[embedding]` | inherited / v3 | hand-picked | |
-| model call group | 256 texts, longest first | `indexer._EMBED_GROUP` | v2 | measured | length-sorted batches waste less padding (2.1× faster builds) |
+| model call group in a build | 256 texts, longest first | `indexer._EMBED_GROUP` | v2 | measured | length-sorted batches waste less padding (2.1× faster builds) |
 | precision | float16 on CUDA and MPS, float32 on CPU | `dtype = "auto"` | v2 | measured | float16 vs float32: cosine ≥ 0.9997, same top 10 |
 | query cache | 512 queries | `embedder._QUERY_CACHE_SIZE` | v2 | hand-picked | the eval asks the same query of several systems |
 | steering | `light` | `steering` | inherited | hand-picked | a variable of the agent study |
