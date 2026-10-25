@@ -111,7 +111,7 @@ How a run works:
 
 **Accuracy.** `recall@k`, `precision@k` (relevant positions in the top k / k), `success@k` (all gold in the top k), and `mrr`, for k = 1, 5, 10, 20, 50.
 
-**Tokens.** Counted with Anthropic's `count_tokens` for the agent-study model (`DEFAULT_MODEL` in `src/cmeval/metrics/tokens.py`), on each hit's `text` only (the fixed request overhead is measured and subtracted). Counts are cached in `CMEVAL_HOME/token-cache/` by text hash. The API key comes from `ANTHROPIC_API_KEY` or, on macOS, the Keychain entry `anthropic-api-key`. Requests are paced to 90 per minute (`CMEVAL_TOKEN_RPM`), because some accounts allow only 100. Without a key, scoring stops with a clear message. `--tokens estimate` gives rough numbers that are marked and must never be reported.
+**Tokens.** Counted with Anthropic's `count_tokens` for the agent-study model (`DEFAULT_MODEL` in `src/cmeval/metrics/tokens.py`), on each hit's `text` only (the fixed request overhead is measured and subtracted). Counts are cached in `CMEVAL_HOME/token-cache/` by text hash. The API key comes from `ANTHROPIC_API_KEY` or, on macOS, the Keychain entry `anthropic-api-key`. Requests are paced to at most 3,000 per minute (`CMEVAL_TOKEN_RPM`). With 4 workers the real speed is about 1,700 per minute. For a key with a low limit (some accounts allow only 100 per minute), set `CMEVAL_TOKEN_RPM=90`. Without a key, scoring stops with a clear message. `--tokens estimate` gives rough numbers that are marked and must never be reported.
 - `tokens_to_first`: tokens of all hits up to and including the first hit that finds gold (`found` = 0 or 1).
 - `recall@budget<B>` for B = 500 to 8000: recall of the whole hits that fit in B tokens.
 

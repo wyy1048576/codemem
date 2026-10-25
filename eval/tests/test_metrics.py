@@ -224,6 +224,15 @@ def test_counts_that_finish_after_a_failure_are_kept(tmp_path):
     assert again.count(["good one", "good two", "good three"]) == [2, 2, 2] and again.client.calls == []
 
 
+def test_default_rpm_is_the_project_key_limit(monkeypatch):
+    from cmeval.metrics.tokens import configured_rpm
+
+    monkeypatch.delenv("CMEVAL_TOKEN_RPM", raising=False)
+    assert configured_rpm() == 3000
+    monkeypatch.setenv("CMEVAL_TOKEN_RPM", "90")
+    assert configured_rpm() == 90
+
+
 def test_bad_rpm_setting_is_a_clear_error(monkeypatch, tmp_path):
     monkeypatch.setenv("CMEVAL_TOKEN_RPM", "fast")
     with pytest.raises(TokenCountError, match="CMEVAL_TOKEN_RPM"):
