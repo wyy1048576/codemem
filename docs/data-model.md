@@ -485,8 +485,10 @@ The tool names stay stable, so other front-ends and versions can be compared.
 watcher has seen (stage A), then embeds the queue (newest edits first), all within
 `catchup_budget_ms` (4 s), then searches. If the budget runs out, the results say what is
 pending: files not applied yet, chunks whose vectors are still being computed, or "unconfirmed"
-when the watcher couldn't confirm in time that it had seen every earlier save (shown to the agent
-from phase 2). `get_chunk` waits for stage A only: its code, lines and links are current.
+when the watcher couldn't confirm in time that it had seen every earlier save; `search_code` ends
+with a `Note:` line saying which. `get_chunk` waits for stage A only: its code, lines and links are
+current. While the embedding model is still loading (at startup), an MCP search waits for it within
+the same budget, then answers from keywords alone with a note; the CLI and the eval always wait.
 
 **stdout carries only MCP messages;** logs go to stderr.
 
