@@ -27,6 +27,7 @@ from pathlib import Path
 from ..github import GitHub
 from ..paths import tmp_dir
 from ..repos import RepoError, shallow_clone, slug
+from ..status import NullStatus
 from ..tasks import clean_query
 from .search import is_bot, search_merged_prs
 
@@ -207,10 +208,13 @@ def code_stats(repo: str, branch: str, *, url: str | None = None,
 def collect_stats(gh: GitHub, candidates: list[Candidate], since: date, until: date, *,
                   functions: bool = False, min_python_share: float = DEFAULT_MIN_PYTHON_SHARE,
                   progress: Callable[[str], None] = lambda message: None,
-                  code_fn: Callable[..., CodeStats] = code_stats) -> list[RepoStats]:
+                  code_fn: Callable[..., CodeStats] = code_stats, status: NullStatus | None = None) -> list[RepoStats]:
+    status = status or NullStatus()
+    status.total(len(candidates), "repos")
     results = []
-    for candidate in candidates:
+    for number, candidate in enumerate(candidates, start=1):
         repo = candidate.name
+        status.stage(f"repo {number}/{len(candidates)}: {repo}")
         api = api_stats(gh, repo)
         prs = search_merged_prs(gh, repo, api["default_branch"], since, until, progress=progress)
         stats = RepoStats(repo=repo, note=candidate.note, funnel=pr_funnel(prs, repo), **api)
@@ -222,6 +226,7 @@ def collect_stats(gh: GitHub, candidates: list[Candidate], since: date, until: d
             stats.code = asdict(code_fn(repo, api["default_branch"], progress=progress))
         results.append(stats)
         progress(f"{repo}: done ({stats.funnel['body_100']} possible tasks)")
+        status.advance()
     return results
 
 

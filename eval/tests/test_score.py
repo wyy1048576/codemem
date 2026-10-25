@@ -6,9 +6,10 @@ import pytest
 
 from cmeval.cli import main
 from cmeval.metrics.tokens import EstimateCounter
-from cmeval.paths import runs_dir
+from cmeval.paths import runs_dir, status_dir
 from cmeval.retriever import Hit
 from cmeval.score import ScoreError, score
+from cmeval.status import read_all
 from cmeval.tasks import Fix, Gold, Span, save_tasks
 
 
@@ -175,3 +176,13 @@ def test_tasks_file_override_for_runs_from_another_machine(run_dir, tmp_path):
     copy.write_bytes(tasks_file.read_bytes() + b"\n")
     with pytest.raises(ScoreError, match="changed since the run"):
         score("r1", counter=WordCounter(), tasks_file=copy)
+
+
+def test_cli_score_writes_a_status_file(run_dir):
+    assert main(["score", "r1", "--tokens", "estimate"]) == 0
+    assert main(["score", "missing-run", "--tokens", "estimate"]) == 1
+    jobs = {job["name"]: job for job in read_all(status_dir())}
+    texts = 3 + 1  # unique hit texts: aaaa, bb, ccc, dddd
+    assert jobs["r1"]["state"] == "done" and (jobs["r1"]["done"], jobs["r1"]["total"]) == (texts, texts)
+    assert jobs["r1"]["unit"] == "texts" and jobs["r1"]["result"]["tasks_scored"] == 3
+    assert jobs["missing-run"]["state"] == "failed"

@@ -51,6 +51,11 @@ def collect_dir() -> Path:
     return cmeval_home() / "collect"
 
 
+def status_dir() -> Path:
+    """One JSON status file for each long job (run, score, collect, repo-stats), for the dashboard."""
+    return cmeval_home() / "status"
+
+
 def tmp_dir() -> Path:
     """Short-lived data, for example shallow clones for repo-stats."""
     return cmeval_home() / "tmp"

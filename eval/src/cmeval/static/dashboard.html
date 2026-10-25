@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cmeval jobs</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='14' height='14' rx='3' fill='%23e9b440' stroke='%232b2622' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+  <header class="top">
+    <h1>cmeval <span>jobs</span></h1>
+    <p id="connection" class="connection" role="status">connecting...</p>
+  </header>
+  <main>
+    <section aria-labelledby="running-title">
+      <h2 id="running-title">Running <span id="running-count" class="count"></span></h2>
+      <div id="running" class="cards"></div>
+      <p id="running-empty" class="empty" hidden>No job is running. Start one in a terminal, for example <code>cmeval run ...</code>, and it shows here.</p>
+    </section>
+    <section aria-labelledby="recent-title">
+      <h2 id="recent-title">Recent</h2>
+      <table id="recent" class="recent">
+        <thead>
+          <tr><th>Job</th><th>Name</th><th>State</th><th class="num">Done</th><th class="num">Time</th><th>Ended</th><th>Result</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="recent-empty" class="empty" hidden>No finished jobs yet.</p>
+    </section>
+  </main>
+  <footer class="foot">Reads the status files in <code id="folder">CMEVAL_HOME/status</code> every 2 seconds. This page cannot change a job.</footer>
+  <script src="/dashboard.js"></script>
+</body>
+</html>

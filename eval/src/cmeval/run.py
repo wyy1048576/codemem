@@ -34,6 +34,7 @@ from .files import sha256_file as _sha256
 from .files import write_json as _write_json
 from .paths import indexes_dir, runs_dir
 from .retriever import Retriever, RetrieverError, check_hits
+from .status import NullStatus
 from .systems import load_systems, make_system
 from .tasks import Task, load_tasks, select
 
@@ -101,6 +102,7 @@ def run(
     k: int = 50,
     keep_indexes: bool = False,
     progress: Callable[[str], None] = lambda message: None,
+    status: NullStatus | None = None,
 ) -> RunSummary:
     if not _RUN_ID_RE.match(run_id):
         raise RunError(f"run id {run_id!r} may only use letters, digits, '_', '.', '-'")
@@ -166,7 +168,8 @@ def run(
         meta["sessions"].append(session)  # each start of this run: when, which code, which machine
         meta.update(status="running", filters={"repos": repo_filter, "limit_per_repo": limit_per_repo})
         _write_json(meta_path, meta)
-        return _run_tasks(run_id, run_dir, meta, systems, ordered, index_mode, k, keep_indexes, progress, start)
+        return _run_tasks(run_id, run_dir, meta, systems, ordered, index_mode, k, keep_indexes, progress, start,
+                          status or NullStatus())
     finally:
         lock.release()
 
@@ -189,7 +192,8 @@ def _code(meta: dict) -> dict[str, Any]:
 
 
 def _run_tasks(run_id: str, run_dir: Path, meta: dict, systems: list[Retriever], ordered: dict[str, list[Task]],
-               index_mode: str, k: int, keep_indexes: bool, progress: Callable[[str], None], start: float) -> RunSummary:
+               index_mode: str, k: int, keep_indexes: bool, progress: Callable[[str], None], start: float,
+               status: NullStatus) -> RunSummary:
     meta_path = run_dir / "meta.json"
     summary = RunSummary(run_dir=run_dir, tasks=sum(len(g) for g in ordered.values()), systems=len(systems))
     out_files = {s.name: run_dir / f"{s.name}.jsonl" for s in systems}
@@ -203,6 +207,12 @@ def _run_tasks(run_id: str, run_dir: Path, meta: dict, systems: list[Retriever],
         groups.setdefault(s.index_key(), []).append(s)
     warmed: set[str] = set()
     index_root = indexes_dir() / run_id
+    # Dashboard counts: a task is done when every system has searched it.
+    status.total(summary.tasks, "tasks")
+    for repo, group_tasks in ordered.items():
+        before = sum(1 for t in group_tasks if all(t.id in done[s.name] for s in systems))
+        status.part(repo, len(group_tasks), before)
+        status.already_done(before)
 
     try:
         for repo_number, (repo, group_tasks) in enumerate(ordered.items(), start=1):
@@ -210,6 +220,8 @@ def _run_tasks(run_id: str, run_dir: Path, meta: dict, systems: list[Retriever],
             summary.skipped += sum(1 for t in group_tasks for s in systems if t.id in done[s.name])
             if not todo:
                 continue
+            stage = f"repo {repo_number}/{len(ordered)}: {repo}"
+            status.stage(f"{stage}, checkout")
             # Always a new worktree: one left by a stopped run may be half checked out.
             repos.discard_live(repo, f"run-{run_id}")
             worktree = repos.checkout(repo, todo[0].base_commit, name=f"run-{run_id}")
@@ -217,6 +229,7 @@ def _run_tasks(run_id: str, run_dir: Path, meta: dict, systems: list[Retriever],
             try:
                 for task_number, task in enumerate(todo, start=1):
                     progress(f"[repo {repo_number}/{len(ordered)}] {repo}  task {task_number}/{len(todo)}  {task.id}")
+                    status.stage(f"{stage}, task {task_number}/{len(todo)}")
                     repos.move_to(worktree, task.base_commit)
                     if repos.head(worktree) != task.base_commit:  # leak check: never search the wrong code
                         raise RunError(f"{task.id}: worktree is at {repos.head(worktree)}, not {task.base_commit}")
@@ -224,7 +237,9 @@ def _run_tasks(run_id: str, run_dir: Path, meta: dict, systems: list[Retriever],
                         if all(task.id in done[m.name] for m in members):
                             continue  # resume: this group already searched this task
                         index_dir = index_root / repos.slug(repo) / key
+                        status.stage(f"{stage}, task {task_number}/{len(todo)}, index of {members[0].name}")
                         _index_group(index_dir, members, worktree, task, repo, key, index_mode, index_file, summary)
+                        status.stage(f"{stage}, task {task_number}/{len(todo)}")
                     for system in systems:
                         if task.id in done[system.name]:
                             continue
@@ -245,6 +260,7 @@ def _run_tasks(run_id: str, run_dir: Path, meta: dict, systems: list[Retriever],
                         done[system.name].add(task.id)
                         summary.searched += 1
                     summary.by_repo[repo] = summary.by_repo.get(repo, 0) + 1
+                    status.advance(part=repo)
                 finished = True
             finally:
                 for system in systems:

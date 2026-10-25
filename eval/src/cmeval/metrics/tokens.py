@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Protocol
 
 from ..paths import token_cache_dir
+from ..status import NullStatus
 
 DEFAULT_MODEL = "claude-opus-5-5"
 BUDGETS = (500, 1000, 2000, 4000, 8000)
@@ -102,7 +103,7 @@ class AnthropicCounter:
 
     def __init__(self, model: str = DEFAULT_MODEL, *, api_key: str | None = None, client=None,
                  cache_dir: Path | None = None, workers: int = 4, rpm: int | None = None,
-                 progress: Callable[[str], None] = lambda message: None):
+                 progress: Callable[[str], None] = lambda message: None, status: NullStatus | None = None):
         self.model = model
         self.name = f"anthropic:{model}"
         if client is None:
@@ -113,6 +114,7 @@ class AnthropicCounter:
         self.workers = workers
         self.limiter = _RateLimiter(configured_rpm() if rpm is None else rpm)
         self.progress = progress
+        self.status = status or NullStatus()
         cache_dir = cache_dir or token_cache_dir()
         cache_dir.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(cache_dir / f"{model}.sqlite")
@@ -163,6 +165,7 @@ class AnthropicCounter:
             if row:
                 cached[sha] = row[0]
         missing = [t for t, sha in shas.items() if sha not in cached]
+        self.status.already_done(len(shas) - len(missing))
         if missing:
             self.progress(f"counting tokens for {len(missing)} new texts ({len(shas) - len(missing)} cached)")
 
@@ -179,6 +182,7 @@ class AnthropicCounter:
                     for done, future in enumerate(as_completed(futures), start=1):
                         save(futures[future], future.result())
                         saved.add(future)
+                        self.status.advance()
                         if done % 50 == 0 or done == len(missing):
                             self.db.commit()
                             self.progress(f"counted {done}/{len(missing)}")
@@ -201,7 +205,8 @@ class AnthropicCounter:
         self.db.close()
 
 
-def make_counter(kind: str, warn=lambda message: None, progress=lambda message: None) -> TokenCounter:
+def make_counter(kind: str, warn=lambda message: None, progress=lambda message: None,
+                 status: NullStatus | None = None) -> TokenCounter:
     """"anthropic" (needs an API key) or "estimate" (rough, only when asked for by name).
 
     No key with "anthropic" is an error, not a quiet fallback: a fallback would replace real
@@ -218,7 +223,7 @@ def make_counter(kind: str, warn=lambda message: None, progress=lambda message: 
             "no Anthropic API key: set ANTHROPIC_API_KEY or add the macOS Keychain entry 'anthropic-api-key'. "
             "Or score with --tokens estimate (marked, never reported)."
         )
-    return AnthropicCounter(api_key=key, progress=progress)
+    return AnthropicCounter(api_key=key, progress=progress, status=status)
 
 
 def token_metrics(hit_tokens: list[int], relevance: list[set[int]], n_gold: int,
