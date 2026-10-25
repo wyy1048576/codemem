@@ -869,6 +869,14 @@ class Store:
         return sorted(self.get_chunks(ids).values(), key=lambda c: (c.path, c.start_line))
 
     # ---- BM25
+    def term_doc_counts(self, terms: Iterable[str]) -> dict[str, int]:
+        """How many chunks hold each term, from the FTS vocabulary (no posting lists are read)."""
+        out: dict[str, int] = {}
+        for batch in _batches(sorted(set(terms))):
+            marks = ",".join("?" * len(batch))
+            out.update(self.conn.execute(f"SELECT term, doc FROM fts_vocab WHERE term IN ({marks})", tuple(batch)).fetchall())
+        return out
+
     def bm25_search(
         self, match: str, n: int, weights: Sequence[float], path_prefix: str | None = None,
         flt: ChunkFilter | None = None,

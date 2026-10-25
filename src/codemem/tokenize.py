@@ -63,9 +63,12 @@ def to_fts_text(text: str, **opts: bool) -> str:
 
 def fts_match_query(query: str, **opts: bool) -> str | None:
     """Build a safe FTS5 MATCH expression: quoted tokens OR-ed together."""
-    seen: dict[str, None] = {}
-    for tok in tokenize(query, **opts):
-        seen.setdefault(tok, None)
+    return fts_or(tokenize(query, **opts))
+
+
+def fts_or(tokens: list[str]) -> str | None:
+    """Distinct tokens as one FTS5 MATCH expression, OR-ed together."""
+    seen = dict.fromkeys(tokens)
     if not seen:
         return None
     # Tokens are [a-z0-9_] only, but quote anyway so FTS5 keywords (AND/OR/NEAR) stay literal.

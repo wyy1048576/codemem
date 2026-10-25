@@ -236,11 +236,27 @@ def test_kind_weights_push_kinds_down(index):
         config_from_dict({"kind_weights": {"klass": 0.5}})
 
 
-def test_default_weights_and_how_a_config_overrides_them():
+def test_default_weights_are_neutral_and_a_config_can_set_them():
     from codemem.config import Config, config_from_dict
 
-    assert Config().test_weight == 0.5 and Config().kind_weights == {"class": 0.5, "block": 0.5}
-    # A config's table is merged over the defaults, so naming one kind keeps the other defaults.
-    assert config_from_dict({"kind_weights": {"class": 1.0}}).kind_weights == {"class": 1.0, "block": 0.5}
-    plain = config_from_dict({"test_weight": 1.0, "kind_weights": {"class": 1.0, "block": 1.0}})
-    assert plain.test_weight == 1.0 and set(plain.kind_weights.values()) == {1.0}
+    assert Config().test_weight == 1.0 and Config().kind_weights == {}  # D24: nothing is demoted
+    v2 = config_from_dict({"test_weight": 0.5, "kind_weights": {"class": 0.5, "block": 0.5}})
+    assert v2.test_weight == 0.5 and v2.kind_weights == {"class": 0.5, "block": 0.5}
+    assert config_from_dict({"kind_weights": {"class": 0.5}}).kind_weights == {"class": 0.5}
+
+
+def test_long_queries_keep_their_rarest_words_for_bm25(index):
+    from codemem.search import bm25_match
+
+    store, cfg, _ = index
+    assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "session"'  # stopwords dropped
+    assert bm25_match(store, "the", cfg) == '"the"'  # only stopwords: kept after all
+    filler = " ".join(f"zzword{i}" for i in range(40))  # words no chunk has
+    long_q = f"{filler} revoke session user table insert delete login logout token disable"
+    words = bm25_match(store, long_q, cfg).split(" OR ")
+    assert not any("zzword" in w for w in words)  # 51 words, so the long-query rule applied
+    assert '"revoke"' in words and len(words) <= cfg.bm25_query_terms
+    docs = store.term_doc_counts(w.strip('"') for w in words)
+    assert all(docs.get(w.strip('"')) for w in words)  # every kept word is in the index
+    cfg.bm25_query_terms = 0  # v2: every word, stopwords too
+    assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "the" OR "session"'

@@ -18,7 +18,7 @@ from .config import Config
 from .embedder import Embedder, make_embedder
 from .schema import Chunk
 from .store import ChunkFilter, Store, VectorHit
-from .tokenize import fts_match_query, tokenize
+from .tokenize import fts_or, tokenize
 
 BM25 = "bm25"
 
@@ -187,6 +187,24 @@ def _reweigh(
     return sorted(weighed, key=lambda kv: (-kv[1], kv[0]))
 
 
+def bm25_match(store: Store, query: str, config: Config) -> str | None:
+    """The query's words for BM25 (decisions D32): stopwords dropped (a query of stopwords only
+    keeps them), and of a long query only the `bm25_query_terms` words fewest chunks have. Common
+    words add almost nothing to the score, but their long posting lists made a 250-word query
+    take 0.6 s on vLLM. Words the index lacks match nothing, so they go too. The index is
+    unchanged. `bm25_query_terms = 0` keeps every word, as v2 did."""
+    limit = config.bm25_query_terms
+    if limit <= 0:
+        return fts_or(tokenize(query, stem=config.bm25_stem, stopwords=config.bm25_stopwords))
+    words = list(dict.fromkeys(tokenize(query, stem=config.bm25_stem, stopwords=True)))
+    if not words:
+        words = list(dict.fromkeys(tokenize(query, stem=config.bm25_stem, stopwords=False)))
+    if len(words) > limit:
+        docs = store.term_doc_counts(words)
+        words = sorted((w for w in words if docs.get(w)), key=lambda w: (docs[w], w))[:limit]
+    return fts_or(words)
+
+
 def search(
     store: Store,
     query: str,
@@ -228,7 +246,7 @@ def search(
 
     if BM25 in signals:
         t = time.perf_counter()
-        match = fts_match_query(query, stem=config.bm25_stem, stopwords=config.bm25_stopwords)
+        match = bm25_match(store, query, config)
         ranked[BM25] = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
         timings[BM25] = time.perf_counter() - t
 

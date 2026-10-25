@@ -42,10 +42,11 @@ DEFAULT_IGNORE = (
 BM25_FIELDS = ("name", "path", "signature", "doc", "body")
 DEVICES = ("auto", "cpu", "xpu", "cuda", "mps")
 DTYPES = ("auto", "float32", "float16", "bfloat16")
-# Search-time score multipliers, chosen on dev (docs/decisions.md, D18): test code, class
-# skeletons and top-level blocks are useful context but rarely what a query is about.
-DEFAULT_TEST_WEIGHT = 0.5
-DEFAULT_KIND_WEIGHTS = {"class": 0.5, "block": 0.5}
+# Search-time score multipliers. Neutral by default (docs/decisions.md, D24): v2's 0.5 for tests,
+# classes and blocks won on our eval only because its answers are never tests and rarely whole
+# classes, while questions like "add OCR to uploads" often need both. The knobs stay for runs.
+DEFAULT_TEST_WEIGHT = 1.0
+DEFAULT_KIND_WEIGHTS: dict[str, float] = {}
 
 
 @dataclass
@@ -76,6 +77,7 @@ class Config:
     bm25_weights: tuple[float, ...] = (10.0, 3.0, 5.0, 2.0, 1.0)
     bm25_stem: bool = False
     bm25_stopwords: bool = False
+    bm25_query_terms: int = 32  # search-time: a query keeps its rarest words, stopwords dropped; 0 = all (v2)
     rrf_k: int = 60
     rrf_weights: dict[str, float] = field(default_factory=dict)  # signal -> weight, default 1.0
     candidates: int = 50  # top-N per signal before RRF
@@ -226,6 +228,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         bm25_weights=tuple(bm25["weights"]) if "weights" in bm25 else None,
         bm25_stem=bm25.get("stem"),
         bm25_stopwords=bm25.get("stopwords"),
+        bm25_query_terms=bm25.get("query_terms"),
         rrf_k=rrf.get("k"),
         rrf_weights=rrf.get("weights"),
         max_defs_per_name=usage.get("max_defs_per_name"),
