@@ -7,9 +7,11 @@ float16 vector at the model's full dimension, with the chunk, part (window) and 
 came from. FAISS is derived from those rows: an exact inner-product index over vector ids,
 truncated to `embedding_dim` if set, kept in memory and saved as `vec_<type>.faiss` with a
 `vec_<type>.json` note of the epoch it reflects. Every transaction that changes a vector type's
-rows bumps its epoch in `meta`, and FAISS changes are applied only after the commit. An index
-file whose epoch differs from `meta` (a crash before saving, or another process wrote) is rebuilt
-from the rows, which needs no model. docs/data-model.md has the full schema.
+rows bumps its epoch in `meta`, and FAISS is patched right after the commit (never before, so it
+never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
+with a new id. So an index that is behind (a saved file from before a crash, or another process
+wrote) catches up by comparing vector ids and applying only the difference; a missing or corrupt
+file is rebuilt from the rows, which needs no model. docs/data-model.md has the full schema.
 """
 
 from __future__ import annotations
@@ -490,7 +492,7 @@ class Store:
             conn.execute("COMMIT")
             return
         # Hold the vector lock from the commit until the in-memory indexes are patched: a search
-        # in between would see the new epoch with the old index and rebuild it from scratch.
+        # in between would see the new epoch with the old index, and compare every vector id.
         with self._vec_lock:
             conn.execute("COMMIT")
             for hook in hooks:
