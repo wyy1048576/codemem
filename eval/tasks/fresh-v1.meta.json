@@ -10,11 +10,11 @@
   },
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "1587a1134552be9ce807ecefdf0bb2ceaa039d35",
+    "sha": "5bed2312ceb79a9eba938b56544d99ca6d5a2343",
     "dirty": false
   },
-  "labeler": "cmeval-labels/2",
-  "created": "2026-10-25T01:57:08+00:00",
+  "labeler": "cmeval-labels/3",
+  "created": "2026-10-25T02:25:47+00:00",
   "funnel_steps": [
     {
       "key": "merged",
