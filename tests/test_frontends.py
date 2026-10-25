@@ -585,3 +585,61 @@ def test_python_m_codemem_is_the_command_line():
 def test_index_verify_compares_with_a_fresh_build(sample_repo, tmp_path, fake_env, capsys):
     assert main(["index", str(sample_repo), "--index-dir", str(tmp_path / "idx"), "--verify"]) == 0
     assert "the index equals a fresh build" in capsys.readouterr().out
+
+
+class _LoadingModel:
+    """The fake model, taking `delay` seconds to load, as the real one does when codemem starts."""
+
+    def __init__(self, inner, delay):
+        self.inner, self.loaded_at = inner, time.monotonic() + delay
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    @property
+    def ready(self):
+        return time.monotonic() >= self.loaded_at
+
+    def embed_queries(self, texts):
+        while not self.ready:
+            time.sleep(0.01)
+        return self.inner.embed_queries(texts)
+
+    def embed_documents(self, texts):
+        while not self.ready:
+            time.sleep(0.01)
+        return self.inner.embed_documents(texts)
+
+
+def test_the_first_mcp_search_does_not_wait_for_the_model_to_load(sample_repo, tmp_path, fake_env):
+    from mcp import Client
+
+    from codemem.server import build_server
+
+    (sample_repo / ".codemem.toml").write_text("catchup_budget_ms = 300\n")
+    built = CodememService(sample_repo, index_dir=tmp_path / "idx")
+    built.update()
+    built.close()
+    models = {}
+
+    def factory(name, cfg):
+        return models.setdefault(name, _LoadingModel(make_embedder(name, cfg), delay=2.0))
+
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", embedder_factory=factory)
+    try:
+        svc.start()  # with prewarm: the model loads in the background
+        server = build_server(svc)
+
+        async def run():
+            async with Client(server) as client:
+                t = time.monotonic()
+                text = (await client.call_tool("search_code", {"query": "revoke session", "k": 3})).content[0].text
+                assert time.monotonic() - t < 1.5  # within the 0.3 s limit, not the 2 s load
+                assert "revoke_session" in text and "still loading" in text  # keyword results, and the note
+                await anyio.sleep(2.0)
+                text = (await client.call_tool("search_code", {"query": "revoke session", "k": 3})).content[0].text
+                assert "revoke_session" in text and "still loading" not in text
+
+        anyio.run(run)
+    finally:
+        svc.close()

@@ -115,6 +115,13 @@ def agent_notes(steering: str = "light") -> str | None:
     return f"{AGENT_NOTES_MARKER}\n## Code search\n\n{text}\n{AGENT_NOTES_MARKER}\n"
 
 
+def models_loading_notice() -> str:
+    return (
+        "Note: the embedding model is still loading (the first search after codemem starts); these "
+        "results come from keyword matching only. Search again in a few seconds for results by meaning."
+    )
+
+
 def indexing_notice(percent: float) -> str:
     return (
         f"Note: the codemem index is still being built ({percent:.0f}% done); results may be "

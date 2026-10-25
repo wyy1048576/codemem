@@ -104,6 +104,7 @@ class CodememService:
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._watcher: RepoWatcher | None = None
+        self._prewarm: threading.Thread | None = None
         self._polling = False
         self._last_write = 0.0  # monotonic time of the last index change
         self._last_reconcile = 0.0
@@ -152,7 +153,9 @@ class CodememService:
         if watch:
             self.start_watcher()
         if prewarm:
-            threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True).start()
+            with self._cond:
+                self._prewarm = threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True)
+                self._prewarm.start()
 
     def start_background_update(self, *, full: bool = False, prewarm: bool = True) -> threading.Thread:
         """One update in a thread (the handshake of the MCP server is never blocked by it)."""
@@ -461,11 +464,35 @@ class CodememService:
         self.store.close()
 
     # ---- queries
-    def search(self, query: str, **kwargs: Any) -> SearchResponse:
+    def search(self, query: str, *, wait_for_models: bool = True, **kwargs: Any) -> SearchResponse:
+        """Catch up on pending saves, then search. With `wait_for_models=False` (the MCP server), a
+        search waits for a model that is still loading (about 7 s on an M1, at startup) only within
+        `catchup_budget_ms` too: if it isn't ready by then, the search uses keywords alone and says so."""
+        deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
         freshness = self.catch_up() if self._worker is not None or self._watcher is not None else Freshness()
+        loading = not wait_for_models and "signals" not in kwargs and not self._models_ready(deadline)
+        if loading:
+            kwargs["signals"] = ["bm25"]
         resp = search(self.store, query, self.config, embedder_factory=self.embedder_factory, **kwargs)
-        resp.freshness = freshness
+        resp.freshness, resp.models_loading = freshness, loading
         return resp
+
+    def _models_ready(self, until: float) -> bool:
+        """Whether the embedding models are loaded, waiting until `until` while they load. Starts
+        loading them in the background if nothing has yet."""
+        embedders = [self.embedder_factory(self.config.vectors[v].model, self.config) for v in self.config.enabled_vec_types()]
+        if all(e.ready for e in embedders):
+            return True
+        with self._cond:
+            start = self._prewarm is None or not self._prewarm.is_alive()
+            if start:
+                self._prewarm = threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True)
+                self._prewarm.start()
+        while time.monotonic() < until:
+            if all(e.ready for e in embedders):
+                return True
+            time.sleep(0.05)
+        return all(e.ready for e in embedders)
 
     def resolve_ref(self, ref: str | int):
         ref_s = str(ref).strip()

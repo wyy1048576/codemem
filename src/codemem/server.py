@@ -46,10 +46,14 @@ def build_server(service: CodememService) -> MCPServer:
             return "The codemem index is not available yet." + (
                 f" Last error: {service.last_error}" if service.last_error else ""
             )
-        resp = service.search(query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests)
+        resp = service.search(
+            query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
+        )
         fresh = resp.freshness
-        note = freshness_note(fresh, service.store.pending_paths() if fresh is not None and fresh.pending_chunks else (0, []))
-        return notice + format_results(resp) + (f"\n\n{note}" if note else "")
+        notes = [freshness_note(fresh, service.store.pending_paths() if fresh is not None and fresh.pending_chunks else (0, []))]
+        if resp.models_loading:
+            notes.append(prompts.models_loading_notice())
+        return notice + format_results(resp) + "".join(f"\n\n{n}" for n in notes if n)
 
     @server.tool(name="get_chunk", description=prompts.tool_description("get_chunk", steering))
     def get_chunk(ref: str) -> str:

@@ -66,6 +66,11 @@ class Embedder(ABC):
     @abstractmethod
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray: ...
 
+    @property
+    def ready(self) -> bool:
+        """Can embed now, without loading a model first."""
+        return True
+
 
 class FakeEmbedder(Embedder):
     """Deterministic hashed bag-of-tokens vectors. No downloads, ~instant.
@@ -156,6 +161,10 @@ class SentenceTransformerEmbedder(Embedder):
         self._lock = threading.Lock()
         self._device: str | None = None
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
+
+    @property
+    def ready(self) -> bool:
+        return self._model is not None
 
     @property
     def device(self) -> str:

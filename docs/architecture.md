@@ -358,6 +358,7 @@ tests). It reports any difference between the incremental result and a from-scra
 | a chunker or settings upgrade | stored settings differ from the current ones; only what the setting affects is redone: vectors, texts, links, or a rebuild with vectors from the cache (D23) |
 | OS file events don't work (network drives, WSL, Linux watch limits) | a warning, then a reconcile every 10 s; each search asks for a full check first (0.5 s on vLLM), so it still includes every earlier save |
 | the watcher can't confirm in time that it has seen every earlier save (a heavily loaded machine) | the search answers, but says "unconfirmed" instead of "complete" |
+| an agent searches while the embedding model is still loading (about 7 s on the M1, when codemem starts) | the MCP search waits within its budget, then answers from keywords alone and says so; the CLI and the eval wait for the model |
 
 ## 9. Search
 
