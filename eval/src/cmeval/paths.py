@@ -46,6 +46,11 @@ def gh_cache_dir() -> Path:
     return cmeval_home() / "gh-cache"
 
 
+def collect_dir() -> Path:
+    """Collection output before it becomes tasks: <config name>/<owner>__<name>/."""
+    return cmeval_home() / "collect"
+
+
 def tmp_dir() -> Path:
     """Short-lived data, for example shallow clones for repo-stats."""
     return cmeval_home() / "tmp"

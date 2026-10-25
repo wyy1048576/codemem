@@ -41,7 +41,7 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 | `cmeval import swebench-verified [--n 50] [--seed 0]` | Sample and label SWE-bench Verified tasks (pinned dataset revision) |
 | `cmeval systems FILE` | Check a system config and list its systems (adapter, granularity, index key) |
 | `cmeval repo-stats [--candidates FILE] [--repo R ...] [--since DATE] [--until DATE] [--functions]` | Numbers for choosing repos for fresh tasks: size, languages, a PR funnel after the cutoff, and (with `--functions`) the Python files, lines, and chunks that codemem indexes, from a shallow clone. GitHub answers are cached in `CMEVAL_HOME/gh-cache`. Needs `gh` with a login. |
-| `cmeval collect` | Not built yet |
+| `cmeval collect CONFIG [--repo R ...] [--dry-run] [--refresh]` | Fresh candidates for each repo in a collection config (`configs/fresh-v1.toml`): merged PRs after the cutoff, their one linked issue (GitHub's list or SWE-bench's regex), and the query from the issue as it was when the fix PR was opened. Prints a funnel; writes `CMEVAL_HOME/collect/<config>/<repo>/candidates.jsonl` and `funnel.json`. Patches, labels, and task files come next. |
 | `cmeval review` | Not built yet |
 | `cmeval run --tasks FILE --config FILE --run-id ID [--split dev\|test] [--repo R] [--limit-per-repo N] [--index-mode update\|rebuild]` | Run every system on every task; saves hits and timings (see "Run files") |
 | `cmeval score RUN [--tokens anthropic\|estimate] [--iou T ...]` | Score a run: accuracy, tokens, latency (see "Metrics") |

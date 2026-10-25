@@ -1,0 +1,30 @@
+# First fresh task collection (F4). `cmeval collect configs/fresh-v1.toml`
+# The 7 Python repos chosen from `cmeval repo-stats` (results/2026-10-23-repo-stats). The date range
+# is fixed, so the collection can be repeated and gives the same candidates.
+
+[collect]
+since = "2026-07-01"  # the freshness cutoff (Opus 5.5 data ends in June 2026)
+until = "2026-10-22"
+min_body_chars = 100  # issue body without hidden comments, as of when the fix PR was opened
+extra_bots = []  # more bot logins to drop, next to the built-in list
+
+[[repo]]
+name = "home-assistant/core"
+
+[[repo]]
+name = "pandas-dev/pandas"
+
+[[repo]]
+name = "vllm-project/vllm"
+
+[[repo]]
+name = "apache/airflow"
+
+[[repo]]
+name = "ray-project/ray"
+
+[[repo]]
+name = "python/cpython"
+
+[[repo]]
+name = "huggingface/transformers"

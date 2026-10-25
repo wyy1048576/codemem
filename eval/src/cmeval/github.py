@@ -4,12 +4,17 @@
 JSON file named by the sha256 of the request, so a second run of the same request needs no
 network. The collector asks for fixed date windows, so a cached answer stays correct. Use
 refresh=True to ask GitHub again.
+
+A long collection run meets short GitHub failures (502, 504, time-outs, secondary rate limits).
+Those are tried again a few times, and each try is reported through `progress`. All other
+errors stop at once.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import time
 from collections.abc import Callable
@@ -18,10 +23,15 @@ from pathlib import Path
 from .files import write_json
 from .paths import gh_cache_dir
 
-# Stop before GitHub stops us. A GraphQL search page costs 1 point of 5,000 per hour.
+# Stop before GitHub stops us. A GraphQL search page costs 1 to 2 points of 5,000 per hour.
 MIN_REMAINING = 200
 # Space live calls a little: GitHub has secondary limits on bursts of requests.
 DEFAULT_MIN_INTERVAL = 0.25
+DEFAULT_TRIES = 4
+RETRY_WAITS = (15, 60, 120)  # seconds before the second, third, and fourth try
+_TRANSIENT_RE = re.compile(r"HTTP 50[234]|secondary rate limit|timed out|timeout|connection reset|unexpected EOF"
+                           r"|unexpected end of JSON input",
+                           re.IGNORECASE)
 
 Runner = Callable[[list[str], str | None], str]
 
@@ -31,12 +41,22 @@ class GitHubError(RuntimeError):
 
 
 def gh_runner(args: list[str], stdin: str | None) -> str:
-    """Run `gh` with args and return its stdout."""
+    """Run `gh` with args and return its stdout.
+
+    gh exits with 1 when a GraphQL answer has errors, even when the answer also has data (for
+    example one missing issue in a batch). Such an answer is returned, and the caller decides.
+    """
     try:
         proc = subprocess.run(["gh", *args], input=stdin, capture_output=True, text=True)
     except FileNotFoundError:
         raise GitHubError("the gh command is not installed (https://cli.github.com)") from None
     if proc.returncode != 0:
+        try:
+            answer = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            answer = None
+        if isinstance(answer, dict) and "data" in answer:
+            return proc.stdout
         raise GitHubError(f"gh {' '.join(args[:2])} failed: {proc.stderr.strip() or proc.stdout.strip()}")
     return proc.stdout
 
@@ -48,21 +68,37 @@ def cache_key(kind: str, request: str, variables: dict | None = None) -> str:
 
 class GitHub:
     def __init__(self, runner: Runner | None = None, cache_dir: Path | None = None,
-                 min_interval: float = DEFAULT_MIN_INTERVAL, refresh: bool = False):
+                 min_interval: float = DEFAULT_MIN_INTERVAL, refresh: bool = False, tries: int = DEFAULT_TRIES,
+                 progress: Callable[[str], None] = lambda message: None,
+                 sleep: Callable[[float], None] = time.sleep):
         self.runner = runner or gh_runner
         self.cache_dir = cache_dir or gh_cache_dir()
         self.min_interval = min_interval
         self.refresh = refresh
+        self.tries = tries
+        self.progress = progress
+        self.sleep = sleep
         self.api_calls = 0
         self.cache_hits = 0
+        self.retries = 0
         self._last_call = 0.0
 
-    def graphql(self, query: str, variables: dict | None = None) -> dict:
-        """The `data` part of a GraphQL response. Add `rateLimit { remaining }` to the query to guard the limit."""
+    def graphql(self, query: str, variables: dict | None = None, *, allow_missing: bool = False) -> dict:
+        """The `data` part of a GraphQL response. Add `rateLimit { remaining }` to the query to guard the limit.
+
+        allow_missing=True accepts NOT_FOUND errors (for example a deleted issue in a batch): the
+        missing parts are None in the data. All other errors raise GitHubError.
+        """
         body = json.dumps({"query": query, "variables": variables or {}})
-        response = self._cached("graphql", query, variables, ["api", "graphql", "--input", "-"], body)
-        if response.get("errors"):
-            messages = "; ".join(e.get("message", str(e)) for e in response["errors"])
+
+        def errors(response: dict) -> list[dict]:
+            return [e for e in response.get("errors") or []
+                    if not (allow_missing and e.get("type") == "NOT_FOUND")]
+
+        response = self._cached("graphql", query, variables, ["api", "graphql", "--input", "-"], body,
+                                keep=lambda r: not errors(r))
+        if errors(response):
+            messages = "; ".join(e.get("message", str(e)) for e in errors(response))
             raise GitHubError(f"GraphQL errors: {messages}")
         data = response.get("data") or {}
         remaining = (data.get("rateLimit") or {}).get("remaining")
@@ -72,25 +108,40 @@ class GitHub:
 
     def rest(self, path: str):
         """The parsed JSON of a REST GET, for example rest("repos/home-assistant/core")."""
-        return self._cached("rest", path, None, ["api", path], None)
+        return self._cached("rest", path, None, ["api", path], None, keep=lambda r: True)
 
-    def _cached(self, kind: str, request: str, variables: dict | None, args: list[str], stdin: str | None):
+    def _cached(self, kind: str, request: str, variables: dict | None, args: list[str], stdin: str | None,
+                keep: Callable[[object], bool]):
         path = self.cache_dir / f"{cache_key(kind, request, variables)}.json"
         if path.exists() and not self.refresh:
             self.cache_hits += 1
             return json.loads(path.read_text(encoding="utf-8"))["response"]
-        wait = self._last_call + self.min_interval - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-        self._last_call = time.monotonic()
-        out = self.runner(args, stdin)
-        self.api_calls += 1
+        out = self._call(args, stdin)
         try:
             response = json.loads(out)
         except json.JSONDecodeError:
             raise GitHubError(f"gh {' '.join(args[:2])} returned text that is not JSON: {out[:200]!r}") from None
-        if kind == "graphql" and response.get("errors"):
-            return response  # never cache an error
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        write_json(path, {"kind": kind, "request": request, "variables": variables, "response": response})
+        if keep(response):  # never cache an error answer
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            write_json(path, {"kind": kind, "request": request, "variables": variables, "response": response})
         return response
+
+    def _call(self, args: list[str], stdin: str | None) -> str:
+        for attempt in range(1, self.tries + 1):
+            wait = self._last_call + self.min_interval - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            self._last_call = time.monotonic()
+            try:
+                out = self.runner(args, stdin)
+            except GitHubError as exc:
+                if attempt == self.tries or not _TRANSIENT_RE.search(str(exc)):
+                    raise
+                pause = RETRY_WAITS[min(attempt - 1, len(RETRY_WAITS) - 1)]
+                self.retries += 1
+                self.progress(f"GitHub: {exc}; trying again in {pause} s (try {attempt + 1} of {self.tries})")
+                self.sleep(pause)
+                continue
+            self.api_calls += 1
+            return out
+        raise AssertionError("unreachable")

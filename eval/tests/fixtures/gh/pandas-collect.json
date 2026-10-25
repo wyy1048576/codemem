@@ -1,0 +1,1193 @@
+{
+ "_note": "Real pandas-dev/pandas data (2026-07-01 to 2026-10-22), trimmed: PR bodies to 1,500 characters, commit messages to 300, issues to 3 comments of 300 characters. The keys of 'cases' name what each PR shows.",
+ "cases": {
+  "both": 64153,
+  "list": 66174,
+  "regex": 66340,
+  "title_renamed": 62242,
+  "body_edited": 66106,
+  "bot": 66147,
+  "no_link": 64515,
+  "several": 64613,
+  "is_pr": 66165,
+  "short": 66196
+ },
+ "prs": [
+  {
+   "id": "PR_kwDOAA0YD87Dz92s",
+   "number": 64153,
+   "url": "https://github.com/pandas-dev/pandas/pull/64153",
+   "title": "BUG: Case not preserved for quoted string literals in CSS properties",
+   "body": "Resolves an issue/TODO where quoted strings in CSS were incorrectly lowercased by `CSSResolver.parse` and `CSSResolver.atomize`, which was causing string literals in Excel number formats to lose their original case.\r\n\r\n- [X] closes #63101 \r\n- [X] [Tests added and passed](https://pandas.pydata.org/pandas-docs/dev/development/contributing_codebase.html#writing-tests) if fixing a bug or adding a new feature\r\n- [X] All [code checks passed](https://pandas.pydata.org/pandas-docs/dev/development/contributing_codebase.html#pre-commit).\r\n- [X] Added [type annotations](https://pandas.pydata.org/pandas-docs/dev/development/contributing_codebase.html#type-hints) to new arguments/methods/functions.\r\n- [X] Added an entry in the latest `doc/source/whatsnew/vX.X.X.rst` file if fixing a bug or adding a new feature.\r\n- [X] I have reviewed and followed all the [contribution guidelines](https://pandas.pydata.org/docs/dev/development/contributing.html)\r\n- [ ] If I used AI to develop this pull request, I prompted it to follow `AGENTS.md`.\r\n",
+   "createdAt": "2026-02-14T19:07:00Z",
+   "mergedAt": "2026-07-07T20:09:56Z",
+   "baseRefName": "main",
+   "changedFiles": 3,
+   "mergeCommit": {
+    "oid": "6a07695d3fefcc548d57e1f2638d647d681bb3d7"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "sjalkote"
+   },
+   "commits": {
+    "totalCount": 5,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "339b2a2ec1b0d5cf582521f6eb339e523f220a9c",
+       "message": "fix #63101 by preserving case in quoted strings for CSSResolver"
+      }
+     },
+     {
+      "commit": {
+       "oid": "35744a9c022d507ad77344ed32f58d5c1cd6ac80",
+       "message": "Merge branch 'main' into fix-excel-preserve-case"
+      }
+     },
+     {
+      "commit": {
+       "oid": "9b5a068451ceb92aacf028224cafc123a24d1724",
+       "message": "Merge branch 'main' into fix-excel-preserve-case"
+      }
+     },
+     {
+      "commit": {
+       "oid": "48b28f82e97804b4f7b9fcf8f5cf3664dabfab1e",
+       "message": "Merge branch 'main' into fix-excel-preserve-case"
+      }
+     },
+     {
+      "commit": {
+       "oid": "2ea9030d494a67523ad2d2d1c5cb13677c500ae5",
+       "message": "update whatsnew for bugfix #64153"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "number": 63101,
+      "url": "https://github.com/pandas-dev/pandas/issues/63101",
+      "createdAt": "2025-11-12T22:28:49Z",
+      "body": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/i",
+      "repository": {
+       "nameWithOwner": "pandas-dev/pandas"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87ueB6U",
+   "number": 66174,
+   "url": "https://github.com/pandas-dev/pandas/pull/66174",
+   "title": "BUG: DatetimeIndex/TimedeltaIndex constructor pins a non-conforming freq (GH#65012)",
+   "body": "Follow-up to GH-65012, which fixed GH-61086 (accepting equivalent-but-not-equal freqs such as `QS-FEB` vs `QS-MAY`). That change validated a passed `freq` against only the first step (`self[0] + freq == self[1]`), fully validating only holiday/FY5253 offsets. But a fixed-step (`Tick`/`Day`) or business/custom offset can match the first gap by coincidence yet diverge on a later step, so a non-conforming `freq` was silently pinned:\n\n- `DatetimeIndex(<MS data>, freq=\"31D\")` pinned `<31 * Days>` (Jan 2000 happens to have 31 days). `shift(1)` then returned wrong values and dropped an element (len 3 -> 2).\n- `DatetimeIndex(<ME data>, freq=\"BME\")` pinned `<BusinessMonthEnd>` even when a later month-end (e.g. 2000-04-30, a Sunday) is not on the BME offset.\n\nNow validate every step via `_validate_frequency` for `len >= 2`, keeping the `len == 0` and `len == 1` (`is_on_offset`) fast paths. Equivalent freqs (GH-61086) are still accepted.\n\nNo whatsnew: the offending shortcut was introduced during the 3.1.0 dev cycle (GH-65266) and never shipped in a release.",
+   "createdAt": "2026-07-06T17:36:18Z",
+   "mergedAt": "2026-07-14T21:30:13Z",
+   "baseRefName": "main",
+   "changedFiles": 2,
+   "mergeCommit": {
+    "oid": "f45a2b13196100c72ee8dc26f998bdb8128a7877"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "jbrockmendel"
+   },
+   "commits": {
+    "totalCount": 3,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "1d31ac5b93b0a0e16e288532e88ee2b677e77511",
+       "message": "BUG: DatetimeIndex/TimedeltaIndex constructor pinning a non-conforming freq (GH#65012)\n\n_pin_freq only checked the first step (self[0] + freq == self[1]) when a\npassed freq differed from the inferred freq. A fixed-step (Tick/Day) or\nbusiness/custom offset can match the first gap by coincidence yet d"
+      }
+     },
+     {
+      "commit": {
+       "oid": "07bf05a4107c39eec8afaaae035084e5b01a109d",
+       "message": "Merge branch 'main' into regr-dti"
+      }
+     },
+     {
+      "commit": {
+       "oid": "1e76eb6e527f86137767f52eb56914caf41ceb73",
+       "message": "PERF: Tick fast path in _pin_freq to skip _validate_frequency\n\nA Tick offset is a fixed step in i8 space regardless of tz, so conformance\nis just uniform spacing, checkable with a single np.diff. This avoids the\npricier _validate_frequency (freq inference + range allocation) for the\ncommon small-ind"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "number": 61086,
+      "url": "https://github.com/pandas-dev/pandas/issues/61086",
+      "createdAt": "2025-03-08T22:12:32Z",
+      "body": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/i",
+      "repository": {
+       "nameWithOwner": "pandas-dev/pandas"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87x5qb0",
+   "number": 66340,
+   "url": "https://github.com/pandas-dev/pandas/pull/66340",
+   "title": "DOC: clarify sort_index determinism to fix #63154",
+   "body": "This PR updates the docstring for sort_index on both DataFrame and Series to explicitly state that the sorting algorithm is deterministic for a given input.\r\n\r\nThis mirrors the changes recently made to sort_values in #65986, which missed updating the sort_index docstrings to clarify this behavior.\r\n\r\nChecklist:\r\n[x] I have read the CONTRIBUTING.md file.",
+   "createdAt": "2026-07-15T06:58:59Z",
+   "mergedAt": "2026-08-19T16:58:54Z",
+   "baseRefName": "main",
+   "changedFiles": 2,
+   "mergeCommit": {
+    "oid": "8cb88cf1fbd02c747abd1e5d51201bd379c27b71"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "wasim-builds"
+   },
+   "commits": {
+    "totalCount": 4,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "42eb34cb3feb5b4104914787b324027bf4659de7",
+       "message": "DOC: clarify sort_index determinism to fix #63154"
+      }
+     },
+     {
+      "commit": {
+       "oid": "77ff12aeebd04512d145fbdac2d71c639d453b94",
+       "message": "Apply review feedback"
+      }
+     },
+     {
+      "commit": {
+       "oid": "787250b95f0fc14f12c692a7426191e540c249ec",
+       "message": "DOC: use backticks for algorithm names in sort_index docstring\n\nAligns with sort_values docstring convention. Addresses review feedback."
+      }
+     },
+     {
+      "commit": {
+       "oid": "cdb50c24e4c01862f70d6f2b130061f4a5c56b07",
+       "message": "Address review feedback: use single quotes for algorithm names in sort_index docstring"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD86mhhiz",
+   "number": 62242,
+   "url": "https://github.com/pandas-dev/pandas/pull/62242",
+   "title": "BUG: correctly honor specified dtype=str in read_csv pyarrow engine",
+   "body": "## Summary\r\nThis PR partially addresses issue #57666 by improving leading zeros preservation when `dtype=str` is used with dictionary-based dtype specifications. While the global `dtype=str` issue with pyarrow engine remains unfixed, this PR resolves the problem for more targeted dtype specifications.\r\n\r\n## Problem\r\nIssue #57666 reports that the pyarrow engine does not preserve leading zeros in numeric-looking strings when `dtype=str` is specified, while other engines correctly preserve them.\r\n\r\n## Solution\r\n- **Fixed**: Dictionary-based dtype specifications (`dtype={'col': str}`) now properly preserve leading zeros across all engines\r\n- **Partial**: Global `dtype=str` still fails with pyarrow engine (marked with xfail for now)\r\n- **Added**: Test coverage for dtype specification patterns\r\n\r\n## What's Fixed vs Still Broken\r\n\r\n### \u2705 Now Working:\r\n```python\r\n# This now preserve leading zeros correctly across all engines:\r\npd.read_csv(data, dtype={'col2': str, 'col3': int, 'col4': str})\r\n```\r\n\r\n### \u26a0\ufe0f Still Broken (pyarrow only):\r\n```python\r\n# This still strips leading zeros with pyarrow engine:\r\npd.read_csv(data, dtype=str)  # global string dtype\r\n```\r\n\r\n## Next Steps\r\nThis PR provides a foundation for the complete fix. The remaining work involves:\r\n1. Fully resolving the pyarrow engine's global `dtype` handling \r\n2. Removing the xfail marker once completely resolved\r\n3. Improving the pyarrow engine's dtype enforcement during parsing rather than post-processing conversion\r\n\r\n---",
+   "createdAt": "2025-09-02T19:59:09Z",
+   "mergedAt": "2026-08-26T16:11:18Z",
+   "baseRefName": "main",
+   "changedFiles": 5,
+   "mergeCommit": {
+    "oid": "0b54092c19202b579a1114e2d74f4b8028d5d573"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "dxdc"
+   },
+   "commits": {
+    "totalCount": 12,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "b39ff487c94ca2c5256adc8998cde1a567fe6479",
+       "message": "BUG: Preserve leading zeros with dtype=str in pyarrow engine (#57666)"
+      }
+     },
+     {
+      "commit": {
+       "oid": "f8c4a2352460212815362bb37137280a3727c07a",
+       "message": "Merge branch 'main' into patch-2"
+      }
+     },
+     {
+      "commit": {
+       "oid": "6b80f874d5720f58ca43927816adce4ab2d925fd",
+       "message": "Merge branch 'main' into patch-2"
+      }
+     },
+     {
+      "commit": {
+       "oid": "e2916d056d309fefd3e0a4bae931f913550a5532",
+       "message": "Merge branch 'main' into patch-2"
+      }
+     },
+     {
+      "commit": {
+       "oid": "1413d48cec5303f4ecf314ba2a90a5e4a5f0d066",
+       "message": "remove TypeError check"
+      }
+     },
+     {
+      "commit": {
+       "oid": "431f0cc695694fee9fa273f0b8d609daba2a4125",
+       "message": "Merge branch 'main' into patch-2"
+      }
+     },
+     {
+      "commit": {
+       "oid": "09cc4c4ee9620322c271be460909eb3236f36e95",
+       "message": "Merge remote-tracking branch 'upstream/main' into patch-2"
+      }
+     },
+     {
+      "commit": {
+       "oid": "5e8350517d490746cd7c5278219ee3477d40cada",
+       "message": "BUG: read_csv with engine='pyarrow' parses text-preserving dtypes as strings (GH#57666)"
+      }
+     },
+     {
+      "commit": {
+       "oid": "b70df6d631e8ecfad8c4d57c58e2f0d4afab0a1d",
+       "message": "review: defaultdict default via default_column_type, move helper to module level"
+      }
+     },
+     {
+      "commit": {
+       "oid": "47913dc58df1f63cb94edf46e096349ffb1fad3a",
+       "message": "review: use pa.large_string, drop redundant comment, run non-string-key test on all engines"
+      }
+     },
+     {
+      "commit": {
+       "oid": "08289198a9ff604d4795b374a8a4df3696826391",
+       "message": "Merge branch 'main' into patch-2"
+      }
+     },
+     {
+      "commit": {
+       "oid": "64b613cd5ec3746f0d8e60798d17fb3903b57849",
+       "message": "review: revert non-string-key test to pyarrow-only"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "number": 57666,
+      "url": "https://github.com/pandas-dev/pandas/issues/57666",
+      "createdAt": "2024-02-28T20:18:06Z",
+      "body": "### Pandas version checks\n\n- [X] I have checked that this issue has not already been reported.\n\n- [X] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/i",
+      "repository": {
+       "nameWithOwner": "pandas-dev/pandas"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87sbFcP",
+   "number": 66106,
+   "url": "https://github.com/pandas-dev/pandas/pull/66106",
+   "title": "BUG: DataFrame.loc partial assignment upcasting dtype of untouched columns",
+   "body": "I added a dtype check after index-alignment, so when a `.loc` assignment would upcast a shared block I route it through the per column path. That way only the targeted column changes dtype, not its siblings.\r\n\r\n- [X] closes #66105\r\n- [X] [Tests added and passed](https://pandas.pydata.org/pandas-docs/dev/development/contributing_codebase.html#writing-tests) if fixing a bug or adding a new feature\r\n- [X] All [code checks passed](https://pandas.pydata.org/pandas-docs/dev/development/contributing_codebase.html#pre-commit).\r\n- [X] Added [type annotations](https://pandas.pydata.org/pandas-docs/dev/development/contributing_codebase.html#type-hints) to new arguments/methods/functions.\r\n- [X] Added an entry in the latest `doc/source/whatsnew/vX.X.X.rst` file if fixing a bug or adding a new feature.\r\n- [X] I have reviewed and followed all the [contribution guidelines](https://pandas.pydata.org/docs/dev/development/contributing.html)\r\n- [ ] If I used AI to develop this pull request, I prompted it to follow `AGENTS.md`.\r\n",
+   "createdAt": "2026-06-30T21:55:50Z",
+   "mergedAt": "2026-07-04T17:38:36Z",
+   "baseRefName": "main",
+   "changedFiles": 3,
+   "mergeCommit": {
+    "oid": "84d7518bdc3320f5efee4d9949cd9d1ec2702473"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "gautamvarmadatla"
+   },
+   "commits": {
+    "totalCount": 4,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "1abb486533572dd182c46a5c0757049de5ac24b9",
+       "message": "Confine loc partial assignment upcast to the targeted column"
+      }
+     },
+     {
+      "commit": {
+       "oid": "d742cfe2eab268184bc197c715478c01fb5c5ae1",
+       "message": "Merge branch 'main' into fix-loc-setitem-sibling-column-upcast"
+      }
+     },
+     {
+      "commit": {
+       "oid": "6cc0e6b2ec1a265a3103c52662b260cbdcf42a3f",
+       "message": "Add multi-column test for loc partial assignment"
+      }
+     },
+     {
+      "commit": {
+       "oid": "49a6a9efa89c4bad8ea64d99c2e1d8e5cf59e515",
+       "message": "Merge branch 'main' into fix-loc-setitem-sibling-column-upcast"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "number": 66105,
+      "url": "https://github.com/pandas-dev/pandas/issues/66105",
+      "createdAt": "2026-06-30T21:54:04Z",
+      "body": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/i",
+      "repository": {
+       "nameWithOwner": "pandas-dev/pandas"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87t_Itc",
+   "number": 66147,
+   "url": "https://github.com/pandas-dev/pandas/pull/66147",
+   "title": "CI: Update pixi.lock",
+   "body": "Scheduled update by `.github/workflows/update-pixi-lock.yml`.\r\n\r\nClose and re-open the PR to trigger CI. If CI jobs fail, modify this pull request as needed.\r\n\r\n* Added lower bound to `scipy-stubs` as it kept on getting downgraded causing typing errors\r\n* Changed `test_scikit_learn` to avoid a deprecated NumPy API in scikit-learn. Also changed this test to exercise pandas\r\n\r\n# Dependencies\r\n\r\n<details>\r\n<summary>Explicit dependencies</summary>\r\n\r\n|Dependency|Before|After|Change|Environments|\r\n|-|-|-|-|-|\r\n|[ipython](https://prefix.dev/channels/conda-forge/packages/ipython)|9.14.1|9.15.0|Minor Upgrade|typing on *all platforms*|\r\n|[jupyterlite-core](https://prefix.dev/channels/conda-forge/packages/jupyterlite-core)|0.7.6|0.8.0|Minor Upgrade|docs-and-web on *all platforms*|\r\n|[jupyterlite-pyodide-kernel](https://prefix.dev/channels/conda-forge/packages/jupyterlite-pyodide-kernel)|0.7.2|0.8.1|Minor Upgrade|docs-and-web on *all platforms*|\r\n|[numpy](https://prefix.dev/channels/conda-forge/packages/numpy)|2.4.6|2.5.1|Minor Upgrade|{downstream, pyarrow-nightly} on *all platforms*|\r\n|[scipy](https://prefix.dev/channels/conda-forge/packages/scipy)|1.17.1|1.18.0|Minor Upgrade|typing on *all platforms*|\r\n|[scipy-stubs](https://prefix.dev/channels/conda-forge/packages/scipy-stubs)[^2]|1.17.1.5|1.14.1.6|Minor Downgrade|typing on *all platforms*|\r\n|[asv](https://prefix.dev/channels/conda-forge/packages/asv)|0.6.5|0.6.6|Patch Upgrade|asv on *all platforms*|\r\n|[cython](https://prefix.dev/cha",
+   "createdAt": "2026-07-05T05:34:40Z",
+   "mergedAt": "2026-07-06T19:11:22Z",
+   "baseRefName": "main",
+   "changedFiles": 3,
+   "mergeCommit": {
+    "oid": "38bab55af66a6ca399b377463c1e6ddfd9f2245b"
+   },
+   "author": {
+    "__typename": "Bot",
+    "login": "github-actions"
+   },
+   "commits": {
+    "totalCount": 5,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "1383b060b1b2f811acae22f547ed3a423b2e3245",
+       "message": "Update pixi.lock"
+      }
+     },
+     {
+      "commit": {
+       "oid": "874ded86ab069221e7a0d546aa56b5e41338d2eb",
+       "message": "Merge remote-tracking branch 'upstream/main' into ci/update-pixi-lock"
+      }
+     },
+     {
+      "commit": {
+       "oid": "22e48c9bd7f22ab57caf09d4d56deeee45b1c7f9",
+       "message": "Lower bound scipy stubs to avoid downgrade"
+      }
+     },
+     {
+      "commit": {
+       "oid": "d6463ae3a3ea7eb52248c5d1ae4ae938e93e08e6",
+       "message": "Change scikit learn example to test pandas"
+      }
+     },
+     {
+      "commit": {
+       "oid": "9ec0346d9e1e82168eb0a1d1b1d733d409bee9b9",
+       "message": "Merge remote-tracking branch 'upstream/main' into ci/update-pixi-lock"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87Jiy1I",
+   "number": 64515,
+   "url": "https://github.com/pandas-dev/pandas/pull/64515",
+   "title": "PERF: Use SIMD for read_csv C tokenizer",
+   "body": "## Summary\n\nUse NEON (ARM) and SSE2 (x86-64) SIMD intrinsics to accelerate the C tokenizer's inner loop. When the state machine is in `IN_FIELD` or `IN_QUOTED_FIELD` processing a normal character, scan 16 bytes at a time to find the next special character and `memcpy` the intervening bytes in bulk instead of one-at-a-time `PUSH_CHAR`.\n\n- `fast_scan_{neon,sse}`: checks 6 special chars for unquoted fields\n- `fast_scan_quoted_{neon,sse}`: checks only quote + escape for quoted fields (fewer comparisons)\n- Disabled for `delim_whitespace=True`; scalar fallback for fields <16 bytes and non-NEON/SSE2 architectures\n\n## Performance\n\nManually verified benchmarks (median of 10, separate processes per branch):\n\n```python\n# --- Long quoted Unicode strings (MemMapUTF8) ---\n# setup\nimport pandas as pd, numpy as np, tempfile, os\nfrom pandas import DataFrame, concat, date_range, read_csv\nlines = []\nfor lnum in range(ord(\" \"), ord(\"\\U00010080\"), 128):\n    line = \"\".join([chr(c) for c in range(lnum, lnum + 0x80)]) + \"\\n\"\n    try:\n        line.encode(\"utf-8\")\n    except UnicodeEncodeError:\n        continue\n    lines.append(line)\ndf = concat([DataFrame(lines) for _ in range(100)], ignore_index=True)\nfname = os.path.join(tempfile.gettempdir(), \"bench_utf8.csv\")\ndf.to_csv(fname, index=False, header=False, encoding=\"utf-8\")\n\n%timeit read_csv(fname, header=None, memory_map=True, encoding=\"utf-8\", engine=\"c\")\n30.9 ms \u00b1 1.74 ms per loop (mean \u00b1 std. dev. of 7 runs, 10 loops each)  # <- PR\n56.7 ms \u00b1 2.82",
+   "createdAt": "2026-03-11T00:21:37Z",
+   "mergedAt": "2026-07-05T18:54:46Z",
+   "baseRefName": "main",
+   "changedFiles": 5,
+   "mergeCommit": {
+    "oid": "395506fe8c021c367c7fb5c41e24770cda2861c4"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "jbrockmendel"
+   },
+   "commits": {
+    "totalCount": 39,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "300e26ca7c66ac912f6b49bc7be98279c84d613e",
+       "message": "build(simd): add xsimd dependency and simd verification"
+      }
+     },
+     {
+      "commit": {
+       "oid": "1022e10df2728b390e3a29aec13d0b41fc6a84c4",
+       "message": "Update pandas/_libs/meson.build\n\nCo-authored-by: William Ayd <william.ayd@icloud.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "ed588ad19b66cb12f77e0cfef74801a4e71e5e34",
+       "message": "ci: remove no simd job"
+      }
+     },
+     {
+      "commit": {
+       "oid": "84a498252fa4530f22edc222dd3a2e35008aad56",
+       "message": "refactor: create arch specific loop"
+      }
+     },
+     {
+      "commit": {
+       "oid": "aaf025bf7a5673f7f5cf937150a69b53a4f5d9cf",
+       "message": "refactor: move configuration set inside main verification"
+      }
+     },
+     {
+      "commit": {
+       "oid": "0fefde717f919d71d16d189e1aedb0b70bc86033",
+       "message": "fix: bump xsimd to 14.2 for MSVC ARM support"
+      }
+     },
+     {
+      "commit": {
+       "oid": "effdd43bec5c94a0bcbc2789d5b89ddf349b31da",
+       "message": "build: remove simd option"
+      }
+     },
+     {
+      "commit": {
+       "oid": "95c7faddeeaa2aa20917c55c81630cb9e60ab0e4",
+       "message": "PERF: Use SIMD for read_csv C tokenizer\n\nUse NEON (ARM) and SSE2 (x86-64) intrinsics to accelerate the\ntokenizer's inner loop. When processing normal characters in the\nIN_FIELD and IN_QUOTED_FIELD states, scan 16 bytes at a time to\nfind the next special character (delimiter, line terminator, quote,\n"
+      }
+     },
+     {
+      "commit": {
+       "oid": "44c3f86b201e950781873ce9a162a18f19bc0a03",
+       "message": "BLD: Fix MSVC build for SIMD tokenizer by replacing __builtin_ctz\n\nReplace GCC/Clang-only __builtin_ctz with a portable _pandas_ctz\nwrapper that uses _BitScanForward on MSVC.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "94cb290835166d7c4c958aac6a4dda3357ebe70e",
+       "message": "CLN: Address review comments on SIMD tokenizer\n\n- Define PANDAS_HAS_NEON / PANDAS_HAS_SSE2 macros to avoid repeating\n  the full platform-detection conditional at every #ifdef site\n- Replace <immintrin.h> with <emmintrin.h> (SSE2-specific header)\n- Fix _M_IX86 check to require _M_IX86_FP >= 2 (actual"
+      }
+     },
+     {
+      "commit": {
+       "oid": "b09753517c4b0810b60e1b86758ed184d896c6b4",
+       "message": "BLD: Fix -Werror build failure from tautological char < 256 comparison\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "e384990b77ad670065da18c89de5505f93cea837",
+       "message": "CLN: Address review comments on SIMD tokenizer\n\nAdd _M_ARM64 to NEON detection for Windows ARM, deduplicate\nNEON/SSE2 call sites with unified dispatch macros, and add\ncomments to the SIMD scan blocks.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "ee47d11449261d6f570ae91f4aef7cb3df091550",
+       "message": "BLD: Fix MSVC build for SIMD tokenizer on Windows ARM64 by replacing __builtin_ctzll\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "f4c9046ca9da4231b1c79e813926815b7f4df267",
+       "message": "REF: Use xsimd library for read_csv SIMD tokenizer\n\nReplace the hand-rolled NEON and SSE2 intrinsics in the C tokenizer's\nbulk-scan path with a small C++ shim that uses xsimd. The new\n`simd_scan` interface lives in `src/parser/simd_scan.{h,cpp}` and\nexposes a portable scanner API to `tokenizer.c`. x"
+      }
+     },
+     {
+      "commit": {
+       "oid": "615a2b47ce6b3f391c20dc82f7d5a1a38b0c82ff",
+       "message": "BLD: Link simd_scan into tslibs/parsing extension\n\nThe tslibs/parsing extension links tokenizer.c but its meson entry was\nnot updated alongside the other three tokenizer.c consumers (lib,\npandas_parser, parsers), leaving pd_scanner_create / pd_scanner_destroy\n/ pd_scanner_scan unresolved at import t"
+      }
+     },
+     {
+      "commit": {
+       "oid": "0d2ae0a1a94269f485230af31957c4e484e9f5ff",
+       "message": "REF: Restore hand-rolled SIMD intrinsics for read_csv tokenizer\n\nRevert the xsimd-based scanner shim and bring back the hand-rolled NEON\nand SSE2 intrinsics in the C tokenizer's bulk-scan path. Removes\nsrc/parser/simd_scan.{h,cpp} and restores the per-platform #ifdef\nladders and ctz portability wrap"
+      }
+     },
+     {
+      "commit": {
+       "oid": "2db8ddab5ffe09f80c7e2cca48e95994c715eaab",
+       "message": "CLN: Remove leftover xsimd build machinery, fix MSVC ctz guards\n\nThe xsimd dependency, wrap subproject, license, and generated SIMD\nconfig header were left over from the abandoned xsimd variant of the\ntokenizer; nothing consumes them. Scope the portable ctz helpers to the\narchitecture that uses them"
+      }
+     },
+     {
+      "commit": {
+       "oid": "129d7e5f0d2bff2574b80fb73a18e74c267e39cb",
+       "message": "Merge branch 'main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "9eaa46b0a8ac6133b3af2bcdff7b4c559a81b1b2",
+       "message": "Merge branch 'main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "6faa789d36aff8e320a1950dbc120f01bab00442",
+       "message": "Merge branch 'main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "be73d3109123f251c43a45b9dec0ffcd81d381c1",
+       "message": "Merge branch 'main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "02d40044280f40c9295cf09036c041328536c49e",
+       "message": "CI: pin pytest <9.1 in cibuildwheel test phase\n\npytest 9.1.0 has an indirect-parametrize collection regression\n(pytest-dev/pytest#14591) that breaks the wheel builder test run.\nFollow-up to GH#65883, which only pinned the unit-tests workflow.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@an"
+      }
+     },
+     {
+      "commit": {
+       "oid": "0946931c774e62e2c6159886032b83c99ad62664",
+       "message": "CI: use pytest!=9.1.* (not <9.1) in cibuildwheel test phase\n\ncibuildwheel installs test-requires through cmd on Windows, where the\n'<' in 'pytest<9.1' is read as a stdin redirect, so the wheel test phase\nfailed before running with 'The system cannot find the file specified.'\n'pytest!=9.1.*' excludes"
+      }
+     },
+     {
+      "commit": {
+       "oid": "00f82eee367431e5ac421af32e8a44f3a67138fb",
+       "message": "CI: relock pyarrow nightly (dev138 -> dev168)\n\nThe pyarrow-nightly pixi env pinned pyarrow 25.0.0.dev138, which the\nscientific-python nightly index has since rotated out (404), so\n'pixi install -e pyarrow-nightly --locked' failed before running tests.\nBump the pin to a currently-available nightly wh"
+      }
+     },
+     {
+      "commit": {
+       "oid": "6f5841e949e29087bef73bab611a4f9249b89b5d",
+       "message": "Merge branch 'main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "e636c0c082b7ee8026b00670d00e94f0c2bd7e8f",
+       "message": "CI: drop pytest 9.1 exclusion in wheel test phase\n\nThe indirect-parametrize regression (pytest-dev/pytest#14591) that\nprompted the pin was fixed in pytest 9.1.1, so the wheel test phase no\nlonger needs to exclude the 9.1 line.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "ba55b1a0eec57dc4335e376175bc128590bc3888",
+       "message": "Merge branch 'main' into perf-read_csv-simd\n\n# Conflicts:\n#\tpixi.lock"
+      }
+     },
+     {
+      "commit": {
+       "oid": "f8f3b7e091fdc15f18036acf05173508ec1136c6",
+       "message": "DOC: Document stream-space invariant for bulk-scan copies\n\nComment the worst-case stream reservation and the bounds guarantee the\nSIMD/scalar bulk copies rely on, per review feedback.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "a3bc008de14719c788a47bae38c9707b8c81965e",
+       "message": "Merge branch 'main' into perf-read_csv-simd\n\n# Conflicts:\n#\tdoc/source/whatsnew/v3.1.0.rst"
+      }
+     },
+     {
+      "commit": {
+       "oid": "d741fd14e8bd1378939b7431ebe25fa772acdb22",
+       "message": "REF: unify SIMD scan helpers and ctz builtins in tokenizer\n\nRename _pandas_ctz*->pandas_ctz* (drop the reserved leading underscore),\nprefer __builtin_ctz* via __has_builtin (covers clang-cl/mingw) with\n_BitScanForward* only as the MSVC fallback, and collapse the\nfast_scan_*_neon/_sse pairs into shar"
+      }
+     },
+     {
+      "commit": {
+       "oid": "de2c45dfca4e99e44ff9259fa29dd7c1cadfcfda",
+       "message": "PERF: use NEON shift-right-narrow nibble mask in CSV SIMD scan\n\nReplace the two-lane extract-and-branch reduction in the NEON\nfast_scan_simd / fast_scan_quoted_simd helpers with a single\nshift-right-narrow (vshrn) nibble mask, collapsing the 128-bit\ncomparison result to one 64-bit word with a single"
+      }
+     },
+     {
+      "commit": {
+       "oid": "c635ec024e0be73ee3d319c952356f5518903124",
+       "message": "Merge branch 'main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "9458c5cd7173ec52933809502cca2f9206d334fc",
+       "message": "Merge branch 'main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "b816c2bf1410a97f2716f0ffc46959d59e6c0ac3",
+       "message": "TST: cover SIMD 16-byte bulk-scan boundaries in C tokenizer\n\nThe C tokenizer copies runs of ordinary characters 16 bytes at a time via\na SIMD scan (NEON/SSE2). Fields shorter than 16 bytes never enter that\nstride, so the existing suite left the vectorized special-character search\nand its nibble->byt"
+      }
+     },
+     {
+      "commit": {
+       "oid": "3d43b3c3c8b7132251f1fcd84511d7e88c9e2838",
+       "message": "Merge remote-tracking branch 'upstream/main' into perf-read_csv-simd"
+      }
+     },
+     {
+      "commit": {
+       "oid": "7a947813c30805b57c67f2383cdf6db84572b948",
+       "message": "BLD: use pandas_simd_config.h macros for read_csv tokenizer SIMD detection\n\nConsume the shared PANDAS_HAVE_NEON / PANDAS_HAVE_SSE2 macros from pandas/_libs/simd instead of hand-rolling compiler-macro arch detection in the C tokenizer, and wire simd_config_inc into the extensions that compile tokeniz"
+      }
+     },
+     {
+      "commit": {
+       "oid": "a667877d4fa999e43a509ff207064ab04974dcb9",
+       "message": "Merge branch 'main' into perf-read_csv-simd\n\n# Conflicts:\n#\tdoc/source/whatsnew/v3.1.0.rst\n#\tpandas/tests/io/parser/test_c_parser_only.py"
+      }
+     },
+     {
+      "commit": {
+       "oid": "924b835aba4405e866f22db9dcab48621cd3ea56",
+       "message": "BLD: compile CSV tokenizer once into a shared static library\n\nBundle tokenizer.c (plus fast_float_strtod.cpp and pd_strtoi.cpp) into a\npandas_tokenizer static library linked by lib, parsers, pandas_parser and\ntslibs.parsing, instead of recompiling those sources per-extension. This\nscopes simd_config"
+      }
+     },
+     {
+      "commit": {
+       "oid": "a7f72e36da927a879101c3a519a6261cb5c8b6c2",
+       "message": "BLD: fix tokenizer static library Python include for meson >=1.11\n\ninclude_directories() rejects the absolute path returned by\npy.get_path('include'), so configuration failed under meson 1.11.\nProvide the Python headers via py.dependency() instead.\n\nCo-Authored-By: Claude Opus 4.8 <noreply@anthropic"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87KviDd",
+   "number": 64613,
+   "url": "https://github.com/pandas-dev/pandas/pull/64613",
+   "title": "DEPR: .values lossy behavior for DatetimeTZDtype, PeriodDtype, IntervalDtype",
+   "body": "## Summary\n\n- Deprecate `.values` returning lossy/object-dtype results for `DatetimeTZDtype` (drops timezone), `PeriodDtype` (returns object ndarray), and `IntervalDtype` (returns object ndarray)\n- In a future version, `.values` will return the underlying ExtensionArray (matching `._values` behavior)\n- Warns with `Pandas4Warning` on `Series.values`, `PeriodIndex.values`, and `DatetimeIndex.values` (tz-aware only)\n- Fixes internal pandas callers to use `._values`/`.to_numpy()` to avoid self-triggering the warning\n\nAffects both Series (via `external_values()` in `blocks.py`) and Index (via overrides in `period.py` and `datetimelike.py`). IntervalIndex already returns the ExtensionArray from `.values` so only the Series path needs deprecation for IntervalDtype.\n\nCloses #54717\nCloses #55128\n\n## Test plan\n\n- [x] 149,469 tests pass across indexes, series, frame, arithmetic, reductions, tools, io, extension, base, groupby, reshape, indexing, copy_view, internals, generic, construction, tseries\n- [x] All pre-commit hooks pass\n- [x] Doctest validation passes\n- [x] Whatsnew entry added\n\n\ud83e\udd16 Generated with [Claude Code](https://claude.com/claude-code)",
+   "createdAt": "2026-03-15T17:41:51Z",
+   "mergedAt": "2026-07-07T16:09:01Z",
+   "baseRefName": "main",
+   "changedFiles": 44,
+   "mergeCommit": {
+    "oid": "29ca61e16128ac701a1bc81ae38889a4dd0c8bb6"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "jbrockmendel"
+   },
+   "commits": {
+    "totalCount": 12,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "9d1211b9144834493e2b313f91d91ba16cd608fe",
+       "message": "DEPR: Series/Index.values lossy behavior for DatetimeTZDtype, PeriodDtype, IntervalDtype\n\nDeprecate the lossy/inconsistent behavior of .values for three dtype\nfamilies where it differs from ._values:\n\n- DatetimeTZDtype: .values drops timezone info (returns datetime64 ndarray)\n- PeriodDtype: .values "
+      }
+     },
+     {
+      "commit": {
+       "oid": "a05e37ef8764beef95c3fa209ad95e1f1d9a4c60",
+       "message": "Fix CI: mypy errors in arrow/array.py + doc build warning in v0.24.0.rst\n\n- Fix mypy attr-defined errors by asserting isinstance and removing\n  unused type: ignore comments\n- Add :okwarning: to ipython directive in v0.24.0.rst that calls\n  PeriodIndex.values (now triggers deprecation warning)\n\nCo-Au"
+      }
+     },
+     {
+      "commit": {
+       "oid": "841ae78bf46ee7a0054d08df154f88cfd1a6b8df",
+       "message": "Fix CI: additional test and doc fixes for .values deprecation\n\n- Fix test_algos.py::test_index_returned: .values -> ._values\n- Fix test_hashing.py::test_hash_array: .values -> ._values\n- Add :okwarning: to v0.19.0.rst ipython directive calling\n  PeriodIndex.values\n\nCo-Authored-By: Claude Opus 4.6 (1"
+      }
+     },
+     {
+      "commit": {
+       "oid": "886c7cc5ad727ae0e5458d2d4ad42ed4d1c66f6c",
+       "message": "Fix CI: plotting internal .values calls + test/xarray fixes\n\n- Fix internal .values calls in plotting code (converter.py, core.py)\n  to use ._values, avoiding self-triggering deprecation warnings\n- Fix test_frame.py and test_frame_subplots.py test code\n- Add filterwarnings for xarray tests (external"
+      }
+     },
+     {
+      "commit": {
+       "oid": "af9332e2e73ced17f1308098ce95dd830a0103f7",
+       "message": "Fix CI: add filterwarnings for TestParquetFastParquet\n\nThe fastparquet engine triggers .values deprecation warning via\npyarrow internally. Add class-level filterwarning to suppress.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "1ffa54093d8319d75847c6d0cdc31ce3cdcfafa0",
+       "message": "Fix CI: conftest fixture + pyarrow test filterwarnings\n\nindex_with_missing_sortable fixture used ind.values.copy() which now\ntriggers the .values deprecation for tz-aware/period indexes; switch\nto ind._values.copy() to match the sibling index_with_missing fixture.\n\nAdd filterwarnings to test_util.py"
+      }
+     },
+     {
+      "commit": {
+       "oid": "5404811d8b85705d4f1aef9fabf3cfe366d2a255",
+       "message": "Merge remote-tracking branch 'upstream/main' into depr-values"
+      }
+     },
+     {
+      "commit": {
+       "oid": "fb95dea5e1975fa3f02937fb972abe1d8c1c894f",
+       "message": "Merge branch 'main' into depr-values\n\n# Conflicts:\n#\tdoc/source/whatsnew/v3.1.0.rst"
+      }
+     },
+     {
+      "commit": {
+       "oid": "10e9ca561ea84a519b352fe28a367be727e0f242",
+       "message": "TST: simplify PeriodIndex copy check in test_ensure_copied_data\n\nConstruct via Index.__new__ with copy=False instead of from_ordinals\nand drop the stale \"._values is a PeriodArray, thus copied\" note.\n\nCo-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+      }
+     },
+     {
+      "commit": {
+       "oid": "4e1eb2434a6f7c8d13e6581472fdfbb7ff4cebd6",
+       "message": "Merge branch 'main' of https://github.com/pandas-dev/pandas into depr-values\n\n# Conflicts:\n#\tdoc/source/whatsnew/v3.1.0.rst"
+      }
+     },
+     {
+      "commit": {
+       "oid": "13ba75b638fdd0f980ba7c73957a2eeb9d4c3d2e",
+       "message": "Merge branch 'main' into depr-values"
+      }
+     },
+     {
+      "commit": {
+       "oid": "3ba1220b5b43a659e02e4da54b49cd88df7914cb",
+       "message": "Merge branch 'main' into depr-values\n\n# Conflicts:\n#\tdoc/source/whatsnew/v3.1.0.rst\n#\tpandas/_libs/src/vendored/ujson/python/objToJSON.c"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 2,
+    "nodes": [
+     {
+      "number": 54717,
+      "url": "https://github.com/pandas-dev/pandas/issues/54717",
+      "createdAt": "2023-08-23T20:37:33Z",
+      "body": "ATM series.values drops the tz from dt64tz, converts interval to object, converts period to object, but preserves other EAs.  We have kept this weird behavior for backward compatibility, should eventu",
+      "repository": {
+       "nameWithOwner": "pandas-dev/pandas"
+      }
+     },
+     {
+      "number": 55128,
+      "url": "https://github.com/pandas-dev/pandas/issues/55128",
+      "createdAt": "2023-09-13T20:04:53Z",
+      "body": "### Pandas version checks\n\n- [X] I have checked that this issue has not already been reported.\n\n- [X] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/i",
+      "repository": {
+       "nameWithOwner": "pandas-dev/pandas"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87uacE1",
+   "number": 66165,
+   "url": "https://github.com/pandas-dev/pandas/pull/66165",
+   "title": "BUG: read_hdf fails to round-trip CategoricalIndex edge cases (GH#65576)",
+   "body": "closes #65576\n\nFor `format=\"table\"`, `IndexCol.convert` did not mirror `DataCol.convert`'s NaN-category handling, leaving two live bugs in the recently-added `CategoricalIndex` round-trip (GH-33909, GH-16118):\n\n- A `CategoricalIndex` with a category equal to the `nan_rep` string (e.g. the default `\"nan\"`) wrote fine but **every** subsequent `read_hdf` raised `ValueError: Categorical categories cannot be null`, permanently bricking the key. The categories metadata `Series` decodes the `\"nan\"` category back to `NaN` on read; `convert` now drops NaN categories and remaps the codes, matching how a categorical *column* already behaves (GH-21741).\n- An all-`NaN` `CategoricalIndex` (zero categories) read back as a plain integer `Index` of raw codes, because empty categories cannot be stored as metadata and `IndexCol` only inferred `meta=\"category\"` from a present metadata node. `meta` is now persisted as an explicit attribute so the index round-trips as categorical.\n\nBoth behaviors now match a categorical data column across read, all-NaN round-trip, and append. No whatsnew entry \u2014 GH-65576 is unreleased (`3.1.0.dev0`), so this is a regression against unreleased work; the existing feature entry already documents the round-trip.",
+   "createdAt": "2026-07-06T15:15:27Z",
+   "mergedAt": "2026-07-07T16:55:40Z",
+   "baseRefName": "main",
+   "changedFiles": 2,
+   "mergeCommit": {
+    "oid": "ecced3fc916c6325a0a632411885a1a653341d91"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "jbrockmendel"
+   },
+   "commits": {
+    "totalCount": 2,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "8753de2437c006240c2ead08b350e9ded98ba4ad",
+       "message": "BUG: read_hdf fails to round-trip CategoricalIndex edge cases (GH#65576)\n\nFor format=\"table\", IndexCol.convert did not mirror DataCol.convert's\nNaN-category handling. Two bugs resulted:\n\n- A CategoricalIndex with a category equal to the nan_rep string (e.g.\n  the default \"nan\") wrote fine but every "
+      }
+     },
+     {
+      "commit": {
+       "oid": "e82047e961e466d757487e5eb07b3462ca4588de",
+       "message": "Merge branch 'main' into regr-hdf-categorical-round-trip"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  {
+   "id": "PR_kwDOAA0YD87u6SOC",
+   "number": 66196,
+   "url": "https://github.com/pandas-dev/pandas/pull/66196",
+   "title": "CI: Scope forkserver launch method to ASV CI task (GH#66193)",
+   "body": "closes #66193\n\nasv 0.6.6 (pulled in by GH-66147) changed the default benchmark launch method from `forkserver` to `spawn` on all platforms. Under `spawn` every benchmark runs in a fresh interpreter that re-imports pandas, so the `asv run --quick --dry-run` smoke test in the ASV Benchmarks CI job ballooned from minutes to ~4 hours (pandas has ~940 benchmark functions, most parameterized).\n\nThis passes `--launch-method=forkserver` in the `ci-asv` Pixi task, restoring the pre-0.6.6 behavior for the CI job: pandas is imported once in a fork server and each benchmark is a cheap `fork()`.\n\nScoping the flag to the (Linux) CI task \u2014 rather than setting `launch_method` in `asv.conf.json` \u2014 leaves asv's default untouched for everyone else, so local `asv run` keeps working on Windows, where `forkserver` is unavailable. Also bumps the asv floor to `>=0.6.6`.\n",
+   "createdAt": "2026-07-07T16:11:19Z",
+   "mergedAt": "2026-07-07T19:12:07Z",
+   "baseRefName": "main",
+   "changedFiles": 3,
+   "mergeCommit": {
+    "oid": "001982e0f39bc9c5eec5a239125fe7a72c29e515"
+   },
+   "author": {
+    "__typename": "User",
+    "login": "jbrockmendel"
+   },
+   "commits": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "commit": {
+       "oid": "95590cc57576ae5aab991781b2804a9f38bfd50c",
+       "message": "CI: Scope forkserver launch method to ASV CI task (GH#66193)\n\nasv 0.6.6 changed the default benchmark launch method to \"spawn\" on all\nplatforms. Under \"spawn\" every benchmark runs in a fresh interpreter that\nre-imports pandas, so the `asv run --quick --dry-run` smoke test in the ASV\nBenchmarks CI jo"
+      }
+     }
+    ]
+   },
+   "closingIssuesReferences": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "number": 66193,
+      "url": "https://github.com/pandas-dev/pandas/issues/66193",
+      "createdAt": "2026-07-07T11:27:59Z",
+      "body": "After #66147, the ASV job is taking almost 4 hours to complete.",
+      "repository": {
+       "nameWithOwner": "pandas-dev/pandas"
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "issues": {
+  "54717": {
+   "__typename": "Issue",
+   "number": 54717,
+   "url": "https://github.com/pandas-dev/pandas/issues/54717",
+   "title": "DEPR: values casting dt64tz, Interval, Period",
+   "body": "ATM series.values drops the tz from dt64tz, converts interval to object, converts period to object, but preserves other EAs.  We have kept this weird behavior for backward compatibility, should eventually just bite the bullet and deprecate these weird behaviors, just match `_values`\r\n\r\nI think this would close #55128",
+   "createdAt": "2023-08-23T20:37:33Z",
+   "userContentEdits": {
+    "totalCount": 3,
+    "nodes": [
+     {
+      "editedAt": "2023-11-01T16:56:50Z",
+      "deletedAt": null,
+      "diff": "ATM series.values drops the tz from dt64tz, converts interval to object, converts period to object, but preserves other EAs.  We have kept this weird behavior for backward compatibility, should eventually just bite the bullet and deprecate these weird behaviors, just match `_values`\r\n\r\nI think this would close #55128"
+     },
+     {
+      "editedAt": "2023-08-23T20:38:02Z",
+      "deletedAt": null,
+      "diff": "ATM series.values drops the tz from dt64tz, converts interval to object, converts period to object, but preserves other EAs.  We have kept this weird behavior for backward compatibility, should eventually just bite the bullet and deprecate these weird behaviors, just match `_values`\r\n"
+     },
+     {
+      "editedAt": "2023-08-23T20:37:33Z",
+      "deletedAt": null,
+      "diff": "### Pandas version checks\n\n- [X] I have checked that this issue has not already been reported.\n\n- [X] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [X] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\nNA\n```\n\n\n### Issue Description\n\nATM series.values drops the tz from dt64tz, converts interval to object, converts period to object, but preserves other EAs.  We have kept this weird behavior for backward compatibility, should eventually just bite the bullet and deprecate these weird behaviors, just match `_values`\n\n### Expected Behavior\n\nNA\n\n### Installed Versions\n\n<details>\r\n\r\nReplace this line with the output of pd.show_versions()\r\n\r\n</details>\r\n"
+     }
+    ]
+   },
+   "timelineItems": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "comments": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "createdAt": "2024-05-28T02:18:22Z",
+      "author": {
+       "__typename": "User",
+       "login": "pedrocariellof"
+      },
+      "body": "Take"
+     }
+    ]
+   }
+  },
+  "55128": {
+   "__typename": "Issue",
+   "number": 55128,
+   "url": "https://github.com/pandas-dev/pandas/issues/55128",
+   "title": "BUG: Inconsistent behavior of `Series.values` with `Series.array` or `Series.to_numpy()`",
+   "body": "### Pandas version checks\n\n- [X] I have checked that this issue has not already been reported.\n\n- [X] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [ ] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\nimport pandas\r\n\r\nseries = pandas.Series([pandas.Timestamp(\"2016-01-01\", tz=\"US/Eastern\") for _ in range(3)])\r\nprint(series.values)\r\n# ['2016-01-01T05:00:00.000000000' '2016-01-01T05:00:00.000000000'\r\n#  '2016-01-01T05:00:00.000000000']\r\n\r\nprint(series.array)\r\n# <DatetimeArray>\r\n# ['2016-01-01 00:00:00-05:00', '2016-01-01 00:00:00-05:00',\r\n#  '2016-01-01 00:00:00-05:00']\r\n# Length: 3, dtype: datetime64[ns, US/Eastern]\r\n\r\nprint(series.to_numpy())\r\n# [Timestamp('2016-01-01 00:00:00-0500', tz='US/Eastern')\r\n#  Timestamp('2016-01-01 00:00:00-0500', tz='US/Eastern')\r\n#  Timestamp('2016-01-01 00:00:00-0500', tz='US/Eastern')]\n```\n\n\n### Issue Description\n\n`.values` output does not match `.array` output neither `.to_numpy()` output\n\n### Expected Behavior\n\nIn this case, the expected behavior is when the output of `.value` matches the output of `.array` (my guess).\n\n### Installed Versions\n\n<details>\r\n\r\n```bash\r\nINSTALLED VERSIONS\r\n------------------\r\ncommit              : ba1cccd19da778f0c3a7d6a885685da16a072870\r\npython              : 3.9.17.final.0\r\npython-bits         : 64\r\nOS                  : Windows\r\nOS-release          : 10\r\nVersion             : 10.0.22621\r\nmachine             : AMD64\r\nprocessor           : Intel64 Family 6 Model 140 Stepping 1, GenuineIntel\r\nbyteorder           : little\r\nLC_ALL              : None\r\nLANG                : en_US.UTF-8\r\nLOCALE              : English_United States.1252\r\n\r\npandas              : 2.1.0\r\nnumpy               : 1.25.2\r\npytz                : 2023.3\r\ndateutil            : 2.8.2\r\nsetuptools          : 68.0.0\r\npip                 : 23.2.1\r\nCython              : None\r\npytest              : 7.4.0\r\nhypothesis          : None\r\nsphinx              : 7.1.1\r\nblosc               : None\r\nfeather             : None\r\nxlsxwriter          : None\r\nlxml.etree          : 4.9.3\r\nhtml5lib            : None\r\npymysql             : None\r\npsycopg2            : 2.9.6\r\njinja2              : 3.1.2\r\nIPython             : 8.12.2\r\npandas_datareader   : None\r\nbs4                 : 4.12.2\r\nbottleneck          : None\r\ndataframe-api-compat: None\r\nfastparquet         : 2023.7.0\r\nfsspec              : 2023.6.0\r\ngcsfs               : None\r\nmatplotlib          : 3.7.2\r\nnumba               : None\r\nnumexpr             : 2.8.4\r\nodfpy               : None\r\nopenpyxl            : 3.1.2\r\npandas_gbq          : 0.15.0\r\npyarrow             : 11.0.0\r\npyreadstat          : None\r\npyxlsb              : None\r\ns3fs                : 2023.6.0\r\nscipy               : 1.11.2\r\nsqlalchemy          : 2.0.20\r\ntables              : 3.8.0\r\ntabulate            : None\r\nxarray              : None\r\nxlrd                : 2.0.1\r\nzstandard           : None\r\ntzdata              : 2023.3\r\nqtpy                : 2.3.1\r\npyqt5               : None\r\n```\r\n</details>\r\n",
+   "createdAt": "2023-09-13T20:04:53Z",
+   "userContentEdits": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "timelineItems": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "comments": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  "57666": {
+   "__typename": "Issue",
+   "number": 57666,
+   "url": "https://github.com/pandas-dev/pandas/issues/57666",
+   "title": "BUG: pyarrow read_csv engine stripping leading zeros with dtype=str",
+   "body": "### Pandas version checks\n\n- [X] I have checked that this issue has not already been reported.\n\n- [X] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [X] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\nimport pandas as pd\r\nfrom io import StringIO\r\n\r\nx = \"\"\"\r\n    AB|000388907|abc|0150\r\n    AB|101044572|abc|0150\r\n    AB|000023607|abc|0205\r\n    AB|100102040|abc|0205\r\n\"\"\"\r\n\r\ndf_arrow = pd.read_csv(\r\n    StringIO(x),\r\n    delimiter=\"|\",\r\n    header=None,\r\n    dtype=str,\r\n    engine=\"pyarrow\",\r\n    keep_default_na=False,\r\n)\r\n\r\ndf_python = pd.read_csv(\r\n    StringIO(x),\r\n    delimiter=\"|\",\r\n    header=None,\r\n    dtype=str,\r\n    engine=\"python\",\r\n    keep_default_na=False,\r\n)\r\n\r\ndf_arrow\r\n        0          1    2    3\r\n0      AB     388907  abc  150\r\n1      AB  101044572  abc  150\r\n2      AB      23607  abc  205\r\n3      AB  100102040  abc  205\r\n\r\ndf_python\r\n        0          1    2     3\r\n0      AB  000388907  abc  0150\r\n1      AB  101044572  abc  0150\r\n2      AB  000023607  abc  0205\r\n3      AB  100102040  abc  0205\n```\n\n\n### Issue Description\n\nwhen I use engine=pyarrow and set dtype to str i am seeing the leading zeros in my numeric columns removed even though the resulting column type is 'O'. When I use the python engine I see that the leading zeros are still there as expected.\n\n### Expected Behavior\n\nI would expect when treating all columns as strings that the leading zeros are retained and the data is unmodified.\n\n### Installed Versions\n\n<details>\r\n\r\nINSTALLED VERSIONS\r\n------------------\r\ncommit                : bdc79c146c2e32f2cab629be240f01658cfb6cc2\r\npython                : 3.11.8.final.0\r\npython-bits           : 64\r\nOS                    : Linux\r\nOS-release            : 6.5.0-17-generic\r\nVersion               : #17-Ubuntu SMP PREEMPT_DYNAMIC Thu Jan 11 14:20:13 UTC 2024\r\nmachine               : x86_64\r\nprocessor             : x86_64\r\nbyteorder             : little\r\nLC_ALL                : None\r\nLANG                  : None\r\nLOCALE                : en_US.UTF-8\r\n\r\npandas                : 2.2.1\r\nnumpy                 : 1.26.4\r\npytz                  : 2024.1\r\ndateutil              : 2.8.2\r\nsetuptools            : 69.1.1\r\npip                   : 24.0\r\nCython                : None\r\npytest                : None\r\nhypothesis            : None\r\nsphinx                : None\r\nblosc                 : None\r\nfeather               : None\r\nxlsxwriter            : None\r\nlxml.etree            : None\r\nhtml5lib              : None\r\npymysql               : None\r\npsycopg2              : None\r\njinja2                : None\r\nIPython               : None\r\npandas_datareader     : None\r\nadbc-driver-postgresql: None\r\nadbc-driver-sqlite    : None\r\nbs4                   : None\r\nbottleneck            : None\r\ndataframe-api-compat  : None\r\nfastparquet           : None\r\nfsspec                : None\r\ngcsfs                 : None\r\nmatplotlib            : None\r\nnumba                 : None\r\nnumexpr               : None\r\nodfpy                 : None\r\nopenpyxl              : None\r\npandas_gbq            : None\r\npyarrow               : 15.0.0\r\npyreadstat            : None\r\npython-calamine       : None\r\npyxlsb                : None\r\ns3fs                  : None\r\nscipy                 : None\r\nsqlalchemy            : 2.0.27\r\ntables                : None\r\ntabulate              : 0.9.0\r\nxarray                : None\r\nxlrd                  : None\r\nzstandard             : None\r\ntzdata                : 2024.1\r\nqtpy                  : None\r\npyqt5                 : None\r\n</details>\r\n",
+   "createdAt": "2024-02-28T20:18:06Z",
+   "userContentEdits": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "timelineItems": {
+    "totalCount": 1,
+    "nodes": [
+     {
+      "createdAt": "2026-01-28T14:21:39Z",
+      "previousTitle": "BUG: pyarrow stripping leading zeros with dtype=str",
+      "currentTitle": "BUG: pyarrow read_csv engine stripping leading zeros with dtype=str"
+     }
+    ]
+   },
+   "comments": {
+    "totalCount": 16,
+    "nodes": [
+     {
+      "createdAt": "2024-03-15T15:26:44Z",
+      "author": {
+       "__typename": "User",
+       "login": "benjaminbauer"
+      },
+      "body": "can confirm this in 2.2.1"
+     },
+     {
+      "createdAt": "2024-03-15T17:50:06Z",
+      "author": {
+       "__typename": "User",
+       "login": "mroeschke"
+      },
+      "body": "Do you get the same result when you use the `pyarrow.csv.read_csv` method directly? https://arrow.apache.org/docs/python/generated/pyarrow.csv.read_csv.html"
+     },
+     {
+      "createdAt": "2024-03-15T20:01:35Z",
+      "author": {
+       "__typename": "User",
+       "login": "benjaminbauer"
+      },
+      "body": "seems to be a problem with the pyarrow engine in pandas (pandas 2.2.1, pyarrow 15.0.1)\r\n```\r\npandas engine pandas dtype: 01\r\npyarrow engine pandas dtype: 1\r\npandas engine pyarrow dtype: 01\r\npyarrow engine pyarrow dtype: 1\r\npyarrow native: 01\r\n```\r\n\r\n```python\r\nimport io\r\n\r\nimport pandas as pd\r\nimpor"
+     }
+    ]
+   }
+  },
+  "61086": {
+   "__typename": "Issue",
+   "number": 61086,
+   "url": "https://github.com/pandas-dev/pandas/issues/61086",
+   "title": "BUG: Collision between equivalent frequencies 'QS-FEB' and 'QS-NOV'",
+   "body": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [ ] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\n>>> import pandas as pd\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-MAY')\n>>> pd.DatetimeIndex(i, freq='QS-FEB')\nTraceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\indexes\\datetimes.py\", line 370, in __new__\n    dtarr = DatetimeArray._from_sequence_not_strict(\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimes.py\", line 394, in _from_sequence_not_strict\n    result._maybe_pin_freq(freq, validate_kwds)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2094, in _maybe_pin_freq\n    _validate_inferred_freq(freq, self._freq)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2526, in _validate_inferred_freq\n    raise ValueError(\nValueError: Inferred frequency <QuarterBegin: startingMonth=5> from passed values does not conform to passed frequency QS-FEB\n```\n\n### Issue Description\n\n`pd.DatetimeIndex(...)`, when passed both an index with a frequency, AND a frequency, throws an error if the frequencies are unequal - even if they are equivalent.\n\n### Expected Behavior\n\nIf the frequencies are unequal, but equivalent (like in the example), an index with the specified (new) frequency should be returned.\n\nThat the frequencies are equivalent can be seen in the following snippet: simply direct setting the frequency of `i` to the specified frequency DOES work:\n\n```\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i.freq = 'QS-FEB'\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-FEB')\n``` \n\nI think this only occurs for quarter-frequency, where \"equivalent\" means that the starting month mod 3 is equal.\n\nCurrent workaround: \n\nWe don't want to change `i`, so the current workaround to `i2 = pd.DatetimeIndex(i, freq='QS-FEB')` is\n\n```\ni2 = i.copy()\ni2.freq = 'QS-FEB'\n```\n...which is cumbersome, because it requires 2 steps and cannot be used in list comprehensions etc.\n\nAlternatively, there is the elegant\n\n```\ni2 = pd.DatetimeIndex(i, freq=None).to_frame().asfreq(i.freq).index\n```\n\n\n\n### Installed Versions\n\n<details>\nINSTALLED VERSIONS\n------------------\ncommit                : 0691c5cf90477d3503834d983f69350f250a6ff7\npython                : 3.12.2\npython-bits           : 64\nOS                    : Windows\nOS-release            : 10\nVersion               : 10.0.19045\nmachine               : AMD64\nprocessor             : Intel64 Family 6 Model 140 Stepping 1, GenuineIntel\nbyteorder             : little\nLC_ALL                : None\nLANG                  : en_US.UTF-8\nLOCALE                : English_United States.1252\n\npandas                : 2.2.3\nnumpy                 : 2.1.1\npytz                  : 2024.2\ndateutil              : 2.9.0.post0\npip                   : 24.2\nCython                : None\nsphinx                : None\nIPython               : None\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nblosc                 : None\nbottleneck            : None\ndataframe-api-compat  : None\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : None\ngcsfs                 : None\njinja2                : None\nlxml.etree            : None\nmatplotlib            : None\nnumba                 : None\nnumexpr               : None\nodfpy                 : None\nopenpyxl              : None\npandas_gbq            : None\npsycopg2              : None\npymysql               : None\npyarrow               : None\npyreadstat            : None\npytest                : None\npython-calamine       : None\npyxlsb                : None\ns3fs                  : None\nscipy                 : None\nsqlalchemy            : None\ntables                : None\ntabulate              : None\nxarray                : None\nxlrd                  : None\nxlsxwriter            : None\nzstandard             : None\ntzdata                : 2024.2\nqtpy                  : None\npyqt5                 : None\n</details>\n",
+   "createdAt": "2025-03-08T22:12:32Z",
+   "userContentEdits": {
+    "totalCount": 3,
+    "nodes": [
+     {
+      "editedAt": "2025-03-08T22:38:20Z",
+      "deletedAt": null,
+      "diff": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [ ] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\n>>> import pandas as pd\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-MAY')\n>>> pd.DatetimeIndex(i, freq='QS-FEB')\nTraceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\indexes\\datetimes.py\", line 370, in __new__\n    dtarr = DatetimeArray._from_sequence_not_strict(\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimes.py\", line 394, in _from_sequence_not_strict\n    result._maybe_pin_freq(freq, validate_kwds)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2094, in _maybe_pin_freq\n    _validate_inferred_freq(freq, self._freq)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2526, in _validate_inferred_freq\n    raise ValueError(\nValueError: Inferred frequency <QuarterBegin: startingMonth=5> from passed values does not conform to passed frequency QS-FEB\n```\n\n### Issue Description\n\n`pd.DatetimeIndex(...)`, when passed both an index with a frequency, AND a frequency, throws an error if the frequencies are unequal - even if they are equivalent.\n\n### Expected Behavior\n\nIf the frequencies are unequal, but equivalent (like in the example), an index with the specified (new) frequency should be returned.\n\nThat the frequencies are equivalent can be seen in the following snippet: simply direct setting the frequency of `i` to the specified frequency DOES work:\n\n```\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i.freq = 'QS-FEB'\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-FEB')\n``` \n\nI think this only occurs for quarter-frequency, where \"equivalent\" means that the starting month mod 3 is equal.\n\nCurrent workaround: \n\nWe don't want to change `i`, so the current workaround to `i2 = pd.DatetimeIndex(i, freq='QS-FEB')` is\n\n```\ni2 = i.copy()\ni2.freq = 'QS-FEB'\n```\n...which is cumbersome, because it requires 2 steps and cannot be used in list comprehensions etc.\n\nAlternatively, there is the elegant\n\n```\ni2 = pd.DatetimeIndex(i, freq=None).to_frame().asfreq(i.freq).index\n```\n\n\n\n### Installed Versions\n\n<details>\nINSTALLED VERSIONS\n------------------\ncommit                : 0691c5cf90477d3503834d983f69350f250a6ff7\npython                : 3.12.2\npython-bits           : 64\nOS                    : Windows\nOS-release            : 10\nVersion               : 10.0.19045\nmachine               : AMD64\nprocessor             : Intel64 Family 6 Model 140 Stepping 1, GenuineIntel\nbyteorder             : little\nLC_ALL                : None\nLANG                  : en_US.UTF-8\nLOCALE                : English_United States.1252\n\npandas                : 2.2.3\nnumpy                 : 2.1.1\npytz                  : 2024.2\ndateutil              : 2.9.0.post0\npip                   : 24.2\nCython                : None\nsphinx                : None\nIPython               : None\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nblosc                 : None\nbottleneck            : None\ndataframe-api-compat  : None\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : None\ngcsfs                 : None\njinja2                : None\nlxml.etree            : None\nmatplotlib            : None\nnumba                 : None\nnumexpr               : None\nodfpy                 : None\nopenpyxl              : None\npandas_gbq            : None\npsycopg2              : None\npymysql               : None\npyarrow               : None\npyreadstat            : None\npytest                : None\npython-calamine       : None\npyxlsb                : None\ns3fs                  : None\nscipy                 : None\nsqlalchemy            : None\ntables                : None\ntabulate              : None\nxarray                : None\nxlrd                  : None\nxlsxwriter            : None\nzstandard             : None\ntzdata                : 2024.2\nqtpy                  : None\npyqt5                 : None\n</details>\n"
+     },
+     {
+      "editedAt": "2025-03-08T22:14:33Z",
+      "deletedAt": null,
+      "diff": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [ ] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\n>>> import pandas as pd\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-MAY')\n>>> pd.DatetimeIndex(i, freq='QS-FEB')\nTraceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\indexes\\datetimes.py\", line 370, in __new__\n    dtarr = DatetimeArray._from_sequence_not_strict(\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimes.py\", line 394, in _from_sequence_not_strict\n    result._maybe_pin_freq(freq, validate_kwds)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2094, in _maybe_pin_freq\n    _validate_inferred_freq(freq, self._freq)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2526, in _validate_inferred_freq\n    raise ValueError(\nValueError: Inferred frequency <QuarterBegin: startingMonth=5> from passed values does not conform to passed frequency QS-FEB\n```\n\n### Issue Description\n\n`pd.DatetimeIndex(...)`, when passed both an index with a frequency, AND a frequency, throws an error if the frequencies are unequal - even if they are equivalent.\n\n### Expected Behavior\n\nIf the frequencies are unequal, but equivalent (like in the example), an index with the specified (new) frequency should be returned.\n\nThat the frequencies are equivalent can be seen in the following snippet: simply direct setting the frequency of `i` to the specified frequency DOES work:\n\n```\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i.freq = 'QS-FEB'\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-FEB')\n``` \n\nI think this only occurs for quarter-frequency, where \"equivalent\" means that the starting month mod 3 is equal.\n\nCurrent workaround: \n\nWe don't want to change `i`, so the current workaround to `i2 = pd.DatetimeIndex(i, freq='QS-FEB')` is\n\n```\ni2 = i.copy()\ni2.freq = 'QS-FEB'\n```\n...which is cumbersome, because it requires 2 steps and cannot be used in list comprehensions etc.\n\n### Installed Versions\n\n<details>\nINSTALLED VERSIONS\n------------------\ncommit                : 0691c5cf90477d3503834d983f69350f250a6ff7\npython                : 3.12.2\npython-bits           : 64\nOS                    : Windows\nOS-release            : 10\nVersion               : 10.0.19045\nmachine               : AMD64\nprocessor             : Intel64 Family 6 Model 140 Stepping 1, GenuineIntel\nbyteorder             : little\nLC_ALL                : None\nLANG                  : en_US.UTF-8\nLOCALE                : English_United States.1252\n\npandas                : 2.2.3\nnumpy                 : 2.1.1\npytz                  : 2024.2\ndateutil              : 2.9.0.post0\npip                   : 24.2\nCython                : None\nsphinx                : None\nIPython               : None\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nblosc                 : None\nbottleneck            : None\ndataframe-api-compat  : None\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : None\ngcsfs                 : None\njinja2                : None\nlxml.etree            : None\nmatplotlib            : None\nnumba                 : None\nnumexpr               : None\nodfpy                 : None\nopenpyxl              : None\npandas_gbq            : None\npsycopg2              : None\npymysql               : None\npyarrow               : None\npyreadstat            : None\npytest                : None\npython-calamine       : None\npyxlsb                : None\ns3fs                  : None\nscipy                 : None\nsqlalchemy            : None\ntables                : None\ntabulate              : None\nxarray                : None\nxlrd                  : None\nxlsxwriter            : None\nzstandard             : None\ntzdata                : 2024.2\nqtpy                  : None\npyqt5                 : None\n</details>\n"
+     },
+     {
+      "editedAt": "2025-03-08T22:12:32Z",
+      "deletedAt": null,
+      "diff": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [ ] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\n>>> import pandas as pd\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-MAY')\n>>> pd.DatetimeIndex(i, freq='QS-FEB')\nTraceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\indexes\\datetimes.py\", line 370, in __new__\n    dtarr = DatetimeArray._from_sequence_not_strict(\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimes.py\", line 394, in _from_sequence_not_strict\n    result._maybe_pin_freq(freq, validate_kwds)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2094, in _maybe_pin_freq\n    _validate_inferred_freq(freq, self._freq)\n  File \"C:\\Program Files\\Python312\\Lib\\site-packages\\pandas\\core\\arrays\\datetimelike.py\", line 2526, in _validate_inferred_freq\n    raise ValueError(\nValueError: Inferred frequency <QuarterBegin: startingMonth=5> from passed values does not conform to passed frequency QS-FEB\n```\n\n### Issue Description\n\n`pd.DatetimeIndex(...)`, when passed both an index with a frequency, AND a frequency, throws an error if the frequencies are unequal.\n\n### Expected Behavior\n\nIf the frequencies are unequal, but equivalent (like in the example), an index with the specified (new) frequency should be returned.\n\nThat the frequencies are equivalent can be seen in the following snippet: simply direct setting the frequency of `i` to the specified frequency DOES work:\n\n```\n>>> i = pd.date_range('2020-02-01', freq='QS-MAY', periods=3)\n>>> i.freq = 'QS-FEB'\n>>> i\nDatetimeIndex(['2020-02-01', '2020-05-01', '2020-08-01'], dtype='datetime64[ns]', freq='QS-FEB')\n``` \n\nCurrent workaround: \n\nWe don't want to change `i`, so the current workaround to `i2 = pd.DatetimeIndex(i, freq='QS-FEB')` is\n\n```\ni2 = i.copy()\ni2.freq = 'QS-FEB'\n```\n...which is cumbersome, because it requires 2 steps and cannot be used in list comprehensions etc.\n\n### Installed Versions\n\n<details>\nINSTALLED VERSIONS\n------------------\ncommit                : 0691c5cf90477d3503834d983f69350f250a6ff7\npython                : 3.12.2\npython-bits           : 64\nOS                    : Windows\nOS-release            : 10\nVersion               : 10.0.19045\nmachine               : AMD64\nprocessor             : Intel64 Family 6 Model 140 Stepping 1, GenuineIntel\nbyteorder             : little\nLC_ALL                : None\nLANG                  : en_US.UTF-8\nLOCALE                : English_United States.1252\n\npandas                : 2.2.3\nnumpy                 : 2.1.1\npytz                  : 2024.2\ndateutil              : 2.9.0.post0\npip                   : 24.2\nCython                : None\nsphinx                : None\nIPython               : None\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nblosc                 : None\nbottleneck            : None\ndataframe-api-compat  : None\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : None\ngcsfs                 : None\njinja2                : None\nlxml.etree            : None\nmatplotlib            : None\nnumba                 : None\nnumexpr               : None\nodfpy                 : None\nopenpyxl              : None\npandas_gbq            : None\npsycopg2              : None\npymysql               : None\npyarrow               : None\npyreadstat            : None\npytest                : None\npython-calamine       : None\npyxlsb                : None\ns3fs                  : None\nscipy                 : None\nsqlalchemy            : None\ntables                : None\ntabulate              : None\nxarray                : None\nxlrd                  : None\nxlsxwriter            : None\nzstandard             : None\ntzdata                : 2024.2\nqtpy                  : None\npyqt5                 : None\n</details>\n"
+     }
+    ]
+   },
+   "timelineItems": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "comments": {
+    "totalCount": 7,
+    "nodes": [
+     {
+      "createdAt": "2025-03-09T13:32:49Z",
+      "author": {
+       "__typename": "User",
+       "login": "rhshadrach"
+      },
+      "body": "Thanks for the report. When setting the attribute, pandas generates the NumPy array with the new frequency and confirms that it matches the data underlying the DatetimeIndex. I'd be supportive of doing the same in `DatetimeIndex.__init__`.\n\n~I think we should also just be comparing frequency strings"
+     },
+     {
+      "createdAt": "2025-03-09T19:30:09Z",
+      "author": {
+       "__typename": "User",
+       "login": "rwijtvliet"
+      },
+      "body": "Thanks for the quick triage!\n\nAnother welcome addition would be a method like `DatetimeIndex.set_freq()`, returning a copy of the index but with the specified frequency. \n\nAnalogous methods exist for changing other properties of (a copy of) the index - to such as `DatetimeIndex.rename()` (for the in"
+     },
+     {
+      "createdAt": "2025-03-12T15:12:26Z",
+      "author": {
+       "__typename": "User",
+       "login": "ycdjun"
+      },
+      "body": "Take"
+     }
+    ]
+   }
+  },
+  "63101": {
+   "__typename": "Issue",
+   "number": 63101,
+   "url": "https://github.com/pandas-dev/pandas/issues/63101",
+   "title": "BUG: Strings in Excel number formats do not preserve case",
+   "body": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [x] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\nimport pandas as pd\n\ndata = pd.DataFrame({\"col\": [1e6, 2e6, 3e6]})\ncss = 'number-format: #,,\"M\";'  # format 1000000 as '1M'\ndata.style.apply(lambda series: [css] * len(series)).to_excel(\"test.xlsx\")\n```\n\n### Issue Description\n\nWhen exporting an Excel file with a custom number format, any custom strings (in double quotes) are lower-cased. This happens with both `engine=\"openpyxl\"` and `engine=\"xlsxwriter\"`. Here, e.g., the string literal `\"M\"` is converted to `\"m\"`:\n\n<img width=\"153\" height=\"104\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/c5243c99-732c-4841-9342-e67fd201dea8\" />\n\n### Expected Behavior\n\nString literals in custom number formats should be unchanged.\n\n### Installed Versions\n\n<details>\n\n```\nINSTALLED VERSIONS\n------------------\ncommit                : 415830fc8f9c77a8031f84082bef5cc441c2d13f\npython                : 3.13.9\npython-bits           : 64\nOS                    : Linux\nOS-release            : 6.6.87.2-microsoft-standard-WSL2\nVersion               : #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025\nmachine               : x86_64\nprocessor             : x86_64\nbyteorder             : little\nLC_ALL                : None\nLANG                  : en_US.UTF-8\nLOCALE                : en_US.UTF-8\n\npandas                : 3.0.0.dev0+2709.g415830fc8f\nnumpy                 : 2.4.0.dev0+git20251111.bf56676\ndateutil              : 2.9.0.post0\npip                   : 25.2\nCython                : None\nsphinx                : None\nIPython               : None\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nbottleneck            : None\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : None\ngcsfs                 : None\njinja2                : 3.1.6\nlxml.etree            : None\nmatplotlib            : None\nnumba                 : None\nnumexpr               : None\nodfpy                 : None\nopenpyxl              : 3.1.5\npsycopg2              : None\npymysql               : None\npyarrow               : None\npyiceberg             : None\npyreadstat            : None\npytest                : None\npython-calamine       : None\npytz                  : None\npyxlsb                : 1.0.10\ns3fs                  : None\nscipy                 : None\nsqlalchemy            : None\ntables                : None\ntabulate              : None\nxarray                : None\nxlrd                  : 2.0.2\nxlsxwriter            : 3.2.9\nzstandard             : None\nqtpy                  : None\npyqt5                 : None\n```\n\n</details>",
+   "createdAt": "2025-11-12T22:28:49Z",
+   "userContentEdits": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "timelineItems": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "comments": {
+    "totalCount": 2,
+    "nodes": [
+     {
+      "createdAt": "2025-11-14T12:57:07Z",
+      "author": {
+       "__typename": "User",
+       "login": "parthkandharkar"
+      },
+      "body": "Hi,\nThis is an interesting issue. Can you please assign it to me?"
+     },
+     {
+      "createdAt": "2026-02-14T17:34:52Z",
+      "author": {
+       "__typename": "User",
+       "login": "sjalkote"
+      },
+      "body": "Hi, this looks stale so I'd like to take a shot at resolving it"
+     }
+    ]
+   }
+  },
+  "63154": {
+   "__typename": "Issue",
+   "number": 63154,
+   "url": "https://github.com/pandas-dev/pandas/issues/63154",
+   "title": "DOC: clarify that `value_counts`, `sort_values`, `sort_index` etc. are deterministic",
+   "body": "### Pandas version checks\n\n- [x] I have checked that the issue still exists on the latest versions of the docs on `main` [here](https://pandas.pydata.org/docs/dev/)\n\n\n### Location of the documentation\n\nhttps://pandas.pydata.org/docs/dev/reference/api/pandas.DataFrame.sort_values.html\n\n### Documentation problem\n\nIn the current dev documentation, it is not clear whether `value_counts`, `sort_values`, `sort_index` etc. give the same result in case of ties. It turns out the underlying sorting function is `numpy.sort`, and [the answer is positive for quick sort](https://stackoverflow.com/questions/70188386/is-pandas-sort-values-deterministic-in-case-of-ties), [when one checkes the source](https://github.com/numpy/numpy/blob/0ecf7805870507d6c0bbfa97f529eb82741284d0/numpy/_core/src/npysort/quicksort.cpp).\n\n\n\n### Suggested fix for documentation\n\nSince `quicksort` is the default sorting algorithm, we can clarify that the sorting is deterministic. Other algorithms might be clarified if numpy/numpy#30262 is resolved.",
+   "createdAt": "2025-11-19T16:49:45Z",
+   "userContentEdits": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "timelineItems": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "comments": {
+    "totalCount": 5,
+    "nodes": [
+     {
+      "createdAt": "2025-11-21T05:30:34Z",
+      "author": {
+       "__typename": "User",
+       "login": "makroumi"
+      },
+      "body": "I can take this and open a small docs PR to clarify the determinism of `value_counts`, `sort_values`, and `sort_index` in the presence of ties. I will reference this issue in the PR and keep the change docs-only and atomic.\n"
+     },
+     {
+      "createdAt": "2025-12-11T19:54:07Z",
+      "author": {
+       "__typename": "User",
+       "login": "divya1974"
+      },
+      "body": "I can take this up."
+     },
+     {
+      "createdAt": "2026-02-09T15:25:19Z",
+      "author": {
+       "__typename": "User",
+       "login": "kumar0205"
+      },
+      "body": "Hi! I\u2019m new to pandas and preparing for GSoC 2026.\nI\u2019d like to work on clarifying this documentation \u2014 is it okay if I take this up?"
+     }
+    ]
+   }
+  },
+  "65576": {
+   "__typename": "PullRequest"
+  },
+  "66105": {
+   "__typename": "Issue",
+   "number": 66105,
+   "url": "https://github.com/pandas-dev/pandas/issues/66105",
+   "title": "BUG: DataFrame.loc partial assignment upcasts dtype of untouched columns",
+   "body": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [x] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n``` python \n\nimport pandas as pd\n\ndf = pd.DataFrame({\"A\": [1, 2, 3], \"B\": [4, 5, 6], \"C\": [7, 8, 9]})\nprint(\"before:\")\nprint(df.dtypes)\n\ndf.loc[df[\"A\"] > 1, \"B\"] = pd.Series([99], index=[2])\nprint(\"\\nafter:\")\nprint(df.dtypes)\n```\n\n```\nOutput:\n\nbefore:\nA    int64\nB    int64\nC    int64\ndtype: object\n\nafter:\nA    float64\nB    float64\nC    float64\ndtype: object\n```\n\n### Issue Description\n\nAssigning a `Series` to a subset of rows of one column via `df.loc[mask, \"col\"] = series` silently upcasts the `dtype` of other, untouched columns in a single-dtype DataFrame (and can corrupt large integer values), because pandas checks whether it can write in-place before index-alignment introduces the `NaN` that forces the upcast\n\n### Expected Behavior\n\nIn the above example, only the assigned column B should upcast to float64, the untouched columns A and C should stay int64 \n\n### Installed Versions\n\n<details>\n\nINSTALLED VERSIONS\n------------------\ncommit                : 77aa567f265b96d99871970fbd4e608e180f76da\npython                : 3.12.12\npython-bits           : 64\nOS                    : Windows\nOS-release            : 11\nVersion               : 10.0.26200\nmachine               : AMD64\nprocessor             : Intel64 Family 6 Model 183 Stepping 1, GenuineIntel\nbyteorder             : little\nLC_ALL                : None\nLANG                  : None\nLOCALE                : English_United States.1252\n\npandas                : 3.1.0.dev0+1188.g77aa567f26\nnumpy                 : 2.4.2\ndateutil              : 2.9.0.post0\npip                   : 26.0.1\nCython                : 3.2.4\nsphinx                : None\nIPython               : 9.10.0\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nbottleneck            : 1.6.0\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : 6.151.6\ngcsfs                 : None\njinja2                : None\nlxml.etree            : None\nmatplotlib            : 3.10.8\nnumba                 : None\nnumexpr               : 2.14.1\nodfpy                 : None\nopenpyxl              : None\npsycopg2              : None\npymysql               : None\npyarrow               : 23.0.1\npyiceberg             : None\npyreadstat            : None\npytest                : 9.0.2\npython-calamine       : None\npytz                  : 2025.2\npyxlsb                : None\ns3fs                  : None\nscipy                 : 1.17.0\nsqlalchemy            : 2.0.46\ntables                : None\ntabulate              : 0.9.0\nxarray                : None\nxlrd                  : None\nxlsxwriter            : None\nzstandard             : None\nqtpy                  : None\npyqt5                 : None\n\n</details>\n",
+   "createdAt": "2026-06-30T21:54:04Z",
+   "userContentEdits": {
+    "totalCount": 2,
+    "nodes": [
+     {
+      "editedAt": "2026-06-30T21:57:36Z",
+      "deletedAt": null,
+      "diff": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [x] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n``` python \n\nimport pandas as pd\n\ndf = pd.DataFrame({\"A\": [1, 2, 3], \"B\": [4, 5, 6], \"C\": [7, 8, 9]})\nprint(\"before:\")\nprint(df.dtypes)\n\ndf.loc[df[\"A\"] > 1, \"B\"] = pd.Series([99], index=[2])\nprint(\"\\nafter:\")\nprint(df.dtypes)\n```\n\n```\nOutput:\n\nbefore:\nA    int64\nB    int64\nC    int64\ndtype: object\n\nafter:\nA    float64\nB    float64\nC    float64\ndtype: object\n```\n\n### Issue Description\n\nAssigning a `Series` to a subset of rows of one column via `df.loc[mask, \"col\"] = series` silently upcasts the `dtype` of other, untouched columns in a single-dtype DataFrame (and can corrupt large integer values), because pandas checks whether it can write in-place before index-alignment introduces the `NaN` that forces the upcast\n\n### Expected Behavior\n\nIn the above example, only the assigned column B should upcast to float64, the untouched columns A and C should stay int64 \n\n### Installed Versions\n\n<details>\n\nINSTALLED VERSIONS\n------------------\ncommit                : 77aa567f265b96d99871970fbd4e608e180f76da\npython                : 3.12.12\npython-bits           : 64\nOS                    : Windows\nOS-release            : 11\nVersion               : 10.0.26200\nmachine               : AMD64\nprocessor             : Intel64 Family 6 Model 183 Stepping 1, GenuineIntel\nbyteorder             : little\nLC_ALL                : None\nLANG                  : None\nLOCALE                : English_United States.1252\n\npandas                : 3.1.0.dev0+1188.g77aa567f26\nnumpy                 : 2.4.2\ndateutil              : 2.9.0.post0\npip                   : 26.0.1\nCython                : 3.2.4\nsphinx                : None\nIPython               : 9.10.0\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nbottleneck            : 1.6.0\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : 6.151.6\ngcsfs                 : None\njinja2                : None\nlxml.etree            : None\nmatplotlib            : 3.10.8\nnumba                 : None\nnumexpr               : 2.14.1\nodfpy                 : None\nopenpyxl              : None\npsycopg2              : None\npymysql               : None\npyarrow               : 23.0.1\npyiceberg             : None\npyreadstat            : None\npytest                : 9.0.2\npython-calamine       : None\npytz                  : 2025.2\npyxlsb                : None\ns3fs                  : None\nscipy                 : 1.17.0\nsqlalchemy            : 2.0.46\ntables                : None\ntabulate              : 0.9.0\nxarray                : None\nxlrd                  : None\nxlsxwriter            : None\nzstandard             : None\nqtpy                  : None\npyqt5                 : None\n\n</details>\n"
+     },
+     {
+      "editedAt": "2026-06-30T21:54:04Z",
+      "deletedAt": null,
+      "diff": "### Pandas version checks\n\n- [x] I have checked that this issue has not already been reported.\n\n- [x] I have confirmed this bug exists on the [latest version](https://pandas.pydata.org/docs/whatsnew/index.html) of pandas.\n\n- [x] I have confirmed this bug exists on the [main branch](https://pandas.pydata.org/docs/dev/getting_started/install.html#installing-the-development-version-of-pandas) of pandas.\n\n\n### Reproducible Example\n\n```python\npython \n\nimport pandas as pd\n\ndf = pd.DataFrame({\"A\": [1, 2, 3], \"B\": [4, 5, 6], \"C\": [7, 8, 9]})\nprint(\"before:\")\nprint(df.dtypes)\n\ndf.loc[df[\"A\"] > 1, \"B\"] = pd.Series([99], index=[2])\nprint(\"\\nafter:\")\nprint(df.dtypes)\n\n\n\n \n\nOutput:\n\nbefore:\nA    int64\nB    int64\nC    int64\ndtype: object\n\nafter:\nA    float64\nB    float64\nC    float64\ndtype: object\n```\n\n### Issue Description\n\nAssigning a `Series` to a subset of rows of one column via `df.loc[mask, \"col\"] = series` silently upcasts the `dtype` of other, untouched columns in a single-dtype DataFrame (and can corrupt large integer values), because pandas checks whether it can write in-place before index-alignment introduces the `NaN` that forces the upcast\n\n### Expected Behavior\n\nIn the above example, only the assigned column B should upcast to float64, the untouched columns A and C should stay int64 \n\n### Installed Versions\n\n<details>\n\nINSTALLED VERSIONS\n------------------\ncommit                : 77aa567f265b96d99871970fbd4e608e180f76da\npython                : 3.12.12\npython-bits           : 64\nOS                    : Windows\nOS-release            : 11\nVersion               : 10.0.26200\nmachine               : AMD64\nprocessor             : Intel64 Family 6 Model 183 Stepping 1, GenuineIntel\nbyteorder             : little\nLC_ALL                : None\nLANG                  : None\nLOCALE                : English_United States.1252\n\npandas                : 3.1.0.dev0+1188.g77aa567f26\nnumpy                 : 2.4.2\ndateutil              : 2.9.0.post0\npip                   : 26.0.1\nCython                : 3.2.4\nsphinx                : None\nIPython               : 9.10.0\nadbc-driver-postgresql: None\nadbc-driver-sqlite    : None\nbs4                   : None\nbottleneck            : 1.6.0\nfastparquet           : None\nfsspec                : None\nhtml5lib              : None\nhypothesis            : 6.151.6\ngcsfs                 : None\njinja2                : None\nlxml.etree            : None\nmatplotlib            : 3.10.8\nnumba                 : None\nnumexpr               : 2.14.1\nodfpy                 : None\nopenpyxl              : None\npsycopg2              : None\npymysql               : None\npyarrow               : 23.0.1\npyiceberg             : None\npyreadstat            : None\npytest                : 9.0.2\npython-calamine       : None\npytz                  : 2025.2\npyxlsb                : None\ns3fs                  : None\nscipy                 : 1.17.0\nsqlalchemy            : 2.0.46\ntables                : None\ntabulate              : 0.9.0\nxarray                : None\nxlrd                  : None\nxlsxwriter            : None\nzstandard             : None\nqtpy                  : None\npyqt5                 : None\n\n</details>\n"
+     }
+    ]
+   },
+   "timelineItems": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "comments": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  },
+  "66193": {
+   "__typename": "Issue",
+   "number": 66193,
+   "url": "https://github.com/pandas-dev/pandas/issues/66193",
+   "title": "BUG|CI: CI is running full benchmark suite",
+   "body": "After #66147, the ASV job is taking almost 4 hours to complete.",
+   "createdAt": "2026-07-07T11:27:59Z",
+   "userContentEdits": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "timelineItems": {
+    "totalCount": 0,
+    "nodes": []
+   },
+   "comments": {
+    "totalCount": 0,
+    "nodes": []
+   }
+  }
+ }
+}

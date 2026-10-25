@@ -79,3 +79,32 @@ def test_repo_stats_needs_repos_and_good_dates(tmp_path, capsys):
     assert "--candidates" in capsys.readouterr().err
     assert main(["repo-stats", "--repo", "acme/demo", "--since", "July"]) == 1
     assert "repo-stats:" in capsys.readouterr().err
+
+
+def test_collect_dry_run_writes_nothing_and_full_run_writes(tmp_path, monkeypatch, capsys):
+    import json
+
+    import cmeval.github
+    from cmeval.paths import collect_dir
+
+    config = tmp_path / "fresh-t.toml"
+    config.write_text('[collect]\nsince = "2026-07-01"\nuntil = "2026-07-02"\n\n[[repo]]\nname = "acme/demo"\n')
+    empty = {"data": {"search": {"issueCount": 0, "nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}},
+                      "rateLimit": {"remaining": 4000}}}
+
+    def runner(args, stdin):
+        return json.dumps(empty if args[1] == "graphql" else {"default_branch": "main"})
+
+    real = cmeval.github.GitHub
+    monkeypatch.setattr(cmeval.github, "GitHub", lambda **kw: real(runner=runner, min_interval=0, **kw))
+    assert main(["collect", str(config), "--dry-run"]) == 0
+    out = capsys.readouterr()
+    assert "| acme/demo | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |" in out.out and "dry run" in out.err
+    assert not (collect_dir() / "fresh-t").exists()
+
+    assert main(["collect", str(config)]) == 0
+    assert (collect_dir() / "fresh-t" / "acme__demo" / "candidates.jsonl").exists()
+    assert (collect_dir() / "fresh-t" / "acme__demo" / "funnel.json").exists()
+
+    assert main(["collect", str(config), "--repo", "other/repo"]) == 1
+    assert "not in" in capsys.readouterr().err
