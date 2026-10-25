@@ -23,7 +23,8 @@ log = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "jinaai/jina-code-embeddings-0.5b"
 REPO_CONFIG_NAME = ".codemem.toml"
-TEXT_FORMAT_VERSION = 2  # bump when a text builder's output changes, so old vectors are not reused
+TEXT_FORMAT_VERSION = 3  # bump when a text builder's output changes, so old vectors are not reused
+CHUNKER_VERSION = 2  # bump when chunking changes (kinds, ranges, keys, calls): an index is then rebuilt
 
 # Directories that are never indexed, regardless of .gitignore.
 ALWAYS_SKIP_DIRS = frozenset(
@@ -124,6 +125,7 @@ class Config:
         """Every setting that changes what an index stores. Equal settings -> an equal index."""
         return {
             "text_format": TEXT_FORMAT_VERSION,
+            "chunker": CHUNKER_VERSION,
             "vectors": {name: {"model": self.model_id(name)} for name in self.enabled_vec_types()},
             "embedding_dim": self.embedding_dim,
             "dtype": self.dtype,

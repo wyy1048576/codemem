@@ -15,6 +15,7 @@ The walker is generic; each language's syntax is described in `codemem.languages
 from __future__ import annotations
 
 import logging
+import zlib
 from collections.abc import Iterable, Iterator
 
 from tree_sitter import Node
@@ -148,6 +149,18 @@ class _Walker:
             stack.extend(reversed(n.named_children))
         return names, lines
 
+    def call_sites(self, roots: Iterable[Node]) -> list[tuple[str, int]]:
+        """Every call under `roots` as (callee name, 1-based line), in source order."""
+        spec = self.spec
+        sites: list[tuple[str, int]] = []
+        stack = list(reversed(list(roots)))
+        while stack:
+            n = stack.pop()
+            if n.type in spec.call_types and (name := spec.callee(n)):
+                sites.append((name, n.start_point[0] + 1))
+            stack.extend(reversed(n.named_children))
+        return sites
+
     # ---- walking
     def module(self, body: Node, scope: list[tuple[str, str]]) -> None:
         """Top level or a namespace body: definitions become chunks, the code between them blocks."""
@@ -242,6 +255,7 @@ class _Walker:
             end_line=end + 1,
             signature=spec.signature(defn),
             docstring=spec.docstring(defn, comments),
+            lead_comment=spec.lead_comment(defn, comments),
             code=code,
             content_hash=text_hash(code),
             class_name=class_name,
@@ -276,6 +290,24 @@ class _Walker:
         if group:
             self.block(group, scope)
 
+    def piece_bounds(self, start: int, end: int) -> list[tuple[int, int]]:
+        """Rows start..end as pieces of at most max_block_lines rows. A piece also ends after a line
+        whose hash has its 5 low bits clear (once it has a quarter of the maximum), so the cuts
+        follow the content: inserting a line moves only the cuts near it, not every later piece."""
+        size = self.max_block_lines
+        if end - start < size:
+            return [(start, end)]
+        min_rows = max(1, size // 4)
+        pieces: list[tuple[int, int]] = []
+        first = start
+        for row in range(start, end + 1):
+            rows = row - first + 1
+            boundary = rows >= min_rows and zlib.crc32(self.lines[row].encode("utf-8")) & 31 == 0
+            if row == end or rows >= size or boundary:
+                pieces.append((first, row))
+                first = row + 1
+        return pieces
+
     def block(self, nodes: list[Node], scope: list[tuple[str, str]]) -> None:
         spec = self.spec
         real = [n for n in nodes if n.type not in spec.comment_types]
@@ -283,36 +315,50 @@ class _Walker:
             return
         start = nodes[0].start_point[0]
         end = max(end_row(n) for n in nodes)
-        code = "\n".join(self.lines[start : end + 1])
-        if not code.strip():
-            return
         imports = all(n.type in spec.import_types for n in real)
-        label = "imports" if imports else _one_line(self.lines[real[0].start_point[0]], _LABEL_CHARS)
         prefix = ".".join(s[1] for s in scope)
         qualname = f"{prefix}.{BLOCK_QUALNAME}" if prefix else BLOCK_QUALNAME
-        content_hash = text_hash(code)
         names_called, call_lines = self.calls_in(real, skip_definitions=False)
         docstring = self.module_doc if real[0].start_point[0] == self.module_doc_row else ""
-        self.chunks.append(
-            Chunk(
-                key=self.unique_key(make_key(self.path, f"{qualname}@{content_hash[:8]}")),
-                path=self.path,
-                qualname=qualname,
-                name=label,
-                kind="block",
-                start_line=start + 1,
-                end_line=end + 1,
-                signature=label,
-                docstring=docstring,
-                code=code,
-                content_hash=content_hash,
-                calls=names_called,
-                language=spec.name,
-                subkind="imports" if imports else "statements",
-                is_test=self.test_file,
-                call_lines=call_lines,
+        # One statement can be longer than max_block_lines (a 1,668-line dict in vllm/envs.py):
+        # such a run is cut by lines, so every block points at a readable range.
+        pieces = self.piece_bounds(start, end)
+        sites = self.call_sites(real) if len(pieces) > 1 else []
+        for i, (first, last) in enumerate(pieces):
+            code = "\n".join(self.lines[first : last + 1])
+            if not code.strip():
+                continue
+            if len(pieces) == 1:
+                label_row, calls, lines = real[0].start_point[0], names_called, call_lines
+            else:
+                label_row = next(r for r in range(first, last + 1) if self.lines[r].strip())
+                calls, lines = [], []
+                for name, line in sites:
+                    if first < line <= last + 1 and name not in calls:
+                        calls.append(name)
+                        lines.append(line)
+            label = "imports" if imports else _one_line(self.lines[label_row], _LABEL_CHARS)
+            content_hash = text_hash(code)
+            self.chunks.append(
+                Chunk(
+                    key=self.unique_key(make_key(self.path, f"{qualname}@{content_hash[:8]}")),
+                    path=self.path,
+                    qualname=qualname,
+                    name=label,
+                    kind="block",
+                    start_line=first + 1,
+                    end_line=last + 1,
+                    signature=label,
+                    docstring=docstring if i == 0 else "",
+                    code=code,
+                    content_hash=content_hash,
+                    calls=calls,
+                    language=spec.name,
+                    subkind="imports" if imports else "statements",
+                    is_test=self.test_file,
+                    call_lines=lines,
+                )
             )
-        )
 
 
 def chunk_source(

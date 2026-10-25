@@ -117,7 +117,7 @@ def test_long_code_is_split_into_windows():
     assert [p.part for p in parts] == list(range(len(parts))) and {p.n_parts for p in parts} == {len(parts)}
     assert parts[0].start_off == 0 and parts[-1].end_off == len(lines)
     assert all(b.start_off <= a.end_off < b.end_off for a, b in zip(parts, parts[1:]))  # overlapping, in order
-    assert parts[1].text.splitlines()[:2] == ["# m/big.py", f"# part 2/{len(parts)}"]
+    assert parts[1].text.splitlines()[:2] == ["# m/big.py", f"# part 2/{len(parts)} of def big():"]
     assert build_parts(c, ctx, "usage") == []  # no callers: no usage vector
     short = build_parts(_chunk(1, "f"), ctx, "code")
     assert len(short) == 1 and (short[0].start_off, short[0].end_off) == (0, 1)
@@ -200,3 +200,16 @@ def test_resolve_device_cuda_before_mps(monkeypatch):
 
 def test_config_accepts_mps():
     assert config_from_dict({"device": "mps"}).device == "mps"
+
+
+def test_windows_are_even_and_name_their_definition():
+    lines = [f"    v{i} = step({i})" for i in range(130)]
+    code = "def long_one(a, b):\n" + "\n".join(lines)
+    c = Chunk(key="k", path="p.py", qualname="long_one", name="long_one", kind="function", start_line=1,
+              end_line=1 + len(lines), signature="def long_one(a, b):", docstring="", code=code, content_hash="x")
+    parts = build_parts(c, BuildContext(window_chars=1200, window_overlap_lines=3), "code")
+    sizes = [p.end_off - p.start_off + 1 for p in parts]
+    assert len(parts) >= 3 and min(sizes) >= 0.6 * max(sizes), sizes  # no tiny last window
+    assert all(len(p.text) <= 1200 for p in parts)
+    assert parts[0].text.splitlines()[1] == f"# part 1/{len(parts)}"
+    assert all(p.text.splitlines()[1] == f"# part {p.part + 1}/{len(parts)} of def long_one(a, b):" for p in parts[1:])

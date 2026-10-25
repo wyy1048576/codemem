@@ -1,9 +1,10 @@
+import json
 import numpy as np
 import pytest
 
 from codemem.embedder import l2_normalize
 from codemem.schema import Chunk, text_hash
-from codemem.store import ChunkFilter, FaissVectorStore, IndexLock, Store, VectorRow
+from codemem.store import SCHEMA_VERSION, ChunkFilter, FaissVectorStore, IndexLock, Store, VectorRow
 from codemem.tokenize import fts_match_query
 
 
@@ -184,7 +185,7 @@ def test_find_vectors_reuses_equal_texts(store):
     assert store.find_vectors("another-embedder|doc", ["same"]) == {}
 
 
-def test_a_v1_index_is_rebuilt_for_schema_v2(tmp_path):
+def test_an_older_index_is_rebuilt_for_the_current_schema(tmp_path):
     import sqlite3
 
     idx = tmp_path / "idx"
@@ -201,9 +202,26 @@ def test_a_v1_index_is_rebuilt_for_schema_v2(tmp_path):
     (idx / "vec_code.faiss").write_bytes(b"old")
     (idx / "cmeval-built").write_text("")  # files of other tools stay
     s = Store(idx)
-    assert s.get_meta("schema_version") == 2 and s.counts()["chunks"] == 0
+    assert s.get_meta("schema_version") == SCHEMA_VERSION and s.counts()["chunks"] == 0
     assert not (idx / "vec_code.faiss").exists() and (idx / "cmeval-built").exists()
     s.close()
+
+
+def test_a_newer_index_is_refused_not_wiped(tmp_path):
+    """A newer codemem may still be using the index: wiping it would destroy its work."""
+    idx = tmp_path / "idx"
+    s = Store(idx)
+    with s.transaction():
+        s.upsert_chunk(_chunk("keep_me"))
+        s.set_meta("schema_version", SCHEMA_VERSION + 1)
+    s.close()
+    with pytest.raises(RuntimeError, match="newer codemem"):
+        Store(idx)
+    import sqlite3
+
+    conn = sqlite3.connect(idx / "index.db")
+    assert conn.execute("SELECT count(*) FROM chunks").fetchone()[0] == 1
+    conn.close()
 
 
 def test_chunk_filter(store):
@@ -261,3 +279,79 @@ def test_index_lock_is_exclusive(tmp_path):
             other.acquire(timeout=0.2)
     with IndexLock(tmp_path):  # released -> acquirable again
         pass
+
+
+def _seed(store, names, seed=0):
+    with store.transaction():
+        ids = [store.upsert_chunk(_chunk(n)) for n in names]
+        store.ensure_vec_type("code", "fake|doc")
+    store.put_vectors("code", "fake|doc", _rows(ids, [f"h{n}" for n in names]), _vecs(len(ids), seed=seed))
+    return ids
+
+
+def test_another_process_writes_and_this_one_catches_up(tmp_path):
+    """A second Store on the same folder stands in for another process: after its write, the first
+    one applies only the difference to its loaded index instead of rebuilding it."""
+    a, b = Store(tmp_path / "idx"), Store(tmp_path / "idx")
+    _seed(a, ["one", "two"])
+    loaded = b._type_index("code")
+    assert len(loaded.store) == 2
+    ids = _seed(a, ["three"], seed=1)
+    ti = b._type_index("code")
+    assert ti is loaded and len(ti.store) == 3 and _in_sync(b, "code")  # caught up, not rebuilt
+    hit = b.vector_search("code", _vecs(1, seed=1)[0], 1)[0]
+    assert hit.chunk_id == ids[0]
+    a.close(), b.close()
+
+
+def test_a_saved_index_with_other_ids_is_not_trusted(tmp_path):
+    """A note with the current epoch on a file holding older vectors (two processes saving at once)
+    must not be loaded: the ids are compared, not only the count."""
+    s = Store(tmp_path / "idx")
+    _seed(s, ["one", "two"])
+    s.save_vectors()
+    old_faiss = (tmp_path / "idx" / "vec_code.faiss").read_bytes()
+    with s.transaction():
+        row = s.vector_rows("code")
+    vid = next(iter(row.values()))[0]
+    s.delete_vectors("code", [vid])
+    _seed(s, ["three"], seed=2)  # same count as before, different ids
+    s.save_vectors()
+    note = json.loads((tmp_path / "idx" / "vec_code.json").read_text())
+    s.close()
+    (tmp_path / "idx" / "vec_code.faiss").write_bytes(old_faiss)  # older data, newer note
+    s2 = Store(tmp_path / "idx")
+    assert s2._load_saved("code", note["epoch"], note["dim"]) is None
+    assert _in_sync(s2, "code")  # rebuilt from the rows instead
+    s2.close()
+
+
+def test_searches_during_writes_never_see_a_half_patched_index(tmp_path):
+    import threading
+
+    s = Store(tmp_path / "idx")
+    _seed(s, [f"f{i}" for i in range(20)])
+    errors: list[BaseException] = []
+    stop = threading.Event()
+
+    def search():
+        try:
+            while not stop.is_set():
+                s.vector_search("code", _vecs(1, seed=5)[0], 5)
+        except BaseException as e:  # noqa: BLE001 - any error fails the test
+            errors.append(e)
+        finally:
+            s.close_thread_conn()
+
+    t = threading.Thread(target=search)
+    t.start()
+    try:
+        for i in range(40):
+            vids = [vid for vid, _ in s.vector_rows("code").values()][:2]
+            s.delete_vectors("code", vids)
+            _seed(s, [f"g{i}a", f"g{i}b"], seed=i)
+    finally:
+        stop.set()
+        t.join()
+    assert errors == [] and _in_sync(s, "code")
+    s.close()

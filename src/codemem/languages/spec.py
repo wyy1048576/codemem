@@ -162,6 +162,10 @@ class LanguageSpec:
         """Leading doc comments by default (Python reads its docstring instead)."""
         return "\n".join(clean_comment(text_of(c)) for c in comments).strip()
 
+    def lead_comment(self, defn: Definition, comments: list[Node]) -> str:
+        """Comment lines above the definition that `docstring` does not already hold (Python only)."""
+        return ""
+
     # ---- tests
     def is_test_path(self, path: str) -> bool:
         p = PurePosixPath(path)

@@ -38,13 +38,13 @@ from .vectorcache import from_blob, to_blob
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS files (
     path TEXT PRIMARY KEY, language TEXT NOT NULL, content_hash TEXT NOT NULL, mtime REAL NOT NULL,
-    size INTEGER NOT NULL, status TEXT NOT NULL
+    size INTEGER NOT NULL, status TEXT NOT NULL, reason TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS chunks (
     chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,13 +64,16 @@ CREATE TABLE IF NOT EXISTS chunks (
     code TEXT NOT NULL,
     skeleton TEXT NOT NULL,
     content_hash TEXT NOT NULL,
-    is_test INTEGER NOT NULL
+    is_test INTEGER NOT NULL,
+    lead_comment TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS chunks_path ON chunks(path);
 CREATE INDEX IF NOT EXISTS chunks_name ON chunks(name);
 CREATE INDEX IF NOT EXISTS chunks_parent ON chunks(parent_key);
 CREATE TABLE IF NOT EXISTS calls (caller_id INTEGER NOT NULL, callee_name TEXT NOT NULL, line INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS calls_caller ON calls(caller_id);
+CREATE INDEX IF NOT EXISTS calls_callee ON calls(callee_name);
+CREATE TABLE IF NOT EXISTS dirty_texts (chunk_id INTEGER PRIMARY KEY, seq INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS edges (
     caller_id INTEGER NOT NULL, callee_id INTEGER NOT NULL, PRIMARY KEY (caller_id, callee_id)
 );
@@ -78,6 +81,7 @@ CREATE INDEX IF NOT EXISTS edges_callee ON edges(callee_id);
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
     name_tokens, path_tokens, signature_tokens, doc_tokens, body_tokens, tokenize = "unicode61 tokenchars '_'"
 );
+CREATE VIRTUAL TABLE IF NOT EXISTS fts_vocab USING fts5vocab(fts, 'row');
 CREATE TABLE IF NOT EXISTS vectors (
     vector_id INTEGER PRIMARY KEY AUTOINCREMENT,
     chunk_id INTEGER NOT NULL,
@@ -95,16 +99,18 @@ CREATE TABLE IF NOT EXISTS vectors (
 CREATE INDEX IF NOT EXISTS vectors_type ON vectors(vec_type, chunk_id);
 CREATE INDEX IF NOT EXISTS vectors_hash ON vectors(embedder, text_hash);
 """
-_V1_TABLES = ("meta", "files", "chunks", "calls", "edges", "fts", "embeddings", "vectors")
+# Every table any schema version has created, dropped when an older index is rebuilt.
+_OLD_TABLES = ("meta", "files", "chunks", "calls", "edges", "fts_vocab", "fts", "embeddings", "vectors", "dirty_texts")
 
 _CHUNK_COLS = (
     "chunk_id, key, path, language, kind, subkind, name, qualname, class_name, parent_key, start_line, "
-    "end_line, signature, docstring, code, skeleton, content_hash, is_test"
+    "end_line, signature, docstring, code, skeleton, content_hash, is_test, lead_comment"
 )
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
-    tmp = path.with_name(path.name + ".tmp")
+    # A name of its own per process and thread: two writers never share a half-written temp file.
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp.write_bytes(data)
     os.replace(tmp, path)  # atomic on Windows and POSIX
 
@@ -334,7 +340,8 @@ class FileRow(NamedTuple):
     mtime: float
     size: int
     language: str
-    status: str
+    status: str  # ok | skipped
+    reason: str = ""  # for skipped files: too_large | generated | minified | binary
 
 
 @dataclass(frozen=True)
@@ -374,7 +381,7 @@ def _row_to_chunk(row: sqlite3.Row) -> Chunk:
         start_line=row["start_line"], end_line=row["end_line"], signature=row["signature"],
         docstring=row["docstring"], code=row["code"], content_hash=row["content_hash"],
         language=row["language"], subkind=row["subkind"], parent_key=row["parent_key"],
-        is_test=bool(row["is_test"]), skeleton=row["skeleton"],
+        is_test=bool(row["is_test"]), skeleton=row["skeleton"], lead_comment=row["lead_comment"],
     )
 
 
@@ -390,6 +397,12 @@ def _family(language: str) -> str:
     return spec.family if spec else language
 
 
+def _batches(items: Sequence[Any], size: int = 500) -> Iterator[Sequence[Any]]:
+    """SQLite caps the number of `?` in one statement; query long id lists in slices."""
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
+
+
 class Store:
     def __init__(self, index_dir: Path | str, *, bm25_stem: bool = False, bm25_stopwords: bool = False):
         self.index_dir = Path(index_dir)
@@ -398,25 +411,41 @@ class Store:
         self.tok_opts = {"stem": bm25_stem, "stopwords": bm25_stopwords}
         self._local = threading.local()
         self._vec_lock = threading.RLock()
+        self._save_lock = threading.Lock()
         self._types: dict[str, _TypeIndex] = {}
         self._all_conns: list[sqlite3.Connection] = []
         self._open_schema()
 
+    def _schema_version(self) -> int | None:
+        conn = self.conn
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meta'").fetchone():
+            return None
+        row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+        return json.loads(row[0]) if row else 0
+
     def _open_schema(self) -> None:
         conn = self.conn
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-        if "meta" in tables:
-            row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
-            version = json.loads(row[0]) if row else None
-            if version != SCHEMA_VERSION:
-                log.warning(
-                    "index at %s has schema version %s; rebuilding it for version %s", self.index_dir, version, SCHEMA_VERSION
-                )
-                for table in _V1_TABLES:
-                    conn.execute(f"DROP TABLE IF EXISTS {table}")
-                for p in self.index_dir.glob("vec_*"):
-                    p.unlink(missing_ok=True)
-                tables = set()
+        version = self._schema_version()
+        if version is not None and version > SCHEMA_VERSION:
+            # Never wipe an index a newer codemem is still using.
+            raise RuntimeError(
+                f"the index at {self.index_dir} was built by a newer codemem (schema {version}, this one reads "
+                f"{SCHEMA_VERSION}); upgrade codemem or use another --index-dir"
+            )
+        if version is not None and version < SCHEMA_VERSION:
+            # Rebuild an older index, but only while no other process writes to it.
+            with IndexLock(self.index_dir):
+                if (self._schema_version() or 0) < SCHEMA_VERSION:
+                    log.warning(
+                        "index at %s has schema version %s; rebuilding it for version %s",
+                        self.index_dir, version, SCHEMA_VERSION,
+                    )
+                    for table in _OLD_TABLES:
+                        conn.execute(f"DROP TABLE IF EXISTS {table}")
+                    for p in self.index_dir.glob("vec_*"):
+                        p.unlink(missing_ok=True)
+            tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         if not tables:
             conn.execute("PRAGMA auto_vacuum = INCREMENTAL")  # must precede the first table
             conn.execute("VACUUM")
@@ -453,10 +482,29 @@ class Store:
             conn.execute("ROLLBACK")
             self._local.after_commit = []
             raise
-        conn.execute("COMMIT")
         hooks, self._local.after_commit = self._local.after_commit, []
-        for hook in hooks:
-            hook()
+        if not hooks:
+            conn.execute("COMMIT")
+            return
+        # Hold the vector lock from the commit until the in-memory indexes are patched: a search
+        # in between would see the new epoch with the old index and rebuild it from scratch.
+        with self._vec_lock:
+            conn.execute("COMMIT")
+            for hook in hooks:
+                hook()
+
+    @contextmanager
+    def _read_snapshot(self) -> Iterator[None]:
+        """Several reads that see one committed state (a read transaction), unless inside a write."""
+        conn = self.conn
+        if conn.in_transaction:
+            yield
+            return
+        conn.execute("BEGIN")
+        try:
+            yield
+        finally:
+            conn.execute("COMMIT")
 
     def _after_commit(self, hook: Callable[[], None]) -> None:
         hooks = getattr(self._local, "after_commit", None)
@@ -496,17 +544,21 @@ class Store:
 
     # ---- files
     def get_files(self) -> dict[str, FileRow]:
-        rows = self.conn.execute("SELECT path, content_hash, mtime, size, language, status FROM files")
-        return {r["path"]: FileRow(r["content_hash"], r["mtime"], r["size"], r["language"], r["status"]) for r in rows}
+        rows = self.conn.execute("SELECT path, content_hash, mtime, size, language, status, reason FROM files")
+        return {
+            r["path"]: FileRow(r["content_hash"], r["mtime"], r["size"], r["language"], r["status"], r["reason"])
+            for r in rows
+        }
 
     def upsert_file(
-        self, path: str, content_hash: str, mtime: float, size: int, language: str = "python", status: str = "ok"
+        self, path: str, content_hash: str, mtime: float, size: int, language: str = "python", status: str = "ok",
+        reason: str = "",
     ) -> None:
         self.conn.execute(
-            "INSERT INTO files(path, language, content_hash, mtime, size, status) VALUES(?, ?, ?, ?, ?, ?) "
+            "INSERT INTO files(path, language, content_hash, mtime, size, status, reason) VALUES(?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(path) DO UPDATE SET language=excluded.language, content_hash=excluded.content_hash, "
-            "mtime=excluded.mtime, size=excluded.size, status=excluded.status",
-            (path, language, content_hash, mtime, size, status),
+            "mtime=excluded.mtime, size=excluded.size, status=excluded.status, reason=excluded.reason",
+            (path, language, content_hash, mtime, size, status, reason),
         )
 
     def delete_file(self, path: str) -> list[int]:
@@ -522,7 +574,7 @@ class Store:
         values = (
             chunk.path, chunk.language, chunk.kind, chunk.subkind, chunk.name, chunk.qualname, chunk.class_name,
             chunk.parent_key, chunk.start_line, chunk.end_line, chunk.signature, chunk.docstring, chunk.code,
-            chunk.skeleton, chunk.content_hash, int(chunk.is_test),
+            chunk.skeleton, chunk.content_hash, int(chunk.is_test), chunk.lead_comment,
         )
         row = conn.execute("SELECT chunk_id FROM chunks WHERE key = ?", (chunk.key,)).fetchone()
         if row:
@@ -530,7 +582,7 @@ class Store:
             conn.execute(
                 "UPDATE chunks SET path=?, language=?, kind=?, subkind=?, name=?, qualname=?, class_name=?, "
                 "parent_key=?, start_line=?, end_line=?, signature=?, docstring=?, code=?, skeleton=?, "
-                "content_hash=?, is_test=? WHERE chunk_id=?",
+                "content_hash=?, is_test=?, lead_comment=? WHERE chunk_id=?",
                 (*values, chunk_id),
             )
             conn.execute("DELETE FROM fts WHERE rowid = ?", (chunk_id,))
@@ -538,8 +590,8 @@ class Store:
         else:
             cur = conn.execute(
                 "INSERT INTO chunks(key, path, language, kind, subkind, name, qualname, class_name, parent_key, "
-                "start_line, end_line, signature, docstring, code, skeleton, content_hash, is_test) "
-                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "start_line, end_line, signature, docstring, code, skeleton, content_hash, is_test, lead_comment) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (chunk.key, *values),
             )
             chunk_id = int(cur.lastrowid)
@@ -552,7 +604,7 @@ class Store:
                 to_fts_text(f"{chunk.qualname} {chunk.name}", **self.tok_opts),
                 to_fts_text(chunk.path, **self.tok_opts),
                 to_fts_text(chunk.signature, **self.tok_opts),
-                to_fts_text(chunk.docstring, **self.tok_opts),
+                to_fts_text(f"{chunk.docstring}\n{chunk.lead_comment}", **self.tok_opts),
                 to_fts_text(body, **self.tok_opts),
             ),
         )
@@ -580,6 +632,7 @@ class Store:
         conn.executemany("DELETE FROM fts WHERE rowid = ?", params)
         conn.executemany("DELETE FROM calls WHERE caller_id = ?", params)
         conn.executemany("DELETE FROM edges WHERE caller_id = ? OR callee_id = ?", [(i, i) for i in ids])
+        conn.executemany("DELETE FROM dirty_texts WHERE chunk_id = ?", params)
         for vec_type, vector_ids in by_type.items():
             self.delete_vectors(vec_type, vector_ids)
 
@@ -621,6 +674,24 @@ class Store:
         for r in self.conn.execute(f"SELECT {_CHUNK_COLS} FROM chunks ORDER BY chunk_id"):
             yield _row_to_chunk(r)
 
+    def chunks_for_paths(self, paths: Iterable[str]) -> list[Chunk]:
+        out: list[Chunk] = []
+        for batch in _batches(list(dict.fromkeys(paths))):
+            marks = ",".join("?" * len(batch))
+            out.extend(_row_to_chunk(r) for r in self.conn.execute(
+                f"SELECT {_CHUNK_COLS} FROM chunks WHERE path IN ({marks}) ORDER BY path, start_line", batch
+            ))
+        return out
+
+    def chunk_ids(self) -> set[int]:
+        return {r[0] for r in self.conn.execute("SELECT chunk_id FROM chunks")}
+
+    def file_paths_under(self, rel_dir: str) -> list[str]:
+        """Indexed (or skipped) files inside a repo-relative folder."""
+        return [r[0] for r in self.conn.execute(
+            "SELECT path FROM files WHERE path LIKE ? ESCAPE '!'", (_like_prefix(rel_dir.rstrip("/") + "/"),)
+        )]
+
     def ids_with_prefix(self, prefix: str) -> list[int]:
         return self.filter_ids(ChunkFilter(path_prefix=prefix))
 
@@ -645,15 +716,114 @@ class Store:
         self.conn.execute("DELETE FROM edges")
         self.conn.executemany("INSERT INTO edges(caller_id, callee_id) VALUES(?, ?)", sorted(edges))
 
-    def caller_refs(self) -> dict[int, list[Ref]]:
+    def caller_refs(self, ids: Iterable[int] | None = None) -> dict[int, list[Ref]]:
+        """callee id -> its callers, for every chunk or only for `ids`."""
         out: dict[int, list[Ref]] = {}
-        rows = self.conn.execute(
+        sql = (
             "SELECT e.callee_id, c.chunk_id, c.qualname, c.name, c.path, c.start_line, c.is_test, c.kind "
             "FROM edges e JOIN chunks c ON c.chunk_id = e.caller_id"
         )
-        for r in rows:
-            out.setdefault(r[0], []).append(Ref(r[1], r[2], r[3], r[4], r[5], bool(r[6]), r[7]))
+        if ids is None:
+            queries = [(sql, ())]
+        else:
+            queries = [(f"{sql} WHERE e.callee_id IN ({','.join('?' * len(b))})", tuple(b)) for b in _batches(list(ids))]
+        for query, params in queries:
+            for r in self.conn.execute(query, params):
+                out.setdefault(r[0], []).append(Ref(r[1], r[2], r[3], r[4], r[5], bool(r[6]), r[7]))
         return out
+
+    # ---- call graph, for one part of the repo (incremental updates)
+    def definitions_named(self, names: Iterable[str]) -> list[tuple[int, str, str]]:
+        """(chunk_id, name, language family) of every definition with one of these names."""
+        out: list[tuple[int, str, str]] = []
+        kinds = ",".join("?" * len(CALLABLE_KINDS))
+        for batch in _batches(sorted(set(names))):
+            rows = self.conn.execute(
+                f"SELECT chunk_id, name, language FROM chunks WHERE kind IN ({kinds}) AND name IN ({','.join('?' * len(batch))})",
+                (*CALLABLE_KINDS, *batch),
+            )
+            out.extend((r[0], r[1], _family(r[2])) for r in rows)
+        return out
+
+    def _calls_where(self, column: str, values: Iterable[Any]) -> list[tuple[int, str, str]]:
+        out: list[tuple[int, str, str]] = []
+        for batch in _batches(sorted(set(values))):
+            rows = self.conn.execute(
+                "SELECT k.caller_id, k.callee_name, c.language FROM calls k JOIN chunks c ON c.chunk_id = k.caller_id "
+                f"WHERE k.{column} IN ({','.join('?' * len(batch))})",
+                tuple(batch),
+            )
+            out.extend((r[0], r[1], _family(r[2])) for r in rows)
+        return out
+
+    def calls_of(self, caller_ids: Iterable[int]) -> list[tuple[int, str, str]]:
+        """(caller_id, callee_name, family) of every call these chunks make."""
+        return self._calls_where("caller_id", caller_ids)
+
+    def calls_to_names(self, names: Iterable[str]) -> list[tuple[int, str, str]]:
+        """(caller_id, callee_name, family) of every call, anywhere, to one of these names."""
+        return self._calls_where("callee_name", names)
+
+    def edges_from(self, caller_ids: Iterable[int]) -> set[tuple[int, int]]:
+        out: set[tuple[int, int]] = set()
+        for batch in _batches(sorted(set(caller_ids))):
+            out.update(
+                (r[0], r[1]) for r in self.conn.execute(
+                    f"SELECT caller_id, callee_id FROM edges WHERE caller_id IN ({','.join('?' * len(batch))})", tuple(batch)
+                )
+            )
+        return out
+
+    def replace_edges_from(self, caller_ids: Iterable[int], edges: Iterable[tuple[int, int]]) -> None:
+        """Replace the outgoing edges of these callers (and only theirs) with `edges`."""
+        for batch in _batches(sorted(set(caller_ids))):
+            self.conn.execute(f"DELETE FROM edges WHERE caller_id IN ({','.join('?' * len(batch))})", tuple(batch))
+        self.conn.executemany("INSERT OR IGNORE INTO edges(caller_id, callee_id) VALUES(?, ?)", sorted(edges))
+
+    def edge_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
+
+    # ---- the queue of chunks whose texts must be rebuilt (stage B of an update)
+    def next_dirty_seq(self) -> int:
+        seq = int(self.get_meta("dirty_seq", 0)) + 1
+        self.set_meta("dirty_seq", seq)
+        return seq
+
+    def mark_dirty(self, chunk_ids: Iterable[int], seq: int) -> None:
+        self.conn.executemany(
+            "INSERT OR REPLACE INTO dirty_texts(chunk_id, seq) VALUES(?, ?)", [(i, seq) for i in sorted(set(chunk_ids))]
+        )
+
+    def mark_all_dirty(self, seq: int) -> None:
+        self.conn.execute("INSERT OR REPLACE INTO dirty_texts(chunk_id, seq) SELECT chunk_id, ? FROM chunks", (seq,))
+
+    def dirty_batch(self, limit: int, skip: Iterable[int] = (), only: Iterable[int] | None = None) -> dict[int, int]:
+        """Up to `limit` queued chunk ids (oldest first) -> the sequence number they were queued with."""
+        skip = set(skip)
+        if only is not None:
+            rows = self.dirty_seqs(only)
+            return dict(list((i, s) for i, s in sorted(rows.items()) if i not in skip)[:limit])
+        rows = self.conn.execute(
+            "SELECT chunk_id, seq FROM dirty_texts ORDER BY seq, chunk_id LIMIT ?", (limit + len(skip),)
+        )
+        return dict(list((r[0], r[1]) for r in rows if r[0] not in skip)[:limit])
+
+    def dirty_seqs(self, chunk_ids: Iterable[int]) -> dict[int, int]:
+        out: dict[int, int] = {}
+        for batch in _batches(sorted(set(chunk_ids))):
+            out.update(
+                (r[0], r[1]) for r in self.conn.execute(
+                    f"SELECT chunk_id, seq FROM dirty_texts WHERE chunk_id IN ({','.join('?' * len(batch))})", tuple(batch)
+                )
+            )
+        return out
+
+    def clear_dirty(self, seqs: dict[int, int]) -> None:
+        """Drop queue rows, but only those not queued again since (same sequence number)."""
+        self.conn.executemany("DELETE FROM dirty_texts WHERE chunk_id = ? AND seq = ?", sorted(seqs.items()))
+
+    def dirty_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM dirty_texts").fetchone()[0]
 
     def callers_of(self, chunk_id: int) -> list[Chunk]:
         ids = [r[0] for r in self.conn.execute("SELECT caller_id FROM edges WHERE callee_id = ?", (chunk_id,))]
@@ -756,6 +926,18 @@ class Store:
         )
         return {(r[0], r[1]): (r[2], r[3]) for r in rows}
 
+    def vector_parts(self, vec_type: str, chunk_ids: Iterable[int]) -> dict[tuple[int, int], tuple[int, str, int, int, int]]:
+        """(chunk_id, part) -> (vector_id, text_hash, n_parts, start_off, end_off) for these chunks."""
+        out: dict[tuple[int, int], tuple[int, str, int, int, int]] = {}
+        for batch in _batches(sorted(set(chunk_ids))):
+            rows = self.conn.execute(
+                "SELECT chunk_id, part, vector_id, text_hash, n_parts, start_off, end_off FROM vectors "
+                f"WHERE vec_type = ? AND chunk_id IN ({','.join('?' * len(batch))})",
+                (vec_type, *batch),
+            )
+            out.update(((r[0], r[1]), (r[2], r[3], r[4], r[5], r[6])) for r in rows)
+        return out
+
     def find_vectors(self, embedder: str, text_hashes: Iterable[str]) -> dict[str, np.ndarray]:
         """Stored vectors for these texts, from any chunk or type (equal text, equal vector)."""
         hashes = list(dict.fromkeys(text_hashes))
@@ -816,11 +998,13 @@ class Store:
                     ti = self._types.get(vec_type)
                     if ti is not None and ti.epoch == epoch:
                         return  # a reader already reloaded it after the commit
-                    if ti is None or ti.epoch != epoch - 1:
-                        # Not loaded yet, or it missed a change: load it from the committed rows
-                        # (which include these), so save_vectors() can persist it.
-                        self._types.pop(vec_type, None)
+                    if ti is None:
+                        # Not loaded yet: load it from the committed rows (which include these),
+                        # so save_vectors() can persist it.
                         self._type_index(vec_type)
+                        return
+                    if ti.epoch != epoch - 1:
+                        self._catch_up(ti, vec_type, epoch)  # it missed another process's change
                         return
                     ti.remove(old)
                     ti.add(new_ids, info, vecs)
@@ -843,7 +1027,7 @@ class Store:
                     if ti is None or ti.epoch == epoch:
                         return  # loaded lazily on first use, or a reader already reloaded it
                     if ti.epoch != epoch - 1:
-                        self._types.pop(vec_type, None)
+                        self._catch_up(ti, vec_type, epoch)  # it missed another process's change
                         return
                     ti.remove(vector_ids)
                     ti.epoch = epoch
@@ -854,7 +1038,7 @@ class Store:
     # ---- vectors: the search index
     def _type_index(self, vec_type: str) -> _TypeIndex | None:
         """The in-memory index of a vector type, loaded or rebuilt if missing or out of date."""
-        with self._vec_lock:
+        with self._vec_lock, self._read_snapshot():
             epoch = self._epoch(vec_type)
             ti = self._types.get(vec_type)
             if ti is not None and ti.epoch == epoch:
@@ -863,9 +1047,31 @@ class Store:
             if dim is None:
                 self._types.pop(vec_type, None)
                 return None
-            ti = self._load_saved(vec_type, epoch, dim) or self._rebuild(vec_type, epoch, dim)
+            if ti is not None and ti.dim == dim:
+                self._catch_up(ti, vec_type, epoch)  # another process wrote: apply only the difference
+            else:
+                ti = self._load_saved(vec_type, epoch, dim) or self._rebuild(vec_type, epoch, dim)
             self._types[vec_type] = ti
             return ti
+
+    def _catch_up(self, ti: _TypeIndex, vec_type: str, epoch: int) -> None:
+        """Bring an in-memory index to the committed rows by their ids. Vector rows never change in
+        place (a new vector is a new row), so the set of ids says everything."""
+        now = {r[0] for r in self.conn.execute("SELECT vector_id FROM vectors WHERE vec_type = ?", (vec_type,))}
+        have = set(ti.owner)
+        ti.remove(have - now)
+        new = sorted(now - have)
+        for batch in _batches(new, 4096):
+            rows = self.conn.execute(
+                "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors "
+                f"WHERE vector_id IN ({','.join('?' * len(batch))})",
+                tuple(batch),
+            ).fetchall()
+            if rows:
+                ti.add([r[0] for r in rows], [(r[1], r[2], r[3], r[4], r[5]) for r in rows],
+                       np.stack([from_blob(r[7], r[6]) for r in rows]))
+        ti.epoch = epoch
+        ti.dirty = True
 
     def _owner_rows(self, vec_type: str) -> list[tuple[int, tuple[int, int, int, int, int]]]:
         rows = self.conn.execute(
@@ -890,7 +1096,9 @@ class Store:
         for vid, row in self._owner_rows(vec_type):
             ti.owner[vid] = row
             ti.by_chunk[row[0]].append(vid)
-        if len(ti.owner) != len(store):
+        # The same ids, not just as many: a file saved by another process at an older epoch, with
+        # a newer note, must not be trusted (rows never change in place, so equal ids = equal vectors).
+        if set(ti.owner) != store.ids():
             return None
         return ti
 
@@ -982,16 +1190,27 @@ class Store:
         return ordered[:n]
 
     def save_vectors(self) -> None:
-        """Persist the in-memory indexes that changed, with the epoch they reflect."""
-        with self._vec_lock:
-            for vec_type, ti in sorted(self._types.items()):
-                if not ti.dirty:
-                    continue
-                ti.store.save(self._faiss_path(vec_type))
-                note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
-                        "embedder": self.get_meta(f"vec.{vec_type}.embedder")}
+        """Persist the in-memory indexes that changed, with the epoch they reflect. The indexes are
+        copied while holding the vector lock (fast) and written after it is released, so searches
+        don't wait for the disk. Saves run one at a time; data first, note second."""
+        with self._save_lock:
+            copies = []
+            with self._vec_lock:
+                for vec_type, ti in sorted(self._types.items()):
+                    if not ti.dirty:
+                        continue
+                    note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
+                            "embedder": self.get_meta(f"vec.{vec_type}.embedder")}
+                    copies.append((vec_type, faiss.serialize_index(ti.store.index).tobytes(), note))
+                    ti.dirty = False
+            for vec_type, data, note in copies:
+                _atomic_write(self._faiss_path(vec_type), data)
                 _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
-                ti.dirty = False
+
+    def vectors_unsaved(self) -> bool:
+        """Whether an in-memory index has changes its file doesn't have yet."""
+        with self._vec_lock:
+            return any(ti.dirty for ti in self._types.values())
 
     def load_vectors(self) -> None:
         """Load (or rebuild) every vector type's search index now instead of on first search."""
@@ -1021,3 +1240,49 @@ class Store:
             "edges": c.execute("SELECT COUNT(*) FROM edges").fetchone()[0],
             "vectors": vectors,
         }
+
+    # ---- comparing two indexes
+    def snapshot(self) -> dict[str, Any]:
+        """Everything stored, keyed by chunk key and path, never by id: an updated index and a
+        rebuild of the same files must give equal snapshots (ids and file dates may differ)."""
+        c = self.conn
+        key_of = {r[0]: r[1] for r in c.execute("SELECT chunk_id, key FROM chunks")}
+        chunks = {}
+        for r in c.execute(f"SELECT {_CHUNK_COLS} FROM chunks"):
+            chunks[r["key"]] = tuple(r[col] for col in r.keys() if col not in ("chunk_id", "key", "code"))
+        calls: dict[str, list[tuple[str, int]]] = defaultdict(list)
+        for r in c.execute("SELECT caller_id, callee_name, line FROM calls"):
+            calls[key_of[r[0]]].append((r[1], r[2]))
+        fts = {}
+        for r in c.execute("SELECT rowid, name_tokens, path_tokens, signature_tokens, doc_tokens, body_tokens FROM fts"):
+            fts[key_of.get(r[0], f"<missing chunk {r[0]}>")] = tuple(r[1:])
+        vectors = {}
+        for r in c.execute("SELECT chunk_id, vec_type, part, n_parts, start_off, end_off, text_hash, embedder FROM vectors"):
+            vectors[(key_of.get(r[0], f"<missing chunk {r[0]}>"), r[1], r[2])] = tuple(r[3:])
+        return {
+            "files": {
+                r[0]: tuple(r[1:]) for r in c.execute("SELECT path, content_hash, size, language, status, reason FROM files")
+            },
+            "chunks": chunks,
+            "calls": {k: sorted(v) for k, v in calls.items()},
+            "edges": sorted((key_of[r[0]], key_of[r[1]]) for r in c.execute("SELECT caller_id, callee_id FROM edges")),
+            "fts": fts,
+            "vectors": vectors,
+            "pending": sorted(key_of.get(r[0], str(r[0])) for r in c.execute("SELECT chunk_id FROM dirty_texts")),
+        }
+
+
+def diff_snapshots(a: dict[str, Any], b: dict[str, Any], limit: int = 20) -> list[str]:
+    """Readable differences between two `Store.snapshot()`s (empty when they are equal)."""
+    out: list[str] = []
+    for part in a:
+        x, y = a[part], b[part]
+        if x == y:
+            continue
+        if isinstance(x, dict):
+            for key in sorted(set(x) | set(y), key=str):
+                if x.get(key) != y.get(key):
+                    out.append(f"{part}[{key}]: {x.get(key)!r} != {y.get(key)!r}")
+        else:
+            out.append(f"{part}: only in first {sorted(set(x) - set(y))[:5]}, only in second {sorted(set(y) - set(x))[:5]}")
+    return out[:limit] + ([f"... {len(out) - limit} more"] if len(out) > limit else [])

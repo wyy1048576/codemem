@@ -7,7 +7,7 @@ import inspect
 
 from tree_sitter import Node
 
-from .spec import Definition, LanguageSpec, text_of
+from .spec import Definition, LanguageSpec, clean_comment, end_row, text_of
 
 
 def _docstring(body: Node | None) -> str:
@@ -68,6 +68,14 @@ class Python(LanguageSpec):
 
     def docstring(self, defn: Definition, comments: list[Node]) -> str:
         return _docstring(defn.body)
+
+    def lead_comment(self, defn: Definition, comments: list[Node]) -> str:
+        # A comment that trails code on its line (`x = 1  # note`) belongs to that code.
+        own = [
+            c for c in comments
+            if c.prev_named_sibling is None or end_row(c.prev_named_sibling) < c.start_point[0]
+        ]
+        return "\n".join(clean_comment(text_of(c)) for c in own).strip()
 
     def is_test_definition(self, defn: Definition, attached: list[Node]) -> bool:
         return defn.name.startswith("test_") or defn.name == "test"

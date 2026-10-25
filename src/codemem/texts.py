@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from .callgraph import is_test_caller
 from .schema import BLOCK_QUALNAME, Chunk
 
+_SIGNATURE_CHARS = 120  # a later window's header names its definition, cut to this length
+
 
 @dataclass(frozen=True)
 class Ref:
@@ -104,11 +106,13 @@ def _header_lines(chunk: Chunk, part_label: str = "") -> list[str]:
 
 
 def _doc_lines(chunk: Chunk) -> list[str]:
-    """Doc comments of non-Python code sit above the code span, so the code text lacks them."""
-    if chunk.language == "python" or not chunk.docstring:
+    """Comments above a definition sit outside its code span, so the code text lacks them: the doc
+    comment in most languages, the leading `#` comment in Python (whose docstring is in the code)."""
+    doc = chunk.lead_comment if chunk.language == "python" else chunk.docstring
+    if not doc:
         return []
     prefix = _comment_prefix(chunk)
-    return [f"{prefix} {line}".rstrip() for line in chunk.docstring.splitlines()]
+    return [f"{prefix} {line}".rstrip() for line in doc.splitlines()]
 
 
 def _code_body(chunk: Chunk) -> str:
@@ -144,17 +148,41 @@ def _windows(lines: list[str], budget: int, overlap: int) -> list[tuple[int, int
     return windows
 
 
+def _even_windows(lines: list[str], budget: int, overlap: int) -> list[tuple[int, int]]:
+    """As many windows as `_windows` needs, but as even as possible: the smallest budget that still
+    needs no more windows, so a long function never ends in a window of a few lines."""
+    windows = _windows(lines, budget, overlap)
+    if len(windows) <= 1:
+        return windows
+    lo, hi = 1, budget
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if len(_windows(lines, mid, overlap)) <= len(windows):
+            hi = mid
+        else:
+            lo = mid + 1
+    return _windows(lines, lo, overlap)
+
+
+def _part_label(chunk: Chunk, i: int, n: int) -> str:
+    """`part 2/3 of def f(x):`: every window after the first says which definition it belongs to."""
+    if i == 0:
+        return f"part 1/{n}"
+    return f"part {i + 1}/{n} of {' '.join(chunk.signature.split())[:_SIGNATURE_CHARS]}"
+
+
 def _split_code(chunk: Chunk, ctx: BuildContext) -> list[TextPart]:
     body = _code_body(chunk)
     lines = body.split("\n")
     span = chunk.end_line - chunk.start_line
-    head_len = sum(len(line) + 1 for line in _header_lines(chunk, "part 99/99")) if ctx.code_header else 0
+    longest_label = _part_label(chunk, 98, 99)
+    head_len = sum(len(line) + 1 for line in _header_lines(chunk, longest_label)) if ctx.code_header else 0
     doc = _doc_lines(chunk) if ctx.code_header else []
     budget = max(ctx.window_chars - head_len - sum(len(line) + 1 for line in doc), 200)
-    windows = _windows(lines, budget, ctx.window_overlap_lines)
+    windows = _even_windows(lines, budget, ctx.window_overlap_lines)
     parts: list[TextPart] = []
     for i, (first, last) in enumerate(windows):
-        label = f"part {i + 1}/{len(windows)}"
+        label = _part_label(chunk, i, len(windows))
         head = [*_header_lines(chunk, label), *(doc if i == 0 else [])] if ctx.code_header else []
         text = "\n".join([*head, *lines[first : last + 1]])
         if chunk.kind == "class":  # a skeleton's lines are not source lines
@@ -189,7 +217,8 @@ def _is_test(ref: Ref) -> bool:
 def build_usage(chunk: Chunk, ctx: BuildContext) -> str | None:
     if chunk.kind == "block" or chunk.chunk_id is None:
         return None
-    callers = sorted(ctx.callers.get(chunk.chunk_id, []), key=lambda r: (r.path, r.start_line))
+    # Fully ordered (never by chunk id), so an updated index and a rebuild write the same text.
+    callers = sorted(ctx.callers.get(chunk.chunk_id, []), key=lambda r: (r.path, r.start_line, r.qualname, r.kind))
     tests = [r for r in callers if _is_test(r)]
     users = [r for r in callers if not _is_test(r)]
     commits = ctx.commits.get(chunk.path, [])

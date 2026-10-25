@@ -44,6 +44,7 @@ class Chunk:
     is_test: bool = False
     skeleton: str = ""  # classes only: header + member signatures (embedded instead of the full code)
     call_lines: list[int] = field(default_factory=list)  # line of the first call of each name in `calls`
+    lead_comment: str = ""  # Python: the comment lines directly above (other languages keep them in docstring)
 
     @property
     def location(self) -> str:

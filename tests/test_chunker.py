@@ -142,3 +142,49 @@ def test_crlf_and_broken_code_do_not_crash():
 
 def test_decorator_calls_belong_to_decorated_function(chunks):
     assert chunks["pkg/chunk_sample.py::decorated"].calls == ["lru_cache"]
+
+
+def test_python_leading_comment_becomes_text_not_range():
+    src = (
+        "x = 1  # a note on x, not on revoke\n"
+        "# Revoke one session; called on logout.\n"
+        "# Second line.\n"
+        "@cache\n"
+        "def revoke(sid):\n"
+        '    """Drop it."""\n'
+        "    db.delete(sid)\n"
+    )
+    chunks = chunk_source(src, "auth.py")
+    c = next(c for c in chunks if c.kind == "function")
+    # Decorators are in the range, comments above are not: the eval labeler's rule.
+    assert (c.start_line, c.end_line) == (4, 7)
+    assert c.lead_comment == "Revoke one session; called on logout.\nSecond line."
+    assert c.docstring == "Drop it."
+    block = next(c for c in chunks if c.kind == "block")
+    assert block.code == "x = 1  # a note on x, not on revoke"
+
+    from codemem.texts import BuildContext, build_parts
+
+    text = build_parts(c, BuildContext(), "code")[0].text
+    assert text.splitlines()[:4] == ["# auth.py", "# Revoke one session; called on logout.", "# Second line.", "@cache"]
+
+
+def test_other_languages_keep_leading_comments_as_docstring():
+    c = chunk_source("// Revoke one session.\nfunc Revoke(id string) {\n}\n", "auth.go")[0]
+    assert (c.docstring, c.lead_comment, c.start_line) == ("Revoke one session.", "", 2)
+
+
+def test_one_huge_statement_is_cut_into_pieces_that_follow_the_content():
+    entries = "\n".join(f'    "KEY_{i}": lambda: getenv("KEY_{i}", "{i}"),' for i in range(600))
+    src = f"ENV = {{\n{entries}\n}}\n"
+    blocks = chunk_source(src, "envs.py", max_block_lines=200)
+    assert len(blocks) > 3 and all(b.kind == "block" and b.end_line - b.start_line < 200 for b in blocks)
+    assert blocks[0].start_line == 1 and blocks[-1].end_line == 602
+    assert all(a.end_line + 1 == b.start_line for a, b in zip(blocks, blocks[1:]))  # contiguous, no overlap
+    # Each piece names only the calls on its own lines.
+    assert all(b.calls == ["getenv"] and all(b.start_line <= n <= b.end_line for n in b.call_lines) for b in blocks[:-1])
+    # An insertion near the top moves only the cuts near it: later pieces keep their keys.
+    src2 = src.replace('    "KEY_3"', '    "KEY_NEW": lambda: None,\n    "KEY_3"', 1)
+    keys = [b.key for b in blocks]
+    keys2 = [b.key for b in chunk_source(src2, "envs.py", max_block_lines=200)]
+    assert len(set(keys) & set(keys2)) >= len(keys) - 2
