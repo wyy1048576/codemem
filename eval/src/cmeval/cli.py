@@ -309,6 +309,17 @@ def cmd_collect(args) -> int:
     return 0
 
 
+def cmd_dashboard(args) -> int:
+    from .dashboard import serve
+
+    try:
+        serve(args.port, open_browser=args.open, progress=lambda message: print(message, file=sys.stderr, flush=True))
+    except OSError as exc:  # for example the port is in use
+        print(f"dashboard: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_planned(args) -> int:
     print(f"cmeval {args.command}: not built yet", file=sys.stderr)
     return 2
@@ -400,6 +411,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--refresh", action="store_true", help="ask GitHub again instead of using cached answers")
     p.add_argument("--out", type=Path, default=None, help="folder (default: eval/results/<today>-repo-stats)")
     p.set_defaults(func=cmd_repo_stats)
+
+    p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
+    p.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")
+    p.add_argument("--open", action="store_true", help="open the page in the web browser")
+    p.set_defaults(func=cmd_dashboard)
 
     for name, help_text in PLANNED.items():
         p = sub.add_parser(name, help=f"{help_text} (not built yet)")

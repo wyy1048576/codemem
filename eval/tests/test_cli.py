@@ -11,7 +11,7 @@ def test_help_lists_commands(capsys):
         main(["--help"])
     assert info.value.code == 0
     out = capsys.readouterr().out
-    for name in ("validate", "import", "collect", "review", "run", "score", "report", "repo-stats"):
+    for name in ("validate", "import", "collect", "review", "run", "score", "report", "repo-stats", "dashboard"):
         assert name in out
 
 
