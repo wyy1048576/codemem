@@ -20,6 +20,10 @@ from .paths import repos_dir, worktrees_dir
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 LIVE_MARK = "@live-"
+# info/attributes of every clone. It comes before the repo's own .gitattributes, so git never
+# changes file bytes on checkout (line endings, $Id$, filters, encodings), and git status
+# compares the exact bytes of the commit.
+RAW_ATTRIBUTES = "* -text -ident -filter -working-tree-encoding\n"
 
 
 class RepoError(RuntimeError):
@@ -50,6 +54,10 @@ def ensure_clone(repo: str, url: str | None = None) -> Path:
     core.autocrlf is always false in the clone (its worktrees inherit it). Git for Windows
     converts line endings on checkout by default, and then file contents, hit texts, and token
     counts would differ from other machines.
+
+    The clone also gets RAW_ATTRIBUTES. Some repos commit a file with CRLF line endings while
+    their .gitattributes asks for LF (home-assistant, 2026-10). After a clean checkout, git status
+    then shows the file as changed, and the runner refuses to move the worktree.
     """
     path = clone_path(repo)
     if not path.exists():
@@ -59,6 +67,10 @@ def ensure_clone(repo: str, url: str | None = None) -> Path:
         _git("clone", "--bare", "--quiet", "-c", "core.autocrlf=false", url or f"https://github.com/{repo}.git", str(tmp))
         tmp.rename(path)  # a stopped clone never looks like a finished one
     _git("config", "core.autocrlf", "false", cwd=path)  # also for clones made before this setting
+    attributes = path / "info" / "attributes"
+    if not attributes.exists() or attributes.read_text(encoding="utf-8") != RAW_ATTRIBUTES:
+        attributes.parent.mkdir(exist_ok=True)
+        attributes.write_text(RAW_ATTRIBUTES, encoding="utf-8", newline="\n")
     return path
 
 
