@@ -173,7 +173,8 @@ def test_gold_in_another_language_is_kept_but_not_all_python(history):
     fixed = remote.commit({"src/fast.c": "int add(int a, int b) {\n    return b + a;\n}\n"}, "fix C")
     task = candidate_to_task(candidate(fixed), settings(), ["src/fast.c"])
     assert task.tags["gold_languages"] == ["c"] and task.tags["gold_all_python"] is False
-    assert task.tags["partial_labels"] is True  # no C grammar in the labeler yet
+    assert task.tags["partial_labels"] is False  # the labeler reads C since cmeval-labels/4
+    assert [s.symbol for s in task.gold.functions] == ["add"]
 
 
 def test_patch_paths_use_new_names_and_deleted_old_names():

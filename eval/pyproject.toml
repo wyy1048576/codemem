@@ -9,6 +9,9 @@ dependencies = [
     # Same ranges as codemem, so both packages can share one environment.
     "tree-sitter>=0.25,<0.27",
     "tree-sitter-python>=0.25,<0.26",
+    "tree-sitter-c>=0.24,<0.25",
+    "tree-sitter-cpp>=0.23,<0.24",
+    "tree-sitter-typescript>=0.23,<0.24",
     "pyarrow>=15",
     "anthropic>=2,<3",  # token counting (count_tokens)
 ]
