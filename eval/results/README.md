@@ -14,6 +14,7 @@ texts (those stay in `CMEVAL_HOME/runs/<run id>/`, outside git).
 | `2026-10-25-subset-v3/` | codemem v3 (`configs/codemem-v3.toml` at codemem `96bc2bc`) on the same 13 tasks, on an M1: the v3 default (neutral weights, BM25 queries without stopwords) and five variants. Indicative only; see `docs/decisions.md` §4, which also compares it with v2, the MVP and the grep baselines task by task. |
 | `2026-10-25-subset-v3-b4/` | The update vs. rebuild check for codemem v3 on those 13 tasks: PASS, both at codemem `96bc2bc` (13/13 tasks with the same top 10 for all six systems, metric differences 0.0000). |
 | `2026-10-25-fresh-dev-grep-b/` | The grep baselines (grep, grep-fn, grep-fn-plus) on the 399 fresh dev tasks (`tasks/fresh-v1.jsonl`), at `3743a30`. The report is made with `--where gold_all_python=true` (364 tasks; the 35 others are in its last section). No codemem systems yet: they join with `cmeval merge` after the codemem changes land. Dev split. |
+| `2026-10-26-py100/` | The main Python comparison (F5 B4): grep, grep-fn, grep-fn-plus and `cm3-full` (`configs/main-python.toml`) on the Python sample `tasks/fresh-v1-py100.jsonl` (100 all-Python fresh dev tasks from pandas, transformers, home-assistant and airflow), at `aed438d`, update mode, Mac M5. Primary tests: `cm3-full` vs. grep-fn-plus, Holm over 2. The report is rebuilt byte for byte from these files at `aed438d`. pandas built from the vector cache (warm). |
 
 Files in a run folder:
 
