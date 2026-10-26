@@ -9,7 +9,7 @@ Contents:
   grep-fn stays in every table): mean difference, paired 95% bootstrap interval, Wilcoxon p;
 - two primary metrics, fixed before the first results (2026-10-23): function-level MRR and
   function-level tokens to the first right answer, for each primary system (PRIMARY_SYSTEMS, the
-  3 codemem systems). Their p-values get one Holm correction over all primary tests. Every other
+  3 codemem v3 systems). Their p-values get one Holm correction over all primary tests. Every other
   comparison, including other grep variants, is "exploratory" and shows a raw p;
 - group tables (means and counts only), the IoU check, latency and size, task counts.
 
@@ -46,12 +46,15 @@ COST = HEADLINE[5:]
 LOWER_IS_BETTER = frozenset({"tokens_to_first", "not_found_share"})
 COUNTS = frozenset({"tokens_to_first"})  # in tokens, not between 0 and 1
 PRIMARY = (("function", "mrr"), ("function", "tokens_to_first"))
-# The systems under test for the primary tests, fixed in the design (2026-10-23). The family is
-# PRIMARY x these systems, so its size never depends on which other systems a run has.
-PRIMARY_SYSTEMS = ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage")
+# The systems under test for the primary tests, fixed in the design. The family is PRIMARY x these
+# systems, so its size never depends on which other systems a run has. Since 2026-10-25 they are the
+# codemem v3 systems of configs/codemem-v3.toml: keywords, + code, + usage (the same ladder as the
+# MVP). Runs of the MVP (2026-10-23) name theirs with --primary cm-bm25 --primary cm-bm25-code
+# --primary cm-bm25-code-usage.
+PRIMARY_SYSTEMS = ("cm3-bm25", "cm3-bm25-code", "cm3-full")
 GROUP_METRICS = (("function", "mrr"), ("function", "recall@10"), ("file", "recall@10"), ("function", "tokens_to_first"))
 # Group cutoffs live here, not in the tasks, so they can change without a new collection.
-REPO_SIZE_CUTOFFS = (1000, 5000)  # Python files: small < 1,000, medium 1,000 to 5,000, large > 5,000 (proposed)
+REPO_SIZE_CUTOFFS = (1000, 5000)  # Python files: small < 1,000, medium 1,000 to 5,000, large > 5,000 (agreed 2026-10-25)
 FIX_LINES_CUTOFFS = (10, 50)  # changed code lines: up to 10, 11 to 50, over 50
 IOU_METRICS = ("mrr", "recall@10")
 IOUS = (0.3, 0.5, 0.7)
@@ -283,7 +286,7 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
         "language": (lambda t: t.language, None),
         "issue date": (created, None),
         "gold all Python": (tag("gold_all_python"), None),
-        "repo size (Python files; proposed cutoffs)": (
+        "repo size (Python files)": (
             repo_size, [f"small (< {small:,})", f"medium ({small:,} to {large:,})", f"large (> {large:,})"]),
         "fix size (changed code lines)": (fix_lines, [f"up to {low}", f"{low + 1} to {high}", f"over {high}"]),
         "gold files": (gold_files, ["1", "2 or more"]),

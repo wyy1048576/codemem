@@ -99,9 +99,12 @@ def build_query(title: str, body: str) -> str:
 
 
 def leak(query: str, pr: dict) -> str | None:
-    """Why the query gives away the fix, or None: it names the fix PR or a commit of the fix."""
+    """Why the query gives away the fix, or None: it names the fix PR or a commit of the fix.
+
+    A PR is named as #N, as a /pull/N link, or as gh-N or GH-N (the form cpython uses).
+    """
     number = pr["number"]
-    if re.search(rf"(?<![\w&])#{number}\b|/pull/{number}\b", query):
+    if re.search(rf"(?<![\w&])#{number}\b|/pull/{number}\b|(?<![\w-])gh-{number}\b", query, re.IGNORECASE):
         return f"mentions the fix PR #{number}"
     shas = [c["commit"]["oid"] for c in (pr.get("commits") or {}).get("nodes") or []]
     if pr.get("mergeCommit"):

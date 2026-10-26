@@ -149,7 +149,7 @@ def test_refusals(run_dir, tmp_path):
 
 
 def test_the_primary_systems_are_an_explicit_list(run_dir):
-    with pytest.raises(ReportError, match=r"primary systems \['cm-bm25'"):
+    with pytest.raises(ReportError, match=r"primary systems \['cm3-bm25'"):
         report("r1", baseline="grep-fn")  # the default list names the real codemem systems
     with pytest.raises(ReportError, match=r"primary systems \['grep'\]"):
         report("r1", baseline="grep-fn", primary=["cm-a", "grep"])  # grep has no function level
@@ -241,7 +241,7 @@ def test_filter_refusals(tagged):
 
 def test_size_groups_in_natural_order(tagged):
     text = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).report_path.read_text()
-    section = text.split("### By repo size (Python files; proposed cutoffs)")[1].split("###")[0]
+    section = text.split("### By repo size (Python files)")[1].split("###")[0]
     rows = ["| small (< 1,000) | 1 |", "| medium (1,000 to 5,000) | 2 |", "| large (> 5,000) | 2 |", "| unknown | 1 |"]
     assert [section.index(r) for r in rows] == sorted(section.index(r) for r in rows)  # natural order, unknown last
     section = text.split("### By fix size (changed code lines)")[1].split("###")[0]
