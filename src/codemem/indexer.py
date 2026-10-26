@@ -1,6 +1,6 @@
 """Indexing: one update function for the first build, a reconcile and a single save.
 
-An update runs in two stages (docs/architecture.md §8):
+An update runs in two stages (docs/architecture.md §3 and §4):
 
   A. structure (`structure()`): find the changed files (the watcher's paths, or a scan of the
      whole repo), re-chunk them, apply each file's chunk diff by key, relink only the calls that
@@ -39,7 +39,7 @@ import pathspec
 from . import __version__
 from .callgraph import resolve_edges
 from .chunker import chunk_source
-from .config import ALWAYS_SKIP_DIRS, DEFAULT_IGNORE, Config, codemem_home
+from .config import ALWAYS_SKIP_DIRS, DEFAULT_IGNORE, Config, VectorConfig, codemem_home
 from .embedder import Embedder, make_embedder
 from .languages import EXTENSIONS, LANGUAGES, language_for_path
 from .schema import CALLABLE_KINDS, Chunk, text_hash
@@ -50,7 +50,7 @@ from .vectorcache import VectorCache
 log = logging.getLogger(__name__)
 
 ProgressFn = Callable[[str, int, int], None]  # (phase, done, total)
-EmbedderFactory = Callable[[str, Config], Embedder]
+EmbedderFactory = Callable[[VectorConfig, Config], Embedder]
 
 _GENERATED = re.compile(rb"Code generated .{0,200}DO NOT EDIT|@generated\b")
 _MINIFIABLE = frozenset({"javascript", "typescript", "tsx"})
@@ -66,6 +66,7 @@ _SETTING_TIERS = {
     "window_overlap_lines": "texts", "max_usage_items": "texts", "include_commits": "texts",
     "max_defs_per_name": "links",
     "embedding": "vectors",  # another API provider, model or dimensions: re-embed
+    "vector_backend": None,  # nothing stored: the search index rebuilds itself from the stored vectors
 }
 
 
@@ -565,11 +566,12 @@ class Indexer:
         if stored is None:
             return set()
         current = json.loads(json.dumps(self.config.index_settings()))
-        return {_SETTING_TIERS.get(k, "rebuild") for k in set(stored) | set(current) if stored.get(k) != current.get(k)}
+        changed = {_SETTING_TIERS.get(k, "rebuild") for k in set(stored) | set(current) if stored.get(k) != current.get(k)}
+        return changed - {None}
 
     def _embedders(self) -> dict[str, Embedder]:
         cfg = self.config
-        return {v: self.embedder_factory(cfg.vectors[v].model, cfg) for v in cfg.enabled_vec_types()}
+        return {v: self.embedder_factory(cfg.vectors[v], cfg) for v in cfg.enabled_vec_types()}
 
     def _commits_moved(self) -> bool:
         if not self.config.include_commits:

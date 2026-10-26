@@ -1,8 +1,8 @@
 """Text builders: the texts that get embedded, one or more per (chunk, vector type).
 
 A builder is `fn(chunk, ctx) -> str | None` and returns the whole text of one vector type; None
-means "no vector of this type for this chunk". New types (summary, file summary, ...) register
-here without changes to the store or search.
+means "no vector of this type for this chunk". New types register here without changes to the
+store or search.
 
 `build_parts()` turns a text into the vectors actually stored. A `code` text longer than the
 embedder can read is split into windows ("parts") of whole lines, each with the same short
@@ -30,7 +30,7 @@ class Ref:
     name: str
     path: str
     start_line: int
-    is_test: bool | None = None  # None: guess from path and name (v1 behaviour, Python rules)
+    is_test: bool | None = None  # None: guess from path and name (Python rules)
     kind: str = "function"
 
 
@@ -242,9 +242,3 @@ def _caller_line(verb: str, block_verb: str, ref: Ref) -> str:
     if ref.kind == "block":
         return f"{block_verb} {ref.path}"
     return f"{verb} {ref.qualname} in {ref.path}"
-
-
-@register("summary")
-def build_summary(chunk: Chunk, ctx: BuildContext) -> str | None:
-    # Slot for LLM summaries. Enabling `vectors.summary` is a no-op until a summarizer fills this in.
-    return None

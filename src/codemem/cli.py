@@ -118,9 +118,9 @@ def cmd_init(args) -> int:
 def _download_model(config) -> None:
     from .embedder import make_embedder
 
-    model = config.vectors["code"].model
-    print(f"loading the embedding model {model} (downloaded once, about 1 GB) ...", file=sys.stderr)
-    make_embedder(model, config).embed_documents(["warm up"])
+    spec = config.vectors["code"]
+    print(f"loading the embedding model {spec.model} (downloaded once, about 1 GB) ...", file=sys.stderr)
+    make_embedder(spec, config).embed_documents(["warm up"])
 
 
 def cmd_search(args) -> int:
