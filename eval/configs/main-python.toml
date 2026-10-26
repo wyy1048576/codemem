@@ -1,0 +1,27 @@
+# The main comparison on the Python sample (tasks/fresh-v1-py100.jsonl, decision of 2026-10-25): the
+# three grep baselines and codemem's default, in one run. Needs: uv sync --extra codemem, and ripgrep.
+
+[[system]]
+name = "grep"
+adapter = "grep"
+
+[[system]]
+name = "grep-fn"
+adapter = "grep_fn"
+
+# The stronger grep baseline (2026-10-23), the baseline of the primary tests: Python files only,
+# rare keywords weigh more, noisy keywords dropped, tests last.
+[[system]]
+name = "grep-fn-plus"
+adapter = "grep_fn"
+types = ["py"]
+weighting = "idf"
+clean_keywords = true
+tests_last = true
+
+# codemem's default (the same settings as configs/codemem-v3-full.toml).
+[[system]]
+name = "cm3-full"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = {}, bm25 = { query_terms = 32, common_share = 0.0 } }

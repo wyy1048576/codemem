@@ -330,6 +330,22 @@ def cmd_collect(args) -> int:
     return 0
 
 
+def cmd_subset(args) -> int:
+    from .subset import SubsetError, subset
+
+    try:
+        result = subset(args.tasks, args.out, per_repo=args.per_repo, seed=args.seed, split=args.split,
+                        where=args.where, repos=args.repo)
+    except (SubsetError, FileNotFoundError, TaskError) as exc:
+        print(f"subset: {exc}", file=sys.stderr)
+        return 1
+    print(f"{result.out}: {len(result.tasks)} tasks")
+    for repo, n in result.available.items():
+        chosen = sum(1 for t in result.tasks if t.repo == repo)
+        print(f"  {repo}: {chosen} of {n} matching tasks" + ("  (fewer than asked)" if repo in result.short else ""))
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
@@ -435,6 +451,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--refresh", action="store_true", help="ask GitHub again instead of using cached answers")
     p.add_argument("--out", type=Path, default=None, help="folder (default: eval/results/<today>-repo-stats)")
     p.set_defaults(func=cmd_repo_stats)
+
+    p = sub.add_parser("subset", help="a fixed random subset of a task file: N tasks for each repo")
+    p.add_argument("tasks", type=Path, help="task file (.jsonl)")
+    p.add_argument("--out", type=Path, required=True, help="new task file (.jsonl); a .meta.json is written next to it")
+    p.add_argument("--per-repo", type=int, required=True, help="tasks for each repo (all of them if a repo has fewer)")
+    p.add_argument("--seed", required=True, help="seed of the random draw, for example cmeval-sample-1")
+    p.add_argument("--split", choices=["dev", "test"], default="dev", help="split to draw from (default dev)")
+    p.add_argument("--where", action="append", default=None, metavar="KEY=VALUE",
+                   help="only tasks with this tag value, for example gold_all_python=true; repeatable (all must match)")
+    p.add_argument("--repo", action="append", default=None, help="only this repo (owner/name); repeatable (default: every repo)")
+    p.set_defaults(func=cmd_subset)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")

@@ -37,6 +37,8 @@ from .files import read_jsonl, write_text_atomic
 from .metrics.matching import LEVELS
 from .metrics.stats import (RESAMPLES, SEED, WilcoxonResult, bootstrap_ci, differences, holm, wilcoxon)
 from .score import MAIN_IOU, resolve_run, run_tasks
+from .tasks import WhereError, check_where_keys, task_matches
+from .tasks import parse_where as _parse_where
 
 DEFAULT_BASELINE = "grep-fn-plus"  # the stronger grep (2026-10-23); older runs: --baseline grep-fn
 DEFAULT_CUTOFF = "2026-07-01"
@@ -215,51 +217,23 @@ def default_primary(names: list[str], has_codemem: bool) -> tuple[str, tuple[str
 
 
 def parse_where(conditions: list[str] | None) -> list[tuple[str, object]]:
-    """["gold_all_python=true", "repo=pandas-dev/pandas"] -> [(key, value)]. true/false and whole
-    numbers are typed; any other value is text and compared without case."""
-    out = []
-    for condition in conditions or []:
-        key, sep, raw = condition.partition("=")
-        key, raw = key.strip(), raw.strip()
-        if not sep or not key or not raw:
-            raise ReportError(f"filter {condition!r} must be KEY=VALUE, for example gold_all_python=true")
-        value: object = raw
-        if raw.lower() in ("true", "false"):
-            value = raw.lower() == "true"
-        elif raw.lstrip("-").isdigit():
-            value = int(raw)
-        out.append((key, value))
-    return out
+    """tasks.parse_where, with its errors as ReportError."""
+    try:
+        return _parse_where(conditions)
+    except WhereError as exc:
+        raise ReportError(str(exc)) from None
 
 
-def _task_value(task, key: str):
-    if key in ("repo", "language"):
-        return getattr(task, key)
-    return task.tags.get(key)
-
-
-def _matches(task, conditions: list[tuple[str, object]]) -> bool:
-    for key, wanted in conditions:
-        value = _task_value(task, key)
-        if isinstance(wanted, bool) or isinstance(value, bool):
-            if value is not wanted:
-                return False
-        elif isinstance(wanted, int):
-            if value != wanted:
-                return False
-        elif str(value).lower() != str(wanted).lower():
-            return False
-    return True
+_matches = task_matches
 
 
 def _select(tasks: dict, task_ids: list[str], conditions: list[tuple[str, object]]) -> list[str]:
     """The scored tasks that match every condition. Unknown keys and an empty result are errors."""
-    scored = [tasks[t] for t in task_ids if t in tasks]
-    known = {"repo", "language"} | {k for task in scored for k in task.tags}
-    unknown = sorted({key for key, _ in conditions} - known)
-    if unknown:
-        raise ReportError(f"no scored task has {unknown}; known keys: {', '.join(sorted(known))}")
-    kept = [t for t in task_ids if t in tasks and _matches(tasks[t], conditions)]
+    try:
+        check_where_keys([tasks[t] for t in task_ids if t in tasks], conditions, what="scored task")
+    except WhereError as exc:
+        raise ReportError(str(exc)) from None
+    kept = [t for t in task_ids if t in tasks and task_matches(tasks[t], conditions)]
     if not kept:
         raise ReportError("no scored task matches the filter")
     return kept
