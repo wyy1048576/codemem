@@ -1,4 +1,6 @@
 import json
+
+import faiss
 import numpy as np
 import pytest
 
@@ -58,6 +60,34 @@ def test_faiss_vector_store_upsert_remove_search_filter():
     assert vs.search(v[3], 4, allowed_ids=[]) == []
     with pytest.raises(ValueError):
         vs.upsert([1], _vecs(1, dim=4))
+
+
+def _as_stored(vecs):
+    """Vectors as the rows hold them: rounded to float16."""
+    return vecs.astype(np.float16).astype(np.float32)
+
+
+def test_faiss_keeps_two_bytes_per_number_and_ranks_exactly():
+    vs = FaissVectorStore(8)
+    assert faiss.downcast_index(vs.index.index).sa_code_size() == 2 * 8
+    v = _as_stored(_vecs(50))
+    vs.upsert(list(range(50)), v)
+    q = _vecs(1, seed=1)[0]
+    exact = v @ q
+    hits = vs.search(q, 10)
+    assert [i for i, _ in hits] == list(np.argsort(-exact)[:10])
+    assert np.allclose([s for _, s in hits], np.sort(exact)[::-1][:10], atol=1e-6)
+
+
+def test_a_saved_file_of_four_byte_numbers_still_loads():
+    flat = faiss.IndexIDMap2(faiss.IndexFlatIP(8))
+    v = _as_stored(_vecs(4))
+    flat.add_with_ids(v, np.array([10, 20, 30, 40], dtype=np.int64))
+    vs = FaissVectorStore.from_bytes(faiss.serialize_index(flat).tobytes())
+    assert faiss.downcast_index(vs.index.index).sa_code_size() == 2 * 8
+    assert vs.ids() == {10, 20, 30, 40} and vs.search(v[2], 1)[0][0] == 30
+    again = FaissVectorStore.from_bytes(vs.to_bytes())
+    assert again.ids() == vs.ids() and again.search(v[1], 1)[0][0] == 20
 
 
 def test_chunk_upsert_keeps_id_and_refreshes_fts_and_calls(store):
