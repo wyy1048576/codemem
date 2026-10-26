@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import csv
 import json
+import tomllib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -36,6 +37,7 @@ from pathlib import Path
 from .files import read_jsonl, write_text_atomic
 from .metrics.matching import LEVELS
 from .metrics.stats import (RESAMPLES, SEED, WilcoxonResult, bootstrap_ci, differences, holm, wilcoxon)
+from .paths import default_configs_dir
 from .score import MAIN_IOU, resolve_run, run_tasks
 from .tasks import WhereError, check_where_keys, task_matches
 from .tasks import parse_where as _parse_where
@@ -56,10 +58,12 @@ PRIMARY = (("function", "mrr"), ("function", "tokens_to_first"))
 # + usage; the v3 family is codemem's default alone (Andrew, 2026-10-25). The family of tests is
 # PRIMARY x these systems, so its size never depends on which other systems a run has.
 # A run without --primary uses the newest family whose systems are all in it, so a committed run of
-# an older version still reports with the plain command.
+# an older version still reports with the plain command. A family with a config file is also checked
+# against it: the run's definition of each system must be the fixed one, so a system that only has the
+# name cannot take the family's place. (The MVP family is from before this check.)
 PRIMARY_FAMILIES = (
-    ("codemem v3, fixed 2026-10-25", ("cm3-full",)),  # configs/codemem-v3-full.toml
-    ("codemem MVP, fixed 2026-10-23", ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage")),  # configs/baseline.toml
+    ("codemem v3, fixed 2026-10-25", ("cm3-full",), "codemem-v3-full.toml"),
+    ("codemem MVP, fixed 2026-10-23", ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage"), None),  # configs/baseline.toml
 )
 PRIMARY_SYSTEMS = PRIMARY_FAMILIES[0][1]  # the current family
 GROUP_METRICS = (("function", "mrr"), ("function", "recall@10"), ("file", "recall@10"), ("function", "tokens_to_first"))
@@ -196,21 +200,37 @@ def _compare(scores: Scores, system: str, baseline: str, level: str, metric: str
                       wilcoxon(d), found=found)
 
 
-def default_primary(names: list[str], has_codemem: bool) -> tuple[str, tuple[str, ...]]:
+def default_primary(names: list[str], has_codemem: bool, config_text: str | None = None) -> tuple[str, tuple[str, ...]]:
     """(label, systems) for the primary tests when --primary is not given.
 
     A run with no codemem system has none. A codemem run gets the newest family whose systems are all
     in it. A codemem run that fits no family is an error: a renamed system must never drop the
-    primary tests without notice.
+    primary tests without notice. If the family has a config file, the run's definitions (from its
+    config_text) must equal the fixed ones.
     """
     if not has_codemem:
         return "none (no codemem system in this run)", ()
-    for label, family in PRIMARY_FAMILIES:
+    for label, family, config_file in PRIMARY_FAMILIES:
         if all(name in names for name in family):
+            if config_file:
+                _check_definitions(family, config_file, config_text)
             return label, family
-    known = "; ".join(f"{label}: {', '.join(family)}" for label, family in PRIMARY_FAMILIES)
+    known = "; ".join(f"{label}: {', '.join(family)}" for label, family, _ in PRIMARY_FAMILIES)
     raise ReportError(f"no primary family fits this run's systems {names} (known families: {known}); "
                       "choose them with --primary")
+
+
+def _check_definitions(family: tuple[str, ...], config_file: str, config_text: str | None) -> None:
+    """Each system of the family must be defined in the run as in configs/<config_file>."""
+    fixed = {spec["name"]: spec for spec in tomllib.loads((default_configs_dir() / config_file).read_text("utf-8"))["system"]}
+    try:
+        used = {spec["name"]: spec for spec in tomllib.loads(config_text or "").get("system", [])}
+    except tomllib.TOMLDecodeError:
+        used = {}
+    changed = [name for name in family if used.get(name) != fixed[name]]
+    if changed:
+        raise ReportError(f"{changed} in this run are not defined as in configs/{config_file} (the fixed primary family); "
+                          "choose the primary systems with --primary")
 
 
 # ---- the filter
@@ -222,9 +242,6 @@ def parse_where(conditions: list[str] | None) -> list[tuple[str, object]]:
         return _parse_where(conditions)
     except WhereError as exc:
         raise ReportError(str(exc)) from None
-
-
-_matches = task_matches
 
 
 def _select(tasks: dict, task_ids: list[str], conditions: list[tuple[str, object]]) -> list[str]:
@@ -336,7 +353,7 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     if primary is not None:
         primary_label, under_test = "chosen with --primary", list(dict.fromkeys(primary))
     else:
-        primary_label, family_systems = default_primary(names, has_codemem)
+        primary_label, family_systems = default_primary(names, has_codemem, meta.get("config_text"))
         under_test = list(family_systems)
     bad = [n for n in under_test if n not in names or n == baseline or granularity[n] == "file"]
     if bad:

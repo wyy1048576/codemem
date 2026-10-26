@@ -19,9 +19,9 @@ weighting = "idf"
 clean_keywords = true
 tests_last = true
 
-# codemem's default (the same settings as configs/codemem-v3-full.toml).
+# codemem's default: the same definition as in configs/codemem-v3-full.toml (a test checks it).
 [[system]]
 name = "cm3-full"
 adapter = "codemem"
 signals = ["bm25", "code", "usage"]
-config = { device = "auto", test_weight = 1.0, kind_weights = {}, bm25 = { query_terms = 32, common_share = 0.0 } }
+config = { device = "auto", test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }

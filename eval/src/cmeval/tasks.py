@@ -399,7 +399,7 @@ def parse_where(conditions: list[str] | None) -> list[tuple[str, object]]:
         value: object = raw
         if raw.lower() in ("true", "false"):
             value = raw.lower() == "true"
-        elif raw.lstrip("-").isdigit():
+        elif re.fullmatch(r"-?[0-9]+", raw):  # plain whole numbers only; anything else stays text
             value = int(raw)
         out.append((key, value))
     return out

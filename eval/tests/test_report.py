@@ -211,6 +211,7 @@ def test_parse_where():
     assert parse_where(["gold_all_python=true", "n_gold_files=2", "repo=Acme/Web", "x=False"]) == \
         [("gold_all_python", True), ("n_gold_files", 2), ("repo", "Acme/Web"), ("x", False)]
     assert parse_where(None) == []
+    assert parse_where(["n=--5", "m=+5", "k=-3"]) == [("n", "--5"), ("m", "+5"), ("k", -3)]  # strict numbers
     for bad in ("gold_all_python", "=true", "gold_all_python="):
         with pytest.raises(ReportError, match="KEY=VALUE"):
             parse_where([bad])
@@ -273,26 +274,56 @@ def test_cli_report_with_a_filter(tagged, capsys):
     assert main(["report", "r1", "--baseline", "grep-fn", "--where", "nope"]) == 1
 
 
+CONFIGS = __import__("pathlib").Path(__file__).parents[1] / "configs"
+
+
 def test_default_primary_picks_the_family_of_the_run():
     from cmeval.report import PRIMARY_FAMILIES, default_primary
 
     v3, mvp = PRIMARY_FAMILIES[0][1], PRIMARY_FAMILIES[1][1]
-    assert default_primary(["grep-fn-plus", *v3, "cm3-full-v2-weights"], True)[1] == v3
+    fixed = (CONFIGS / "codemem-v3-full.toml").read_text()
+    assert default_primary(["grep-fn-plus", *v3, "cm3-full-v2-weights"], True, fixed)[1] == v3
     assert default_primary(["grep-fn-plus", *mvp], True)[1] == mvp  # an old MVP run reports as before
-    assert default_primary([*mvp, *v3], True)[1] == v3  # the newest family first
+    assert default_primary([*mvp, *v3], True, fixed)[1] == v3  # the newest family first
     assert default_primary(["grep", "grep-fn-plus"], False) == ("none (no codemem system in this run)", ())
     with pytest.raises(ReportError, match="no primary family fits"):
         default_primary(["grep-fn-plus", "cm3-bm25", "cm-bm25", "cm-bm25-code"], True)  # no family complete
 
 
-def test_primary_families_name_real_codemem_systems():
-    from pathlib import Path
+def test_a_system_with_only_the_name_is_not_the_family():
+    from cmeval.report import default_primary
 
+    fixed = (CONFIGS / "codemem-v3-full.toml").read_text()
+    other = fixed.replace("test_weight = 1.0", "test_weight = 0.5")
+    with pytest.raises(ReportError, match="not defined as in configs/codemem-v3-full.toml"):
+        default_primary(["grep-fn-plus", "cm3-full"], True, other)
+    with pytest.raises(ReportError, match="not defined as in"):
+        default_primary(["grep-fn-plus", "cm3-full"], True, None)  # no config text: cannot be checked
+    merged = (CONFIGS / "grep.toml").read_text() + "\n# merged from x:\n" + fixed  # as cmeval merge writes it
+    assert default_primary(["grep-fn-plus", "cm3-full"], True, merged)[1] == ("cm3-full",)
+
+
+def test_primary_families_name_real_codemem_systems():
     from cmeval.report import PRIMARY_FAMILIES
     from cmeval.systems import load_systems
 
-    configs = Path(__file__).parents[1] / "configs"
-    for (label, family), config in zip(PRIMARY_FAMILIES, ("codemem-v3-full.toml", "baseline.toml")):
-        specs = {spec.name: spec for spec in load_systems(configs / config)}
+    for label, family, config in PRIMARY_FAMILIES:
+        specs = {spec.name: spec for spec in load_systems(CONFIGS / (config or "baseline.toml"))}
         for name in family:
             assert name in specs and specs[name].adapter == "codemem", (label, name)
+
+
+def test_main_configs_define_systems_as_their_references():
+    """A system in a main-*.toml config must be the same as in its reference config, so the main
+    comparison runs the system that the checks ran."""
+    import tomllib
+
+    reference = {}
+    for name in ("codemem-v3-full.toml", "grep.toml"):
+        for spec in tomllib.loads((CONFIGS / name).read_text())["system"]:
+            reference[spec["name"]] = spec
+    mains = sorted(CONFIGS.glob("main-*.toml"))
+    assert mains
+    for path in mains:
+        for spec in tomllib.loads(path.read_text())["system"]:
+            assert spec == reference[spec["name"]], (path.name, spec["name"])

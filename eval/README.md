@@ -31,6 +31,7 @@ Task files:
 |---|---|---|
 | `tasks/swebv-dev50.jsonl` | 50 SWE-bench Verified tasks, about the same number from each of its 12 repos, labeled with cmeval's rules. `swebv-dev50.meta.json` records the dataset revision, seed, skipped rows, and label statistics. | dev |
 | `tasks/fresh-v1.jsonl` | 2,084 fresh tasks from 7 Python repos (home-assistant, vllm, pandas, airflow, ray, transformers, cpython): fixes opened and merged from 2026-07-01 to 2026-10-22, after the model cutoff. Made by `cmeval collect configs/fresh-v1.toml`. `fresh-v1.meta.json` records the settings, the funnel for each repo (13 steps, from 21,822 merged PRs), the drop reasons, and label statistics. Use tag `gold_all_python` for the main comparison (codemem reads Python only). | dev (399) and test (1,685) |
+| `tasks/fresh-v1-py100.jsonl` | The Python sample of the main comparison: 25 all-Python dev tasks from each of pandas and transformers (medium) and home-assistant and airflow (large), drawn from `fresh-v1.jsonl` with `cmeval subset` (seed `cmeval-sample-1`). `fresh-v1-py100.meta.json` records the rule, the seed, and the chosen ids. |
 
 Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions that the fix changed, found with tree-sitter on the code at `base_commit`.
 

@@ -18,8 +18,7 @@ texts (those stay in `CMEVAL_HOME/runs/<run id>/`, outside git).
 Files in a run folder:
 
 - `report.md`: the report (`cmeval report`): main tables with 95% bootstrap intervals, paired tests
-  against grep-fn-plus (primary: function MRR and tokens to the first right function, Holm over 6
-  tests), group tables, the IoU check, latency, and task counts.
+  against grep-fn-plus (primary: function MRR and tokens to the first right function for the primary systems of the run's codemem version, Holm over all primary tests: 6 for the MVP runs, 2 for cm3-full), group tables, the IoU check, latency, and task counts.
 - `summary.csv`: the mean of each metric for each system, level, and IoU.
 - `scores.jsonl.gz`: one row for each task, system, level, IoU, and metric (gzip).
 - `meta.json`, `score-meta.json`: inputs, code commits, machine, token counter, and the merged parts.

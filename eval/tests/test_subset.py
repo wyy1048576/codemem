@@ -30,6 +30,7 @@ def test_the_draw_is_fixed_by_the_seed_and_per_repo():
     assert draw(ids, 5, "s1", "acme/a") == draw(list(reversed(ids)), 5, "s1", "acme/a")  # input order does not matter
     assert draw(ids, 5, "s1", "acme/a") != draw(ids, 5, "s2", "acme/a")
     assert draw(ids[:3], 5, "s1", "acme/a") == ids[:3]  # fewer than n: all of them
+    assert draw(ids, 5, "s1", "acme/a") != draw(ids, 5, "s1", "acme/b")  # each repo has its own draw
 
 
 def test_subset_writes_tasks_and_meta(source, tmp_path):
@@ -53,7 +54,25 @@ def test_repos_limit_the_draw(source, tmp_path):
     assert {t.repo for t in result.tasks} == {"acme/b"} and len(result.tasks) == 2
 
 
+def test_repo_order_and_case_do_not_change_the_file(source, tmp_path):
+    a, b = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    subset(source, a, per_repo=2, seed="s1", repos=["acme/a", "acme/b"])
+    subset(source, b, per_repo=2, seed="s1", repos=["ACME/B", "acme/a", "acme/b"])
+    assert a.read_bytes() == b.read_bytes()
+
+
+def test_subset_never_writes_over_its_source(source):
+    before = source.read_bytes()
+    with pytest.raises(SubsetError, match="write over the source"):
+        subset(source, source, per_repo=2, seed="s1")
+    with pytest.raises(SubsetError, match="write over the source"):
+        subset(source, source.with_suffix(".json"), per_repo=2, seed="s1")  # same meta file name
+    assert source.read_bytes() == before
+
+
 def test_subset_refusals(source, tmp_path):
+    with pytest.raises(SubsetError, match="no task matches"):
+        subset(source, tmp_path / "x.jsonl", per_repo=2, seed="s1", where=["language=rust"])
     with pytest.raises(SubsetError, match="no task has"):
         subset(source, tmp_path / "x.jsonl", per_repo=2, seed="s1", where=["gold_python=true"])
     with pytest.raises(SubsetError, match="no matching dev task in"):
