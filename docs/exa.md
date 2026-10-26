@@ -1,5 +1,7 @@
 # What we take from Exa
 
+**Status:** research notes, exploratory. How codemem works is in [architecture.md](architecture.md).
+
 Exa runs a web search engine for AI agents, and its blog is a model for both our techniques and
 our write-up. We don't use Exa's product. This page merges two reading passes:
 - **Oct 4, 2026:** 13 sources (the vector DB, BM25, exa-d, Canon, Highlights, WebCode, RL
@@ -37,17 +39,17 @@ How the ideas turn into research experiments is in [advanced-design.md](advanced
 
 ## 2. What codemem already uses
 
-| Exa idea | Where in codemem | Status |
-|---|---|---|
-| Hybrid: dense top 50 + keyword top 30, merged with RRF k = 60 | `search.py`: BM25, code and usage lists (top 50 each), RRF k = 60 | done (v2) |
-| exa-d: compute only what is missing; derived data keyed by input hash and version | texts and vectors keyed by text hash and embedder key; vector cache; epochs | done (v2) |
-| exa-d: "backfills and incremental updates follow the same codepath" | one update function for builds, reconciles and saves (decisions D19) | v3, in progress |
-| Model upgrades as new versioned columns | the embedder key: a new model re-embeds only its vector type | done (v2) |
-| Highlights: return the part that matters | long-function cards show the best window, focused on the matching lines | first step (v2) |
-| Two-tier tools: search returns highlights, read returns full bodies | `search_code` + `get_chunk` | done |
-| Instruction and scope parameters | `path_prefix`, `kinds`, `languages`, tests | partly; `kinds` and tests on the MCP tool in v3 |
-| Collapse vendored and duplicate copies | vendored, generated and minified files skipped by default | done (v2) |
-| Snapshot "as of a date" for leakage-free evals | the eval indexes each task at its commit | done (Andrew's harness) |
+| Exa idea | Where in codemem |
+|---|---|
+| Hybrid: dense top 50 + keyword top 30, merged with RRF k = 60 | `search.py`: BM25, code and usage lists (top 50 each), RRF k = 60 |
+| exa-d: compute only what is missing; derived data keyed by input hash and version | texts and vectors keyed by text hash and embedder key; the vector cache; epochs |
+| exa-d: "backfills and incremental updates follow the same codepath" | one update function for first builds, full checks and single saves, with a verify mode |
+| Model upgrades as new versioned columns | the embedder key: a new model re-embeds only its vector type |
+| Highlights: return the part that matters | a first step: long-function cards show the best window, focused on the matching lines |
+| Two-tier tools: search returns highlights, read returns full bodies | `search_code` + `get_chunk` |
+| Instruction and scope parameters | the `path_prefix`, `kinds`, `languages` and tests filters |
+| Collapse vendored and duplicate copies | vendored, generated and minified files skipped by default |
+| Snapshot "as of a date" for leakage-free evals | the eval indexes each task at its commit (Andrew's harness) |
 | Fixed-candidate paired bootstrap | Andrew's harness | done |
 
 ---
@@ -82,8 +84,10 @@ drifts, how much recall is lost by keeping old centroids?
 - Candidates come from the rarest query terms, with WAND-style pruning. Result: about 50% less
   memory and 10% lower latency.
 
-**For us:** memory is not our problem, but **"candidates from the rarest terms"** is exactly the
-v3 fix for long queries (keep the 32 rarest words; decisions D32). Freshness angle: BM25 scores
+**For us:** memory is not our problem. "Candidates from the rarest terms" was the first thing we
+tried for long queries, and it is a lesson: keeping only an issue's 32 rarest words cut keyword
+accuracy by a third, because an issue's rarest words are often noise (versions, URLs, the
+reporter's names). codemem drops stopwords only (architecture.md §6). Freshness angle: BM25 scores
 depend on corpus-wide statistics, so chunks that never changed still shift as commits land.
 
 ### 3.3 exa-d, the data framework ([exa-d](https://exa.ai/blog/exa-d), Jan 2026): the most transferable post
@@ -105,7 +109,7 @@ depend on corpus-wide statistics, so chunks that never changed still shift as co
 - Every derived value is keyed by the hash of its inputs and the version of the step that made it
   (as in Bazel, Nix, Salsa).
 - An unchanged hash stops the work early (early cutoff).
-- The v3 incremental update is one code path with a verify mode, which also makes full rebuild vs
+- codemem's incremental update is one code path with a verify mode, which also makes full rebuild vs
   incremental a clean experiment.
 
 ### 3.4 The search pipeline ([Composing a Search Engine](https://exa.ai/blog/composing-a-search-engine), Apr 2026; [reranking](https://exa.ai/blog/sota-reranking), Oct 2026)
@@ -253,7 +257,7 @@ marks what codemem already does.
 6. **Next-reference contrastive fine-tuning with a Matryoshka loss** (§5).
 7. **A Matryoshka-256 binary first stage with rescoring** (§7). ✔ enabled: vectors are stored at
    full size.
-8. **Query-time staleness repair** (§8). ✔ v3: catch-up before search.
+8. **Query-time staleness repair** (§8). ✔ catch-up before every search.
 9. **Collapse vendored and duplicate code.** ✔ skipped by default.
 10. **An internal-API hallucination benchmark** (§9).
 

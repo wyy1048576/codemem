@@ -1,6 +1,6 @@
 """File events -> batches of changed paths for incremental updates.
 
-The watcher only notices; the service decides when to index (docs/architecture.md §8):
+The watcher only notices; the service decides when to index (docs/architecture.md §4):
 - paths are collected until saves stop for `debounce_ms`, or at most `max_wait_ms` after the
   first one, then handed over in one batch;
 - a change to `.gitignore`, the repo config or the git branch asks for a full reconcile instead;

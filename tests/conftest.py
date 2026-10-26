@@ -44,11 +44,7 @@ def sample_repo(tmp_path):
 @pytest.fixture
 def fake_config():
     cfg = Config()
-    cfg.vectors = {
-        "code": VectorConfig(model="fake:64"),
-        "usage": VectorConfig(model="fake:64"),
-        "summary": VectorConfig(model="fake:64", enabled=False),
-    }
+    cfg.vectors = {"code": VectorConfig(model="fake:64"), "usage": VectorConfig(model="fake:64")}
     return cfg
 
 

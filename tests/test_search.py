@@ -2,6 +2,7 @@ import shutil
 
 import pytest
 
+from codemem.config import VectorConfig
 from codemem.indexer import Indexer
 from codemem.schema import Chunk
 from codemem.search import _pick_top, rrf, search
@@ -141,8 +142,9 @@ def test_exact_identifier_query_ranks_first(index):
 def test_signal_selection_and_validation(index):
     store, cfg, factory = index
     assert search(store, "session", cfg, signals=["code"], embedder_factory=factory).signals == ["code"]
-    # summary is configured but has no stored vectors: silently skipped
-    assert search(store, "x", cfg, signals=["bm25", "summary"], embedder_factory=factory).signals == ["bm25"]
+    # A configured vector type with no stored vectors is silently skipped.
+    cfg.vectors["other"] = VectorConfig(model="fake:64", enabled=False)
+    assert search(store, "x", cfg, signals=["bm25", "other"], embedder_factory=factory).signals == ["bm25"]
     with pytest.raises(ValueError):
         search(store, "x", cfg, signals=["nope"], embedder_factory=factory)
 
@@ -239,9 +241,9 @@ def test_kind_weights_push_kinds_down(index):
 def test_default_weights_are_neutral_and_a_config_can_set_them():
     from codemem.config import Config, config_from_dict
 
-    assert Config().test_weight == 1.0 and Config().kind_weights == {}  # D24: nothing is demoted
-    v2 = config_from_dict({"test_weight": 0.5, "kind_weights": {"class": 0.5, "block": 0.5}})
-    assert v2.test_weight == 0.5 and v2.kind_weights == {"class": 0.5, "block": 0.5}
+    assert Config().test_weight == 1.0 and Config().kind_weights == {}  # neutral: nothing is demoted
+    halved = config_from_dict({"test_weight": 0.5, "kind_weights": {"class": 0.5, "block": 0.5}})
+    assert halved.test_weight == 0.5 and halved.kind_weights == {"class": 0.5, "block": 0.5}
     assert config_from_dict({"kind_weights": {"class": 0.5}}).kind_weights == {"class": 0.5}
 
 
@@ -259,5 +261,5 @@ def test_bm25_queries_drop_stopwords_and_optionally_common_words(index):
     docs = store.term_doc_counts(w.strip('"') for w in words)
     total = store.chunk_total()
     assert '"revoke"' in words and all(0 < docs.get(w.strip('"'), 0) <= 0.5 * total for w in words)
-    cfg.bm25_common_share, cfg.bm25_query_terms = 0.0, 0  # v2: every word, stopwords too
+    cfg.bm25_common_share, cfg.bm25_query_terms = 0.0, 0  # every word, stopwords too
     assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "the" OR "session"'

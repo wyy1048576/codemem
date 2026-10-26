@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from .config import Config
+from .config import Config, VectorConfig
 from .embedder import Embedder, make_embedder
 from .schema import Chunk
 from .store import ChunkFilter, Store, VectorHit
@@ -192,13 +192,13 @@ TEST_FILTERS = ("include", "exclude", "only")
 
 
 def bm25_match(store: Store, query: str, config: Config) -> str | None:
-    """The query's words for BM25 (decisions D32). Stopwords are dropped (a query of stopwords
+    """The query's words for BM25 (docs/architecture.md §6). Stopwords are dropped (a query of stopwords
     only keeps them). A long query, over `bm25_query_terms` words, also drops the words the index
     lacks and the words more than `bm25_common_share` of chunks contain: their long posting lists
     made a 250-word query take 0.6 s on vLLM, and they weigh almost nothing. Rare words are not
     preferred: in an issue text they are often noise (versions, URLs, the reporter's own names),
     and keeping only the 32 rarest cost keyword search a third of its file MRR on the dev tasks.
-    `bm25_query_terms = 0` keeps every word, as v2 did. The index is unchanged."""
+    `bm25_query_terms = 0` keeps every word. The index is unchanged."""
     limit = config.bm25_query_terms
     if limit <= 0:
         return fts_or(tokenize(query, stem=config.bm25_stem, stopwords=config.bm25_stopwords))
@@ -221,7 +221,7 @@ def search(
     signals: Sequence[str] | None = None,
     path_prefix: str | None = None,
     debug: bool = False,
-    embedder_factory: Callable[[str, Config], Embedder] = make_embedder,
+    embedder_factory: Callable[[VectorConfig, Config], Embedder] = make_embedder,
     kinds: Sequence[str] | None = None,
     languages: Sequence[str] | None = None,
     test_weight: float | None = None,
@@ -264,14 +264,16 @@ def search(
 
     vec_signals = [s for s in signals if s != BM25]
     if vec_signals and (allowed is None or allowed):
-        # Embed the query once per distinct model, not once per vector set.
-        query_vecs: dict[str, np.ndarray] = {}
+        # Embed the query once per distinct model (and plugin and weights), not once per vector set.
+        query_vecs: dict[tuple, np.ndarray] = {}
         for vec_type in vec_signals:
-            model = config.vectors[vec_type].model
+            spec = config.vectors[vec_type]
+            model = (spec.model, spec.embedder, spec.version)
             if model not in query_vecs:
                 t = time.perf_counter()
-                query_vecs[model] = embedder_factory(model, config).embed_queries([query])[0]
-                timings[f"embed_query:{model}"] = time.perf_counter() - t
+                query_vecs[model] = embedder_factory(spec, config).embed_queries([query])[0]
+                label = f"{spec.model}+{spec.embedder}" if spec.embedder else spec.model
+                timings[f"embed_query:{label}"] = time.perf_counter() - t
             t = time.perf_counter()
             hits = store.vector_search(vec_type, query_vecs[model], n, allowed)
             ranked[vec_type] = [h.chunk_id for h in hits]

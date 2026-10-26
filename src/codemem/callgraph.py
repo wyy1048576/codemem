@@ -16,7 +16,7 @@ _TEST_FILE = re.compile(r"^(test_.*|.*_test|conftest)\.py$")
 
 
 def is_test_path(path: str) -> bool:
-    """v1 Python heuristic, kept for Refs built without an `is_test` flag. Chunks carry their own
+    """A Python-only heuristic, for Refs built without an `is_test` flag. Chunks carry their own
     language-aware `is_test` (see `LanguageSpec.is_test_path`)."""
     p = PurePosixPath(path)
     return bool(_TEST_FILE.match(p.name)) or any(part in _TEST_DIRS for part in p.parts[:-1])

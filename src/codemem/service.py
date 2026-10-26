@@ -4,7 +4,7 @@ The MCP server and `codemem watch` call `start()`. The CLI and the eval call `up
 `search()` directly. Creating a service has no side effects beyond opening the index, because the
 eval adapter re-pins `repo_root` after construction.
 
-Freshness (docs/architecture.md §8):
+Freshness (docs/architecture.md §4):
 - the watcher hands over batches of changed paths; a writer thread applies them (stage A), then
   embeds what they queued (stage B, in small batches, so new edits get applied in between);
 - `search()` hands every save seen so far to the writer thread and waits until it has applied
@@ -84,7 +84,10 @@ class CodememService:
         self._own_config = config is None  # loaded from the repo's files: reload it when they change
         self.config = config or load_config(self.repo_root)
         self.embedder_factory = embedder_factory
-        self.store = Store(self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords)
+        self.store = Store(
+            self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords,
+            vector_backend=self.config.vector_backend,
+        )
         self.state = "ready" if self.has_index() else "empty"
         self.progress = 0.0
         self.last_error: str | None = None
@@ -184,7 +187,7 @@ class CodememService:
         self.notify(set(), reconcile=True)
 
     def request_update(self) -> None:
-        """v2 name for a full catch-up."""
+        """Another name for `request_reconcile`."""
         self.request_reconcile()
 
     def _take_changes(self) -> tuple[set[str], bool, int]:
@@ -335,6 +338,12 @@ class CodememService:
             return
         if new != self.config:
             log.info("the config changed; the index follows it")
+            if new.vector_backend != self.store.vector_backend:
+                try:
+                    self.store.use_vector_backend(new.vector_backend)
+                except Exception:
+                    log.exception("could not load vector_backend %r; keeping the current config", new.vector_backend)
+                    return
             self.config = new
             self.store.tok_opts = {"stem": new.bm25_stem, "stopwords": new.bm25_stopwords}
             if self._indexer is not None:
@@ -424,11 +433,15 @@ class CodememService:
 
     def prewarm(self) -> None:
         """Load the embedding models and the search indexes, so the first query doesn't wait."""
-        for model in {self.config.vectors[v].model for v in self.config.enabled_vec_types()}:
+        specs = {}
+        for v in self.config.enabled_vec_types():
+            spec = self.config.vectors[v]
+            specs.setdefault((spec.model, spec.embedder, spec.version), spec)
+        for spec in specs.values():
             try:
-                self.embedder_factory(model, self.config).embed_queries(["warmup"])
+                self.embedder_factory(spec, self.config).embed_queries(["warmup"])
             except Exception:
-                log.exception("could not load embedding model %s", model)
+                log.exception("could not load embedding model %s", spec.model)
         try:
             self.store.load_vectors()
         except Exception:
@@ -480,7 +493,7 @@ class CodememService:
     def _models_ready(self, until: float) -> bool:
         """Whether the embedding models are loaded, waiting until `until` while they load. Starts
         loading them in the background if nothing has yet."""
-        embedders = [self.embedder_factory(self.config.vectors[v].model, self.config) for v in self.config.enabled_vec_types()]
+        embedders = [self.embedder_factory(self.config.vectors[v], self.config) for v in self.config.enabled_vec_types()]
         if all(e.ready for e in embedders):
             return True
         with self._cond:

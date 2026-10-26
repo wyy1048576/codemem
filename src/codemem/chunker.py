@@ -1,6 +1,6 @@
 """tree-sitter chunking for every supported language, plus call extraction.
 
-Chunks (see docs/data-model.md):
+Chunks (docs/architecture.md §3.2):
 - one per named function or method, nested ones included, from its first decorator, annotation or
   attribute line to the end of its body;
 - one per class-like type (class, struct, interface, enum, trait) covering the whole type; its

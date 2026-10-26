@@ -40,8 +40,8 @@ def test_query_document_similarity_is_semantic(config):
 
 def test_nl_query_finds_revoke_session(sample_repo, tmp_path, config):
     """Observed with jina-0.5b on CPU (Oct 2026): fused rank 7 with the neutral default weights
-    (D24: on this tiny fixture a test helper class, a test and two blocks rank above it), rank 3
-    with v2's 0.5 weights; usage rank 2, code rank 10. disable_user ranks first, which is a fair
+    (on this tiny fixture a test helper class, a test and two blocks rank above it), rank 3 with
+    tests, classes and blocks at half score; usage rank 2, code rank 10. disable_user ranks first, which is a fair
     answer here. What this checks is that the usage signal surfaces it."""
     store = Store(tmp_path / "idx")
     try:

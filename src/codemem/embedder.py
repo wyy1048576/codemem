@@ -1,14 +1,15 @@
 """Embedder interface: the local sentence-transformers (jina) embedder, any OpenAI-compatible
-embeddings API, and FakeEmbedder.
+embeddings API, an embedder class named in config (`vectors.<type>.embedder = "module:Class"`),
+and FakeEmbedder.
 
 Callers only see `embed_documents` / `embed_queries`; task prompts/prefixes are
 handled here. All outputs are float32, L2-normalized, shape (n, dim), at the model's full
 dimension: Matryoshka truncation (`embedding_dim`) is applied by the store when it builds the
 search index, so changing it never re-embeds.
 
-`Embedder.key` names the embedding space of document vectors (model, prompt, max length, dtype,
-device): vectors with equal keys are interchangeable, so the store and the vector cache reuse
-them by (key, text hash).
+`Embedder.key` names the embedding space of document vectors (model and its weights version,
+prompt, max length, dtype, device): vectors with equal keys are interchangeable, so the store and
+the vector cache reuse them by (key, text hash).
 """
 
 from __future__ import annotations
@@ -27,7 +28,8 @@ from urllib.parse import urlparse
 
 import numpy as np
 
-from .config import Config, EmbeddingConfig
+from .config import Config, EmbeddingConfig, VectorConfig, model_version
+from .plugins import load_object
 from .tokenize import tokenize
 
 log = logging.getLogger(__name__)
@@ -56,9 +58,10 @@ class Embedder(ABC):
     def dim(self) -> int: ...
 
     @property
-    @abstractmethod
     def key(self) -> str:
-        """Identity of the document-vector space; equal keys give interchangeable vectors."""
+        """Identity of the document-vector space; equal keys give interchangeable vectors. Every
+        built-in embedder defines it. A plugin class need not: PluginEmbedder names its vectors."""
+        raise NotImplementedError(f"{type(self).__name__} does not name its vectors")
 
     @abstractmethod
     def embed_documents(self, texts: Sequence[str]) -> np.ndarray: ...
@@ -150,8 +153,10 @@ class SentenceTransformerEmbedder(Embedder):
         batch_size: int = 16,
         max_seq_length: int | None = 1024,
         dtype: str = "auto",
+        version: str | None = None,
     ):
         self.model_name = model_name
+        self.version = version  # of the weights (config.model_version); None for a hub name
         self.device_preference = device
         self.dtype_preference = dtype
         self.batch_size = batch_size
@@ -178,7 +183,8 @@ class SentenceTransformerEmbedder(Embedder):
 
     @property
     def key(self) -> str:
-        return f"{self.model_name}|doc|L{self.max_seq_length}|{self.dtype}|{self.device}"
+        model = f"{self.model_name}#{self.version}" if self.version else self.model_name  # unchanged for hub names
+        return f"{model}|doc|L{self.max_seq_length}|{self.dtype}|{self.device}"
 
     @property
     def model(self):
@@ -369,24 +375,69 @@ def _retry_after(response: Any) -> float | None:
         return None
 
 
+class PluginEmbedder(Embedder):
+    """An embedder class named in config (`vectors.<type>.embedder = "module:Class"`), built
+    as Class(model, config). It subclasses Embedder and gives `dim`, `embed_documents` and
+    `embed_queries`; codemem names its vectors by model, weights version, class and the settings
+    passed to it, so a new class or new weights re-embed. Its vectors are normalized here."""
+
+    def __init__(self, spec: str, model_name: str, config: Config, version: str | None):
+        inner = load_object(spec)(model_name, config)
+        if not isinstance(inner, Embedder):
+            raise TypeError(f"{spec} must subclass codemem.embedder.Embedder")
+        self.inner, self.spec, self.model_name, self.version = inner, spec, model_name, version
+        self._settings = f"L{config.max_seq_length}|{config.dtype}|{config.device}"
+
+    @property
+    def dim(self) -> int:
+        return self.inner.dim
+
+    @property
+    def key(self) -> str:
+        model = f"{self.model_name}#{self.version}" if self.version else self.model_name
+        return f"{model}|plugin={self.spec}|{self._settings}"
+
+    @property
+    def ready(self) -> bool:
+        return self.inner.ready
+
+    def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
+        return l2_normalize(self.inner.embed_documents(texts))
+
+    def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
+        return l2_normalize(self.inner.embed_queries(texts))
+
+
 _CACHE: dict[tuple, Embedder] = {}
 _CACHE_LOCK = threading.Lock()
 
 
-def make_embedder(model_name: str, config: Config) -> Embedder:
-    """Build (or reuse) the embedder for a model name. `fake` / `fake:<dim>` -> FakeEmbedder. With
-    `[embedding] provider = "openai"`, every other model name means the API's `[embedding] model`."""
+def make_embedder(spec: VectorConfig | str, config: Config) -> Embedder:
+    """Build (or reuse) the embedder for a vector type's settings (or a bare model name), in this
+    order: `fake` / `fake:<dim>` -> FakeEmbedder, even with a plugin set, so CODEMEM_MODEL=fake
+    always gives a test setup; a plugin (`embedder = "module:Class"`); with `[embedding] provider =
+    "openai"`, the API's `[embedding] model` for every vector type; else sentence-transformers."""
+    if isinstance(spec, str):
+        spec = VectorConfig(model=spec)
+    model_name = spec.model
     fake = model_name == "fake" or model_name.startswith("fake:")
     emb = config.embedding
-    if emb.remote and not fake:
-        key: tuple = ("api", *(getattr(emb, f) for f in emb.__dataclass_fields__))
-    else:
-        key = (model_name, config.device, config.dtype, config.batch_size, config.max_seq_length)
+    settings = (config.device, config.dtype, config.batch_size, config.max_seq_length)
+    if fake:
+        key: tuple = ("fake", model_name, *settings)
+    elif spec.embedder:
+        key = ("plugin", spec.embedder, model_name, model_version(spec), *settings)
+    elif emb.remote:
+        key = ("api", *(getattr(emb, f) for f in emb.__dataclass_fields__))
+    else:  # the version is in the key, so new weights saved over a model folder load fresh
+        key = ("local", model_name, model_version(spec), *settings)
     with _CACHE_LOCK:
         if key not in _CACHE:
             if fake:
                 dim = int(model_name.split(":", 1)[1]) if ":" in model_name else 64
                 _CACHE[key] = FakeEmbedder(dim)
+            elif spec.embedder:
+                _CACHE[key] = PluginEmbedder(spec.embedder, model_name, config, key[3])
             elif emb.remote:
                 _CACHE[key] = OpenAIEmbedder(emb)
             else:
@@ -396,5 +447,6 @@ def make_embedder(model_name: str, config: Config) -> Embedder:
                     batch_size=config.batch_size,
                     max_seq_length=config.max_seq_length,
                     dtype=config.dtype,
+                    version=key[2],
                 )
         return _CACHE[key]

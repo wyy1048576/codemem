@@ -622,8 +622,8 @@ def test_the_first_mcp_search_does_not_wait_for_the_model_to_load(sample_repo, t
     built.close()
     models = {}
 
-    def factory(name, cfg):
-        return models.setdefault(name, _LoadingModel(make_embedder(name, cfg), delay=2.0))
+    def factory(spec, cfg):
+        return models.setdefault(spec.model, _LoadingModel(make_embedder(spec, cfg), delay=2.0))
 
     svc = CodememService(sample_repo, index_dir=tmp_path / "idx", embedder_factory=factory)
     try:
