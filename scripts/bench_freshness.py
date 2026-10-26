@@ -31,8 +31,7 @@ from codemem.store import Store
 
 def config(model: str) -> Config:
     cfg = Config(vector_cache="off")
-    cfg.vectors = {"code": VectorConfig(model=model), "usage": VectorConfig(model=model),
-                   "summary": VectorConfig(enabled=False)}
+    cfg.vectors = {"code": VectorConfig(model=model), "usage": VectorConfig(model=model)}
     return cfg
 
 
