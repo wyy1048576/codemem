@@ -377,7 +377,10 @@ must stay the same.
   index.db                           SQLite (WAL): meta, files, chunks, fts (+ fts_vocab), calls, edges, vectors,
                                      dirty_texts (the queue)
   vec_code.faiss, vec_code.json      a saved copy of the search index + a note {epoch, dim, count, embedder,
-  vec_usage.faiss, vec_usage.json    backend, file}; another backend saves vec_<type><suffix>, or nothing
+  vec_usage.faiss, vec_usage.json    backend, file}; another backend saves vec_<type><suffix>, or nothing.
+                                     FAISS files hold an IndexIDMap2 over an fp16 IndexScalarQuantizer
+                                     (inner product, 2 bytes per number); a file of 4-byte numbers
+                                     (IndexFlatIP) is converted when loaded
   write.lock                         one writer at a time (OS file lock)
 $CODEMEM_HOME/cache/vectors.db       shared vector cache: (embedder key, text_hash) -> float16 vector
 $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sha256], so it is read once
