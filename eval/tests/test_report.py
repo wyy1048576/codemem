@@ -176,3 +176,97 @@ def test_cli_report(run_dir, capsys):
     out = capsys.readouterr().out
     assert "report.md: 6 tasks" in out and "Holm over 4 tests" in out and "cm-a" in out
     assert main(["report", "missing"]) == 1
+
+
+# ---- F5 B1: the filter, the new groups, grep-only runs
+
+# task -> gold_all_python, repo_py_files, code_lines_changed, n_gold_files (None: the tag is missing)
+TAGS = {"acme__auth-1": (True, 999, 10, 1), "acme__auth-2": (True, 1000, 11, 2), "acme__auth-3": (True, 5000, 50, 1),
+        "acme__web-4": (True, 5001, 51, 1), "acme__web-5": (False, None, 3, 3), "acme__web-6": (False, 20000, None, 1)}
+
+
+@pytest.fixture
+def tagged(run_dir):
+    """The run of run_dir, with fresh-task tags on its tasks (the tasks file hash is updated)."""
+    from dataclasses import replace
+
+    from cmeval.tasks import load_tasks
+
+    meta_path = run_dir / "meta.json"
+    tasks_file = json.loads(meta_path.read_text())["tasks_file"]
+    tagged_tasks = []
+    for task in load_tasks(tasks_file):
+        names = ("gold_all_python", "repo_py_files", "code_lines_changed", "n_gold_files")
+        extra = {k: v for k, v in zip(names, TAGS[task.id]) if v is not None}
+        tagged_tasks.append(replace(task, tags={**task.tags, **extra}))
+    save_tasks(tasks_file, tagged_tasks)
+    edit_json(meta_path, tasks_sha256=hashlib.sha256(open(tasks_file, "rb").read()).hexdigest())
+    return run_dir
+
+
+def test_parse_where():
+    from cmeval.report import parse_where
+
+    assert parse_where(["gold_all_python=true", "n_gold_files=2", "repo=Acme/Web", "x=False"]) == \
+        [("gold_all_python", True), ("n_gold_files", 2), ("repo", "Acme/Web"), ("x", False)]
+    assert parse_where(None) == []
+    for bad in ("gold_all_python", "=true", "gold_all_python="):
+        with pytest.raises(ReportError, match="KEY=VALUE"):
+            parse_where([bad])
+
+
+def test_the_filter_limits_every_table(tagged):
+    result = report("r1", baseline="grep-fn", primary=PRIMARY, where=["gold_all_python=true"], resamples=500)
+    assert (result.tasks_scored, result.left_out, result.filter) == (4, 2, "gold_all_python=true")
+    assert result.warnings == []  # score-meta.json still has all 6 tasks: no false "score it again"
+    assert {c.n for c in result.primary if c.metric == "mrr"} == {4}
+    text = result.report_path.read_text()
+    assert "- Filter: gold_all_python=true: 4 of 6 scored tasks (2 left out" in text
+    assert "| cm-a | 4 | 1.000 [1.000, 1.000] |" in text and "4 tasks scored" in text
+    assert "## Tasks left out by the filter" in text and "| left out | 2 | 0.500 (2) | 1.000 (2) |" in text
+    assert "over all 6 scored tasks: the filter does not apply to them" in text
+
+
+def test_many_conditions_and_text_values(tagged):
+    result = report("r1", baseline="grep-fn", primary=PRIMARY, where=["repo=ACME/WEB", "gold_all_python=false"], resamples=500)
+    assert (result.tasks_scored, result.left_out) == (2, 4)
+
+
+def test_filter_refusals(tagged):
+    with pytest.raises(ReportError, match="no scored task has \\['gold_python'\\]; known keys: .*gold_all_python"):
+        report("r1", baseline="grep-fn", primary=PRIMARY, where=["gold_python=true"])
+    with pytest.raises(ReportError, match="no scored task matches"):
+        report("r1", baseline="grep-fn", primary=PRIMARY, where=["repo=acme/nope"])
+
+
+def test_size_groups_in_natural_order(tagged):
+    text = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).report_path.read_text()
+    section = text.split("### By repo size (Python files; proposed cutoffs)")[1].split("###")[0]
+    rows = ["| small (< 1,000) | 1 |", "| medium (1,000 to 5,000) | 2 |", "| large (> 5,000) | 2 |", "| unknown | 1 |"]
+    assert [section.index(r) for r in rows] == sorted(section.index(r) for r in rows)  # natural order, unknown last
+    section = text.split("### By fix size (changed code lines)")[1].split("###")[0]
+    rows = ["| up to 10 | 2 |", "| 11 to 50 | 2 |", "| over 50 | 1 |", "| unknown | 1 |"]
+    assert [section.index(r) for r in rows] == sorted(section.index(r) for r in rows)
+    section = text.split("### By gold files")[1].split("###")[0]
+    assert "| 1 | 4 |" in section and "| 2 or more | 2 |" in section
+    assert "### By gold all Python" in text and "| false | 2 |" in text
+
+
+def test_a_run_without_codemem_has_no_primary_tests(run_dir):
+    meta = json.loads((run_dir / "meta.json").read_text())
+    for system in meta["systems"]:
+        system["adapter"] = "grep"  # a grep-only run, like the fresh grep baselines
+    (run_dir / "meta.json").write_text(json.dumps(meta))
+    result = report("r1", baseline="grep-fn", resamples=500)
+    text = result.report_path.read_text()
+    assert result.primary == [] and "No primary systems in this run (it has no codemem system)" in text
+    assert "Holm correction over all 0 tests" not in text
+    with pytest.raises(ReportError, match=r"primary systems \['cm-x'\]"):
+        report("r1", baseline="grep-fn", primary=["cm-x"])  # an explicit list is still checked
+
+
+def test_cli_report_with_a_filter(tagged, capsys):
+    args = ["report", "r1", "--baseline", "grep-fn", "--primary", "cm-a", "--where", "gold_all_python=true"]
+    assert main(args) == 0
+    assert "4 tasks (filter gold_all_python=true; 2 tasks left out)" in capsys.readouterr().out
+    assert main(["report", "r1", "--baseline", "grep-fn", "--where", "nope"]) == 1

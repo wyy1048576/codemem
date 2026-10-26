@@ -13,6 +13,7 @@ texts (those stay in `CMEVAL_HOME/runs/<run id>/`, outside git).
 | `2026-10-24-subset-b4/` | The update vs. rebuild check for codemem v2 on those 13 tasks: PASS (update at `31c0f99`, rebuild at `18d3b77`). |
 | `2026-10-25-subset-v3/` | codemem v3 (`configs/codemem-v3.toml` at codemem `96bc2bc`) on the same 13 tasks, on an M1: the v3 default (neutral weights, BM25 queries without stopwords) and five variants. Indicative only; see `docs/decisions.md` §4, which also compares it with v2, the MVP and the grep baselines task by task. |
 | `2026-10-25-subset-v3-b4/` | The update vs. rebuild check for codemem v3 on those 13 tasks: PASS, both at codemem `96bc2bc` (13/13 tasks with the same top 10 for all six systems, metric differences 0.0000). |
+| `2026-10-25-fresh-dev-grep-b/` | The grep baselines (grep, grep-fn, grep-fn-plus) on the 399 fresh dev tasks (`tasks/fresh-v1.jsonl`), at `3743a30`. The report is made with `--where gold_all_python=true` (364 tasks; the 35 others are in its last section). No codemem systems yet: they join with `cmeval merge` after the codemem changes land. Dev split. |
 
 Files in a run folder:
 
@@ -25,5 +26,6 @@ Files in a run folder:
 - `index.jsonl`: build and update cost for each task.
 
 To make the report again from these files, unpack `scores.jsonl.gz` next to the other files and run
-`cmeval report <folder>`. The tasks file must be `tasks/swebv-dev50.jsonl` with the same sha256
-(`--tasks tasks/swebv-dev50.jsonl` on another machine).
+`cmeval report <folder>`. The tasks file must be the run's (`tasks/swebv-dev50.jsonl` or
+`tasks/fresh-v1.jsonl`) with the same sha256 (`--tasks tasks/<file>.jsonl` on another machine).
+For the fresh run, add `--where gold_all_python=true`.

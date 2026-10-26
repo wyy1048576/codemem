@@ -158,13 +158,14 @@ def cmd_report(args) -> int:
     try:
         kwargs = {"primary": args.primary} if args.primary else {}
         result = report(args.run, baseline=args.baseline, split=args.split, cutoff=args.cutoff, tasks_file=args.tasks,
-                        **kwargs)
+                        where=args.where, **kwargs)
     except (ReportError, ScoreError, TaskError) as exc:
         print(f"report {args.run}: {exc}", file=sys.stderr)
         return 1
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
-    print(f"{result.report_path}: {result.tasks_scored} tasks")
+    where = f" (filter {result.filter}; {result.left_out} tasks left out)" if result.filter else ""
+    print(f"{result.report_path}: {result.tasks_scored} tasks{where}")
     if result.primary:
         print(f"  primary metrics vs. {args.baseline} (Holm over {len(result.primary)} tests):")
     for c in result.primary:
@@ -391,6 +392,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="system for the primary tests (repeatable; default: the 3 codemem systems)")
     p.add_argument("--cutoff", default="2026-07-01", help="issue date that splits tasks into before and after (default 2026-07-01)")
     p.add_argument("--tasks", type=Path, default=None, help="tasks file to use instead of the path in meta.json (same sha256)")
+    p.add_argument("--where", action="append", default=None, metavar="KEY=VALUE",
+                   help="only tasks with this tag value, for example gold_all_python=true; repeatable (all must match)")
     p.set_defaults(func=cmd_report)
 
     p = sub.add_parser("merge", help="copy systems of one run into a copy of another run, for one report")

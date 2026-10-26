@@ -46,7 +46,7 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 | `cmeval review` | Not built yet |
 | `cmeval run --tasks FILE --config FILE --run-id ID [--split dev\|test] [--repo R] [--limit-per-repo N] [--index-mode update\|rebuild]` | Run every system on every task; saves hits and timings (see "Run files") |
 | `cmeval score RUN [--tokens anthropic\|estimate] [--iou T ...]` | Score a run: accuracy, tokens, latency (see "Metrics") |
-| `cmeval report RUN [--baseline grep-fn-plus] [--split dev\|test] [--cutoff DATE] [--tasks FILE]` | Write `report.md` for a scored run: tables, intervals, paired tests |
+| `cmeval report RUN [--baseline grep-fn-plus] [--split dev\|test] [--cutoff DATE] [--tasks FILE] [--where KEY=VALUE ...]` | Write `report.md` for a scored run: tables, intervals, paired tests, and groups (repo, language, issue date, identifier in query, gold all Python, repo size, fix size, gold files). `--where` keeps only the tasks whose tag has that value; the main comparison on fresh tasks uses `--where gold_all_python=true` (codemem reads only Python). The tasks left out get their own section. A run with no codemem system has no primary tests. |
 | `cmeval merge BASE EXTRA --run-id ID [--system S ...]` | Copy systems of one run into a copy of another run, for one report |
 | `cmeval compare RUN_A RUN_B [--tasks FILE]` | Update vs. rebuild check: compare two scored runs of the same tasks |
 | `cmeval dashboard [--port 8765] [--open]` | A local web page with the live progress of long jobs (see "Watch a long job") |
