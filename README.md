@@ -1,10 +1,27 @@
 # codemem
 
-Local, agent-agnostic code search. Point it at a Python repository and it indexes every
-function, then serves hybrid search (BM25 + embeddings, merged with RRF) to coding agents
-over **MCP** and to humans and eval scripts through a **CLI**. Your code never leaves the machine.
+Local, agent-agnostic code search. Point it at a repository in any of nine languages (Python,
+JavaScript, TypeScript, Go, Java, C, C++/CUDA, Rust). It indexes every function, class and block
+of top-level code, and serves hybrid search (BM25 + embeddings, merged with RRF) to coding agents
+over **MCP** and to people and eval scripts through a **CLI**. Your code never leaves the machine
+unless you choose an embedding API.
 
-Design and decisions: [docs/design-notes.md](docs/design-notes.md).
+**What it is for:** vague, feature-level questions in a codebase you don't know well, such as
+"I want to add login auth, where do I start?" or "add OCR to my upload pipeline". Keyword search
+fails on these and grep takes many tries. codemem works next to grep (which stays the tool for
+exact strings), not instead of it.
+
+**Status:** on branch `andre/backend-v3`, the v3 core works: incremental updates, a fresh index
+before every search, and a record of every file that isn't indexed. API embeddings and the MCP tool
+changes come next. [docs/architecture.md](docs/architecture.md) §2 has the status of each part.
+
+| Doc | For |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | why it exists and how it works end to end, with one running example |
+| [docs/data-model.md](docs/data-model.md) | every stored record, plus the contracts: MCP tools, the eval adapter, the config |
+| [docs/decisions.md](docs/decisions.md) | every design choice and constant, why it has its value, and the parked questions |
+| [docs/exa.md](docs/exa.md) | what we take from Exa's engineering blog |
+| [docs/advanced-design.md](docs/advanced-design.md) | research questions and directions: anchors, routing, multi-vector, training, highlights, compression |
 
 ## Install
 
@@ -16,12 +33,12 @@ For development:
 
 ```bash
 uv sync
-uv run pytest              # fast suite, FakeEmbedder, no model download
+uv run pytest              # fast suite with a fake embedding model, no download
 uv run pytest -m model     # real jina-code-embeddings-0.5b (downloads ~1 GB once)
 ```
 
-Python 3.11+. Works on Windows, macOS and Linux. PyTorch from PyPI is CPU-only on Windows,
-which is the default device here.
+Python 3.11+. Works on Windows, macOS and Linux. In this workspace, run
+`source .cache/env.sh` first, so models, caches and indexes stay inside the project.
 
 ## Quick start
 
@@ -34,102 +51,79 @@ codemem status
 
 | Command | What it does |
 |---|---|
-| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--write-agent-notes] [--dry-run] [-y]` | Register with agents, then index |
-| `codemem index [PATH] [--full] [--json]` | Build or incrementally update the index |
-| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--json] [--debug]` | Search |
-| `codemem status [PATH] [--json]` | Counts, models, indexed commit, staleness |
-| `codemem watch [PATH]` | Foreground watcher: re-index on save |
+| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--write-agent-notes] [--dry-run] [-y]` | register with agents, then index (with `--no-index`, it still downloads the model, so the first search doesn't wait) |
+| `codemem index [PATH] [--full] [--no-cache] [--verify] [--json]` | build or update the index (`--no-cache`: cold timing; `--verify`: then compare with a fresh build) |
+| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--kinds function,method] [--language go] [--tests include\|exclude\|only] [--json] [--debug]` | search |
+| `codemem status [PATH] [--json]` | counts, models, indexed commit, staleness |
+| `codemem watch [PATH]` | foreground watcher: re-index on save |
 | `codemem mcp [PATH]` | MCP server over stdio (what agents launch) |
+| `codemem languages` | supported languages and file extensions |
 
-Every command accepts `--index-dir DIR`. The eval harness uses it for per-commit indexes.
+Every command accepts `--index-dir DIR`; the eval harness uses it for per-commit indexes.
 
 ### Agents
 
 - **Claude Code:** `init --agents claude` writes a project `.mcp.json`. You can also run
   `claude mcp add codemem -- codemem mcp`.
+- **No `codemem` on PATH** (installed in a virtualenv, not with `uv tool` or pipx): `init` writes
+  `<that python> -m codemem mcp` instead, which works while that environment exists.
 - **Cursor:** `init --agents cursor` writes `.cursor/mcp.json`.
-- **Codex:** `init --agents codex` prints a `~/.codex/config.toml` snippet. It never edits
-  that global file.
+- **Codex:** `init --agents codex` prints a `~/.codex/config.toml` snippet. It never edits that
+  global file.
 
-The MCP server exposes three tools: `search_code(query, k, path_prefix)`, `get_chunk(ref)`
-and `index_status()`. On startup it answers the handshake immediately, runs a hash-based
-catch-up (or the first full index) in the background, and starts a file watcher. Until the
-first index is done, search results carry an "indexing, X% done" note.
+The MCP server exposes four tools (data-model.md §12.1):
+- `search_code(query, k, path_prefix, kinds, tests)`: plain-language or identifier search. A note
+  says when a recent save or embedding isn't in yet.
+- `get_chunk(ref)`: one result in full, with callers and callees.
+- `index_status()`: readiness, what is still being indexed, and what isn't indexed and why.
+- `refresh_index()`: a full check now, for after `git checkout`, pull or rebase.
 
-## How it works
-
-```
-walk .py files (respects .gitignore) -> tree-sitter chunks (one per function/method + file header)
-  -> call graph (name heuristic) -> texts per chunk: code, usage (callers/tests), summary (slot)
-  -> embed each text type into its own FAISS index (jina-code-embeddings-0.5b)
-  -> SQLite: chunks, FTS5 (pre-tokenized, weighted BM25), calls/edges, embedding hashes
-search: BM25 top-N + vector top-N per enabled set -> RRF (k=60) -> result cards
-```
-
-- **Incremental updates** re-chunk only changed files (content hash, mtime pre-check), rebuild
-  all texts, and re-embed only the texts whose hash changed. Renaming a caller therefore
-  refreshes the callee's usage vector and leaves its code vector alone.
-- **Ablations:** pick the signals per query (`--signals bm25,usage`). Each vector set can be
-  enabled or disabled, or given its own model, in the config.
-- **Crash safety:** each `vec_<type>.faiss` has an `ids.json` sidecar. If an update is
-  interrupted, the next run detects the mismatch and re-embeds what's missing.
-- **Concurrency:** one writer per index (OS file lock) and SQLite WAL, so searches keep
-  working during updates.
-
-### Code map
-
-| Module | Role |
-|---|---|
-| `config.py` | settings, index paths, per-vector-type models |
-| `schema.py` | `Chunk` dataclass, keys, hashes |
-| `chunker.py` | tree-sitter Python chunking + call extraction |
-| `tokenize.py` | code-aware BM25 tokenization (shared by index and query) |
-| `callgraph.py` | call resolution heuristic (isolated so it can be replaced) |
-| `texts.py` | text-builder registry: `code`, `usage`, `summary` slot |
-| `embedder.py` | `Embedder` interface, sentence-transformers/jina, `FakeEmbedder` |
-| `store.py` | SQLite + `VectorStore` (FAISS `IndexIDMap2(IndexFlatIP)`) |
-| `indexer.py` | full + incremental indexing, timings |
-| `search.py` | BM25, vector search, RRF, result cards (pure library function) |
-| `service.py` | long-lived owner of an index: background updates, progress, watcher |
-| `watcher.py` | watchdog + debounce |
-| `prompts.py` | **all** agent-facing text (tool descriptions, instructions, notes) |
-| `agents.py` | agent config writers for `init` |
-| `server.py`, `cli.py`, `render.py` | thin front-ends |
-
-Library use (for retrieval and eval work):
-
-```python
-from codemem.service import CodememService
-svc = CodememService("path/to/repo", index_dir="idx/requests@abc123")
-svc.update()
-resp = svc.search("retry on connection failure", k=10, signals=["bm25", "code"], debug=True)
-print(resp.to_dict())
-```
+Searches catch up on your saves first (at most `catchup_budget_ms`, 4 s), so an agent finds the
+code it just wrote.
+- **Startup:** it answers the handshake at once, and runs the catch-up (or the first full index)
+  in the background.
+- **Watcher:** it starts a file watcher.
+- **First index:** until it's done, search results carry an "indexing, X% done" note.
 
 ## Configuration
 
 `~/.codemem/config.toml`, overridden per repo by `<repo>/.codemem.toml`, then by environment
-variables (`CODEMEM_HOME`, `CODEMEM_DEVICE`, `CODEMEM_MODEL`, `CODEMEM_STEERING`).
+variables (`CODEMEM_HOME`, `CODEMEM_DEVICE`, `CODEMEM_MODEL`, `CODEMEM_STEERING`,
+`CODEMEM_VECTOR_CACHE`). Why each default has its value: [docs/decisions.md](docs/decisions.md) §2.
 
 ```toml
 device = "auto"              # auto | cpu | xpu | cuda | mps   (auto = cuda, then mps, else cpu)
-embedding_dim = 256          # optional Matryoshka truncation; omit for full 896
+dtype = "auto"               # auto = float16 on cuda/mps, float32 on cpu
+embedding_dim = 256          # optional Matryoshka truncation; omit for the full 896 (no re-embedding)
 batch_size = 16
 max_seq_length = 1024
 steering = "light"           # none | light | strong  (agent-study variable)
-max_file_size = 1000000
+max_file_size = 10000000     # larger files are listed as skipped (too_large), never silently
 ignore = ["migrations/"]     # extra gitignore-style patterns
+use_default_ignore = true    # also skip vendor/, *.min.js, *_pb2.py, *.pb.go, ...
+skip_generated = true        # skip "Code generated ... DO NOT EDIT" / "@generated" files
+languages = ["python", "go"] # optional; default: every supported language
+code_header = true           # path / enclosing-scope header above embedded code
+window_chars = 3000          # longer code is split into windows (default from max_seq_length)
+vector_cache = "global"      # global | off (reuse vectors across indexes)
+kinds = ["function", "method"]  # optional search-time filter; default: every kind
+test_weight = 0.5            # search-time; v3 default: 1.0 (neutral)
+kind_weights = { class = 0.5, block = 0.5 }  # search-time; v3 default: none
+debounce_ms = 500            # the background writer starts once saves stop for this long,
+debounce_max_wait_ms = 2000  # or at the latest this long after the first save
+catchup_budget_ms = 4000     # a search first applies and embeds pending edits for at most this long
 
 [vectors.code]
 model = "jinaai/jina-code-embeddings-0.5b"
 [vectors.usage]
 model = "jinaai/jina-code-embeddings-0.5b"
-enabled = true
 [vectors.summary]
-enabled = false              # slot only in Week 1
+enabled = false              # slot only
 
 [bm25]
-weights = [10.0, 5.0, 1.0]   # name, signature, body
+query_terms = 32             # search-time: queries drop stopwords (0 = keep every word, as v2)
+common_share = 0.0           # opt-in: a query over 32 words also drops words in more than this share of chunks (faster, less accurate)
+weights = [10.0, 3.0, 5.0, 2.0, 1.0]   # name, path, signature, doc, body (v1 triples accepted)
 [rrf]
 k = 60
 weights = { bm25 = 1.0, code = 1.0, usage = 1.0 }
@@ -139,24 +133,79 @@ max_items = 20
 include_commits = false
 ```
 
-Changing a vector type's model (or `embedding_dim`) rebuilds only that vector set.
-`CODEMEM_MODEL=fake` uses the hash-based `FakeEmbedder` everywhere, which is handy for fast
-dev runs.
+**(v3) Remote embeddings,** opt-in. Any OpenAI-compatible endpoint works. The key is read from
+the named environment variable and never stored:
 
-**Intel Arc / XPU:** `device = "xpu"` needs a PyTorch build with XPU support (installed from
-PyTorch's XPU wheel index). This is experimental: if `torch.xpu` is unavailable, codemem logs
-a warning and falls back to CPU.
+```toml
+[embedding]
+provider = "openai"                 # local (default) | openai = any OpenAI-compatible /embeddings API
+model = "Qwen/Qwen3-Embedding-8B"   # used for every vector type, documents and queries alike
+base_url = "https://api.studio.nebius.com/v1"   # from your provider's docs
+api_key_env = "NEBIUS_API_KEY"      # the key is read from this variable, never stored; "" = no key
+dimensions = 1024                   # optional: shorter vectors (Qwen3-Embedding-8B returns 4,096)
+query_prefix = "Instruct: Given a code search request, retrieve the relevant code\nQuery: "
+batch_size = 64                     # texts per request
+max_concurrency = 4                 # requests in flight
+```
 
-**Apple Silicon / MPS:** `device = "mps"` uses the Mac GPU through the standard PyTorch wheel.
-`auto` picks it when CUDA is unavailable. On other platforms, codemem logs a warning and falls
-back to CPU.
+Remote embedding sends your code to the provider; `codemem status` says so. Retries with backoff
+cover rate limits and server errors. With the API, `[vectors.*] model` is not used. The API
+client needs `httpx`, which codemem's own environment has (through its dependencies); install it
+if your environment lacks it. A smoke test against Nebius: `NEBIUS_API_KEY=… uv run pytest -m api`.
+
+Other notes:
+- **Changing settings.** Changing a vector type's model re-embeds only that vector set. Changing
+  `embedding_dim` only rebuilds the FAISS index from the stored vectors.
+- **Fast dev runs.** `CODEMEM_MODEL=fake` uses the hash-based `FakeEmbedder` everywhere.
+- **Apple Silicon (MPS):** `device = "mps"` uses the Mac GPU, and `auto` picks it when CUDA is
+  unavailable.
+- **Intel Arc (XPU):** `device = "xpu"` needs a PyTorch build with XPU support. It is
+  experimental and falls back to CPU with a warning.
 
 ## Index location
 
-`~/.codemem/indexes/<repo-name>-<hash-of-abs-path>/` by default (`CODEMEM_HOME` moves the
-base). It contains `index.db`, `vec_<type>.faiss` (+ `.ids.json`) and `write.lock`.
+`~/.codemem/indexes/<repo-name>-<hash-of-abs-path>/` by default (`CODEMEM_HOME` moves the base).
+It contains `index.db`, `vec_<type>.faiss` (plus a `.json` note with its epoch) and `write.lock`.
+The shared vector cache is `~/.codemem/cache/vectors.db`.
+
+## Evaluating
+
+The eval harness lives in `eval/` (Andrew's `cmeval`; see `eval/README.md`). To run codemem's
+systems on the dev tasks:
+
+```bash
+cd eval && uv sync --extra codemem
+uv run cmeval run --tasks tasks/swebv-dev50.jsonl --config configs/codemem-v2.toml --run-id my-run
+uv run cmeval score my-run            # --tokens estimate if no ANTHROPIC_API_KEY
+uv run cmeval report my-run --baseline cm2-bm25 --primary cm2-bm25-code --primary cm2-full
+```
+
+Configs:
+- `configs/codemem-v2.toml` holds search-time variants that share one index. Each system pins its
+  weights, so a name keeps its meaning if the defaults change.
+- `configs/codemem-v2-weights.toml` holds the weightings v2's defaults were chosen from.
+- `configs/codemem-v2-ablations.toml` holds index-time ablations, each with its own index.
+- `configs/baseline-v2.toml` adds the grep baselines (they need ripgrep).
+
+**The full dev50** runs on Andrew's machine or a CUDA GPU in under an hour. The M1 is about 14×
+slower:
+
+```bash
+uv run cmeval run --tasks tasks/swebv-dev50.jsonl --config configs/codemem-v2.toml --run-id dev50-v2
+uv run cmeval score dev50-v2
+uv run python ../scripts/compare_scores.py results/2026-10-23-dev50-final/scores.jsonl.gz cm-bm25-code-usage \
+    $CMEVAL_HOME/runs/dev50-v2/scores.jsonl cm2-full
+```
+
+`compare_scores.py` compares any two scored runs task by task.
+
+## Team
+
+- **Andre:** backend, retrieval, research.
+- **Andrew:** evaluation (`eval/`).
+- **Wilson:** the Week 1 MVP, and the MCP front-end's portability (to be compared with v3).
 
 ## License note
 
-`jina-code-embeddings` models are reportedly licensed for **non-commercial** use (CC BY-NC
-4.0). That's fine for this course project; check before any other use.
+`jina-code-embeddings` models are reportedly licensed for **non-commercial** use (CC BY-NC 4.0).
+That's fine for this course project; check before any other use.

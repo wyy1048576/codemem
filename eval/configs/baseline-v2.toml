@@ -1,0 +1,65 @@
+# Baseline comparison for codemem v2: the grep baselines of baseline.toml and the codemem v2
+# systems of codemem-v2.toml (which share one index; see there for the search-time weights).
+# Needs: uv sync --extra codemem, and ripgrep.
+
+[[system]]
+name = "grep"
+adapter = "grep"
+
+[[system]]
+name = "grep-fn"
+adapter = "grep_fn"
+
+# The stronger grep baseline (2026-10-23): Python files only, rare keywords weigh more, noisy
+# keywords dropped, tests last. The report's primary tests compare against it.
+[[system]]
+name = "grep-fn-plus"
+adapter = "grep_fn"
+types = ["py"]
+weighting = "idf"
+clean_keywords = true
+tests_last = true
+
+[[system]]
+name = "cm2-bm25"
+adapter = "codemem"
+signals = ["bm25"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+[[system]]
+name = "cm2-bm25-code"
+adapter = "codemem"
+signals = ["bm25", "code"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+[[system]]
+name = "cm2-bm25-code-usage"  # all three signals, no weights
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { class = 1.0, block = 1.0 } }
+
+# codemem v2 as agents get it: all signals, tests / classes / blocks at half weight (the defaults).
+[[system]]
+name = "cm2-full"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 } }
+
+# Search-time variants of cm2-full.
+[[system]]
+name = "cm2-full-fn"  # functions and methods only (no class or block results)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", kinds = ["function", "method"], test_weight = 0.5 }
+
+[[system]]
+name = "cm2-full-no-tests"  # test chunks never returned
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.0, kind_weights = { class = 0.5, block = 0.5 } }
+
+[[system]]
+name = "cm2-full-v1-bm25"  # v1 BM25 weights (name 10, signature 5, body 1; no path or doc field)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 }, bm25 = { weights = [10, 5, 1] } }

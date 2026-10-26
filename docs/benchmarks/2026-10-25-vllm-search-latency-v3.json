@@ -1,0 +1,33 @@
+{
+ "meta": {
+  "repo": ".cache/repos/vllm",
+  "chunks": 102224,
+  "query_model": "jinaai/jina-code-embeddings-0.5b",
+  "device": "mps",
+  "note": "index vectors from the fake model (same 896 dims); timings only, not ranking"
+ },
+ "results": {
+  "10-word query": {
+   "total_ms": 115.1,
+   "parts_ms": {
+    "bm25": 39.5,
+    "embed_query:jinaai/jina-code-embeddings-0.5b": 49.1,
+    "code": 19.5,
+    "usage": 3.3,
+    "fuse": 0.9,
+    "total": 115.0
+   }
+  },
+  "250-word query": {
+   "total_ms": 631.1,
+   "parts_ms": {
+    "bm25": 393.7,
+    "embed_query:jinaai/jina-code-embeddings-0.5b": 205.4,
+    "code": 22.2,
+    "usage": 6.0,
+    "fuse": 1.1,
+    "total": 631.0
+   }
+  }
+ }
+}

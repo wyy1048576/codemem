@@ -1,11 +1,22 @@
-"""Compact plain-text rendering shared by the MCP tools and the CLI."""
+"""Compact plain-text rendering shared by the MCP tools and the CLI.
+
+A card is what an agent reads for one result; the eval harness counts its tokens.
+"""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
-from .search import SearchResponse
+from .search import ResultCard, SearchResponse
+
+
+def card_label(r: ResultCard) -> str:
+    if r.kind == "block":
+        return f"<{r.subkind or 'block'}> {r.name}" if r.subkind != "imports" else "<imports>"
+    if r.kind == "class" and r.subkind and r.subkind != "class":
+        return f"{r.qualname} ({r.subkind})"
+    return r.qualname
 
 
 def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool = True) -> str:
@@ -13,21 +24,60 @@ def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool =
         return f"No results for {resp.query!r}."
     out: list[str] = []
     for i, r in enumerate(resp.results, start=1):
-        head = f"{i}. {r.location}  {r.qualname}  [id {r.chunk_id}]"
+        head = f"{i}. {r.location}  {card_label(r)}  [id {r.chunk_id}]"
+        if r.best_lines:
+            head += f"  best {r.best_lines[0]}-{r.best_lines[1]}"
         if debug and r.ranks is not None:
             head += "  " + " ".join(f"{s}={rank}" for s, rank in sorted(r.ranks.items())) + f" rrf={r.score:.4f}"
         out.append(head)
-        out.append(f"   {r.signature}")
+        if r.kind != "block":
+            out.append(f"   {r.signature}")
         if r.doc:
             out.append(f"   {r.doc}")
-        if preview and r.preview and r.kind != "file_header":
-            body = r.preview.splitlines()[1:]  # first line repeats the signature/decorator
+        if preview and r.preview:
+            body = r.preview.splitlines()
+            if r.kind != "block" and not r.best_lines:
+                body = body[1:]  # first line repeats the signature/decorator
             out.extend(f"   | {line}" for line in body[:6])
     return "\n".join(out)
 
 
+def freshness_note(fresh: Any, pending: tuple[int, list[str]] = (0, [])) -> str:
+    """One line for the agent when a search could not include everything yet; "" when it could.
+    `pending` is (files with queued chunks, a few of them), from `Store.pending_paths()`."""
+    if fresh is None or fresh.complete:
+        return ""
+    parts = []
+    if fresh.pending_files:
+        parts.append(f"{_files(fresh.pending_files)} saved moments ago are still being indexed, so results may miss their latest edits")
+    if fresh.pending_chunks:
+        n, examples = pending
+        where = f" in {_files(n)} ({', '.join(examples)}{', ...' if n > len(examples) else ''})" if examples else ""
+        parts.append(
+            f"{fresh.pending_chunks} code chunks{where} are still being embedded: keyword matches for them are "
+            "current, ranking by meaning may be out of date"
+        )
+    if fresh.unconfirmed:
+        parts.append("codemem could not confirm it has seen your most recent saves")
+    return "Note: " + "; ".join(parts) + ". Search again in a few seconds, or use grep for those files."
+
+
+def format_refresh(out: dict[str, Any]) -> str:
+    """The result of a full check (`CodememService.refresh`), for the agent."""
+    text = (
+        f"Checked every file in {out['seconds']:.1f} s: {_files(out['files_changed'])} changed, "
+        f"{out['files_deleted']} deleted, {out['files_skipped']} skipped; chunks +{out['chunks_added']} "
+        f"~{out['chunks_updated']} -{out['chunks_deleted']}; {out['texts_embedded']} texts embedded."
+    )
+    if out.get("pending"):
+        text += f" {out['pending']} chunks are still being embedded in the background; searches work meanwhile."
+    return text
+
+
 def format_chunk(d: dict[str, Any]) -> str:
     lines = [f"{d['location']}  {d['qualname']}  [id {d['chunk_id']}]", "", d["code"], ""]
+    if d.get("members"):
+        lines.append("members: " + ", ".join(f"{c['qualname']} ({c['location']})" for c in d["members"]))
     for label in ("callers", "callees"):
         items = d[label]
         lines.append(f"{label}: " + (", ".join(f"{c['qualname']} ({c['location']})" for c in items) or "none"))
@@ -41,9 +91,14 @@ def format_status(info: dict[str, Any]) -> str:
     lines.append(
         f"files: {info['files']}  chunks: {info['chunks']} {json.dumps(info['chunks_by_kind'])}  edges: {info['edges']}"
     )
+    if info.get("chunks_by_language"):
+        lines.append(f"languages: {json.dumps(info['chunks_by_language'])}")
     lines.append(f"vectors: {json.dumps(info['vectors'])}")
     for vec_type, m in info["models"].items():
         lines.append(f"  {vec_type}: {m['model']} (dim {m['dim']})")
+    emb = info.get("embedding") or {}
+    if emb.get("provider", "local") != "local":
+        lines.append(f"embeddings: remote, {emb.get('model')} at {emb.get('host')} (code is sent there to be embedded)")
     lines.append(f"indexed commit: {info['indexed_commit'] or '-'}")
     if "age_seconds" in info:
         lines.append(f"last indexed: {info['age_seconds']:.0f}s ago")
@@ -52,6 +107,43 @@ def format_status(info: dict[str, Any]) -> str:
             f"stale: {stale['changed_files']} changed, {stale['deleted_files']} deleted"
             + (", git HEAD moved" if stale["head_moved"] else "")
         )
+    if info.get("pending_chunks") or info.get("pending_files"):
+        lines.append(f"pending: {info.get('pending_files', 0)} files, {info.get('pending_chunks', 0)} chunks to embed")
+    if "watching" in info:
+        lines.append("watching for changes" if info["watching"] else "not watching (scanning on a timer or on request)")
+    lines.extend(format_coverage(info))
     if info.get("error"):
         lines.append(f"error: {info['error']}")
     return "\n".join(lines)
+
+
+_REASONS = {"too_large": "too large", "parse_errors": "with parse errors"}  # the rest read as they are
+
+
+def _size(n: int) -> str:
+    return f"{n / 1e6:.1f} MB" if n >= 1e6 else f"{n / 1e3:.1f} KB"
+
+
+def _files(n: int) -> str:
+    return f"{n} file" if n == 1 else f"{n} files"
+
+
+def format_coverage(info: dict[str, Any]) -> list[str]:
+    """What the index leaves out, and why, so nothing is missed silently."""
+    out: list[str] = []
+    skipped = info.get("skipped_files") or {}
+    if by_reason := skipped.get("by_reason"):
+        parts = ", ".join(f"{n} {_REASONS.get(reason, reason)}" for reason, n in sorted(by_reason.items()))
+        out.append(f"not indexed or partly parsed: {parts}")
+        for ex in skipped.get("examples", [])[:5]:
+            out.append(f"  {ex['path']} ({_REASONS.get(ex['reason'], ex['reason'])}, {_size(ex['size'])})")
+    cov = info.get("coverage") or {}
+    if n := cov.get("not_code_files"):
+        by_ext = cov.get("not_code_by_extension") or {}
+        exts = ", ".join(f"{'no extension' if e == '(none)' else e} {k}" for e, k in by_ext.items())
+        out.append(f"not code (no supported language): {_files(n)} ({exts})")
+    dirs = cov.get("skipped_dirs") or {}
+    if cov.get("ignored_files") or dirs:
+        folders = ", ".join(f"{n} by ignore rules" if d == "(ignored)" else f"{d} {n}" for d, n in dirs.items())
+        out.append(f"ignored: {_files(cov.get('ignored_files', 0))}; skipped folders: {folders or 'none'}")
+    return out

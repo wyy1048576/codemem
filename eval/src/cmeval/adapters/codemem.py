@@ -34,7 +34,8 @@ from ..retriever import Hit, IndexReport, RetrieverError, stable_hash
 
 log = logging.getLogger(__name__)
 
-# Settings that change the index. Everything else in codemem's Config is used at search time.
+# Settings that change the index, for codemem versions without Config.index_settings() (0.1).
+# Newer codemem lists its own index-time settings, so a new knob can never be missed here.
 INDEX_TIME_FIELDS = (
     "embedding_dim", "max_seq_length", "batch_size", "bm25_stem", "bm25_stopwords",
     "max_defs_per_name", "max_usage_items", "include_commits", "max_file_size", "ignore",
@@ -84,11 +85,17 @@ class CodememRetriever:
 
     def _index_settings(self) -> dict[str, Any]:
         cfg = self.config
+        if hasattr(cfg, "index_settings"):
+            settings = cfg.index_settings()
+        else:
+            settings = {
+                "vectors": {name: {"model": cfg.model_id(name)} for name in cfg.enabled_vec_types()},
+                **{f: getattr(cfg, f) for f in INDEX_TIME_FIELDS},
+            }
         return {
             "codemem": CODEMEM_VERSION,
-            "vectors": {name: {"model": cfg.model_id(name)} for name in cfg.enabled_vec_types()},
             "device": resolve_device(cfg.device),  # GPU and CPU round slightly differently
-            **{f: getattr(cfg, f) for f in INDEX_TIME_FIELDS},
+            **settings,
         }
 
     def index_key(self) -> str:
@@ -171,7 +178,10 @@ class CodememRetriever:
             hits.append(Hit(
                 path=card.path, start_line=card.start_line, end_line=card.end_line, symbol=card.qualname,
                 score=card.score, text=text,
-                extra={"ranks": card.ranks or {}, "kind": card.kind, "chunk_id": card.chunk_id},
+                extra={
+                    "ranks": card.ranks or {}, "kind": card.kind, "chunk_id": card.chunk_id,
+                    **{f: getattr(card, f) for f in ("language", "subkind", "best_lines") if hasattr(card, f)},
+                },
             ))
         if hits:
             hits[0].extra["signals"] = resp.signals

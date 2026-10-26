@@ -192,7 +192,8 @@ def test_code_stats_counts_what_codemem_indexes(remote):
     assert stats.commit == remote.shas[-1]
     assert stats.files == 2  # app.py and pkg/mod.py
     assert stats.functions == 1 and stats.methods == 1
-    assert stats.chunks == stats.functions + stats.methods + stats.file_headers
+    assert stats.chunks == stats.functions + stats.methods + stats.classes + stats.blocks
+    assert stats.classes == 1 and stats.blocks >= 1  # class A; `import os` is top-level code
     assert not list((repo_stats.tmp_dir()).glob("repo-stats-*"))  # the clone is deleted
 
 

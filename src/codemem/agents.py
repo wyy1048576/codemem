@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +26,14 @@ class Action:
         return self.path is not None
 
 
+def launch_command() -> tuple[str, list[str]]:
+    """How an agent starts codemem: the `codemem` command when it is on PATH (uv tool, pipx),
+    else this Python with `-m codemem`, which works from whichever environment codemem is in."""
+    if shutil.which(COMMAND):
+        return COMMAND, []
+    return sys.executable, ["-m", "codemem"]
+
+
 def _merge_mcp_json(path: Path, entry: dict) -> str:
     data: dict = {}
     if path.is_file():
@@ -43,25 +52,28 @@ def plan(repo_root: Path, agents: list[str], *, write_agent_notes: bool = False,
     if unknown:
         raise ValueError(f"unknown agents {unknown}; choose from {list(AGENTS)}")
 
+    command, prefix = launch_command()
     if "claude" in agents:
         # Claude Code starts project servers in the project root, so no path argument is needed.
         path = repo_root / ".mcp.json"
+        shown = " ".join([command, *prefix, "mcp"])
         actions.append(Action(
-            "claude", f"add 'codemem' to {path.name} (or run: claude mcp add codemem -- codemem mcp)",
-            path, _merge_mcp_json(path, {"command": COMMAND, "args": ["mcp"]}),
+            "claude", f"add 'codemem' to {path.name} (or run: claude mcp add codemem -- {shown})",
+            path, _merge_mcp_json(path, {"command": command, "args": [*prefix, "mcp"]}),
         ))
     if "cursor" in agents:
         path = repo_root / ".cursor" / "mcp.json"
         actions.append(Action(
             "cursor", "add 'codemem' to .cursor/mcp.json", path,
-            _merge_mcp_json(path, {"command": COMMAND, "args": ["mcp", "${workspaceFolder}"]}),
+            _merge_mcp_json(path, {"command": command, "args": [*prefix, "mcp", "${workspaceFolder}"]}),
         ))
     if "codex" in agents:
+        args = json.dumps([*prefix, "mcp", repo_root.as_posix()])
         snippet = (
             "# Add to ~/.codex/config.toml (codemem does not edit global files):\n"
             f"[mcp_servers.{prompts.SERVER_NAME}]\n"
-            f'command = "{COMMAND}"\n'
-            f'args = ["mcp", {json.dumps(repo_root.as_posix())}]\n'
+            f"command = {json.dumps(command)}\n"
+            f"args = {args}\n"
         )
         actions.append(Action("codex", "print snippet for ~/.codex/config.toml", None, snippet))
 

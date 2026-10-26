@@ -1,0 +1,32 @@
+{
+  "cmeval_version": "0.1.0",
+  "scored": "2026-10-24T08:37:41+00:00",
+  "run_status": "done",
+  "tasks_scored": 13,
+  "warnings": [],
+  "token_counter": "estimate",
+  "token_estimate": true,
+  "token_overhead": null,
+  "token_api_calls": 0,
+  "ious": [
+    0.5,
+    0.3,
+    0.7
+  ],
+  "main_iou": 0.5,
+  "ks": [
+    1,
+    5,
+    10,
+    20,
+    50
+  ],
+  "budgets": [
+    500,
+    1000,
+    2000,
+    4000,
+    8000
+  ],
+  "texts_counted": 3658
+}

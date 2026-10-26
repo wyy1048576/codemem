@@ -50,6 +50,8 @@ def test_a_tie_at_the_cut_is_kept_whole():
 
 
 def test_same_code_gives_the_same_order_with_other_chunk_ids(sample_repo, tmp_path, fake_config, recorder):
+    fake_config.code_header = False  # without the path header, copies of code embed identically: real ties
+    fake_config.test_weight, fake_config.kind_weights = 1.0, {}  # weights would split some of those ties
     factory = lambda m, c: recorder  # noqa: E731
     first = Store(tmp_path / "first")
     Indexer(sample_repo, first, fake_config, embedder_factory=factory).update()
@@ -77,6 +79,8 @@ def test_same_code_gives_the_same_order_with_other_chunk_ids(sample_repo, tmp_pa
 def test_copies_of_the_same_code_are_ordered_by_location_in_each_signal(tmp_path, fake_config, recorder):
     from codemem.tokenize import fts_match_query
 
+    fake_config.code_header = False  # copies in different files must embed identically to tie
+
     repo = tmp_path / "repo"
     repo.mkdir()
     store = Store(tmp_path / "index")
@@ -91,7 +95,7 @@ def test_copies_of_the_same_code_are_ordered_by_location_in_each_signal(tmp_path
     paths = lambda ids: [store.get_chunk(i).path for i in ids]  # noqa: E731
     query = recorder.embed_queries(["same thing"])[0]
     for n in (1, 2, 4):  # the 5 equal scores cross every cut
-        assert paths(i for i, _ in store.vector_search("code", query, n)) == ["a.py", "b.py", "c.py", "d.py"][:n]
+        assert paths(h.chunk_id for h in store.vector_search("code", query, n)) == ["a.py", "b.py", "c.py", "d.py"][:n]
         assert paths(store.bm25_search(fts_match_query("same_thing"), n, fake_config.bm25_weights)) == ["a.py", "b.py", "c.py", "d.py"][:n]
     store.close()
 
@@ -116,7 +120,7 @@ def test_end_to_end_nl_query_found_via_usage(index):
     store, cfg, factory = index
     usage_only = search(store, QUERY, cfg, k=3, signals=["usage"], embedder_factory=factory)
     assert "revoke_session" in _quals(usage_only)
-    resp = search(store, QUERY, cfg, k=10, debug=True, embedder_factory=factory)
+    resp = search(store, QUERY, cfg, k=15, debug=True, embedder_factory=factory)
     assert resp.signals == ["bm25", "code", "usage"]
     assert "revoke_session" in _quals(resp)
     card = next(r for r in resp.results if r.qualname == "revoke_session")
@@ -180,3 +184,80 @@ def test_weird_query_does_not_break(index):
     store, cfg, factory = index
     for q in ['"', "AND OR NOT", "*", "-", "!!!", "", "NEAR(a b)"]:
         search(store, q, cfg, embedder_factory=factory)
+
+
+def test_kinds_languages_and_test_weight(index):
+    store, cfg, factory = index
+    only_funcs = search(store, "session", cfg, k=50, kinds=["function", "method"], embedder_factory=factory)
+    assert only_funcs.results and {r.kind for r in only_funcs.results} <= {"function", "method"}
+    assert search(store, "session", cfg, k=50, languages=["go"], embedder_factory=factory).results == []
+    everything = search(store, "disabled user", cfg, k=50, embedder_factory=factory).results
+    no_tests = search(store, "disabled user", cfg, k=50, test_weight=0.0, embedder_factory=factory).results
+    assert any(r.is_test for r in everything) and not any(r.is_test for r in no_tests)
+    demoted = search(store, "disabled user", cfg, k=50, test_weight=0.01, embedder_factory=factory).results
+    first_test = next(i for i, r in enumerate(demoted) if r.is_test)
+    assert all(r.is_test for r in demoted[first_test:])  # pushed below every non-test result
+    cfg.kinds = ["class"]  # the same filters can come from the config (the eval adapter sets them there)
+    assert {r.kind for r in search(store, "session", cfg, k=50, embedder_factory=factory).results} == {"class"}
+
+
+def test_card_names_the_best_window_of_a_long_function(tmp_path, fake_config):
+    from codemem.embedder import FakeEmbedder
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # Filler lines share no words with the query, so only the last window can match it.
+    body = "\n".join("    pass" for _ in range(300)) + "\n    flush_the_audit_log_now()\n"
+    (repo / "big.py").write_text("def big():\n" + body)
+    fake_config.window_chars = 600
+    store = Store(tmp_path / "index")
+    wide = FakeEmbedder(256)
+    factory = lambda m, c: wide  # noqa: E731
+    Indexer(repo, store, fake_config, embedder_factory=factory).update()
+    assert store.counts()["vectors"]["code"] > 3  # one function, several windows
+    card = search(store, "flush the audit log now", fake_config, k=1, signals=["code"], embedder_factory=factory).results[0]
+    assert card.qualname == "big" and (card.start_line, card.end_line) == (1, 302)  # the hit is still the function
+    assert card.best_lines is not None and card.best_lines[1] == 302 and card.best_lines[0] > 200
+    assert "flush_the_audit_log_now()" in card.preview  # the preview shows that window
+    store.close()
+
+
+def test_kind_weights_push_kinds_down(index):
+    store, cfg, factory = index
+    plain = search(store, "session table", cfg, k=50, embedder_factory=factory).results
+    assert any(r.kind == "class" for r in plain)
+    weighed = search(store, "session table", cfg, k=50, kind_weights={"class": 0.01}, embedder_factory=factory).results
+    first_class = next(i for i, r in enumerate(weighed) if r.kind == "class")
+    assert all(r.kind == "class" for r in weighed[first_class:])  # every class now ranks below the rest
+    assert {r.key for r in plain} == {r.key for r in weighed}  # pushed down, not dropped
+    with pytest.raises(ValueError, match="unknown kinds"):
+        from codemem.config import config_from_dict
+
+        config_from_dict({"kind_weights": {"klass": 0.5}})
+
+
+def test_default_weights_are_neutral_and_a_config_can_set_them():
+    from codemem.config import Config, config_from_dict
+
+    assert Config().test_weight == 1.0 and Config().kind_weights == {}  # D24: nothing is demoted
+    v2 = config_from_dict({"test_weight": 0.5, "kind_weights": {"class": 0.5, "block": 0.5}})
+    assert v2.test_weight == 0.5 and v2.kind_weights == {"class": 0.5, "block": 0.5}
+    assert config_from_dict({"kind_weights": {"class": 0.5}}).kind_weights == {"class": 0.5}
+
+
+def test_bm25_queries_drop_stopwords_and_optionally_common_words(index):
+    from codemem.search import bm25_match
+
+    store, cfg, _ = index
+    assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "session"'  # stopwords dropped
+    assert bm25_match(store, "the", cfg) == '"the"'  # only stopwords: kept after all
+    filler = " ".join(f"zzword{i}" for i in range(40))  # words no chunk has
+    long_q = f"{filler} revoke session user table insert delete login logout token disable"
+    assert "zzword0" in bm25_match(store, long_q, cfg)  # by default nothing else is dropped
+    cfg.bm25_common_share = 0.5  # opt-in, for a long query: words the index lacks, and very common ones
+    words = bm25_match(store, long_q, cfg).split(" OR ")
+    docs = store.term_doc_counts(w.strip('"') for w in words)
+    total = store.chunk_total()
+    assert '"revoke"' in words and all(0 < docs.get(w.strip('"'), 0) <= 0.5 * total for w in words)
+    cfg.bm25_common_share, cfg.bm25_query_terms = 0.0, 0  # v2: every word, stopwords too
+    assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "the" OR "session"'

@@ -1,0 +1,16 @@
+# Index-time ablations of codemem v2. Each system needs its own index (different index_key), so
+# run these on a subset first (--repo ...). Vectors are shared through the vector cache wherever
+# the embedded text is the same (for example the usage texts). The search-time settings equal
+# cm2-full in codemem-v2.toml, so compare each ablation against cm2-full.
+
+[[system]]
+name = "cm2-no-header"  # embed raw code, without the path / enclosing-scope header
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", code_header = false, test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 } }
+
+[[system]]
+name = "cm2-no-windows"  # one vector per chunk, truncated by the model (v1 behaviour)
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", window_chars = 1000000, test_weight = 0.5, kind_weights = { class = 0.5, block = 0.5 } }
