@@ -13,6 +13,10 @@ Contents:
   comparison, including other grep variants, is "exploratory" and shows a raw p;
 - group tables (means and counts only), the IoU check, latency and size, task counts.
 
+A filter (--where gold_all_python=true) limits the report to the tasks whose tags match. The main
+comparison uses only the tasks with all-Python gold (decision of 2026-10-24). The tasks left out
+get a short section of their own at the end.
+
 The same inputs always give the same report: tasks are taken in sorted order, the bootstrap
 seed is fixed, and the report has no time stamp of its own.
 """
@@ -46,6 +50,9 @@ PRIMARY = (("function", "mrr"), ("function", "tokens_to_first"))
 # PRIMARY x these systems, so its size never depends on which other systems a run has.
 PRIMARY_SYSTEMS = ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage")
 GROUP_METRICS = (("function", "mrr"), ("function", "recall@10"), ("file", "recall@10"), ("function", "tokens_to_first"))
+# Group cutoffs live here, not in the tasks, so they can change without a new collection.
+REPO_SIZE_CUTOFFS = (1000, 5000)  # Python files: small < 1,000, medium 1,000 to 5,000, large > 5,000 (proposed)
+FIX_LINES_CUTOFFS = (10, 50)  # changed code lines: up to 10, 11 to 50, over 50
 IOU_METRICS = ("mrr", "recall@10")
 IOUS = (0.3, 0.5, 0.7)
 LATENCY = (("search_ms_median", "search ms (median)"), ("search_ms_p95", "search ms (p95)"),
@@ -83,6 +90,8 @@ class ReportResult:
     tasks_scored: int
     warnings: list[str] = field(default_factory=list)
     primary: list[Comparison] = field(default_factory=list)
+    filter: str | None = None  # the --where conditions, as written
+    left_out: int = 0  # scored tasks that the filter left out
 
 
 # ---- loading
@@ -174,10 +183,66 @@ def _compare(scores: Scores, system: str, baseline: str, level: str, metric: str
                       wilcoxon(d), found=found)
 
 
+# ---- the filter
+
+
+def parse_where(conditions: list[str] | None) -> list[tuple[str, object]]:
+    """["gold_all_python=true", "repo=pandas-dev/pandas"] -> [(key, value)]. true/false and whole
+    numbers are typed; any other value is text and compared without case."""
+    out = []
+    for condition in conditions or []:
+        key, sep, raw = condition.partition("=")
+        key, raw = key.strip(), raw.strip()
+        if not sep or not key or not raw:
+            raise ReportError(f"filter {condition!r} must be KEY=VALUE, for example gold_all_python=true")
+        value: object = raw
+        if raw.lower() in ("true", "false"):
+            value = raw.lower() == "true"
+        elif raw.lstrip("-").isdigit():
+            value = int(raw)
+        out.append((key, value))
+    return out
+
+
+def _task_value(task, key: str):
+    if key in ("repo", "language"):
+        return getattr(task, key)
+    return task.tags.get(key)
+
+
+def _matches(task, conditions: list[tuple[str, object]]) -> bool:
+    for key, wanted in conditions:
+        value = _task_value(task, key)
+        if isinstance(wanted, bool) or isinstance(value, bool):
+            if value is not wanted:
+                return False
+        elif isinstance(wanted, int):
+            if value != wanted:
+                return False
+        elif str(value).lower() != str(wanted).lower():
+            return False
+    return True
+
+
+def _select(tasks: dict, task_ids: list[str], conditions: list[tuple[str, object]]) -> list[str]:
+    """The scored tasks that match every condition. Unknown keys and an empty result are errors."""
+    scored = [tasks[t] for t in task_ids if t in tasks]
+    known = {"repo", "language"} | {k for task in scored for k in task.tags}
+    unknown = sorted({key for key, _ in conditions} - known)
+    if unknown:
+        raise ReportError(f"no scored task has {unknown}; known keys: {', '.join(sorted(known))}")
+    kept = [t for t in task_ids if t in tasks and _matches(tasks[t], conditions)]
+    if not kept:
+        raise ReportError("no scored task matches the filter")
+    return kept
+
+
 # ---- groups
 
 
 def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[str, list[str]]]:
+    """Group name -> {group value -> task ids}. Size groups keep their natural order (small, medium,
+    large); the others are sorted. A task without the tag is "unknown" (for example SWE-bench tasks)."""
     def created(task) -> str:
         raw = task.issue.created_at
         if not raw:
@@ -186,18 +251,50 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
         when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
         return f"before {cutoff}" if when.astimezone(timezone.utc).date() < cutoff else f"on or after {cutoff}"
 
-    def tag(task) -> str:
-        value = task.tags.get("identifier_in_query")
-        return "unknown" if value is None else str(value).lower()
+    def tag(name: str):
+        def read(task) -> str:
+            value = task.tags.get(name)
+            return "unknown" if value is None else str(value).lower()
+        return read
 
-    keys = {"identifier in query": tag, "repo": lambda t: t.repo, "language": lambda t: t.language,
-            "issue date": created}
+    def repo_size(task) -> str:
+        n = task.tags.get("repo_py_files")
+        small, large = REPO_SIZE_CUTOFFS
+        if n is None:
+            return "unknown"
+        return f"small (< {small:,})" if n < small else f"medium ({small:,} to {large:,})" if n <= large else f"large (> {large:,})"
+
+    def fix_lines(task) -> str:
+        n = task.tags.get("code_lines_changed")
+        low, high = FIX_LINES_CUTOFFS
+        if n is None:
+            return "unknown"
+        return f"up to {low}" if n <= low else f"{low + 1} to {high}" if n <= high else f"over {high}"
+
+    def gold_files(task) -> str:
+        n = task.tags.get("n_gold_files")
+        return "unknown" if n is None else "1" if n <= 1 else "2 or more"
+
+    small, large = REPO_SIZE_CUTOFFS
+    low, high = FIX_LINES_CUTOFFS
+    ordered = {  # group name -> (key, natural order of its values, or None to sort)
+        "identifier in query": (tag("identifier_in_query"), None),
+        "repo": (lambda t: t.repo, None),
+        "language": (lambda t: t.language, None),
+        "issue date": (created, None),
+        "gold all Python": (tag("gold_all_python"), None),
+        "repo size (Python files; proposed cutoffs)": (
+            repo_size, [f"small (< {small:,})", f"medium ({small:,} to {large:,})", f"large (> {large:,})"]),
+        "fix size (changed code lines)": (fix_lines, [f"up to {low}", f"{low + 1} to {high}", f"over {high}"]),
+        "gold files": (gold_files, ["1", "2 or more"]),
+    }
     out: dict[str, dict[str, list[str]]] = {}
-    for name, key in keys.items():
+    for name, (key, order) in ordered.items():
         groups: dict[str, list[str]] = defaultdict(list)
         for task_id in task_ids:
             groups[key(tasks[task_id]) if task_id in tasks else "unknown"].append(task_id)
-        out[name] = dict(sorted(groups.items()))
+        rank = {value: i for i, value in enumerate(order or [])}
+        out[name] = dict(sorted(groups.items(), key=lambda kv: (rank.get(kv[0], len(rank)), kv[0])))
     return out
 
 
@@ -205,8 +302,9 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
 
 
 def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "dev", cutoff: str = DEFAULT_CUTOFF,
-           primary: list[str] | tuple[str, ...] = PRIMARY_SYSTEMS,
+           primary: list[str] | tuple[str, ...] | None = None, where: list[str] | None = None,
            tasks_file: str | Path | None = None, resamples: int = RESAMPLES, seed: int = SEED) -> ReportResult:
+    conditions = parse_where(where)
     run_dir = resolve_run(run)
     data = _load(run_dir)
     meta, score_meta = data["meta"], data["score_meta"]
@@ -222,11 +320,18 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     if baseline not in names:
         raise ReportError(f"baseline {baseline!r} is not a system of this run; choose from {names}")
     _, tasks = run_tasks(meta, tasks_file)
-    scores = Scores(data["scores"])
-    task_ids = sorted(scores.task_ids)
+    all_ids = sorted({row["task_id"] for row in data["scores"]})
+    task_ids = _select(tasks, all_ids, conditions) if conditions else all_ids
+    kept = set(task_ids)
+    # Every table below reads these scores, so the filter applies to all of them.
+    scores = Scores([row for row in data["scores"] if row["task_id"] in kept])
+    left_out = Scores([row for row in data["scores"] if row["task_id"] not in kept])
     kw = {"resamples": resamples, "seed": seed}
     granularity = {name: g for name, g, _ in systems}
-    under_test = list(dict.fromkeys(primary))
+    # The default primary systems are the codemem systems of the design. A run with no codemem
+    # system at all (a grep-only run) has no primary tests; a codemem run must name them right.
+    has_codemem = any(s.get("adapter") == "codemem" for s in meta["systems"])
+    under_test = list(dict.fromkeys(primary if primary is not None else PRIMARY_SYSTEMS if has_codemem else ()))
     bad = [n for n in under_test if n not in names or n == baseline or granularity[n] == "file"]
     if bad:
         raise ReportError(f"primary systems {bad} are not function-level systems of this run other than the "
@@ -246,12 +351,15 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     for c, p in zip(family, holm([c.test.p for c in family])):
         c.primary, c.p_holm = True, p
 
-    warnings = _warnings(meta, score_meta, data["summary"], task_ids)
+    warnings = _warnings(meta, score_meta, data["summary"], all_ids)  # all scored tasks, not only the kept ones
+    where_text = ", ".join(where or []) or None
     text = _render(run_dir, meta, score_meta, systems, baseline, scores, task_ids, tasks, comparisons, family,
-                   warnings, cutoff_date, kw, data["summary"])
+                   warnings, cutoff_date, kw, data["summary"],
+                   filtered=(where_text, all_ids, left_out) if conditions else None,
+                   no_primary=not has_codemem and primary is None)
     path = run_dir / "report.md"
     write_text_atomic(path, text)
-    return ReportResult(run_dir, path, len(task_ids), warnings, family)
+    return ReportResult(run_dir, path, len(task_ids), warnings, family, where_text, len(all_ids) - len(task_ids))
 
 
 def _warnings(meta: dict, score_meta: dict, summary: list[dict], task_ids: list[str]) -> list[str]:
@@ -283,8 +391,23 @@ def _warnings(meta: dict, score_meta: dict, summary: list[dict], task_ids: list[
     return out
 
 
+def _group_table(lines: list[str], scores: Scores, names: list[str], granularity: dict, groups: dict[str, list[str]]) -> None:
+    """Means and counts for each group, one table for each group metric."""
+    for level, metric in GROUP_METRICS:
+        shown = [n for n in names if level == "file" or granularity[n] != "file"]
+        lines += [f"{level.capitalize()} {_label(metric)}:", "", "| group | tasks | " + " | ".join(shown) + " |",
+                  "|---" * (len(shown) + 2) + "|"]
+        for group, ids in groups.items():
+            cells = []
+            for name in shown:
+                values = scores.vector(name, level, metric, ids)
+                cells.append(f"{_fmt(_mean(values), metric)} ({len(values)})")
+            lines.append(f"| {group} | {len(ids)} | " + " | ".join(cells) + " |")
+        lines.append("")
+
+
 def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_ids, tasks, comparisons, family,
-            warnings, cutoff, kw, summary) -> str:
+            warnings, cutoff, kw, summary, filtered=None, no_primary=False) -> str:
     names = [name for name, _, _ in systems]
     granularity = {name: g for name, g, _ in systems}
     git = meta.get("cmeval_git") or {}
@@ -303,6 +426,10 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
         f"taken off each count; scored {score_meta.get('scored')}",
         f"- Intervals: 95% percentile bootstrap, {kw['resamples']:,} resamples, seed {kw['seed']}",
     ]
+    if filtered:
+        where_text, all_ids, _ = filtered
+        lines.insert(2, f"- Filter: {where_text}: {len(task_ids)} of {len(all_ids)} scored tasks "
+                        f"({len(all_ids) - len(task_ids)} left out; see 'Tasks left out by the filter')")
     for part in meta.get("merged_from") or []:
         lines.append(f"- Merged part: {', '.join(part['systems'])} from run `{part['run_id']}` "
                      f"(cmeval {((part.get('cmeval_git') or {}).get('sha') or '')[:12]}, "
@@ -340,8 +467,10 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
     lines += ["", f"## Paired comparison with {baseline}", "",
               f"Difference = system - {baseline} on the same tasks. A confidence interval and a p-value can "
               "disagree: the interval is about the mean, the Wilcoxon test is about signed ranks.", "",
-              f"### Primary metrics (Holm correction over all {len(family)} tests, significant at {ALPHA})", ""]
-    if family:
+              "### Primary metrics" + ("" if no_primary else f" (Holm correction over all {len(family)} tests, significant at {ALPHA})"), ""]
+    if no_primary:
+        lines.append("No primary systems in this run (it has no codemem system): every comparison is exploratory.")
+    elif family:
         lines += [f"| system | metric | tasks | {baseline} | system | difference [95% CI] | Wilcoxon p | Holm p | significant |",
                   "|---|---|---|---|---|---|---|---|---|"]
         for c in family:
@@ -377,17 +506,7 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
             lines += [f"- {grouping}: all {len(ids)} tasks are '{only}', so there is no table.", ""]
             continue
         lines += [f"### By {grouping}", ""]
-        for level, metric in GROUP_METRICS:
-            shown = [n for n in names if level == "file" or granularity[n] != "file"]
-            lines += [f"{level.capitalize()} {_label(metric)}:", "", "| group | tasks | " + " | ".join(shown) + " |",
-                      "|---" * (len(shown) + 2) + "|"]
-            for group, ids in groups.items():
-                cells = []
-                for name in shown:
-                    values = scores.vector(name, level, metric, ids)
-                    cells.append(f"{_fmt(_mean(values), metric)} ({len(values)})")
-                lines.append(f"| {group} | {len(ids)} | " + " | ".join(cells) + " |")
-            lines.append("")
+        _group_table(lines, scores, names, granularity, groups)
 
     # ---- IoU check
     lines += ["## IoU check (function level)", "", "| system | " + " | ".join(
@@ -418,6 +537,8 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
             cells.append("-" if value is None else f"{value:,.1f}")
         lines.append(f"| {name} | " + " | ".join(cells) + " |")
     lines.append("\nIndex MB = 10^6 bytes. Systems with the same index settings share one index.")
+    if filtered:
+        lines.append(f"Latency and size come from summary.csv, over all {len(filtered[1])} scored tasks: the filter does not apply to them.")
     if meta.get("merged_from"):
         lines.append("This run is merged from separate runs, so search times of different parts come from different sessions.")
 
@@ -430,4 +551,13 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
             if reasons:
                 text = ", ".join(f"{reason}: {count}" for reason, count in sorted(reasons.items()))
                 lines.append(f"| {name} | {level} | {sum(reasons.values())} | {text} |")
+
+    # ---- tasks left out by the filter (for the gold_all_python filter: the "not supported" group)
+    if filtered:
+        where_text, all_ids, left_out = filtered
+        out_ids = sorted(set(all_ids) - set(task_ids))
+        lines += ["", "## Tasks left out by the filter", "",
+                  f"{len(out_ids)} scored tasks do not match {where_text}. Means and counts only, no intervals.", ""]
+        if out_ids:
+            _group_table(lines, left_out, names, granularity, {"left out": out_ids})
     return "\n".join(lines) + "\n"
