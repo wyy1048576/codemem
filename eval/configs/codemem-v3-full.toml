@@ -1,0 +1,12 @@
+# The fresh codemem runs (decision of 2026-10-25): one system, codemem's default, the v3 primary
+# family of the report. Needs: uv sync --extra codemem
+# Every search-time setting the eval config can set is pinned to its value of 2026-10-25, so the name
+# keeps its meaning if codemem's defaults change (missing kinds and signals weigh 1.0 in codemem, so
+# these equal the defaults of that day). The preview size of a hit (12 lines, 800 characters) cannot
+# be set from here; it is codemem's default.
+
+[[system]]
+name = "cm3-full"  # BM25 + code + usage; neutral weights; BM25 queries drop stopwords
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }

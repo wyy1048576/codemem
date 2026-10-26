@@ -239,7 +239,7 @@ Function tokens_to_first (lower is better):
 
 - gold all Python: all 364 tasks are 'true', so there is no table.
 
-### By repo size (Python files; proposed cutoffs)
+### By repo size (Python files)
 
 Function mrr:
 

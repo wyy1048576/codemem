@@ -8,8 +8,11 @@ Contents:
 - paired comparison with a baseline system (default grep-fn-plus, the stronger grep; the naive
   grep-fn stays in every table): mean difference, paired 95% bootstrap interval, Wilcoxon p;
 - two primary metrics, fixed before the first results (2026-10-23): function-level MRR and
-  function-level tokens to the first right answer, for each primary system (PRIMARY_SYSTEMS, the
-  3 codemem systems). Their p-values get one Holm correction over all primary tests. Every other
+  function-level tokens to the first right answer, for each primary system. The primary systems
+  are a family for each codemem version (PRIMARY_FAMILIES): the MVP family fixed 2026-10-23
+  (3 systems), the v3 family fixed 2026-10-25 (cm3-full alone, before any fresh codemem result,
+  after the first v3 dev results on 13 small-repo tasks). Their p-values get one Holm correction
+  over all primary tests. Every other
   comparison, including other grep variants, is "exploratory" and shows a raw p;
 - group tables (means and counts only), the IoU check, latency and size, task counts.
 
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import csv
 import json
+import tomllib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -33,7 +37,10 @@ from pathlib import Path
 from .files import read_jsonl, write_text_atomic
 from .metrics.matching import LEVELS
 from .metrics.stats import (RESAMPLES, SEED, WilcoxonResult, bootstrap_ci, differences, holm, wilcoxon)
+from .paths import default_configs_dir
 from .score import MAIN_IOU, resolve_run, run_tasks
+from .tasks import WhereError, check_where_keys, task_matches
+from .tasks import parse_where as _parse_where
 
 DEFAULT_BASELINE = "grep-fn-plus"  # the stronger grep (2026-10-23); older runs: --baseline grep-fn
 DEFAULT_CUTOFF = "2026-07-01"
@@ -46,12 +53,22 @@ COST = HEADLINE[5:]
 LOWER_IS_BETTER = frozenset({"tokens_to_first", "not_found_share"})
 COUNTS = frozenset({"tokens_to_first"})  # in tokens, not between 0 and 1
 PRIMARY = (("function", "mrr"), ("function", "tokens_to_first"))
-# The systems under test for the primary tests, fixed in the design (2026-10-23). The family is
+# The systems under test for the primary tests: one family for each codemem version, each fixed in
+# the design before its fresh results, newest first. The MVP family is the ladder keywords, + code,
+# + usage; the v3 family is codemem's default alone (Andrew, 2026-10-25). The family of tests is
 # PRIMARY x these systems, so its size never depends on which other systems a run has.
-PRIMARY_SYSTEMS = ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage")
+# A run without --primary uses the newest family whose systems are all in it, so a committed run of
+# an older version still reports with the plain command. A family with a config file is also checked
+# against it: the run's definition of each system must be the fixed one, so a system that only has the
+# name cannot take the family's place. (The MVP family is from before this check.)
+PRIMARY_FAMILIES = (
+    ("codemem v3, fixed 2026-10-25", ("cm3-full",), "codemem-v3-full.toml"),
+    ("codemem MVP, fixed 2026-10-23", ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage"), None),  # configs/baseline.toml
+)
+PRIMARY_SYSTEMS = PRIMARY_FAMILIES[0][1]  # the current family
 GROUP_METRICS = (("function", "mrr"), ("function", "recall@10"), ("file", "recall@10"), ("function", "tokens_to_first"))
 # Group cutoffs live here, not in the tasks, so they can change without a new collection.
-REPO_SIZE_CUTOFFS = (1000, 5000)  # Python files: small < 1,000, medium 1,000 to 5,000, large > 5,000 (proposed)
+REPO_SIZE_CUTOFFS = (1000, 5000)  # Python files: small < 1,000, medium 1,000 to 5,000, large > 5,000 (agreed 2026-10-25)
 FIX_LINES_CUTOFFS = (10, 50)  # changed code lines: up to 10, 11 to 50, over 50
 IOU_METRICS = ("mrr", "recall@10")
 IOUS = (0.3, 0.5, 0.7)
@@ -183,55 +200,57 @@ def _compare(scores: Scores, system: str, baseline: str, level: str, metric: str
                       wilcoxon(d), found=found)
 
 
+def default_primary(names: list[str], has_codemem: bool, config_text: str | None = None) -> tuple[str, tuple[str, ...]]:
+    """(label, systems) for the primary tests when --primary is not given.
+
+    A run with no codemem system has none. A codemem run gets the newest family whose systems are all
+    in it. A codemem run that fits no family is an error: a renamed system must never drop the
+    primary tests without notice. If the family has a config file, the run's definitions (from its
+    config_text) must equal the fixed ones.
+    """
+    if not has_codemem:
+        return "none (no codemem system in this run)", ()
+    for label, family, config_file in PRIMARY_FAMILIES:
+        if all(name in names for name in family):
+            if config_file:
+                _check_definitions(family, config_file, config_text)
+            return label, family
+    known = "; ".join(f"{label}: {', '.join(family)}" for label, family, _ in PRIMARY_FAMILIES)
+    raise ReportError(f"no primary family fits this run's systems {names} (known families: {known}); "
+                      "choose them with --primary")
+
+
+def _check_definitions(family: tuple[str, ...], config_file: str, config_text: str | None) -> None:
+    """Each system of the family must be defined in the run as in configs/<config_file>."""
+    fixed = {spec["name"]: spec for spec in tomllib.loads((default_configs_dir() / config_file).read_text("utf-8"))["system"]}
+    try:
+        used = {spec["name"]: spec for spec in tomllib.loads(config_text or "").get("system", [])}
+    except tomllib.TOMLDecodeError:
+        used = {}
+    changed = [name for name in family if used.get(name) != fixed[name]]
+    if changed:
+        raise ReportError(f"{changed} in this run are not defined as in configs/{config_file} (the fixed primary family); "
+                          "choose the primary systems with --primary")
+
+
 # ---- the filter
 
 
 def parse_where(conditions: list[str] | None) -> list[tuple[str, object]]:
-    """["gold_all_python=true", "repo=pandas-dev/pandas"] -> [(key, value)]. true/false and whole
-    numbers are typed; any other value is text and compared without case."""
-    out = []
-    for condition in conditions or []:
-        key, sep, raw = condition.partition("=")
-        key, raw = key.strip(), raw.strip()
-        if not sep or not key or not raw:
-            raise ReportError(f"filter {condition!r} must be KEY=VALUE, for example gold_all_python=true")
-        value: object = raw
-        if raw.lower() in ("true", "false"):
-            value = raw.lower() == "true"
-        elif raw.lstrip("-").isdigit():
-            value = int(raw)
-        out.append((key, value))
-    return out
-
-
-def _task_value(task, key: str):
-    if key in ("repo", "language"):
-        return getattr(task, key)
-    return task.tags.get(key)
-
-
-def _matches(task, conditions: list[tuple[str, object]]) -> bool:
-    for key, wanted in conditions:
-        value = _task_value(task, key)
-        if isinstance(wanted, bool) or isinstance(value, bool):
-            if value is not wanted:
-                return False
-        elif isinstance(wanted, int):
-            if value != wanted:
-                return False
-        elif str(value).lower() != str(wanted).lower():
-            return False
-    return True
+    """tasks.parse_where, with its errors as ReportError."""
+    try:
+        return _parse_where(conditions)
+    except WhereError as exc:
+        raise ReportError(str(exc)) from None
 
 
 def _select(tasks: dict, task_ids: list[str], conditions: list[tuple[str, object]]) -> list[str]:
     """The scored tasks that match every condition. Unknown keys and an empty result are errors."""
-    scored = [tasks[t] for t in task_ids if t in tasks]
-    known = {"repo", "language"} | {k for task in scored for k in task.tags}
-    unknown = sorted({key for key, _ in conditions} - known)
-    if unknown:
-        raise ReportError(f"no scored task has {unknown}; known keys: {', '.join(sorted(known))}")
-    kept = [t for t in task_ids if t in tasks and _matches(tasks[t], conditions)]
+    try:
+        check_where_keys([tasks[t] for t in task_ids if t in tasks], conditions, what="scored task")
+    except WhereError as exc:
+        raise ReportError(str(exc)) from None
+    kept = [t for t in task_ids if t in tasks and task_matches(tasks[t], conditions)]
     if not kept:
         raise ReportError("no scored task matches the filter")
     return kept
@@ -283,7 +302,7 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
         "language": (lambda t: t.language, None),
         "issue date": (created, None),
         "gold all Python": (tag("gold_all_python"), None),
-        "repo size (Python files; proposed cutoffs)": (
+        "repo size (Python files)": (
             repo_size, [f"small (< {small:,})", f"medium ({small:,} to {large:,})", f"large (> {large:,})"]),
         "fix size (changed code lines)": (fix_lines, [f"up to {low}", f"{low + 1} to {high}", f"over {high}"]),
         "gold files": (gold_files, ["1", "2 or more"]),
@@ -331,7 +350,11 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     # The default primary systems are the codemem systems of the design. A run with no codemem
     # system at all (a grep-only run) has no primary tests; a codemem run must name them right.
     has_codemem = any(s.get("adapter") == "codemem" for s in meta["systems"])
-    under_test = list(dict.fromkeys(primary if primary is not None else PRIMARY_SYSTEMS if has_codemem else ()))
+    if primary is not None:
+        primary_label, under_test = "chosen with --primary", list(dict.fromkeys(primary))
+    else:
+        primary_label, family_systems = default_primary(names, has_codemem, meta.get("config_text"))
+        under_test = list(family_systems)
     bad = [n for n in under_test if n not in names or n == baseline or granularity[n] == "file"]
     if bad:
         raise ReportError(f"primary systems {bad} are not function-level systems of this run other than the "
@@ -356,7 +379,7 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     text = _render(run_dir, meta, score_meta, systems, baseline, scores, task_ids, tasks, comparisons, family,
                    warnings, cutoff_date, kw, data["summary"],
                    filtered=(where_text, all_ids, left_out) if conditions else None,
-                   no_primary=not has_codemem and primary is None)
+                   no_primary=not has_codemem and primary is None, primary_label=primary_label)
     path = run_dir / "report.md"
     write_text_atomic(path, text)
     return ReportResult(run_dir, path, len(task_ids), warnings, family, where_text, len(all_ids) - len(task_ids))
@@ -407,7 +430,7 @@ def _group_table(lines: list[str], scores: Scores, names: list[str], granularity
 
 
 def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_ids, tasks, comparisons, family,
-            warnings, cutoff, kw, summary, filtered=None, no_primary=False) -> str:
+            warnings, cutoff, kw, summary, filtered=None, no_primary=False, primary_label="") -> str:
     names = [name for name, _, _ in systems]
     granularity = {name: g for name, g, _ in systems}
     git = meta.get("cmeval_git") or {}
@@ -471,7 +494,8 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
     if no_primary:
         lines.append("No primary systems in this run (it has no codemem system): every comparison is exploratory.")
     elif family:
-        lines += [f"| system | metric | tasks | {baseline} | system | difference [95% CI] | Wilcoxon p | Holm p | significant |",
+        lines += [f"Primary systems: {', '.join(dict.fromkeys(c.system for c in family))} ({primary_label}).", "",
+                  f"| system | metric | tasks | {baseline} | system | difference [95% CI] | Wilcoxon p | Holm p | significant |",
                   "|---|---|---|---|---|---|---|---|---|"]
         for c in family:
             significant = "yes" if c.p_holm is not None and c.p_holm <= ALPHA and c.test.p is not None else "no"

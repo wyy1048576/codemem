@@ -378,3 +378,58 @@ def select(tasks: Iterable[Task], split: str | None) -> list[Task]:
     if split is not None and split not in SPLITS:
         raise ValueError(f"split must be one of {', '.join(SPLITS)} or None, got {split!r}")
     return [t for t in tasks if split is None or t.split == split]
+
+
+# ---- task filters (KEY=VALUE), shared by `cmeval report --where` and `cmeval subset --where`
+
+
+class WhereError(ValueError):
+    """A task filter is not KEY=VALUE, or names a key that no task has."""
+
+
+def parse_where(conditions: list[str] | None) -> list[tuple[str, object]]:
+    """["gold_all_python=true", "repo=pandas-dev/pandas"] -> [(key, value)]. true/false and whole
+    numbers are typed; any other value is text and compared without case."""
+    out = []
+    for condition in conditions or []:
+        key, sep, raw = condition.partition("=")
+        key, raw = key.strip(), raw.strip()
+        if not sep or not key or not raw:
+            raise WhereError(f"filter {condition!r} must be KEY=VALUE, for example gold_all_python=true")
+        value: object = raw
+        if raw.lower() in ("true", "false"):
+            value = raw.lower() == "true"
+        elif re.fullmatch(r"-?[0-9]+", raw):  # plain whole numbers only; anything else stays text
+            value = int(raw)
+        out.append((key, value))
+    return out
+
+
+def task_value(task: Task, key: str):
+    """A filter key's value for a task: `repo`, `language`, or a tag (None if the task lacks it)."""
+    if key in ("repo", "language"):
+        return getattr(task, key)
+    return task.tags.get(key)
+
+
+def task_matches(task: Task, conditions: list[tuple[str, object]]) -> bool:
+    """True if the task matches every condition."""
+    for key, wanted in conditions:
+        value = task_value(task, key)
+        if isinstance(wanted, bool) or isinstance(value, bool):
+            if value is not wanted:
+                return False
+        elif isinstance(wanted, int):
+            if value != wanted:
+                return False
+        elif str(value).lower() != str(wanted).lower():
+            return False
+    return True
+
+
+def check_where_keys(tasks: Iterable[Task], conditions: list[tuple[str, object]], what: str = "task") -> None:
+    """A key that none of the tasks has is a mistyped filter, not an empty result."""
+    known = {"repo", "language"} | {k for task in tasks for k in task.tags}
+    unknown = sorted({key for key, _ in conditions} - known)
+    if unknown:
+        raise WhereError(f"no {what} has {unknown}; known keys: {', '.join(sorted(known))}")

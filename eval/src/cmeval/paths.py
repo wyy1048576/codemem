@@ -66,6 +66,11 @@ def default_results_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "results"
 
 
+def default_configs_dir() -> Path:
+    """eval/configs in the repo: the system and collection configs."""
+    return Path(__file__).resolve().parents[2] / "configs"
+
+
 def default_tasks_dir() -> Path:
     """eval/tasks in the repo, where task files (answer keys) are kept in git."""
     return Path(__file__).resolve().parents[2] / "tasks"

@@ -31,6 +31,7 @@ Task files:
 |---|---|---|
 | `tasks/swebv-dev50.jsonl` | 50 SWE-bench Verified tasks, about the same number from each of its 12 repos, labeled with cmeval's rules. `swebv-dev50.meta.json` records the dataset revision, seed, skipped rows, and label statistics. | dev |
 | `tasks/fresh-v1.jsonl` | 2,084 fresh tasks from 7 Python repos (home-assistant, vllm, pandas, airflow, ray, transformers, cpython): fixes opened and merged from 2026-07-01 to 2026-10-22, after the model cutoff. Made by `cmeval collect configs/fresh-v1.toml`. `fresh-v1.meta.json` records the settings, the funnel for each repo (13 steps, from 21,822 merged PRs), the drop reasons, and label statistics. Use tag `gold_all_python` for the main comparison (codemem reads Python only). | dev (399) and test (1,685) |
+| `tasks/fresh-v1-py100.jsonl` | The Python sample of the main comparison: 25 all-Python dev tasks from each of pandas and transformers (medium) and home-assistant and airflow (large), drawn from `fresh-v1.jsonl` with `cmeval subset` (seed `cmeval-sample-1`). `fresh-v1-py100.meta.json` records the rule, the seed, and the chosen ids. |
 
 Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions that the fix changed, found with tree-sitter on the code at `base_commit`.
 
@@ -46,9 +47,10 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 | `cmeval review` | Not built yet |
 | `cmeval run --tasks FILE --config FILE --run-id ID [--split dev\|test] [--repo R] [--limit-per-repo N] [--index-mode update\|rebuild]` | Run every system on every task; saves hits and timings (see "Run files") |
 | `cmeval score RUN [--tokens anthropic\|estimate] [--iou T ...]` | Score a run: accuracy, tokens, latency (see "Metrics") |
-| `cmeval report RUN [--baseline grep-fn-plus] [--split dev\|test] [--cutoff DATE] [--tasks FILE] [--where KEY=VALUE ...]` | Write `report.md` for a scored run: tables, intervals, paired tests, and groups (repo, language, issue date, identifier in query, gold all Python, repo size, fix size, gold files). `--where` keeps only the tasks whose tag has that value; the main comparison on fresh tasks uses `--where gold_all_python=true` (codemem reads only Python). The tasks left out get their own section. A run with no codemem system has no primary tests. |
+| `cmeval report RUN [--baseline grep-fn-plus] [--split dev\|test] [--cutoff DATE] [--tasks FILE] [--where KEY=VALUE ...]` | Write `report.md` for a scored run: tables, intervals, paired tests, and groups (repo, language, issue date, identifier in query, gold all Python, repo size, fix size, gold files). `--where` keeps only the tasks whose tag has that value; the main comparison on fresh tasks uses `--where gold_all_python=true` (the labeler finds functions in Python only, and grep-fn-plus reads `.py` files only). The tasks left out get their own section. The primary tests use the family of the run's codemem version: `cm3-full` for v3, or `cm-bm25`, `cm-bm25-code`, `cm-bm25-code-usage` for the MVP (`--primary` chooses others). A run with no codemem system has no primary tests. |
 | `cmeval merge BASE EXTRA --run-id ID [--system S ...]` | Copy systems of one run into a copy of another run, for one report |
 | `cmeval compare RUN_A RUN_B [--tasks FILE]` | Update vs. rebuild check: compare two scored runs of the same tasks |
+| `cmeval subset TASKS --out FILE --per-repo N --seed S [--split dev] [--where KEY=VALUE ...] [--repo R ...]` | A fixed random subset of a task file: N matching tasks for each repo (all of them if a repo has fewer), drawn with a seeded generator per repo. Writes a new task file and a `.meta.json` with the source, rule, seed, and chosen ids. The Python sample `tasks/fresh-v1-py100.jsonl` is made this way. |
 | `cmeval dashboard [--port 8765] [--open]` | A local web page with the live progress of long jobs (see "Watch a long job") |
 
 ## Watch a long job
