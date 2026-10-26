@@ -1,0 +1,117 @@
+{
+  "run_id": "2026-10-25-fresh-dev-grep-b",
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "3743a306394cd0c15ab1435825cd588d2a811115",
+    "dirty": false
+  },
+  "tasks_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/tasks/fresh-v1.jsonl",
+  "tasks_sha256": "9c2ca4591305c55eb5bb96750a6ec502b9ef1ab855b614e7818ae903ff6072a8",
+  "config_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/configs/grep.toml",
+  "config_sha256": "346eb13abe6917deb54e88fe81f9698885518bc2b9f02162dfd754b236980b10",
+  "config_text": "# The two offline grep baselines (Decision 4).\n\n[[system]]\nname = \"grep\"\nadapter = \"grep\"\n\n[[system]]\nname = \"grep-fn\"\nadapter = \"grep_fn\"\n\n# The stronger grep baseline (2026-10-23): Python files only, rare keywords weigh more, noisy\n# keywords dropped, tests last.\n[[system]]\nname = \"grep-fn-plus\"\nadapter = \"grep_fn\"\ntypes = [\"py\"]\nweighting = \"idf\"\nclean_keywords = true\ntests_last = true\n",
+  "split": "dev",
+  "index_mode": "update",
+  "k": 50,
+  "systems": [
+    {
+      "name": "grep",
+      "adapter": "grep",
+      "granularity": "file",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227
+      }
+    },
+    {
+      "name": "grep-fn",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": null,
+        "weighting": "count",
+        "clean_keywords": false,
+        "tests_last": false
+      }
+    },
+    {
+      "name": "grep-fn-plus",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": [
+          "py"
+        ],
+        "weighting": "idf",
+        "clean_keywords": true,
+        "tests_last": true
+      }
+    }
+  ],
+  "machine": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "processor": "arm",
+    "python": "3.11.9"
+  },
+  "started": "2026-10-25T07:40:39+00:00",
+  "resumed": 1,
+  "sessions": [
+    {
+      "started": "2026-10-25T07:40:39+00:00",
+      "cmeval_git": {
+        "sha": "3743a306394cd0c15ab1435825cd588d2a811115",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      }
+    },
+    {
+      "started": "2026-10-25T07:41:21+00:00",
+      "cmeval_git": {
+        "sha": "3743a306394cd0c15ab1435825cd588d2a811115",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      }
+    }
+  ],
+  "status": "done",
+  "filters": {
+    "repos": null,
+    "limit_per_repo": null
+  },
+  "ended": "2026-10-25T08:07:06+00:00",
+  "error": null,
+  "searched": 1176,
+  "skipped": 21
+}
