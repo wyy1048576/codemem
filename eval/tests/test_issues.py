@@ -82,6 +82,9 @@ def test_leak_finds_the_pr_and_its_commits():
     assert "fedcba9876" in leak("in commit fedcba9876", FIX)
     assert "PR #123" in leak("Linked PRs\n* gh-123", FIX)  # the form cpython uses
     assert "PR #123" in leak("fixed by GH-123.", FIX)
+    assert "PR #123" in leak("Merge pythongh-123 into main", FIX)  # GitHub's form in fork commits
+    assert "PR #123" in leak("fixed upstream in acme/demo#123", FIX)
+    assert "PR #123" in leak("see https://github.com/acme/demo/issues/123", FIX)  # sent on to the PR
 
 
 def test_leak_has_no_false_hits():
@@ -89,6 +92,7 @@ def test_leak_has_no_false_hits():
     assert leak("commit a1b2c3 is too short; 0123456789abc is another commit", FIX) is None
     assert leak("HTML entity &#123; is not a PR", FIX) is None
     assert leak("see gh-1234 and gh-12; build-gh-123 is a tag", FIX) is None
+    assert leak("acme/demo#1234, /issues/12 and /issues/1234 are other numbers", FIX) is None
 
 
 # ---- batched fetch

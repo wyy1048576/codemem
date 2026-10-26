@@ -98,6 +98,7 @@ def test_primary_comparisons_with_hand_computed_numbers(run_dir):
     assert [primary[k].p_holm for k in sorted(primary)] == pytest.approx([0.125, 0.125, 1.0, 0.5])
     text = result.report_path.read_text()
     assert "Holm correction over all 4 tests" in text and "| cm-a | function mrr | 6 | 0.500 | 1.000 |" in text
+    assert "Primary systems: cm-a, cm-b (chosen with --primary)." in text
     assert "| cm-b | 3 | 0 | 3 | 0 |" in text  # found by both, system only, baseline only, neither
 
 
@@ -149,8 +150,8 @@ def test_refusals(run_dir, tmp_path):
 
 
 def test_the_primary_systems_are_an_explicit_list(run_dir):
-    with pytest.raises(ReportError, match=r"primary systems \['cm3-bm25'"):
-        report("r1", baseline="grep-fn")  # the default list names the real codemem systems
+    with pytest.raises(ReportError, match="no primary family fits"):
+        report("r1", baseline="grep-fn")  # codemem systems with other names: never a silent empty family
     with pytest.raises(ReportError, match=r"primary systems \['grep'\]"):
         report("r1", baseline="grep-fn", primary=["cm-a", "grep"])  # grep has no function level
     result = report("r1", baseline="grep-fn", primary=["cm-b"], resamples=500)
@@ -270,3 +271,28 @@ def test_cli_report_with_a_filter(tagged, capsys):
     assert main(args) == 0
     assert "4 tasks (filter gold_all_python=true; 2 tasks left out)" in capsys.readouterr().out
     assert main(["report", "r1", "--baseline", "grep-fn", "--where", "nope"]) == 1
+
+
+def test_default_primary_picks_the_family_of_the_run():
+    from cmeval.report import PRIMARY_FAMILIES, default_primary
+
+    v3, mvp = PRIMARY_FAMILIES[0][1], PRIMARY_FAMILIES[1][1]
+    assert default_primary(["grep-fn-plus", *v3, "cm3-full-v2-weights"], True)[1] == v3
+    assert default_primary(["grep-fn-plus", *mvp], True)[1] == mvp  # an old MVP run reports as before
+    assert default_primary([*mvp, *v3], True)[1] == v3  # the newest family first
+    assert default_primary(["grep", "grep-fn-plus"], False) == ("none (no codemem system in this run)", ())
+    with pytest.raises(ReportError, match="no primary family fits"):
+        default_primary(["grep-fn-plus", "cm3-bm25", "cm3-full"], True)  # one system missing
+
+
+def test_primary_families_name_real_codemem_systems():
+    from pathlib import Path
+
+    from cmeval.report import PRIMARY_FAMILIES
+    from cmeval.systems import load_systems
+
+    configs = Path(__file__).parents[1] / "configs"
+    for (label, family), config in zip(PRIMARY_FAMILIES, ("codemem-v3.toml", "baseline.toml")):
+        specs = {spec.name: spec for spec in load_systems(configs / config)}
+        for name in family:
+            assert name in specs and specs[name].adapter == "codemem", (label, name)

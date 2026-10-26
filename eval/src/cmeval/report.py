@@ -8,8 +8,10 @@ Contents:
 - paired comparison with a baseline system (default grep-fn-plus, the stronger grep; the naive
   grep-fn stays in every table): mean difference, paired 95% bootstrap interval, Wilcoxon p;
 - two primary metrics, fixed before the first results (2026-10-23): function-level MRR and
-  function-level tokens to the first right answer, for each primary system (PRIMARY_SYSTEMS, the
-  3 codemem v3 systems). Their p-values get one Holm correction over all primary tests. Every other
+  function-level tokens to the first right answer, for each primary system. The primary systems
+  are a family for each codemem version (PRIMARY_FAMILIES): the MVP family fixed 2026-10-23, the
+  v3 family fixed 2026-10-25 (before any fresh codemem result, after the first v3 dev results on
+  13 small-repo tasks). Their p-values get one Holm correction over all primary tests. Every other
   comparison, including other grep variants, is "exploratory" and shows a raw p;
 - group tables (means and counts only), the IoU check, latency and size, task counts.
 
@@ -46,12 +48,16 @@ COST = HEADLINE[5:]
 LOWER_IS_BETTER = frozenset({"tokens_to_first", "not_found_share"})
 COUNTS = frozenset({"tokens_to_first"})  # in tokens, not between 0 and 1
 PRIMARY = (("function", "mrr"), ("function", "tokens_to_first"))
-# The systems under test for the primary tests, fixed in the design. The family is PRIMARY x these
-# systems, so its size never depends on which other systems a run has. Since 2026-10-25 they are the
-# codemem v3 systems of configs/codemem-v3.toml: keywords, + code, + usage (the same ladder as the
-# MVP). Runs of the MVP (2026-10-23) name theirs with --primary cm-bm25 --primary cm-bm25-code
-# --primary cm-bm25-code-usage.
-PRIMARY_SYSTEMS = ("cm3-bm25", "cm3-bm25-code", "cm3-full")
+# The systems under test for the primary tests: one family for each codemem version, each fixed in
+# the design before its fresh results, newest first. Each is keywords, + code, + usage. The family
+# of tests is PRIMARY x these systems, so its size never depends on which other systems a run has.
+# A run without --primary uses the newest family whose systems are all in it, so a committed run of
+# an older version still reports with the plain command.
+PRIMARY_FAMILIES = (
+    ("codemem v3, fixed 2026-10-25", ("cm3-bm25", "cm3-bm25-code", "cm3-full")),  # configs/codemem-v3.toml
+    ("codemem MVP, fixed 2026-10-23", ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage")),  # configs/baseline.toml
+)
+PRIMARY_SYSTEMS = PRIMARY_FAMILIES[0][1]  # the current family
 GROUP_METRICS = (("function", "mrr"), ("function", "recall@10"), ("file", "recall@10"), ("function", "tokens_to_first"))
 # Group cutoffs live here, not in the tasks, so they can change without a new collection.
 REPO_SIZE_CUTOFFS = (1000, 5000)  # Python files: small < 1,000, medium 1,000 to 5,000, large > 5,000 (agreed 2026-10-25)
@@ -184,6 +190,23 @@ def _compare(scores: Scores, system: str, baseline: str, level: str, metric: str
         found = {key: found.get(key, 0) for key in ("both", "system only", "baseline only", "neither")}
     return Comparison(system, level, metric, len(ids), _mean(y), _mean(x), _mean(d), bootstrap_ci(d, **kw),
                       wilcoxon(d), found=found)
+
+
+def default_primary(names: list[str], has_codemem: bool) -> tuple[str, tuple[str, ...]]:
+    """(label, systems) for the primary tests when --primary is not given.
+
+    A run with no codemem system has none. A codemem run gets the newest family whose systems are all
+    in it. A codemem run that fits no family is an error: a renamed system must never drop the
+    primary tests without notice.
+    """
+    if not has_codemem:
+        return "none (no codemem system in this run)", ()
+    for label, family in PRIMARY_FAMILIES:
+        if all(name in names for name in family):
+            return label, family
+    known = "; ".join(f"{label}: {', '.join(family)}" for label, family in PRIMARY_FAMILIES)
+    raise ReportError(f"no primary family fits this run's systems {names} (known families: {known}); "
+                      "choose them with --primary")
 
 
 # ---- the filter
@@ -334,7 +357,11 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     # The default primary systems are the codemem systems of the design. A run with no codemem
     # system at all (a grep-only run) has no primary tests; a codemem run must name them right.
     has_codemem = any(s.get("adapter") == "codemem" for s in meta["systems"])
-    under_test = list(dict.fromkeys(primary if primary is not None else PRIMARY_SYSTEMS if has_codemem else ()))
+    if primary is not None:
+        primary_label, under_test = "chosen with --primary", list(dict.fromkeys(primary))
+    else:
+        primary_label, family_systems = default_primary(names, has_codemem)
+        under_test = list(family_systems)
     bad = [n for n in under_test if n not in names or n == baseline or granularity[n] == "file"]
     if bad:
         raise ReportError(f"primary systems {bad} are not function-level systems of this run other than the "
@@ -359,7 +386,7 @@ def report(run: str | Path, *, baseline: str = DEFAULT_BASELINE, split: str = "d
     text = _render(run_dir, meta, score_meta, systems, baseline, scores, task_ids, tasks, comparisons, family,
                    warnings, cutoff_date, kw, data["summary"],
                    filtered=(where_text, all_ids, left_out) if conditions else None,
-                   no_primary=not has_codemem and primary is None)
+                   no_primary=not has_codemem and primary is None, primary_label=primary_label)
     path = run_dir / "report.md"
     write_text_atomic(path, text)
     return ReportResult(run_dir, path, len(task_ids), warnings, family, where_text, len(all_ids) - len(task_ids))
@@ -410,7 +437,7 @@ def _group_table(lines: list[str], scores: Scores, names: list[str], granularity
 
 
 def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_ids, tasks, comparisons, family,
-            warnings, cutoff, kw, summary, filtered=None, no_primary=False) -> str:
+            warnings, cutoff, kw, summary, filtered=None, no_primary=False, primary_label="") -> str:
     names = [name for name, _, _ in systems]
     granularity = {name: g for name, g, _ in systems}
     git = meta.get("cmeval_git") or {}
@@ -474,7 +501,8 @@ def _render(run_dir, meta, score_meta, systems, baseline, scores: Scores, task_i
     if no_primary:
         lines.append("No primary systems in this run (it has no codemem system): every comparison is exploratory.")
     elif family:
-        lines += [f"| system | metric | tasks | {baseline} | system | difference [95% CI] | Wilcoxon p | Holm p | significant |",
+        lines += [f"Primary systems: {', '.join(dict.fromkeys(c.system for c in family))} ({primary_label}).", "",
+                  f"| system | metric | tasks | {baseline} | system | difference [95% CI] | Wilcoxon p | Holm p | significant |",
                   "|---|---|---|---|---|---|---|---|---|"]
         for c in family:
             significant = "yes" if c.p_holm is not None and c.p_holm <= ALPHA and c.test.p is not None else "no"

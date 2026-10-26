@@ -28,6 +28,7 @@ Files in a run folder:
 To make the report again from these files, unpack `scores.jsonl.gz` next to the other files and run
 `cmeval report <folder>`. The tasks file must be the run's (`tasks/swebv-dev50.jsonl` or
 `tasks/fresh-v1.jsonl`) with the same sha256 (`--tasks tasks/<file>.jsonl` on another machine).
-For the fresh run, add `--where gold_all_python=true`. For `2026-10-23-dev50-final` (codemem MVP), add
-`--primary cm-bm25 --primary cm-bm25-code --primary cm-bm25-code-usage`: the default primary systems are
-now the codemem v3 ones.
+For the fresh run, add `--where gold_all_python=true`. The primary systems follow the run's codemem
+version, so `2026-10-23-dev50-final` (MVP) needs no flags. Runs that were reported with their own
+`--baseline` or `--primary` (the subset runs) need the same flags again: their `report.md` names the
+baseline in its header and the primary systems in "Primary metrics".
