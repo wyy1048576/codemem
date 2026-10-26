@@ -253,3 +253,12 @@ def test_align_prefers_the_nearest_exact_match():
     assert align_file_diff(base, diff).changed == [5]  # the stated position wins when it matches
     diff_off = header("f.py") + "@@ -3,3 +3,3 @@\n a\n-x\n+y\n b\n"  # stated index 2: index 3 is 1 away, index 0 is 2 away
     assert align_file_diff(base, diff_off).changed == [5]
+
+
+def test_vscode_testing_feature_is_code():
+    from cmeval.patches import classify_path
+
+    # testing/ holds tests only at the top or under src/, also in TypeScript: vscode's Testing feature
+    assert classify_path("src/vs/workbench/contrib/testing/browser/testingExplorerView.ts") == ("code", "typescript")
+    assert classify_path("extensions/copilot/src/platform/testing/common/setup.ts") == ("code", "typescript")
+    assert classify_path("src/vs/workbench/contrib/testing/test/common/testStubs.ts") == ("test", "typescript")

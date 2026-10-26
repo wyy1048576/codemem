@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from ..labels import LANGUAGES, Definition, find_definitions, innermost
-from ..patches import classify_path
+from ..patches import LANGUAGE_BY_EXT, classify_path
 from ..retriever import Hit
 from ..retriever import RetrieverError
 from .grep import GrepRetriever, format_lines, preview_line, rank_files, rg_count, rg_files, rg_lines
@@ -36,7 +36,8 @@ WEIGHTINGS = ("count", "idf")
 # A keyword that cannot name code: a commit hash, a path, a web address, or a file name. Not .io
 # (astropy.io) and not .json (Response.json): those are often real code names. C, C++ and
 # TypeScript file names since F7 (no Python sample query has one).
-NOISE_RE = re.compile(r"^[0-9a-f]{7,}$|/|\.(com|org|net)\b|\.(py|rst|txt|md|cfg|toml|ya?ml|c|h|cc|cpp|hpp|cu|ts|tsx)$")
+_F7_EXTS = "|".join(re.escape(ext[1:]) for ext, lang in LANGUAGE_BY_EXT.items() if lang in ("c", "cpp", "typescript", "tsx"))
+NOISE_RE = re.compile(rf"^[0-9a-f]{{7,}}$|/|\.(com|org|net)\b|\.(py|rst|txt|md|cfg|toml|ya?ml|{_F7_EXTS})$")
 SPARE_KEYWORDS = 10  # extra keywords taken before cleaning, so the cleaned list can still be full
 
 

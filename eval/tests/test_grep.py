@@ -238,4 +238,4 @@ def test_grep_fn_maps_cpp_and_typescript_matches_to_functions(tmp_path):
     grep_fn = GrepFnRetriever()
     grep_fn.build(tmp_path, tmp_path)
     hits = {(h.path, h.symbol, h.start_line, h.end_line) for h in grep_fn.search(QUERY, 5)}
-    assert hits == {("store.cpp", "Store.revoke_session", 2, 4), ("session.ts", "Manager.revoke.run", 3, 3)}
+    assert hits == {("store.cpp", "s.Store.revoke_session", 2, 4), ("session.ts", "Manager.revoke.run", 3, 3)}

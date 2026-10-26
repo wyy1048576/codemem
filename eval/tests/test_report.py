@@ -353,3 +353,19 @@ def test_cpp_tasks_get_their_own_groups(tagged):
     section = text.split("### By repo size (code files of the task's language)")[1].split("###")[0]
     assert "| small (< 1,000) | 1 |" in section and "| medium (1,000 to 5,000) | 3 |" in section
     assert "| large (> 5,000) | 1 |" in section and "| unknown | 1 |" in section
+
+
+def test_tasks_without_repo_code_files_fall_back_to_python_files(tagged):
+    from dataclasses import replace
+
+    from cmeval.tasks import load_tasks
+
+    meta_path = tagged / "meta.json"
+    tasks_file = json.loads(meta_path.read_text())["tasks_file"]
+    tasks = load_tasks(tasks_file)
+    tasks[0] = replace(tasks[0], tags={**tasks[0].tags, "repo_code_files": 7000})  # one new task, the rest old
+    save_tasks(tasks_file, tasks)
+    edit_json(meta_path, tasks_sha256=hashlib.sha256(open(tasks_file, "rb").read()).hexdigest())
+    text = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).report_path.read_text()
+    section = text.split("### By repo size (code files of the task's language)")[1].split("###")[0]
+    assert "| unknown | 1 |" in section  # only the task with neither tag

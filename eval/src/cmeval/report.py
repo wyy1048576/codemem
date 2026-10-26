@@ -284,7 +284,8 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
     size_label = "repo size (code files of the task's language)" if code_sizes else "repo size (Python files)"
 
     def repo_size(task) -> str:
-        n = task.tags.get(size_tag)
+        # Tasks made before repo_code_files (2026-10-26) have only repo_py_files.
+        n = task.tags.get(size_tag, task.tags.get("repo_py_files"))
         small, large = REPO_SIZE_CUTOFFS
         if n is None:
             return "unknown"

@@ -55,6 +55,7 @@ class LangSpec:
     needs_body: bool = False  # a class counts only with a body (C++ "struct S;" is not a class)
     leading_decorators: bool = False  # decorators just before a definition belong to it (TS methods)
     signature_of: Callable[[Node], str | None] | None = None  # tells overloads apart (C++)
+    scopes: frozenset[str] = frozenset()  # named scopes that are not definitions (namespaces)
     misread: Callable[[Node], bool] | None = None  # a definition that is a misparse: its lines count as errors
 
 
@@ -139,6 +140,8 @@ def _c_names(node: Node) -> list[str] | None:
     if node.type != "function_definition":
         name = node.child_by_field_name("name")
         return (_qualified(name) or None) if name is not None else None
+    if node.child_by_field_name("body") is None and not any(c.type == "try_statement" for c in node.children):
+        return None  # A() = default; and A(const A&) = delete; are declarations, like ~A();
     name = _c_declarators(node)[1]
     return (_qualified(name) or None) if name is not None else None
 
@@ -180,6 +183,14 @@ def _ts_names(node: Node) -> list[str] | None:
     return _field_name(node)
 
 
+def _scope_names(node: Node) -> list[str]:
+    """Name parts of a namespace: a::b (C++ 17) and A.B (TypeScript) give two. Anonymous: none."""
+    name = node.child_by_field_name("name")
+    if name is None or name.type == "string":  # declare module 'x' is not a name in code
+        return []
+    return [part for part in re.split(r"::|\.", _text(name)) if part]
+
+
 _C_FAMILY = dict(
     functions=frozenset({"function_definition"}),
     classes=frozenset({"class_specifier", "struct_specifier"}),
@@ -188,6 +199,7 @@ _C_FAMILY = dict(
     needs_body=True,
     signature_of=_c_signature,
     misread=_c_misread,
+    scopes=frozenset({"namespace_definition"}),
 )
 _TS_FAMILY = dict(
     functions=frozenset({
@@ -198,6 +210,7 @@ _TS_FAMILY = dict(
     wrappers=frozenset({"export_statement", "lexical_declaration", "variable_declaration"}),
     name_of=_ts_names,
     leading_decorators=True,
+    scopes=frozenset({"internal_module", "module"}),
 )
 
 LANGUAGES: dict[str, LangSpec] = {
@@ -301,6 +314,9 @@ def _parse_with(spec: LangSpec, root: Node) -> Parsed:
 
     def walk(node: Node, scope: tuple[str, ...]) -> None:
         for child in node.children:
+            if child.type in spec.scopes:
+                walk(child, (*scope, *_scope_names(child)))
+                continue
             kind = "function" if child.type in spec.functions else "class" if child.type in spec.classes else None
             parts = names(child, kind) if kind else None
             if parts:
@@ -402,18 +418,24 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
             partial = True
             continue
         defs = base.definitions
-        new_defs = _definitions_or_none(new_text, change.language) if new_text is not None else None
-        file_module_level = _label_file(path, base_text, new_text, applied, base, new_defs, gold)
+        fixed = _parsed_or_none(new_text, change.language) if new_text is not None else None
+        # Added lines are placed in the fixed file only if it parses clean; else on the base side.
+        new_defs = fixed.definitions if fixed is not None and not fixed.error_lines else None
+        mapping = _map_to_base(new_defs, defs) if new_defs is not None else {}
+        file_module_level = _label_file(path, base_text, new_text, applied, base, new_defs, mapping, gold)
         if file_module_level is None:
             partial = True  # a change touches a parse error
             continue
         module_level = module_level or file_module_level
 
-        if new_defs is not None:
+        if fixed is not None:
             # New in the fixed file: a symbol the base does not have, or (C and C++) a new overload.
+            # A fixed file with parse errors gives only its definitions that contain no error.
+            found = new_defs if new_defs is not None else [d for d in fixed.definitions if not d.has_error]
+            if new_defs is None:
+                mapping = _map_to_base(found, defs)
             known = {(d.kind, d.symbol) for d in defs}
-            mapping = _map_to_base(new_defs, defs)
-            for d in new_defs:
+            for d in found:
                 if (d.kind, d.symbol) not in known or (d.signature is not None and d not in mapping):
                     _add_unretrievable(unretrievable, change.new_path, d)
 
@@ -486,7 +508,7 @@ class _TouchesError(Exception):
     """A changed line is on a parse error or in a function that contains one."""
 
 
-def _label_file(path, base_text, new_text, applied, base: Parsed, new_defs, gold: Gold) -> bool | None:
+def _label_file(path, base_text, new_text, applied, base: Parsed, new_defs, mapping, gold: Gold) -> bool | None:
     """Add the file's gold classes and functions. Returns True if a change is outside every function,
     or None (and adds nothing) if a change touches a parse error of the base file."""
     functions = [d for d in base.definitions if d.kind == "function"]
@@ -519,7 +541,6 @@ def _label_file(path, base_text, new_text, applied, base: Parsed, new_defs, gold
         if new_defs is not None:
             for L in applied.insert_after:
                 check(None, L, L + 1)  # the base side of an insertion must be clean too
-            mapping = _map_to_base(new_defs, base.definitions)
             new_functions = [d for d in new_defs if d.kind == "function"]
             new_classes = [d for d in new_defs if d.kind == "class"]
             new_lines = split_lines(new_text)

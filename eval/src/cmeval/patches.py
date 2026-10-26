@@ -35,8 +35,9 @@ TEST_DIRS = {"tests", "testdata", "__tests__", "spec", "specs"}
 # Directories that hold tests only at the repo top or under src/. Elsewhere they are often library
 # code that a fix can change: django/test/, sympy/testing/, numpy/testing/.
 TOP_TEST_DIRS = {"test", "testing"}
-# In TypeScript code they hold tests at any depth (vscode: src/vs/**/test/, extensions/*/test/).
-ANY_DEPTH_TEST_DIRS = {"typescript": TOP_TEST_DIRS, "tsx": TOP_TEST_DIRS}
+# In TypeScript code, test/ holds tests at any depth (vscode: src/vs/**/test/, extensions/*/test/).
+# Not testing/: in vscode it is product code (the Testing feature, contrib/testing/).
+ANY_DEPTH_TEST_DIRS = {"typescript": {"test"}, "tsx": {"test"}}
 # Product code in a folder named test: playwright's MCP test tools.
 CODE_DIRS_NAMED_TEST = ("packages/playwright/src/mcp/test/",)
 
