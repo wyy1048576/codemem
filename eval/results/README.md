@@ -7,13 +7,13 @@ texts (those stay in `CMEVAL_HOME/runs/<run id>/`, outside git).
 |---|---|
 | `2026-10-23-dev50-final/` | First full dev run: 50 SWE-bench Verified tasks, 6 systems. The grep systems ran at `c6b2933`; the 3 codemem systems come from run `2026-10-23-dev50` (codemem `d5c2013`), merged with `cmeval merge`. Dev split: the numbers guide development and are not final results. |
 | `2026-10-23-b4b/` | The update vs. rebuild check (Decision 5) at the codemem code of the dev run: PASS. |
-| `2026-10-25-fresh-dev-grep-b/` | The grep baselines (grep, grep-fn, grep-fn-plus) on the 399 fresh dev tasks (`tasks/fresh-v1.jsonl`), at `3743a30`. The report is made with `--where gold_all_python=true` (364 tasks; the 35 others are in its last section). No codemem systems yet: they join with `cmeval merge` after the codemem changes land. Dev split. |
 | `2026-10-23-repo-stats/` | `cmeval repo-stats --functions` on the 16 candidate repos for fresh tasks (`configs/fresh-candidates.toml`), merges from 2026-07-01 to 2026-10-22. `stats.md` has the tables; `stats.json` has all numbers. Used to choose the repos for F4. |
 | `2026-10-24-subset-v2/` | codemem v2 (`configs/codemem-v2.toml` at codemem `31c0f99`, before the v2 weights existed, so every system is unweighted) on 13 dev tasks of four small repos (requests, pytest, seaborn, flask), on an M1. Indicative only; see `docs/decisions.md` §5. |
 | `2026-10-24-subset-weights/` | The search-time weightings v2's defaults were chosen from (`configs/codemem-v2-weights.toml`, codemem `18d3b77`), same 13 tasks. |
 | `2026-10-24-subset-b4/` | The update vs. rebuild check for codemem v2 on those 13 tasks: PASS (update at `31c0f99`, rebuild at `18d3b77`). |
 | `2026-10-25-subset-v3/` | codemem v3 (`configs/codemem-v3.toml` at codemem `96bc2bc`) on the same 13 tasks, on an M1: the v3 default (neutral weights, BM25 queries without stopwords) and five variants. Indicative only; see `docs/decisions.md` §4, which also compares it with v2, the MVP and the grep baselines task by task. |
 | `2026-10-25-subset-v3-b4/` | The update vs. rebuild check for codemem v3 on those 13 tasks: PASS, both at codemem `96bc2bc` (13/13 tasks with the same top 10 for all six systems, metric differences 0.0000). |
+| `2026-10-25-fresh-dev-grep-b/` | The grep baselines (grep, grep-fn, grep-fn-plus) on the 399 fresh dev tasks (`tasks/fresh-v1.jsonl`), at `3743a30`. The report is made with `--where gold_all_python=true` (364 tasks; the 35 others are in its last section). No codemem systems yet: they join with `cmeval merge` after the codemem changes land. Dev split. |
 
 Files in a run folder:
 
