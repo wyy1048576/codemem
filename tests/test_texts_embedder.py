@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from codemem.callgraph import is_test_caller, is_test_path, resolve_edges
 from codemem.config import Config, config_from_dict
@@ -79,10 +80,11 @@ def test_usage_text_includes_commits_when_given():
     assert "changed in commit: Fix session leak" in TEXT_BUILDERS["usage"](_chunk(1, "f"), ctx)
 
 
-def test_summary_slot_disabled_and_build_texts_skips_none():
+def test_build_texts_skips_none_and_rejects_unknown_types():
     c = _chunk(1, "f")
-    assert TEXT_BUILDERS["summary"](c, BuildContext()) is None
-    assert build_texts(c, BuildContext(code_header=False), ["code", "usage", "summary"]) == {"code": c.code}
+    assert build_texts(c, BuildContext(code_header=False), ["code", "usage"]) == {"code": c.code}  # no callers
+    with pytest.raises(KeyError, match="summary"):
+        build_texts(c, BuildContext(), ["summary"])  # a type without a builder
 
 
 def test_code_text_has_a_context_header():

@@ -1,14 +1,13 @@
 # Advanced design: where codemem goes after the baseline
 
-**Status:** proposal only; nothing here is implemented. It builds on the v3 core
-([architecture.md](architecture.md), [data-model.md](data-model.md)), which comes first, and is
-evaluated with Andrew's harness (`eval/`).
+**Status:** proposal only; nothing here is implemented. It builds on the current system
+([architecture.md](architecture.md)) and is evaluated with Andrew's harness (`eval/`).
 
 **Inputs:**
 - all 47 Exa blog posts (Oct 23, 2026), summarized in [exa.md](exa.md);
 - the multi-vector and code-retrieval literature up to Oct 2026;
-- the dev50 results of the MVP;
-- what the v2 work showed.
+- the dev50 run of Oct 23 (codemem's first version);
+- what the 13 small-repo dev tasks showed (Oct 24–25).
 
 Numbers from papers are as reported there; anything marked *(est.)* is my own arithmetic.
 
@@ -45,7 +44,7 @@ few tokens) can a local code search tool get at finding the code a coding agent 
 |---|---|---|
 | RQ1, accuracy | Do usage context (call sites, tests, commits) and Exa-style multi-signal retrieval beat the hybrid baseline and grep on Recall@k and MRR? Which parts contribute most? | H1: usage fields add ≥ 3 points of function Acc@5 over code-only, mostly on vague issues. H2: per-repo training (next-reference prediction, idea 4) adds ≥ 3 more |
 | RQ2, tokens and a cheap index | How many tokens does an agent spend before reaching the right code, with codemem vs grep? How small and fast can the index get before it misses? | H3: 256 numbers × 1 bit with rescoring keeps ≥ 98% of full accuracy at ≥ 30× less memory; a static first pass cuts CPU indexing time ≥ 10× at ≤ 2 points of accuracy |
-| RQ3, time | Query, indexing and update latency (save → searchable); does end-to-end task time drop? | a query under about 0.5 s and an update under about 1 s on a laptop (the v3 core's targets) |
+| RQ3, time | Query, indexing and update latency (save → searchable); does end-to-end task time drop? | a query under about 0.5 s and an update under about 1 s on a laptop (the current system's targets) |
 | Final check (H4) | Real agents, same budget, only the tool changes: grep alone vs grep + codemem | the same or better localization at a lower billed cost (tokens, turns, cost, whether the agent opened the right files) |
 
 **Evaluation plan.**
@@ -58,8 +57,7 @@ few tokens) can a local code search tool get at finding the code a coding agent 
   - the full issue text, which is what benchmarks use;
   - short agent-style queries of 3–8 words, which is what agents type, and where embedders break.
 
-  Today's eval has only the first. The second is the change highlighted in
-  [decisions.md](decisions.md) §3.
+  Today's eval has only the first. The second is an open question (§11).
 - **Benchmarks:**
 
   | Benchmark | Languages | Use |
@@ -105,8 +103,8 @@ experiment that runs on the M1 laptop, and a decision gate before the expensive 
 | 2 | **Query routing + exact-lookup protection** | when an issue names a file, function or error string, look it up exactly; only use "meaning" search for the vague rest | RQ1d | a stack-trace / identifier extractor as a new RRF signal |
 | 3 | **Many vectors per function** (your multi-vector intuition) | stop squeezing a whole function into one vector; let each query word find its best match inside the code | RQ1 (new) | windows on/off ablation (exists), then an off-the-shelf code ColBERT as an extra signal |
 | 4 | **Train on the repo's own links**, then distill | Exa's "next-link prediction" for code: learn from call sites → callee, test → function, issue → fixed function | RQ1b | LoRA on 0.5B with mined pairs from repos outside the eval set |
-| 5 | **Highlights under one token budget** | give the agent the 10 lines that matter, not the 80-line function | RQ2 (tokens) | v2's focused previews, scored by gold-hunk coverage |
-| 6 | **Cheap index** | Exa's vector recipe: shorter vectors, 1 bit per number, re-check the top | RQ2 (cheap) | dims × int8/binary × rescoring grid, from v2's stored float16 vectors (no re-embedding) |
+| 5 | **Highlights under one token budget** | give the agent the 10 lines that matter, not the 80-line function | RQ2 (tokens) | the current focused previews, scored by gold-hunk coverage |
+| 6 | **Cheap index** | Exa's vector recipe: shorter vectors, 1 bit per number, re-check the top | RQ2 (cheap) | dims × int8/binary × rescoring grid, from the stored float16 vectors (no re-embedding) |
 
 Two warnings frame everything:
 
@@ -125,35 +123,35 @@ Two warnings frame everything:
 
 ## 1. Where the baseline loses
 
-**What dev50 says about the MVP** (Andrew's run, 50 SWE-bench Verified tasks, Python):
+**What dev50 says about codemem's first version** (Andrew's run, 50 SWE-bench Verified tasks, Python):
 
 - **Usage text is the largest single gain.** Function MRR goes 0.334 → 0.423 (bm25+code → +usage). The anchor-text idea already works in its crudest form: callers' *names* only.
 - **When the issue names no gold identifier,** codemem (MRR 0.346) beats the dev-tuned grep baseline (0.188) by a wide margin. When it names one, they are close (0.488 vs 0.424). This is where routing (idea 2) should help, and where an exact lookup should win outright.
 - **Function-level all-gold success@10 is 0.37.** Published untuned 0.5–0.6B embedders reach about 0.60 Acc@10 on Verified. The harnesses differ (corpus, test files, metric details), so this is not a like-for-like gap. Still, it says the baseline is far from what a tuned retriever can reach (0.72 at 0.6B, 0.76 at 8B, about 0.80 with a reranker).
 - **Indexing cost is real.** Embedding takes 99% of index time (django about 9 minutes on an M-series GPU). Updates between distant commits re-embed most of a repo when formatting changes (django's 2022 `black` reformat).
 
-**What building v2 showed:**
+**What the 13 small-repo dev tasks showed (Oct 24):**
 
 - **Non-target code crowds results.**
   - On the fixture, a test helper class (`FakeUser`) became a callee of the test that mentions "disabled user". It took rank 2, and `revoke_session` fell from 4 to 7.
   - On `requests`, exception classes (`ConnectTimeout`, `RetryError`) outrank `HTTPAdapter.send` for "retry a request when the connection fails".
-  - Down-weighting tests or showing only functions restores the order. On 13 dev tasks, halving the scores of tests, classes and blocks made 4 tasks better at function level and none worse, so it became v2's default. v3 makes the default neutral again, because that gain came from the eval never counting tests as answers ([decisions.md](decisions.md), D24). Grouping results is the alternative being considered (decisions §3).
+  - Down-weighting tests or showing only functions restores the order. On 13 dev tasks, halving the scores of tests, classes and blocks made 4 tasks better at function level and none worse. The default stays neutral all the same, because that gain came from the eval never counting tests as answers, while vague questions often need tests and classes. Grouping results is the alternative being considered (§11).
 - **Long issues are noisy queries.**
   - Median issue length on dev50 is 1,444 characters, and the longest is 24,769 (stack traces, logs, code).
   - BM25 ORs every token, and the embedder truncates the query at 1,024 tokens.
   - Ideas 2 and 3 (query-side compression) both target this.
 
-**What the 13 local dev tasks show, task by task** (v2 default; numbers in
-[decisions.md](decisions.md) §5).
+**What the 13 local dev tasks show, task by task** (the Oct 24 run, with tests, classes and blocks
+at half score; `eval/results/2026-10-24-subset-weights/`).
 
-- Of 12 tasks with function gold, v2 puts a gold function in the top 10 for 8, and every gold function for 7 (success@10 0.583).
+- Of 12 tasks with function gold, codemem puts a gold function in the top 10 for 8, and every gold function for 7 (success@10 0.583).
 - The 4 misses (seaborn-3069, flask-5014, pytest-5787, pytest-7324) and one near-miss (pytest-10081) fall into four patterns. Each points at an idea below.
 
 | Pattern | Tasks (rank of the first gold function) | What happened | Idea that targets it |
 |---|---|---|---|
-| **The issue names the fix site, and retrieval still misses it** | seaborn-3069: the issue says *"Probably straightforward to do in `Plotter._finalize_figure`"*, a gold function. It is not in the top 50 of v2, and not in BM25's either. pytest-7324: the reproducer calls `Expression.compile("False")`, in the gold file. It ranks 16. | In an issue of 1,187 characters, BM25 splits the dotted name into common words (`plotter`, `finalize`, `figure`), and the dense query is about scales. | Idea 2: route dotted names, stack frames and error strings to an exact symbol lookup that fusion cannot bury. |
+| **The issue names the fix site, and retrieval still misses it** | seaborn-3069: the issue says *"Probably straightforward to do in `Plotter._finalize_figure`"*, a gold function. It is not in codemem's top 50, and not in BM25's either. pytest-7324: the reproducer calls `Expression.compile("False")`, in the gold file. It ranks 16. | In an issue of 1,187 characters, BM25 splits the dotted name into common words (`plotter`, `finalize`, `figure`), and the dense query is about scales. | Idea 2: route dotted names, stack frames and error strings to an exact symbol lookup that fusion cannot bury. |
 | **The issue describes a symptom; the fix sits elsewhere** | seaborn-3069: `Nominal._setup` ranks 2, but the fix is in its caller `Plotter._setup_scales` (rank 48). pytest-5787: the chained-exception *display* code ranks top, but the fix is in report *serialization* (`BaseReport._to_json` / `_from_json`, not in the top 50). pytest-7324: the issue is about a compiler crash; the fix is in the parser's `not_expr`. | The retriever finds the code that the issue talks about. The fix is in a caller, a producer or a serializer of that code. | Idea 1: anchors, i.e. what callers and tests say about a function. Also a 1-hop expansion of the top hits along call edges (the callers of `Nominal._setup` include `Plotter._setup_scales`), and the reranker of idea 2. |
-| **Tests that reproduce the issue outrank the code** | pytest-10081: three `test_unittest.py` tests took ranks 1, 3 and 5. Without weights the gold `TestCaseFunction.runtest` ranked 16; with tests ×0.5 it ranks 7. pytest-5787: 4 of the top 6 were tests. | A reproducing test shares the issue's words and code snippets. | Tests ×0.5 (v2's default; neutral in v3, see decisions D24). Idea 1 treats a test as an anchor of the code it calls, not as a competitor. |
+| **Tests that reproduce the issue outrank the code** | pytest-10081: three `test_unittest.py` tests took ranks 1, 3 and 5. Without weights the gold `TestCaseFunction.runtest` ranked 16; with tests ×0.5 it ranks 7. pytest-5787: 4 of the top 6 were tests. | A reproducing test shares the issue's words and code snippets. | Tests ×0.5 (a search setting, `test_weight`; neutral by default). Idea 1 treats a test as an anchor of the code it calls, not as a competitor. |
 | **The class and its siblings compete with the method** | flask-5014, *"Require a non-empty name for Blueprints"*: the class `Blueprint` ranked 1 and three of its methods 2–4. The gold `Blueprint.__init__` ranked 24 without weights and 17 with classes ×0.5. | The skeleton and every method match "Blueprint". Nothing says the check belongs in the constructor. | A reranker that reads the code (idea 2); several vectors per function (idea 3), so a long constructor is matched by its validation lines. |
 
 Two cautions:
@@ -177,8 +175,8 @@ a past commit "Fix sessions surviving account deactivation" touched it. Those te
 
 ### 2.2 What to add (in order of cost)
 
-The MVP's `usage` text has caller and test *names*. Proposed anchor fields, each its own
-vector type and BM25 field (`data-model.md` §11: a new vector type is just a new text builder):
+The `usage` text has caller and test *names*. Proposed anchor fields, each its own
+vector type and BM25 field (a new vector type is just a new text builder; architecture.md §9):
 
 | Field | Content per function | Leakage rule |
 |---|---|---|
@@ -194,7 +192,7 @@ leakage checks.
 
 ### 2.3 How to index anchors
 
-- **Several anchors per function are naturally multi-vector.** Embed each call site separately and score the function by its best-matching anchor (max), or by MaxSim over anchors. v2's table already holds several parts per chunk (`data-model.md` §5.3).
+- **Several anchors per function are naturally multi-vector.** Embed each call site separately and score the function by its best-matching anchor (max), or by MaxSim over anchors. The `vectors` table already holds several parts per chunk (architecture.md §5).
 - **Popularity bias.** Utility functions have thousands of callers. Cap and diversify: different files first, de-duplicated call lines, at most 20 per field. Report results split by caller count.
 
 ### 2.4 Experiments
@@ -230,7 +228,7 @@ issue ─► extract: stack frames (path, line, function), dotted names, identif
 - **New RRF signals.**
   - `trace`: the chunk containing each stack-frame line, frames nearest the error first.
   - `symbol`: chunks whose qualname equals an extracted identifier.
-  - Both are cheap SQL lookups on data v2 already has (`find_chunk_at`, `chunks_name`).
+  - Both are cheap SQL lookups on data the index already has (`find_chunk_at`, `chunks_name`).
 - **Query-side compression for long issues:**
   - drop log noise (timestamps, hex addresses)
   - keep the first and last frames of long tracebacks
@@ -356,8 +354,8 @@ connects idea 3 to idea 5: Exa's Dynamic Highlights (500 characters ≈ 8,000 ch
 
 | Representation | Storage | Query cost | Training |
 |---|---|---|---|
-| single vector, 896-d fp32 (MVP) | 358 MB (fp16 179 MB) | ms | none |
-| windows, max over parts (v2) | ~1.1–1.4× the above | ms | none |
+| single vector, 896-d fp32 | 358 MB (fp16 179 MB) | ms | none |
+| windows, max over parts (the current system) | ~1.1–1.4× the above | ms | none |
 | per token, 128-d fp16 | ~7.7 GB | brute force ~2 TFLOP per long issue; PLAID tens of ms | token head needed |
 | per token, ColBERTv2 2-bit residuals | ~1.1 GB | PLAID: ~30 ms on 8 CPU threads at 8.8M passages | token head needed |
 | + token pooling ×2 (post hoc) | ~0.54 GB | about half | none (≈100% retained at ×2) |
@@ -385,15 +383,15 @@ our data before training.
 
 ### 4.8 How search works end to end in the final design
 
-**Running example** (dev task flask-5014, a real miss of v2):
+**Running example** (dev task flask-5014, a real miss in the Oct 24 run):
 - The issue: *"Require a non-empty name for Blueprints … It would be helpful if a `ValueError` was raised."*
 - The gold function, `Blueprint.__init__`, is 35 lines long. Most of it is a parameter list and attribute assignments.
 - The fix goes next to the two lines `if "." in name: raise ValueError(...)`.
-- v2 ranks the function 17th: its one vector describes "set up a blueprint's options", and the two lines that matter are averaged away.
+- codemem ranks the function 17th: its one vector describes "set up a blueprint's options", and the two lines that matter are averaged away.
 
 **What is stored for each chunk:**
 
-| | v2 today | final design |
+| | today | final design |
 |---|---|---|
 | BM25 entry (5 fields) | yes | same |
 | code vector: one per 3,000-character window, 896-d | yes | same; finds candidates |
@@ -406,7 +404,7 @@ our data before training.
 query ──► 0. exact lookup ─────────────── names that exist in the index (dotted names,
      │                                    stack frames, error strings): pinned on top
      ├──► 1. candidates ──── BM25 + code + usage over the whole repo, RRF ──► top 200
-     │                       (what v2 does now, with a deeper cut)
+     │                       (what codemem does now, with a deeper cut)
      ├──► 2. late interaction ── query → ~32 small vectors; chunk score =
      │                       Σ over query vectors of the best-matching chunk vector
      │                       (MaxSim), combined with the stage-1 rank ──► top 50
@@ -423,18 +421,18 @@ query ──► 0. exact lookup ─────────────── na
 **Why two stages instead of many vectors everywhere:**
 - **Cost.** Stage 2 scores only 200 chunks: 200 × 32 × 32 dot products, a few milliseconds including reading the vectors. Searching all of a repo's small vectors (3.2M for 100k chunks) needs an index like PLAID. That can come later; testing the idea does not need it.
 - **Stage 1 sets the ceiling.**
-  - On the 13 local dev tasks, v2's default has a gold function in its top 10 for 8 of 12 tasks, in its top 20 for 9 and in its top 50 for 10.
+  - On the 13 local dev tasks, the Oct 24 run has a gold function in its top 10 for 8 of 12 tasks, in its top 20 for 9 and in its top 50 for 10.
   - So stage 2 could rescue at most 2 tasks there (flask-5014 at 17, seaborn-3069 at 48).
   - The other 2 misses never reach the candidates. They need stage 0 or anchors (§1).
 - **Updates stay as they are.** A changed function is re-encoded by both encoders. Nothing global is rebuilt.
 
-**How it fits the v2 code:**
+**How it fits the current code:**
 - **Store:** a new vector type (say `late`). Its parts are statement groups. The `vectors` table already holds several parts per chunk with line offsets, so the schema does not change. Stage 2 reads a candidate's rows by chunk id and needs no FAISS index.
 - **Search:** one new step after RRF, `rescore(top N)`. Its settings are the depth, the weight against stage 1 and the query-side pooling. Like every search-time setting, they can be swept on one index.
 - **Indexing:** the late encoder runs on changed chunks only, next to today's embedder.
 
 **Decisions, in order:**
-1. **Off-the-shelf first** (E-A2, laptop): a code ColBERT model (LateOn-Code 149M via PyLate) as stage 2 over v2's top 200. If it adds fewer than 2 function MRR points on dev50, multi-vector is not the main bet.
+1. **Off-the-shelf first** (E-A2, laptop): a code ColBERT model (LateOn-Code 149M via PyLate) as stage 2 over codemem's top 200. If it adds fewer than 2 function MRR points on dev50, multi-vector is not the main bet.
 2. **Per token or pooled.** Per-token vectors cost ~7.7 GB per 100k functions (128-d fp16). Structure-seeded pooling (§4.4) costs ~100–200 MB and is the novel part.
 3. **Training** (GPU, E-A3 to E-A5): the token head and pooler, distilled from an 8B teacher.
 
@@ -491,9 +489,9 @@ answer as well as 8,000 characters of page text (SimpleQA). On long technical do
 500 characters. Their Dynamic Highlights picks tokens across *all* results under one budget, with
 95% fewer tokens than full text.
 
-### 6.2 What v2 already does, and what comes next
+### 6.2 What codemem already does, and what comes next
 
-- **v2:** a long function's card names its best window (`best 245-302`) and shows the lines around the one sharing the most query words.
+- **Now:** a long function's card names its best window (`best 245-302`) and shows the lines around the one sharing the most query words.
 - **Next:**
   1. score every line of the top-k by query-token overlap plus (later) MaxSim alignment (§4.5)
   2. allocate one line budget across all results (softmax over the fused scores; always keep signatures)
@@ -513,7 +511,7 @@ answer as well as 8,000 characters of page text (SimpleQA). On long technical do
 Plus IVF clusters instead of HNSW, and filtering before scoring. Their lookup-table scoring uses
 4- or 8-dim sub-vectors in registers.
 
-**v2 makes this cheap to study.** Every vector is stored once at full dimension (float16), and
+**The current design makes this cheap to study.** Every vector is stored once at full dimension (float16), and
 FAISS is derived. So the whole grid runs from one embedding pass:
 
 | Axis | Values |
@@ -537,7 +535,7 @@ FAISS is derived. So the whole grid runs from one embedding pass:
 | Query-time staleness repair | Exa highlights are computed live | if a hit's file changed since indexing, re-parse it (ms) and return correct lines, flagged `stale_embedding` |
 | Resident-model daemon with pipelined stages | exa-d (Ray actors keep the model loaded; GPU embeds while CPU parses) | sub-second updates outside an MCP session |
 | Index as of a commit | Exa Snapshot (`snapshotAsOf`, built for leakage control) | eval and agents can search the repo as of a release; anchors respect the cutoff |
-| Kill-and-resume convergence test | exa-d's convergence property | a crashed update + resume must equal a full rebuild (v2's epochs make this testable) |
+| Kill-and-resume convergence test | exa-d's convergence property | a crashed update + resume must equal a full rebuild (the index's epochs make this testable) |
 | Static vs dynamic fields | Exa company search | code vectors are static; caller lists and BM25 statistics drift, so refresh them lazily within bounds |
 
 ---
@@ -560,7 +558,7 @@ FAISS is derived. So the whole grid runs from one embedding pass:
 
 | Work | M1 16 GB laptop | Hackathon GPU |
 |---|---|---|
-| v2 baseline on dev50 (0.5B, fp16) | yes (hours; background) | minutes |
+| the current system on dev50 (0.5B, fp16) | yes (hours; background) | minutes |
 | idea 1 anchors, idea 2 routing, idea 6 grid | yes (embedding passes reuse the vector cache) | faster |
 | big fresh repos (vLLM, Kubernetes, Linux) at full scale | chunking yes; embedding too slow | needed |
 | E-A2 off-the-shelf ColBERT | yes (149M) | — |
@@ -573,12 +571,30 @@ FAISS is derived. So the whole grid runs from one embedding pass:
 
 | When | Do | Decide |
 |---|---|---|
-| First | the v3 core: incremental updates, freshness, coverage, API embedders, MCP ([architecture.md](architecture.md) §8); a regression check on the existing dev tasks | nothing: robustness first |
-| Then | the vague-question eval (decisions §3); full dev50 on a fast machine; window and header ablations (E-A0); exact-lookup routing (§1: the cheapest fix) | defaults for v3 tuning |
-| Oct 27 checkpoint | report v2 vs MVP vs grep; this proposal | which two ideas to pursue first |
+| Next | the vague-question eval; the full dev50 on a fast machine; window and header ablations (E-A0); exact-lookup routing (§1: the cheapest fix) | tuned defaults |
+| Oct 27 checkpoint | report codemem against grep; this proposal | which two ideas to pursue first |
 | Oct 27 – Nov 9 | idea 2 (routing signals) + idea 1 step 1 (call sites, tests, commits); E-A1, E-A2 | is multi-vector worth GPU time? (E-A2 gate) |
 | Nov 10 – 23 | idea 4 training on GPU (cross-repo LoRA + Matryoshka); E-A3; idea 6 grid; highlights metric | the paper's main claim |
 | Nov 24 – Dec 1 | E-A4 / E-A5 if the gates passed; agent study with the best configuration | write-up |
+
+
+### Open questions about the current system
+
+Known gaps and ideas, not built yet. Each needs evidence before it is.
+
+| Question | Why it waits | What would decide it |
+|---|---|---|
+| **A vague-question eval:** one sentence per dev task in a user's voice, written from the issue only, with the same gold (Andrew's area) | the eval's queries are whole issue texts | needed before any tuning, or tuning optimizes for issue texts |
+| **Tuning:** RRF k, per-list weights, BM25 field weights, candidates | tuning on issue texts would mislead | the vague-question eval |
+| **Embedding models and window size:** jina 0.5B and 1.5B, Qwen3-Embedding 0.6B/4B/8B, voyage-code-3; 1k to 8k tokens per text | needs an embedding API and the vague-question eval; only about 5% of vLLM's chunks exceed 1,024 tokens | the first tuning experiment |
+| **Functions nothing calls rank lower:** with no usage vector, a function can only score in two of the three lists, so fusion puts it below chunks found in all three (seen when a new function was searched by its exact name) | most functions do have callers | an exact-name lookup, or a fusion rule that treats a missing list as unknown; the same rule would help chunks still waiting for vectors |
+| **Result grouping:** a class once with its matching methods; tests under the function they test | tests, classes and blocks can crowd the top 10 | measure crowding first |
+| **File-level cards** for "where do I start" questions | a file ranks by its best chunk | the vague-question eval |
+| **Callee descriptions in a caller's text** ("calls `ocr_image`: extracts text from an image") | an edit would then ripple to callers too | an ablation, with the ripple cost measured |
+| **Comments between definitions,** and comments between methods | many are license headers or banners | a rule ("attach to the next definition within N lines; skip license headers"), checked on a few repos |
+| **Non-code files** (README, docs, YAML, SQL) | they need a plain-text chunker and another card | user demand; `index_status` shows how much is missing |
+| **Import-aware call links:** prefer the same class, then the same file, then the imported module | name matching works across nine languages | usage-text precision on a sample, then retrieval results |
+| **Incremental parsing:** re-parse only the edited part of a huge file | a 2.3 MB file still takes 1.2 s to parse per save | how often agents edit files that large |
 
 ---
 

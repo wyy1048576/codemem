@@ -12,8 +12,10 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import logging
 import os
+import threading
 import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -42,22 +44,27 @@ DEFAULT_IGNORE = (
 BM25_FIELDS = ("name", "path", "signature", "doc", "body")
 DEVICES = ("auto", "cpu", "xpu", "cuda", "mps")
 DTYPES = ("auto", "float32", "float16", "bfloat16")
-# Search-time score multipliers. Neutral by default (docs/decisions.md, D24): v2's 0.5 for tests,
-# classes and blocks won on our eval only because its answers are never tests and rarely whole
-# classes, while questions like "add OCR to uploads" often need both. The knobs stay for runs.
+# Search-time score multipliers, neutral by default (docs/architecture.md §6). Halving tests,
+# classes and blocks scores better on the eval only because its answers are never tests and rarely
+# whole classes, while questions like "add OCR to uploads" often need both. The knobs stay for runs.
 DEFAULT_TEST_WEIGHT = 1.0
 DEFAULT_KIND_WEIGHTS: dict[str, float] = {}
 
 
 @dataclass
 class VectorConfig:
-    model: str = DEFAULT_MODEL
+    model: str = DEFAULT_MODEL  # a hub name or a local model folder
     enabled: bool = True
+    # "module:Class" subclassing embedder.Embedder, built as Class(model, config); None = the
+    # built-in embedders (docs/architecture.md §3.5)
+    embedder: str | None = None
+    # A label for the weights; None = a hash of a local model folder's files, nothing for a hub name
+    version: str | None = None
 
 
 @dataclass
 class EmbeddingConfig:
-    """Where embeddings come from (docs/decisions.md, D26). `local` runs the model on this machine:
+    """Where embeddings come from (docs/decisions.md §2). `local` runs the model on this machine:
     the default, private, offline and free. `openai` calls any OpenAI-compatible `/embeddings` API
     (Nebius, OpenAI, Together, a self-hosted vLLM or TEI server, Ollama), with `model` for every
     vector type, for documents and queries alike. The API key is read from the environment
@@ -87,12 +94,7 @@ class EmbeddingConfig:
 
 
 def _default_vectors() -> dict[str, VectorConfig]:
-    return {
-        "code": VectorConfig(),
-        "usage": VectorConfig(),
-        # Slot only: the builder returns None, so nothing is embedded.
-        "summary": VectorConfig(enabled=False),
-    }
+    return {"code": VectorConfig(), "usage": VectorConfig()}
 
 
 @dataclass
@@ -104,15 +106,15 @@ class Config:
     dtype: str = "auto"  # auto = float16 on cuda/mps, float32 on cpu
     batch_size: int = 16
     max_seq_length: int = 1024  # tokens per embedded text (keeps CPU indexing tractable)
-    # name, path, signature, doc, body. A 3-value list (name, signature, body) from v1 configs is
-    # accepted: doc gets the body weight and path gets 0.
+    # name, path, signature, doc, body. A 3-value list (name, signature, body) from older configs
+    # is accepted: doc gets the body weight and path gets 0.
     bm25_weights: tuple[float, ...] = (10.0, 3.0, 5.0, 2.0, 1.0)
     bm25_stem: bool = False
     bm25_stopwords: bool = False
-    bm25_query_terms: int = 32  # search-time: queries drop stopwords; 0 = keep every word (v2)
+    bm25_query_terms: int = 32  # search-time: queries drop stopwords; 0 = keep every word
     bm25_common_share: float = 0.0  # opt-in: a query over bm25_query_terms words also drops words in more
     # than this share of chunks: a 250-word query on vLLM takes 0.11 s instead of 0.36 s, but on the dev
-    # tasks keyword-only file MRR fell from 0.453 to 0.378 at 0.05 (docs/decisions.md, D32)
+    # tasks keyword-only file MRR fell from 0.453 to 0.378 at 0.05 (docs/architecture.md §6)
     rrf_k: int = 60
     rrf_weights: dict[str, float] = field(default_factory=dict)  # signal -> weight, default 1.0
     candidates: int = 50  # top-N per signal before RRF
@@ -129,6 +131,9 @@ class Config:
     window_overlap_lines: int = 3
     max_block_lines: int = 200
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
+    # The in-memory search index: faiss (exact) | "module:Class" subclassing store.VectorStore.
+    # Vectors stay in SQLite, so a change rebuilds the search index from them, with no re-embedding.
+    vector_backend: str = "faiss"
     # search-time result filters and weights (the eval adapter can set them per system)
     kinds: list[str] | None = None  # None = every kind; e.g. ["function", "method"]
     test_weight: float = DEFAULT_TEST_WEIGHT  # multiplies the fused score of test chunks; 0 drops them
@@ -145,16 +150,23 @@ class Config:
         return [name for name, v in self.vectors.items() if v.enabled]
 
     def model_id(self, vec_type: str) -> str:
-        """Identity of the embedding space for a vec type (model + truncation)."""
-        model = self.vectors[vec_type].model
-        return f"{model}@{self.embedding_dim}" if self.embedding_dim else model
+        """Identity of the embedding space for a vec type: model, truncation, weights version
+        and plugin embedder. Without a version or a plugin it is the string it was before they
+        existed, so indexes keep their settings."""
+        spec = self.vectors[vec_type]
+        out = f"{spec.model}@{self.embedding_dim}" if self.embedding_dim else spec.model
+        if version := model_version(spec):
+            out += f"#{version}"
+        if spec.embedder:
+            out += f"+{spec.embedder}"
+        return out
 
     def effective_window_chars(self) -> int:
         return self.window_chars or max(3 * (self.max_seq_length - 32), 1000)
 
     def bm25_weights5(self) -> tuple[float, float, float, float, float]:
         w = tuple(float(x) for x in self.bm25_weights)
-        if len(w) == 3:  # v1: name, signature, body (body included docstrings)
+        if len(w) == 3:  # older configs: name, signature, body (body included docstrings)
             return (w[0], 0.0, w[1], w[2], w[2])
         if len(w) != 5:
             raise ValueError(f"bm25 weights need 5 values ({', '.join(BM25_FIELDS)}) or 3, got {len(w)}")
@@ -187,11 +199,82 @@ class Config:
         }
         if self.embedding.remote:  # absent for the local model, so local indexes keep their settings
             settings["embedding"] = self.embedding.index_settings()
+        if self.vector_backend != "faiss":  # likewise: systems with another backend get their own index
+            settings["vector_backend"] = self.vector_backend
         return settings
 
 
 def codemem_home() -> Path:
     return Path(os.environ.get("CODEMEM_HOME") or Path.home() / ".codemem")
+
+
+# --------------------------------------------------------------------------- model weights version
+
+_HASH_CACHE_NAME = "model_hashes.json"
+_hash_lock = threading.Lock()
+_hash_memo: dict[Path, tuple[tuple, str]] = {}
+
+
+def model_version(spec: VectorConfig) -> str | None:
+    """The weights version of a vector type's model: its `version`, else a hash of a local
+    model folder's files, else None (a hub name, whose id names the weights)."""
+    if spec.version:
+        return spec.version
+    path = Path(spec.model).expanduser()
+    return model_folder_hash(path) if path.is_dir() else None
+
+
+def _model_files(root: Path) -> list[Path]:
+    # Dot folders and files (.git, .cache) are tool metadata, not weights.
+    out = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+        out.extend(Path(dirpath) / f for f in sorted(filenames) if not f.startswith("."))
+    return out
+
+
+def model_folder_hash(root: Path) -> str:
+    """sha256 over every file's relative path and content, first 12 hex characters. Content, not
+    timestamps: the same weights give the same version on any machine, and new weights saved over
+    the folder give a new one. Each file is read once: its hash is kept in
+    <codemem home>/model_hashes.json by size and mtime (reading takes about 1 s per GB)."""
+    root = root.resolve()
+    files = [(f, f.stat()) for f in _model_files(root)]
+    stamps = tuple((str(f), st.st_size, st.st_mtime_ns) for f, st in files)
+    with _hash_lock:
+        memo = _hash_memo.get(root)
+        if memo is not None and memo[0] == stamps:  # unchanged since the last call in this process
+            return memo[1]
+        cache_path = codemem_home() / _HASH_CACHE_NAME
+        try:
+            cache = json.loads(cache_path.read_text("utf-8"))
+        except (OSError, ValueError):
+            cache = {}
+        changed = False
+        total = hashlib.sha256()
+        for f, st in files:
+            stamp = [st.st_size, st.st_mtime_ns]
+            entry = cache.get(str(f))
+            if entry is None or entry[:2] != stamp:
+                log.info("hashing %s to version the model's weights (once per file)", f)
+                h = hashlib.sha256()
+                with f.open("rb") as fh:
+                    while block := fh.read(1 << 20):
+                        h.update(block)
+                entry = cache[str(f)] = [*stamp, h.hexdigest()]
+                changed = True
+            total.update(f.relative_to(root).as_posix().encode("utf-8") + b"\0" + entry[2].encode() + b"\n")
+        if changed:
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp")
+                tmp.write_text(json.dumps(cache), "utf-8")
+                os.replace(tmp, cache_path)
+            except OSError:  # the cache only saves time
+                log.warning("could not write %s", cache_path)
+        digest = total.hexdigest()[:12]
+        _hash_memo[root] = (stamps, digest)
+    return digest
 
 
 def default_index_dir(repo_root: Path) -> Path:
@@ -243,19 +326,22 @@ def _env_overrides() -> dict[str, Any]:
 _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
-    "window_overlap_lines", "max_block_lines", "vector_cache", "kinds", "test_weight", "kind_weights",
-    "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms",
+    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_backend", "kinds", "test_weight",
+    "kind_weights", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms",
 )
 
 
 def config_from_dict(raw: dict[str, Any]) -> Config:
     cfg = Config()
     vectors = _default_vectors()
+    known = {f.name for f in fields(VectorConfig)}
     for name, spec in (raw.get("vectors") or {}).items():
+        if unknown := sorted(set(spec) - known):
+            raise ValueError(f"unknown [vectors.{name}] settings {unknown}; choose from {sorted(known)}")
         current = vectors.get(name, VectorConfig(enabled=True))
-        vectors[name] = VectorConfig(
-            model=spec.get("model", current.model), enabled=spec.get("enabled", current.enabled)
-        )
+        vectors[name] = VectorConfig(**{k: spec.get(k, getattr(current, k)) for k in known})
+        if vectors[name].embedder is not None and ":" not in vectors[name].embedder:
+            raise ValueError(f"vectors.{name}.embedder must be 'module:Class', got {vectors[name].embedder!r}")
     cfg.vectors = vectors
 
     flat = {key: raw.get(key) for key in _FLAT_KEYS}
@@ -288,6 +374,12 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
+    if cfg.vector_backend != "faiss" and ":" not in cfg.vector_backend:
+        raise ValueError(f"vector_backend must be faiss or 'module:Class', got {cfg.vector_backend!r}")
+    from .texts import TEXT_BUILDERS
+
+    if unknown := sorted(set(cfg.enabled_vec_types()) - set(TEXT_BUILDERS)):
+        raise ValueError(f"vector types {unknown} have no text builder; choose from {sorted(TEXT_BUILDERS)}")
     cfg.bm25_weights5()  # validates the length
     emb = dict(raw.get("embedding") or {})
     known = {f.name for f in fields(EmbeddingConfig)}

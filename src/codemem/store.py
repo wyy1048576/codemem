@@ -1,17 +1,18 @@
-"""Storage: SQLite (chunks, FTS5, call graph, vectors) + one in-memory FAISS index per vector type.
+"""Storage: SQLite (chunks, FTS5, call graph, vectors) + one in-memory search index per vector type.
 
 Consistency model
 -----------------
 SQLite is the source of truth for everything, vectors included: each row of `vectors` holds one
 float16 vector at the model's full dimension, with the chunk, part (window) and text hash it
-came from. FAISS is derived from those rows: an exact inner-product index over vector ids,
-truncated to `embedding_dim` if set, kept in memory and saved as `vec_<type>.faiss` with a
-`vec_<type>.json` note of the epoch it reflects. Every transaction that changes a vector type's
+came from. The search index is derived from those rows: by default FAISS, an exact inner-product
+index over vector ids (or another `VectorStore` backend, named in config), truncated to
+`embedding_dim` if set, kept in memory and saved as `vec_<type>.faiss` with a `vec_<type>.json`
+note of the epoch it reflects (and the backend that wrote it). Every transaction that changes a vector type's
 rows bumps its epoch in `meta`, and FAISS is patched right after the commit (never before, so it
 never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
 with a new id. So an index that is behind (a saved file from before a crash, or another process
 wrote) catches up by comparing vector ids and applying only the difference; a missing or corrupt
-file is rebuilt from the rows, which needs no model. docs/data-model.md has the full schema.
+file is rebuilt from the rows, which needs no model. docs/architecture.md §5 lists the tables.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from typing import Any, NamedTuple
 import faiss
 import numpy as np
 
+from .plugins import load_object
 from .schema import CALLABLE_KINDS, Chunk
 from .texts import Ref
 from .tokenize import to_fts_text
@@ -120,7 +122,7 @@ def _atomic_write(path: Path, data: bytes) -> None:
 
 
 def bm25_weights5(weights: Sequence[float]) -> tuple[float, ...]:
-    """name, path, signature, doc, body. A v1 triple (name, signature, body) is mapped to it."""
+    """name, path, signature, doc, body. A 3-value list from older configs (name, signature, body) is mapped to it."""
     w = tuple(float(x) for x in weights)
     if len(w) == 3:
         return (w[0], 0.0, w[1], w[2], w[2])
@@ -133,9 +135,22 @@ def bm25_weights5(weights: Sequence[float]) -> tuple[float, ...]:
 
 
 class VectorStore(ABC):
-    """Swappable vector index keyed by an integer id. Vectors must be L2-normalized."""
+    """The in-memory search index of one vector type, keyed by vector id: FAISS by default, or a
+    subclass named in config (`vector_backend = "module:Class"`, docs/architecture.md §5). It is
+    built as Class(dim) and filled from the vectors stored in SQLite, already truncated and
+    L2-normalized; the store calls it under its lock, one call at a time.
+
+    `search(query, k, allowed_ids)` returns at most k (id, score) pairs, best first, with the real
+    similarity as the score (equal scores are ties); fewer than k only when no other vector
+    qualifies; only ids in `allowed_ids` when it is given. An approximate index (HNSW, IVF) can
+    miss some, as it does anywhere else.
+
+    Saving is optional: `to_bytes` gives the index for `vec_<type><suffix>`, and `from_bytes`
+    reads it back at the next start. A backend that returns None is rebuilt from the stored
+    vectors instead, which needs no model."""
 
     dim: int
+    suffix: str = ".vec"
 
     @abstractmethod
     def upsert(self, ids: Sequence[int], vecs: np.ndarray) -> None: ...
@@ -154,9 +169,18 @@ class VectorStore(ABC):
     @abstractmethod
     def __len__(self) -> int: ...
 
+    def to_bytes(self) -> bytes | None:
+        return None
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> VectorStore:
+        raise NotImplementedError(f"{cls.__name__} is not saved")
+
 
 class FaissVectorStore(VectorStore):
     """Exact inner-product search; IndexIDMap2 so the vector id is the FAISS id."""
+
+    suffix = ".faiss"
 
     def __init__(self, dim: int, index: Any = None):
         self.dim = dim
@@ -196,14 +220,24 @@ class FaissVectorStore(VectorStore):
     def __len__(self) -> int:
         return int(self.index.ntotal)
 
-    def save(self, path: Path) -> None:
-        _atomic_write(path, faiss.serialize_index(self.index).tobytes())
+    def to_bytes(self) -> bytes:
+        return faiss.serialize_index(self.index).tobytes()
 
     @classmethod
-    def load(cls, path: Path) -> FaissVectorStore:
-        # Read through Python (not faiss.read_index) so non-ASCII Windows paths work.
-        index = faiss.deserialize_index(np.frombuffer(path.read_bytes(), dtype=np.uint8))
+    def from_bytes(cls, data: bytes) -> FaissVectorStore:
+        # Bytes read through Python (not faiss.read_index), so non-ASCII Windows paths work.
+        index = faiss.deserialize_index(np.frombuffer(data, dtype=np.uint8))
         return cls(index.d, index)
+
+
+def vector_backend_class(name: str) -> type[VectorStore]:
+    """`faiss` or "module:Class" -> the VectorStore subclass."""
+    if name == "faiss":
+        return FaissVectorStore
+    cls = load_object(name)
+    if not (isinstance(cls, type) and issubclass(cls, VectorStore)):
+        raise TypeError(f"{name} must be a subclass of codemem.store.VectorStore")
+    return cls
 
 
 def prepare(vecs: np.ndarray, dim: int) -> np.ndarray:
@@ -239,8 +273,8 @@ class VectorHit:
 class _TypeIndex:
     """The in-memory search index of one vector type and where each vector came from."""
 
-    def __init__(self, dim: int, epoch: int):
-        self.store = FaissVectorStore(dim)
+    def __init__(self, dim: int, epoch: int, store: VectorStore):
+        self.store = store
         self.dim = dim
         self.epoch = epoch
         self.owner: dict[int, tuple[int, int, int, int, int]] = {}  # vector id -> chunk, part, n, start, end
@@ -414,7 +448,12 @@ def _batches(items: Sequence[Any], size: int = 500) -> Iterator[Sequence[Any]]:
 
 
 class Store:
-    def __init__(self, index_dir: Path | str, *, bm25_stem: bool = False, bm25_stopwords: bool = False):
+    def __init__(
+        self, index_dir: Path | str, *, bm25_stem: bool = False, bm25_stopwords: bool = False,
+        vector_backend: str = "faiss",
+    ):
+        self.vector_backend = vector_backend
+        self._backend = vector_backend_class(vector_backend)
         self.index_dir = Path(index_dir)
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.index_dir / "index.db"
@@ -919,11 +958,29 @@ class Store:
         return [i for i, _ in self._order_ties(hits, n, higher_is_better=False)]
 
     # ---- vectors: bookkeeping
-    def _faiss_path(self, vec_type: str) -> Path:
-        return self.index_dir / f"vec_{vec_type}.faiss"
+    def _data_path(self, vec_type: str) -> Path:
+        return self.index_dir / f"vec_{vec_type}{self._backend.suffix}"
 
     def _note_path(self, vec_type: str) -> Path:
         return self.index_dir / f"vec_{vec_type}.json"
+
+    def _read_note(self, vec_type: str) -> dict[str, Any] | None:
+        try:
+            return json.loads(self._note_path(vec_type).read_text("utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def _noted_file(self, vec_type: str, note: dict[str, Any] | None) -> Path | None:
+        """The saved index a note describes (notes from before backends were pluggable: FAISS)."""
+        return self.index_dir / note.get("file", f"vec_{vec_type}.faiss") if note else None
+
+    def use_vector_backend(self, name: str) -> None:
+        """Search with another backend from now on. Each vector type's index is rebuilt from the
+        stored vectors when it is next used; nothing is re-embedded."""
+        backend = vector_backend_class(name)
+        with self._vec_lock:
+            self.vector_backend, self._backend = name, backend
+            self._types.clear()
 
     def vec_types(self) -> list[str]:
         """Vector types that have stored vectors (one index probe per known type: search calls this)."""
@@ -974,8 +1031,10 @@ class Store:
 
         def forget() -> None:
             self._forget(vec_type)
-            for p in (self._faiss_path(vec_type), self._note_path(vec_type)):
-                p.unlink(missing_ok=True)
+            for p in (self._noted_file(vec_type, self._read_note(vec_type)), self._data_path(vec_type),
+                      self._note_path(vec_type)):
+                if p is not None:
+                    p.unlink(missing_ok=True)
 
         self._after_commit(forget)
 
@@ -1150,22 +1209,22 @@ class Store:
         """The saved index file, reconciled with the committed rows by vector id: vectors whose
         row is gone are dropped, rows the file lacks are added. Rows never change in place, so
         this is exact whichever epoch the file was saved at (another process, a crash, a save
-        that is behind), and it costs only the difference instead of a full rebuild."""
-        note_path, faiss_path = self._note_path(vec_type), self._faiss_path(vec_type)
-        if not (note_path.is_file() and faiss_path.is_file()):
+        that is behind), and it costs only the difference instead of a full rebuild. No file, or
+        one from another backend: None, and the index is rebuilt from the rows."""
+        note = self._read_note(vec_type)
+        if note is None or note.get("backend", "faiss") != self.vector_backend:
+            return None
+        path = self._noted_file(vec_type, note)
+        if not path.is_file() or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder"):
             return None
         try:
-            note = json.loads(note_path.read_text("utf-8"))
-            if note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder"):
-                return None
-            store = FaissVectorStore.load(faiss_path)
+            store = self._backend.from_bytes(path.read_bytes())
         except Exception:  # corrupt or partial file: rebuild from the rows
-            log.exception("could not load %s; rebuilding it from the stored vectors", faiss_path)
+            log.exception("could not load %s; rebuilding it from the stored vectors", path)
             return None
         if store.dim != dim:
             return None
-        ti = _TypeIndex(dim, epoch)
-        ti.store = store
+        ti = _TypeIndex(dim, epoch, store)
         rows = dict(self._owner_rows(vec_type))
         in_file = store.ids()
         stale = in_file - rows.keys()
@@ -1180,7 +1239,7 @@ class Store:
         return ti
 
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:
-        ti = _TypeIndex(dim, epoch)
+        ti = _TypeIndex(dim, epoch, self._backend(dim))
         rows = self.conn.execute(
             "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors "
             "WHERE vec_type = ? ORDER BY vector_id",
@@ -1269,7 +1328,8 @@ class Store:
     def save_vectors(self) -> None:
         """Persist the in-memory indexes that changed, with the epoch they reflect. The indexes are
         copied while holding the vector lock (fast) and written after it is released, so searches
-        don't wait for the disk. Saves run one at a time; data first, note second."""
+        don't wait for the disk. Saves run one at a time; data first, note second. A backend that
+        is not saved leaves no file, and is rebuilt from the stored vectors at the next start."""
         with self._save_lock:
             copies = []
             with self._vec_lock:
@@ -1277,12 +1337,19 @@ class Store:
                     if not ti.dirty:
                         continue
                     note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
-                            "embedder": self.get_meta(f"vec.{vec_type}.embedder")}
-                    copies.append((vec_type, faiss.serialize_index(ti.store.index).tobytes(), note))
+                            "embedder": self.get_meta(f"vec.{vec_type}.embedder"),
+                            "backend": self.vector_backend, "file": self._data_path(vec_type).name}
+                    copies.append((vec_type, ti.store.to_bytes(), note))
                     ti.dirty = False
             for vec_type, data, note in copies:
-                _atomic_write(self._faiss_path(vec_type), data)
-                _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
+                old = self._noted_file(vec_type, self._read_note(vec_type))
+                if data is None:
+                    self._note_path(vec_type).unlink(missing_ok=True)
+                else:
+                    _atomic_write(self.index_dir / note["file"], data)
+                    _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
+                if old is not None and old.name != (note["file"] if data is not None else None):
+                    old.unlink(missing_ok=True)  # another backend's file: no note describes it any more
 
     def vectors_unsaved(self) -> bool:
         """Whether an in-memory index has changes its file doesn't have yet."""
