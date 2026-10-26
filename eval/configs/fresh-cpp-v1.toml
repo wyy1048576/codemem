@@ -15,3 +15,7 @@ name = "duckdb/duckdb"
 
 [[repo]]
 name = "ggml-org/llama.cpp"
+
+# Added 2026-10-26 (Andrew): llama.cpp gave only 18 all-C++ dev tasks.
+[[repo]]
+name = "godotengine/godot"

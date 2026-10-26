@@ -10,11 +10,11 @@
   },
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "c46af6360152f9c52f9333d4c3520dd4daab6770",
+    "sha": "5e500e97e683a3a75ba36f26a8f11f63e8b60b5d",
     "dirty": false
   },
   "labeler": "cmeval-labels/4",
-  "created": "2026-10-26T08:36:37+00:00",
+  "created": "2026-10-26T09:13:01+00:00",
   "funnel_steps": [
     {
       "key": "merged",
@@ -138,29 +138,65 @@
         "no code files": 17,
         "too many changed lines": 9
       }
+    },
+    "godotengine/godot": {
+      "base_branch": "master",
+      "counts": {
+        "merged": 1360,
+        "opened_after_cutoff": 1113,
+        "not_bot": 1113,
+        "one_link": 401,
+        "is_issue": 399,
+        "issue_before_pr": 390,
+        "body_ok": 390,
+        "no_leak": 388,
+        "base_found": 388,
+        "files_match": 386,
+        "applies": 386,
+        "size_ok": 350,
+        "labeled": 350
+      },
+      "link_methods": {
+        "list": 13,
+        "both": 374,
+        "regex": 1
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 247,
+        "no linked issue": 678,
+        "several linked issues": 34,
+        "issue opened after the fix PR": 9,
+        "leak": 2,
+        "link is a PR, not an issue": 2,
+        "too many code files": 15,
+        "no code files": 20,
+        "too many changed lines": 1,
+        "file list differs": 2
+      }
     }
   },
   "stats": {
-    "tasks": 374,
+    "tasks": 724,
     "tasks_per_repo": {
       "duckdb/duckdb": 209,
-      "ggml-org/llama.cpp": 165
+      "ggml-org/llama.cpp": 165,
+      "godotengine/godot": 350
     },
-    "mean_gold_files": 1.53,
-    "mean_gold_classes": 0.4,
-    "mean_gold_functions": 1.64,
-    "share_no_gold_function": 0.136,
-    "share_module_level_change": 0.428,
-    "share_partial_labels": 0.131,
-    "share_identifier_in_query": 0.337,
-    "share_with_unretrievable_functions": 0.23,
+    "mean_gold_files": 1.52,
+    "mean_gold_classes": 0.35,
+    "mean_gold_functions": 1.61,
+    "share_no_gold_function": 0.163,
+    "share_module_level_change": 0.348,
+    "share_partial_labels": 0.156,
+    "share_identifier_in_query": 0.3,
+    "share_with_unretrievable_functions": 0.173,
     "tasks_per_split": {
-      "dev": 57,
-      "test": 317
+      "dev": 129,
+      "test": 595
     },
-    "share_gold_all_python": 0.035,
+    "share_gold_all_python": 0.021,
     "merge_types": {
-      "merge": 209,
+      "merge": 559,
       "rebase": 1,
       "squash": 164
     }
