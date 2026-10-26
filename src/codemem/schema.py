@@ -1,7 +1,7 @@
 """Chunk dataclass and ID helpers.
 
 A chunk is the unit codemem retrieves: a function or method, a class, or a block of top-level
-code. `docs/data-model.md` describes every field and the rules for keys, lines and hashes.
+code. docs/architecture.md §3.2 explains keys and line ranges.
 """
 
 from __future__ import annotations
