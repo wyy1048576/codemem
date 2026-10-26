@@ -444,3 +444,12 @@ def test_new_function_in_a_file_with_a_lasting_macro_error_is_unretrievable(remo
     late = remote.commit({MACRO_PATH: insert(MACRO, 8, added)}, "add it right before the misread class")
     r = label_at_commit(REMOTE_REPO, fixed, remote.diff(fixed, late))
     assert r.tags["partial_labels"] is True  # an insertion next to an error region is not trusted
+
+
+def test_deep_nesting_does_not_hit_the_recursion_limit():
+    # Generated code (duckdb's constant tables) nests deeper than Python's recursion limit.
+    deep = "int f() {\n    return " + "(" * 3000 + "1" + ")" * 3000 + ";\n}\n"
+    defs, _ = find_definitions(deep, "cpp")
+    assert [(d.symbol, d.start, d.end) for d in defs] == [("f", 1, 3)]
+    deep_py = "def g():\n    return " + "[" * 3000 + "]" * 3000 + "\n"
+    assert [d.symbol for d in find_definitions(deep_py, "python")[0]] == ["g"]

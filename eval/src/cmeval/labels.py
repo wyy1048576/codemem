@@ -312,11 +312,15 @@ def _parse_with(spec: LangSpec, root: Node) -> Parsed:
                 first = first.prev_named_sibling
         return first
 
-    def walk(node: Node, scope: tuple[str, ...]) -> None:
-        for child in node.children:
-            if child.type in spec.scopes:
-                walk(child, (*scope, *_scope_names(child)))
-                continue
+    # Depth-first, parent before children, with an explicit stack: generated code can nest deeper
+    # than Python's recursion limit (duckdb's generated tables did, 2026-10-26).
+    stack: list[tuple[Node, tuple[str, ...]]] = [(child, ()) for child in reversed(root.children)]
+    while stack:
+        child, scope = stack.pop()
+        inner = scope
+        if child.type in spec.scopes:
+            inner = (*scope, *_scope_names(child))
+        else:
             kind = "function" if child.type in spec.functions else "class" if child.type in spec.classes else None
             parts = names(child, kind) if kind else None
             if parts:
@@ -328,11 +332,8 @@ def _parse_with(spec: LangSpec, root: Node) -> Parsed:
                 signature = spec.signature_of(child) if spec.signature_of is not None else None
                 symbol = ".".join((*scope, *parts))
                 found.append(Definition(kind, parts[-1], symbol, start, end, outer.has_error or misread, signature))
-                walk(child, (*scope, *parts))
-            else:
-                walk(child, scope)
-
-    walk(root, ())
+                inner = (*scope, *parts)
+        stack.extend((grandchild, inner) for grandchild in reversed(child.children))
     found.sort(key=lambda d: (d.start, -d.end))
     return Parsed(found, frozenset(errors))
 
