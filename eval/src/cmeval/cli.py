@@ -390,7 +390,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--split", choices=["dev", "test"], default="dev", help="must match the run's split; test only at milestones")
     p.add_argument("--primary", action="append", default=None,
                    help="system for the primary tests (repeatable; default: the codemem family that fits the run, "
-                        "cm3-bm25/cm3-bm25-code/cm3-full for v3 or cm-bm25/cm-bm25-code/cm-bm25-code-usage for the MVP)")
+                        "cm3-full for v3, or cm-bm25/cm-bm25-code/cm-bm25-code-usage for the MVP)")
     p.add_argument("--cutoff", default="2026-07-01", help="issue date that splits tasks into before and after (default 2026-07-01)")
     p.add_argument("--tasks", type=Path, default=None, help="tasks file to use instead of the path in meta.json (same sha256)")
     p.add_argument("--where", action="append", default=None, metavar="KEY=VALUE",

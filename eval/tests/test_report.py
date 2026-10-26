@@ -282,7 +282,7 @@ def test_default_primary_picks_the_family_of_the_run():
     assert default_primary([*mvp, *v3], True)[1] == v3  # the newest family first
     assert default_primary(["grep", "grep-fn-plus"], False) == ("none (no codemem system in this run)", ())
     with pytest.raises(ReportError, match="no primary family fits"):
-        default_primary(["grep-fn-plus", "cm3-bm25", "cm3-full"], True)  # one system missing
+        default_primary(["grep-fn-plus", "cm3-bm25", "cm-bm25", "cm-bm25-code"], True)  # no family complete
 
 
 def test_primary_families_name_real_codemem_systems():
@@ -292,7 +292,7 @@ def test_primary_families_name_real_codemem_systems():
     from cmeval.systems import load_systems
 
     configs = Path(__file__).parents[1] / "configs"
-    for (label, family), config in zip(PRIMARY_FAMILIES, ("codemem-v3.toml", "baseline.toml")):
+    for (label, family), config in zip(PRIMARY_FAMILIES, ("codemem-v3-full.toml", "baseline.toml")):
         specs = {spec.name: spec for spec in load_systems(configs / config)}
         for name in family:
             assert name in specs and specs[name].adapter == "codemem", (label, name)

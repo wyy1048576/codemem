@@ -9,9 +9,10 @@ Contents:
   grep-fn stays in every table): mean difference, paired 95% bootstrap interval, Wilcoxon p;
 - two primary metrics, fixed before the first results (2026-10-23): function-level MRR and
   function-level tokens to the first right answer, for each primary system. The primary systems
-  are a family for each codemem version (PRIMARY_FAMILIES): the MVP family fixed 2026-10-23, the
-  v3 family fixed 2026-10-25 (before any fresh codemem result, after the first v3 dev results on
-  13 small-repo tasks). Their p-values get one Holm correction over all primary tests. Every other
+  are a family for each codemem version (PRIMARY_FAMILIES): the MVP family fixed 2026-10-23
+  (3 systems), the v3 family fixed 2026-10-25 (cm3-full alone, before any fresh codemem result,
+  after the first v3 dev results on 13 small-repo tasks). Their p-values get one Holm correction
+  over all primary tests. Every other
   comparison, including other grep variants, is "exploratory" and shows a raw p;
 - group tables (means and counts only), the IoU check, latency and size, task counts.
 
@@ -49,12 +50,13 @@ LOWER_IS_BETTER = frozenset({"tokens_to_first", "not_found_share"})
 COUNTS = frozenset({"tokens_to_first"})  # in tokens, not between 0 and 1
 PRIMARY = (("function", "mrr"), ("function", "tokens_to_first"))
 # The systems under test for the primary tests: one family for each codemem version, each fixed in
-# the design before its fresh results, newest first. Each is keywords, + code, + usage. The family
-# of tests is PRIMARY x these systems, so its size never depends on which other systems a run has.
+# the design before its fresh results, newest first. The MVP family is the ladder keywords, + code,
+# + usage; the v3 family is codemem's default alone (Andrew, 2026-10-25). The family of tests is
+# PRIMARY x these systems, so its size never depends on which other systems a run has.
 # A run without --primary uses the newest family whose systems are all in it, so a committed run of
 # an older version still reports with the plain command.
 PRIMARY_FAMILIES = (
-    ("codemem v3, fixed 2026-10-25", ("cm3-bm25", "cm3-bm25-code", "cm3-full")),  # configs/codemem-v3.toml
+    ("codemem v3, fixed 2026-10-25", ("cm3-full",)),  # configs/codemem-v3-full.toml
     ("codemem MVP, fixed 2026-10-23", ("cm-bm25", "cm-bm25-code", "cm-bm25-code-usage")),  # configs/baseline.toml
 )
 PRIMARY_SYSTEMS = PRIMARY_FAMILIES[0][1]  # the current family
