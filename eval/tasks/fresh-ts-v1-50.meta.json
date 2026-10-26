@@ -1,0 +1,88 @@
+{
+  "kind": "subset",
+  "source": "fresh-ts-v1.jsonl",
+  "source_sha256": "5061a8ac8f3f48f6fcc7d7171505bde74ee7458790321f9b30579a12172f0bce",
+  "split": "dev",
+  "where": [
+    "gold_all_typescript=true"
+  ],
+  "repos": [
+    "microsoft/playwright",
+    "microsoft/vscode"
+  ],
+  "per_repo": 25,
+  "seed": "cmeval-sample-1",
+  "draw": "lowest sha256 of '<seed>:<repo>:<task id>'",
+  "available": {
+    "microsoft/playwright": 29,
+    "microsoft/vscode": 155
+  },
+  "chosen": {
+    "microsoft/playwright": 25,
+    "microsoft/vscode": 25
+  },
+  "short": [],
+  "task_ids": {
+    "microsoft/playwright": [
+      "microsoft__playwright-41626",
+      "microsoft__playwright-41759",
+      "microsoft__playwright-41836",
+      "microsoft__playwright-41966",
+      "microsoft__playwright-42009",
+      "microsoft__playwright-42032",
+      "microsoft__playwright-42433",
+      "microsoft__playwright-42664",
+      "microsoft__playwright-42836",
+      "microsoft__playwright-42839",
+      "microsoft__playwright-42848",
+      "microsoft__playwright-42865",
+      "microsoft__playwright-42894",
+      "microsoft__playwright-42916",
+      "microsoft__playwright-43000",
+      "microsoft__playwright-43025",
+      "microsoft__playwright-43076",
+      "microsoft__playwright-43110",
+      "microsoft__playwright-43133",
+      "microsoft__playwright-43146",
+      "microsoft__playwright-43221",
+      "microsoft__playwright-43305",
+      "microsoft__playwright-43317",
+      "microsoft__playwright-43400",
+      "microsoft__playwright-43566"
+    ],
+    "microsoft/vscode": [
+      "microsoft__vscode-325864",
+      "microsoft__vscode-327972",
+      "microsoft__vscode-328313",
+      "microsoft__vscode-328984",
+      "microsoft__vscode-329676",
+      "microsoft__vscode-331586",
+      "microsoft__vscode-331683",
+      "microsoft__vscode-332059",
+      "microsoft__vscode-333212",
+      "microsoft__vscode-333398",
+      "microsoft__vscode-335851",
+      "microsoft__vscode-336549",
+      "microsoft__vscode-336608",
+      "microsoft__vscode-337254",
+      "microsoft__vscode-338253",
+      "microsoft__vscode-338612",
+      "microsoft__vscode-338944",
+      "microsoft__vscode-340134",
+      "microsoft__vscode-341778",
+      "microsoft__vscode-341935",
+      "microsoft__vscode-342711",
+      "microsoft__vscode-342898",
+      "microsoft__vscode-343028",
+      "microsoft__vscode-343104",
+      "microsoft__vscode-343223"
+    ]
+  },
+  "tasks": 50,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "c46af6360152f9c52f9333d4c3520dd4daab6770",
+    "dirty": false
+  },
+  "created": "2026-10-26T08:56:34+00:00"
+}
