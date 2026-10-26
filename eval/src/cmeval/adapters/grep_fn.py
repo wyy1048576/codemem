@@ -34,8 +34,9 @@ from .keywords import extract_keywords
 
 WEIGHTINGS = ("count", "idf")
 # A keyword that cannot name code: a commit hash, a path, a web address, or a file name. Not .io
-# (astropy.io) and not .json (Response.json): those are often real code names.
-NOISE_RE = re.compile(r"^[0-9a-f]{7,}$|/|\.(com|org|net)\b|\.(py|rst|txt|md|cfg|toml|ya?ml)$")
+# (astropy.io) and not .json (Response.json): those are often real code names. C, C++ and
+# TypeScript file names since F7 (no Python sample query has one).
+NOISE_RE = re.compile(r"^[0-9a-f]{7,}$|/|\.(com|org|net)\b|\.(py|rst|txt|md|cfg|toml|ya?ml|c|h|cc|cpp|hpp|cu|ts|tsx)$")
 SPARE_KEYWORDS = 10  # extra keywords taken before cleaning, so the cleaned list can still be full
 
 

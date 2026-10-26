@@ -14,7 +14,7 @@ from pathlib import Path
 from .. import __version__, repos
 from ..github import GitHub
 from ..labels import LABELER_VERSION, LabelError, identifier_in_query, label_at_commit
-from ..patches import parse_patch, split_lines, split_patch
+from ..patches import classify_path, parse_patch, split_lines, split_patch
 from ..repos import RepoError
 from ..status import NullStatus
 from ..files import now, write_json
@@ -26,6 +26,12 @@ BATCH_SIZE = 50
 MAX_PR_FILES = 100  # one page of the files connection; such PRs are far over the code-file limit anyway
 
 PR_FILES_FIELDS = "files(first: %d) { totalCount nodes { path } }" % MAX_PR_FILES
+
+# Language families for the main comparison of each language and for the repo size tag.
+CPP_FAMILY = ("c", "cpp")
+TYPESCRIPT_FAMILY = ("typescript", "tsx")
+FAMILIES = {"python": ("python",), "c": CPP_FAMILY, "cpp": CPP_FAMILY, "typescript": TYPESCRIPT_FAMILY,
+            "tsx": TYPESCRIPT_FAMILY}
 
 
 class Skip(Exception):
@@ -89,7 +95,8 @@ def gold_file_stats(repo: str, base: str, paths: list[str]) -> tuple[int, int]:
 
 
 def candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] | None,
-                      py_files: Callable[[str, str], int] | None = None) -> Task:
+                      py_files: Callable[[str, str], int] | None = None,
+                      code_files: Callable[[str, str, tuple[str, ...]], int] | None = None) -> Task:
     """One task, or Skip with the funnel step and the reason.
 
     A git error on this candidate becomes a Skip of the step it happened in, so one bad
@@ -97,7 +104,8 @@ def candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] |
     """
     step = [GIT_KEYS[0]]  # the step in progress, updated by _candidate_to_task
     try:
-        return _candidate_to_task(cand, settings, pr_files, py_files or count_py_files, step)
+        return _candidate_to_task(cand, settings, pr_files, py_files or count_py_files,
+                                  code_files or count_code_files, step)
     except RepoError as exc:
         raise Skip(step[0], f"git error ({str(exc)[:80]})") from None
 
@@ -107,8 +115,14 @@ def count_py_files(repo: str, commit: str) -> int:
     return sum(1 for path in repos.tracked_files(repo, commit) if path.endswith(".py"))
 
 
+def count_code_files(repo: str, commit: str, languages: tuple[str, ...]) -> int:
+    """Files of these languages in the repo at a commit, tests included (the repo size tag)."""
+    return sum(1 for path in repos.tracked_files(repo, commit) if classify_path(path)[1] in languages)
+
+
 def _candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] | None,
-                       py_files: Callable[[str, str], int], step: list[str]) -> Task:
+                       py_files: Callable[[str, str], int], code_files: Callable[[str, str, tuple[str, ...]], int],
+                       step: list[str]) -> Task:
     repo = cand.repo
     base, merge_type = merge_base(repo, cand)
     step[0] = "files_match"
@@ -163,11 +177,15 @@ def _candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] 
             "code_lines_changed": n_lines,  # added plus removed lines in those files
             "gold_languages": languages,
             "gold_all_python": languages == ["python"],
+            "gold_all_cpp": bool(languages) and set(languages) <= set(CPP_FAMILY),
+            "gold_all_typescript": bool(languages) and set(languages) <= set(TYPESCRIPT_FAMILY),
             # codemem skips files over its max_file_size (1 MB today); these find the tasks it affects
             "max_gold_file_bytes": biggest_bytes,
             "max_gold_file_lines": biggest_lines,
             # repo size at this task's commit, for the small / medium / large groups in the report
             "repo_py_files": py_files(repo, base),
+            # the same in the task's own language family (C and C++, or TypeScript and TSX)
+            "repo_code_files": code_files(repo, base, FAMILIES[label.language]) if label.language in FAMILIES else None,
         },
         labeler=LABELER_VERSION,
     )
@@ -190,17 +208,24 @@ def build_tasks(gh: GitHub, candidates: list[Candidate], settings: Settings, fun
     files = fetch_pr_files(gh, repo, [c.pr_number for c in candidates])
     sizes: dict[str, int] = {}  # tasks that share a base commit share the repo size
 
+    code_sizes: dict[tuple[str, tuple[str, ...]], int] = {}
+
     def py_files(repo_: str, commit: str) -> int:
         if commit not in sizes:
             sizes[commit] = count_py_files(repo_, commit)
         return sizes[commit]
+
+    def code_files(repo_: str, commit: str, languages: tuple[str, ...]) -> int:
+        if (commit, languages) not in code_sizes:
+            code_sizes[(commit, languages)] = count_code_files(repo_, commit, languages)
+        return code_sizes[(commit, languages)]
 
     passed = dict.fromkeys(GIT_KEYS, 0)
     tasks = []
     status.part(repo, len(candidates))
     for i, cand in enumerate(candidates, start=1):
         try:
-            tasks.append(candidate_to_task(cand, settings, files.get(cand.pr_number), py_files))
+            tasks.append(candidate_to_task(cand, settings, files.get(cand.pr_number), py_files, code_files))
             reached = len(GIT_KEYS)
         except Skip as skip:
             step, reason = skip.args

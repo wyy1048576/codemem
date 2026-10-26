@@ -34,7 +34,8 @@ from .patches import PatchMismatch, align_file_diff, apply_file_diff, parse_patc
 from .tasks import Gold, Span, Unretrievable
 
 # 2: added lines are placed in the fixed file (4ec55f4). 3: Cython files (.pyx, .pxd) count as code.
-# 4: C, C++, TypeScript and TSX definitions; the narrow parse-error rule.
+# 4: C, C++, TypeScript and TSX definitions; the narrow parse-error rule; with the F7 path rules
+# in patches.py (.tsx, CUDA and GPU kernel files, TypeScript test folders at any depth).
 LABELER_VERSION = "cmeval-labels/4"
 
 

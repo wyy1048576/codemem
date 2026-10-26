@@ -276,8 +276,15 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
             return "unknown" if value is None else str(value).lower()
         return read
 
+    # C++ and TypeScript tasks (F7) count the files of their own language; Python tasks count
+    # Python files. A Python-only report keeps its old groups.
+    chosen = [tasks[t] for t in task_ids if t in tasks]
+    code_sizes = any("repo_code_files" in task.tags for task in chosen)
+    size_tag = "repo_code_files" if code_sizes else "repo_py_files"
+    size_label = "repo size (code files of the task's language)" if code_sizes else "repo size (Python files)"
+
     def repo_size(task) -> str:
-        n = task.tags.get("repo_py_files")
+        n = task.tags.get(size_tag)
         small, large = REPO_SIZE_CUTOFFS
         if n is None:
             return "unknown"
@@ -302,7 +309,10 @@ def _groups(tasks: dict, task_ids: list[str], cutoff: date) -> dict[str, dict[st
         "language": (lambda t: t.language, None),
         "issue date": (created, None),
         "gold all Python": (tag("gold_all_python"), None),
-        "repo size (Python files)": (
+        **{label: (tag(name), None) for name, label in (("gold_all_cpp", "gold all C++"),
+                                                        ("gold_all_typescript", "gold all TypeScript"))
+           if any(name in task.tags for task in chosen)},
+        size_label: (
             repo_size, [f"small (< {small:,})", f"medium ({small:,} to {large:,})", f"large (> {large:,})"]),
         "fix size (changed code lines)": (fix_lines, [f"up to {low}", f"{low + 1} to {high}", f"over {high}"]),
         "gold files": (gold_files, ["1", "2 or more"]),

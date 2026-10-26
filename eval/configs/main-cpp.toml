@@ -1,0 +1,28 @@
+# The main comparison on the C++ sample (duckdb, llama.cpp; F7, decision of 2026-10-25):
+# the three grep baselines and codemem's default, in one run, as in main-python.toml.
+# Needs: uv sync --extra codemem, and ripgrep.
+
+[[system]]
+name = "grep"
+adapter = "grep"
+
+[[system]]
+name = "grep-fn"
+adapter = "grep_fn"
+
+# The stronger grep baseline (2026-10-23), the baseline of the primary tests: C, C++ and CUDA files only,
+# rare keywords weigh more, noisy keywords dropped, tests last.
+[[system]]
+name = "grep-fn-plus"
+adapter = "grep_fn"
+types = ["c", "cpp", "cuda"]
+weighting = "idf"
+clean_keywords = true
+tests_last = true
+
+# codemem's default: the same definition as in configs/codemem-v3-full.toml (a test checks it).
+[[system]]
+name = "cm3-full"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "auto", test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }

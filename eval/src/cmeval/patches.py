@@ -19,9 +19,12 @@ LANGUAGE_BY_EXT = {
     ".pyx": "cython", ".pxd": "cython",  # pandas, ray: code fixes that codemem cannot read yet
     ".go": "go",
     ".c": "c", ".h": "c",
-    ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
+    ".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".c++": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
+    ".h++": "cpp", ".inl": "cpp", ".ipp": "cpp", ".tpp": "cpp", ".cu": "cpp", ".cuh": "cpp",  # as codemem
+    # GPU kernels and web UI code (llama.cpp): code fixes that the labeler cannot read
+    ".cl": "opencl", ".comp": "glsl", ".glsl": "glsl", ".wgsl": "wgsl", ".metal": "metal", ".svelte": "svelte",
     ".java": "java",
-    ".ts": "typescript", ".tsx": "typescript",
+    ".ts": "typescript", ".mts": "typescript", ".cts": "typescript", ".tsx": "tsx",
     ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
     ".rs": "rust",
     ".rb": "ruby", ".php": "php", ".kt": "kotlin", ".scala": "scala", ".cs": "csharp", ".swift": "swift",
@@ -32,6 +35,10 @@ TEST_DIRS = {"tests", "testdata", "__tests__", "spec", "specs"}
 # Directories that hold tests only at the repo top or under src/. Elsewhere they are often library
 # code that a fix can change: django/test/, sympy/testing/, numpy/testing/.
 TOP_TEST_DIRS = {"test", "testing"}
+# In TypeScript code they hold tests at any depth (vscode: src/vs/**/test/, extensions/*/test/).
+ANY_DEPTH_TEST_DIRS = {"typescript": TOP_TEST_DIRS, "tsx": TOP_TEST_DIRS}
+# Product code in a folder named test: playwright's MCP test tools.
+CODE_DIRS_NAMED_TEST = ("packages/playwright/src/mcp/test/",)
 
 # File-name patterns that mark a test file, for each language.
 TEST_NAME_PATTERNS = {
@@ -40,7 +47,8 @@ TEST_NAME_PATTERNS = {
     "c": [r"^test_.*\.[ch]$", r"^.*_test\.[ch]$"],
     "cpp": [r"^test_.*", r"^.*_test\.\w+$", r"^.*_unittest\.\w+$"],
     "java": [r"^.*Tests?\.java$", r"^.*IT\.java$"],
-    "typescript": [r"^.*\.(test|spec)\.tsx?$"],
+    "typescript": [r"^.*\.(test|spec)\.[mc]?ts$"],
+    "tsx": [r"^.*\.(test|spec)\.tsx$"],
     "javascript": [r"^.*\.(test|spec)\.[mc]?jsx?$"],
     "rust": [r"^.*_test\.rs$"],
     "ruby": [r"^.*_(test|spec)\.rb$"],
@@ -84,6 +92,8 @@ def classify_path(path: str) -> tuple[str, str | None]:
     if any(d in TEST_DIRS for d in dirs):
         return "test", language
     if any(d in TOP_TEST_DIRS and (i == 0 or dirs[i - 1] == "src") for i, d in enumerate(dirs)):
+        return "test", language
+    if any(d in ANY_DEPTH_TEST_DIRS.get(language, ()) for d in dirs) and not path.startswith(CODE_DIRS_NAMED_TEST):
         return "test", language
     if any(rx.match(p.name) for rx in _TEST_NAME_RE.get(language, [])):
         return "test", language

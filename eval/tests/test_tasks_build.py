@@ -175,6 +175,23 @@ def test_gold_in_another_language_is_kept_but_not_all_python(history):
     assert task.tags["gold_languages"] == ["c"] and task.tags["gold_all_python"] is False
     assert task.tags["partial_labels"] is False  # the labeler reads C since cmeval-labels/4
     assert [s.symbol for s in task.gold.functions] == ["add"]
+    assert task.tags["gold_all_cpp"] is True and task.tags["gold_all_typescript"] is False
+    assert task.tags["repo_code_files"] == 1  # C and C++ files at the base commit
+
+
+def test_typescript_task_tags(history):
+    remote, _ = history
+    remote.commit({"src/app.tsx": "export const App = () => {\n  return <div>a</div>;\n};\n",
+                   "src/util.ts": "export function f(): number {\n  return 1;\n}\n",
+                   "src/test/helpers.ts": "export const h = 1;\n"}, "add TS")
+    fixed = remote.commit({"src/app.tsx": "export const App = () => {\n  return <div>b</div>;\n};\n",
+                           "src/test/helpers.ts": "export const h = 2;\n"}, "fix TS")
+    task = candidate_to_task(candidate(fixed), settings(), ["src/app.tsx", "src/test/helpers.ts"])
+    assert task.gold.files == ["src/app.tsx"]  # src/test/ holds tests in TypeScript code
+    assert [s.symbol for s in task.gold.functions] == ["App"] and task.language == "tsx"
+    assert task.tags["gold_all_typescript"] is True and task.tags["gold_all_cpp"] is False
+    assert task.tags["gold_all_python"] is False
+    assert task.tags["repo_code_files"] == 3  # .ts and .tsx files, tests included
 
 
 def test_patch_paths_use_new_names_and_deleted_old_names():
