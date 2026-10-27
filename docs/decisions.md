@@ -63,7 +63,7 @@ The values codemem runs with, and why each was picked. All of these are settings
 | **when a search doesn't wait at all** | more than 1,000 queued chunks, or a first build | that is minutes of embedding; answering at once with a note beats a 4 s wait that changes little | constant |
 | **grouping saves** | 0.5 s after the last save, at most 2 s after the first | one editor action writes several files; the maximum stops a long burst from postponing indexing | `debounce_ms`, `debounce_max_wait_ms` |
 | **safety full check** | every 5 min (every 10 s without file events) | catches a missed event; one check costs 0.3–0.5 s on vLLM | constants |
-| **writing the search index to disk** | after 30 s idle, at shutdown, on `refresh_index` | writing it on every save (520 MB on vLLM) blocked searches for 2.2 s; the CLI and the eval write at once, because the eval measures the index size | constant |
+| **writing the search index to disk** | after 30 s idle, at shutdown, on `refresh_index` | writing it on every save blocked searches for 2.2 s on vLLM (520 MB of files, with 4 bytes per number); the CLI and the eval write at once, because the eval measures the index size | constant |
 | **the vector cache** | on, shared by every index on the machine | rebuilds, branch switches and other commits cost no model calls | `vector_cache = "off"` |
 | **file size cap** | 10 MB | hand-written files can reach megabytes (TypeScript's `checker.ts`); larger ones are generated data | `max_file_size` |
 | **vendored and generated code** | skipped | copies crowd results and cost embedding time; `third_party/` is kept, as it is often the project's own code | `use_default_ignore`, `skip_generated` |
@@ -150,7 +150,7 @@ only what each file costs to recreate.
 | File | What | Size (vLLM) | If deleted |
 |---|---|---|---|
 | `~/.codemem/indexes/<repo>-<hash>/index.db` | the index | ~780 MB | rebuilt by the next update: the structure in about 70 s, vectors from the cache |
-| `~/.codemem/indexes/<repo>-<hash>/vec_*.faiss` | saved copies of the search indexes | ~520 MB | rebuilt from `index.db` in about 2 s |
+| `~/.codemem/indexes/<repo>-<hash>/vec_*.faiss` | saved copies of the search indexes | ~260 MB | rebuilt from `index.db` in about 2 s |
 | `~/.codemem/cache/vectors.db` | every vector ever computed on this machine | grows about 4.5 KB per vector, never shrinks | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping |
 | `~/.codemem/model_hashes.json` | hashes of local model folders' files | tiny | each local model folder is read once more (about 1 s per GB) |
 | the Hugging Face model cache (`HF_HOME`) | the downloaded model | ~1 GB | downloaded again at the next start (needs the network) |

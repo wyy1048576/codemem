@@ -5,9 +5,10 @@ Consistency model
 SQLite is the source of truth for everything, vectors included: each row of `vectors` holds one
 float16 vector at the model's full dimension, with the chunk, part (window) and text hash it
 came from. The search index is derived from those rows: by default FAISS, an exact inner-product
-index over vector ids (or another `VectorStore` backend, named in config), truncated to
-`embedding_dim` if set, kept in memory and saved as `vec_<type>.faiss` with a `vec_<type>.json`
-note of the epoch it reflects (and the backend that wrote it). Every transaction that changes a vector type's
+index over vector ids that holds the same 2-byte numbers (or another `VectorStore` backend,
+named in config), truncated to `embedding_dim` if set, kept in memory and saved as
+`vec_<type>.faiss` with a `vec_<type>.json` note of the epoch it reflects (and the backend that
+wrote it). Every transaction that changes a vector type's
 rows bumps its epoch in `meta`, and FAISS is patched right after the commit (never before, so it
 never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
 with a new id. So an index that is behind (a saved file from before a crash, or another process
@@ -178,13 +179,17 @@ class VectorStore(ABC):
 
 
 class FaissVectorStore(VectorStore):
-    """Exact inner-product search; IndexIDMap2 so the vector id is the FAISS id."""
+    """Exact inner-product search; IndexIDMap2 so the vector id is the FAISS id. It keeps each
+    number in 2 bytes, like the rows: they are rounded to float16 before they are stored, so 4
+    bytes would hold the same values at twice the memory."""
 
     suffix = ".faiss"
 
     def __init__(self, dim: int, index: Any = None):
         self.dim = dim
-        self.index = index if index is not None else faiss.IndexIDMap2(faiss.IndexFlatIP(dim))
+        self.index = index if index is not None else faiss.IndexIDMap2(
+            faiss.IndexScalarQuantizer(dim, faiss.ScalarQuantizer.QT_fp16, faiss.METRIC_INNER_PRODUCT)
+        )
 
     def upsert(self, ids: Sequence[int], vecs: np.ndarray) -> None:
         if len(ids) == 0:
@@ -227,7 +232,14 @@ class FaissVectorStore(VectorStore):
     def from_bytes(cls, data: bytes) -> FaissVectorStore:
         # Bytes read through Python (not faiss.read_index), so non-ASCII Windows paths work.
         index = faiss.deserialize_index(np.frombuffer(data, dtype=np.uint8))
-        return cls(index.d, index)
+        inner = faiss.downcast_index(index.index)
+        if isinstance(inner, faiss.IndexScalarQuantizer):
+            return cls(index.d, index)
+        # A file of 4-byte numbers: the same values, moved into a 2-byte index (the file is
+        # rewritten in the new form at the next save).
+        store = cls(index.d)
+        store.upsert(faiss.vector_to_array(index.id_map), inner.reconstruct_n(0, inner.ntotal))
+        return store
 
 
 def vector_backend_class(name: str) -> type[VectorStore]:
@@ -282,7 +294,9 @@ class _TypeIndex:
         self.dirty = False
 
     def add(self, vector_ids: Sequence[int], info: Sequence[tuple[int, int, int, int, int]], vecs: np.ndarray) -> None:
-        self.store.upsert(vector_ids, prepare(vecs, self.dim))
+        # Normalizing again moves the numbers off float16 values; rounding them back gives every
+        # backend the same numbers, which a 2-byte index holds exactly.
+        self.store.upsert(vector_ids, prepare(vecs, self.dim).astype(np.float16).astype(np.float32))
         for vid, row in zip(vector_ids, info):
             self.owner[vid] = row
             self.by_chunk[row[0]].append(vid)

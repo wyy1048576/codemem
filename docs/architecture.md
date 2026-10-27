@@ -499,7 +499,12 @@ transaction. Vectors are stored in it as plain rows, so the search index is only
 which can always be rebuilt without the model (2 s on vLLM).
 
 **The search index** compares a query vector with every stored vector of a type, using FAISS (a
-vector search library) in its exact mode: about 10 ms over 109k vectors. It sits behind a small
+vector search library) in its exact mode: about 10 ms over 109k vectors. It keeps each number in
+2 bytes, like the stored rows: 196 MB for vLLM's code vectors, against 393 MB at 4 bytes, at the
+same speed. Vectors are scaled back to length 1 as they enter the index and rounded to 2 bytes
+again, so every backend gets the same numbers. Keeping 4 bytes would change scores by at most
+0.0003: on 40 real-model queries, 38 top-10 lists came out in the same order, and the other two
+swapped results that were practically tied. It sits behind a small
 interface (`VectorStore`), so an approximate index (HNSW or IVF, which trade a little accuracy for
 speed on very large repos) can replace it through the config; a switch re-embeds nothing.
 
