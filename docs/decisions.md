@@ -136,8 +136,8 @@ Three identities decide whether codemem can reuse what it has:
 | file selection or chunking (`ignore`, `languages`, `max_file_size`, `use_default_ignore`, `skip_generated`, `max_block_lines`), BM25 tokenization | the index is rebuilt | the structure (vLLM: about 70 s), vectors from the cache |
 | search settings (weights, filters, `rrf`, `candidates`, `catchup_budget_ms`, `steering`) | nothing | none |
 
-**Version stamps.** Upgrading codemem can redo work too: `SCHEMA_VERSION` (3, `store.py`) changes
-the tables, and an older index is wiped and rebuilt (a newer one is refused); `CHUNKER_VERSION` (2)
+**Version stamps.** Upgrading codemem can redo work too: `SCHEMA_VERSION` (4, `store.py`) changes
+the tables or the keyword tokens, and an older index is wiped and rebuilt (a newer one is refused); `CHUNKER_VERSION` (2)
 and `TEXT_FORMAT_VERSION` (3, both `config.py`) work like the chunking and text settings above.
 
 ---
@@ -149,7 +149,7 @@ only what each file costs to recreate.
 
 | File | What | Size (vLLM) | If deleted |
 |---|---|---|---|
-| `~/.codemem/indexes/<repo>-<hash>/index.db` | the index | ~780 MB | rebuilt by the next update: the structure in about 70 s, vectors from the cache |
+| `~/.codemem/indexes/<repo>-<hash>/index.db` | the index | ~640 MB | rebuilt by the next update: the structure in about 70 s, vectors from the cache |
 | `~/.codemem/indexes/<repo>-<hash>/vec_*.faiss` | saved copies of the search indexes | ~260 MB | rebuilt from `index.db` in about 2 s |
 | `~/.codemem/cache/vectors.db` | every vector ever computed on this machine | grows about 4.5 KB per vector, never shrinks | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping |
 | `~/.codemem/model_hashes.json` | hashes of local model folders' files | tiny | each local model folder is read once more (about 1 s per GB) |
