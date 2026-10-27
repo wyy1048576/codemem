@@ -35,8 +35,11 @@ from .tasks import Gold, Span, Unretrievable
 
 # 2: added lines are placed in the fixed file (4ec55f4). 3: Cython files (.pyx, .pxd) count as code.
 # 4: C, C++, TypeScript and TSX definitions; the narrow parse-error rule; with the F7 path rules
-# in patches.py (.tsx, CUDA and GPU kernel files, TypeScript test folders at any depth).
-LABELER_VERSION = "cmeval-labels/4"
+# in patches.py (.tsx, CUDA and GPU kernel files, TypeScript test folders at any depth); as of
+# c46af63, namespaces in symbols (all task sets with labels/4 were made at c46af63).
+# 5: a file with parse errors (fixed or added) gives as new only definitions clear of every error
+# line; C++ inline namespaces drop the keyword.
+LABELER_VERSION = "cmeval-labels/5"
 
 
 class LabelError(ValueError):
@@ -188,7 +191,8 @@ def _scope_names(node: Node) -> list[str]:
     name = node.child_by_field_name("name")
     if name is None or name.type == "string":  # declare module 'x' is not a name in code
         return []
-    return [part for part in re.split(r"::|\.", _text(name)) if part]
+    text = re.sub(r"\binline\s+", "", _text(name))  # namespace a::inline b (C++ 20)
+    return [part for part in re.split(r"::|\.", text) if part]
 
 
 _C_FAMILY = dict(
@@ -236,7 +240,7 @@ def _languages(name: str) -> tuple[Language, ...]:
 class Definition:
     kind: str  # function | class
     name: str
-    symbol: str  # dotted path of enclosing classes and functions, for example Cls.method
+    symbol: str  # dotted path of enclosing namespaces, classes and functions, for example ns.Cls.method
     start: int  # 1-based, inclusive, decorators included
     end: int
     has_error: bool = field(default=False, compare=False)  # its span contains a parse error
@@ -393,8 +397,8 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
             continue
         if change.status == "added":
             unretrievable.files.append(change.new_path)
-            defs = _definitions_or_none(apply_file_diff(None, change.diff), change.language)
-            for d in defs or []:
+            added = _parsed_or_none(apply_file_diff(None, change.diff), change.language)
+            for d in _trusted(added) if added is not None else []:
                 _add_unretrievable(unretrievable, change.new_path, d)
             continue
 
@@ -422,7 +426,8 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
         fixed = _parsed_or_none(new_text, change.language) if new_text is not None else None
         # Added lines are placed in the fixed file only if it parses clean; else on the base side.
         new_defs = fixed.definitions if fixed is not None and not fixed.error_lines else None
-        mapping = _map_to_base(new_defs, defs) if new_defs is not None else {}
+        found = _trusted(fixed) if fixed is not None else []  # all of new_defs when the file is clean
+        mapping = _map_to_base(found, defs)
         file_module_level = _label_file(path, base_text, new_text, applied, base, new_defs, mapping, gold)
         if file_module_level is None:
             partial = True  # a change touches a parse error
@@ -431,10 +436,6 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
 
         if fixed is not None:
             # New in the fixed file: a symbol the base does not have, or (C and C++) a new overload.
-            # A fixed file with parse errors gives only its definitions that contain no error.
-            found = new_defs if new_defs is not None else [d for d in fixed.definitions if not d.has_error]
-            if new_defs is None:
-                mapping = _map_to_base(found, defs)
             known = {(d.kind, d.symbol) for d in defs}
             for d in found:
                 if (d.kind, d.symbol) not in known or (d.signature is not None and d not in mapping):
@@ -457,10 +458,14 @@ def _parsed_or_none(source: str, language: str | None) -> Parsed | None:
     return parse_definitions(source, language) if language in LANGUAGES else None
 
 
-def _definitions_or_none(source: str, language: str | None) -> list[Definition] | None:
-    """Definitions, or None if this file cannot be labeled (no language table or a parse error)."""
-    parsed = _parsed_or_none(source, language)
-    return None if parsed is None or parsed.error_lines else parsed.definitions
+def _trusted(parsed: Parsed) -> list[Definition]:
+    """Definitions whose name and scope can be trusted: no line of them is a parse-error line.
+
+    A definition inside a misparsed region can contain no error itself and still get a wrong
+    scope (its namespace or class was not seen), so its symbol would not match the base.
+    """
+    errors = parsed.error_lines
+    return [d for d in parsed.definitions if not any(line in errors for line in range(d.start, d.end + 1))]
 
 
 def _map_to_base(new_defs: list[Definition], base_defs: list[Definition]) -> dict[Definition, Definition]:

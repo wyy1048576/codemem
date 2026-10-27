@@ -449,7 +449,28 @@ def test_new_function_in_a_file_with_a_lasting_macro_error_is_unretrievable(remo
 def test_deep_nesting_does_not_hit_the_recursion_limit():
     # Generated code (duckdb's constant tables) nests deeper than Python's recursion limit.
     deep = "int f() {\n    return " + "(" * 3000 + "1" + ")" * 3000 + ";\n}\n"
-    defs, _ = find_definitions(deep, "cpp")
-    assert [(d.symbol, d.start, d.end) for d in defs] == [("f", 1, 3)]
+    defs, has_error = find_definitions(deep, "cpp")
+    assert not has_error and [(d.symbol, d.start, d.end) for d in defs] == [("f", 1, 3)]
     deep_py = "def g():\n    return " + "[" * 3000 + "]" * 3000 + "\n"
     assert [d.symbol for d in find_definitions(deep_py, "python")[0]] == ["g"]
+
+
+# ---- second review (cmeval-labels/5)
+
+
+def test_definitions_inside_a_misparsed_region_are_not_new():
+    base = "namespace n {\nclass S {\n  void a() {}\n  void b() {}\n  void c() {}\n};\n}\n"
+    new = base.replace("  void a() {}\n", "  void a() {}\n  MACRO(x) {\n")  # the fix leaves a misparse
+    r = label(new, old=base, path="src/s.cpp")
+    assert r.unretrievable.functions == []  # b and c exist in the base; their new scope is not trusted
+
+
+def test_inline_namespaces_drop_the_keyword():
+    source = "namespace a::inline b { void f() {} }\n"
+    assert [d.symbol for d in find_definitions(source, "cpp")[0]] == ["a.b.f"]
+
+
+def test_added_file_with_a_parse_error_lists_its_clean_functions():
+    added = "DUCKDB_API void Bar(int x) {\n    run(x);\n}\n\nint clean(int a) {\n    return a;\n}\n"
+    r = label_patch(make_diff(None, added, "src/new.cpp"), lambda p: None)
+    assert symbols(r.unretrievable.functions) == ["clean"]  # Bar holds the macro error
