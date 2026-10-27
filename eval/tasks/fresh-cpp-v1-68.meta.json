@@ -1,0 +1,113 @@
+{
+  "kind": "subset",
+  "source": "fresh-cpp-v1.jsonl",
+  "source_sha256": "228973a58961eb69b026f30a478526c8deb98ff08f4cc0eb3478c8430aa75a88",
+  "split": "dev",
+  "where": [
+    "gold_all_cpp=true"
+  ],
+  "repos": [
+    "duckdb/duckdb",
+    "ggml-org/llama.cpp",
+    "godotengine/godot"
+  ],
+  "per_repo": 25,
+  "seed": "cmeval-sample-1",
+  "draw": "lowest sha256 of '<seed>:<repo>:<task id>'",
+  "available": {
+    "duckdb/duckdb": 33,
+    "ggml-org/llama.cpp": 18,
+    "godotengine/godot": 68
+  },
+  "chosen": {
+    "duckdb/duckdb": 25,
+    "ggml-org/llama.cpp": 18,
+    "godotengine/godot": 25
+  },
+  "short": [
+    "ggml-org/llama.cpp"
+  ],
+  "task_ids": {
+    "duckdb/duckdb": [
+      "duckdb__duckdb-23604",
+      "duckdb__duckdb-23773",
+      "duckdb__duckdb-23825",
+      "duckdb__duckdb-23876",
+      "duckdb__duckdb-23939",
+      "duckdb__duckdb-23952",
+      "duckdb__duckdb-24101",
+      "duckdb__duckdb-24163",
+      "duckdb__duckdb-24266",
+      "duckdb__duckdb-24382",
+      "duckdb__duckdb-24505",
+      "duckdb__duckdb-24548",
+      "duckdb__duckdb-24557",
+      "duckdb__duckdb-24582",
+      "duckdb__duckdb-24693",
+      "duckdb__duckdb-24752",
+      "duckdb__duckdb-24821",
+      "duckdb__duckdb-24875",
+      "duckdb__duckdb-24933",
+      "duckdb__duckdb-24957",
+      "duckdb__duckdb-25031",
+      "duckdb__duckdb-25042",
+      "duckdb__duckdb-25055",
+      "duckdb__duckdb-25101",
+      "duckdb__duckdb-25153"
+    ],
+    "ggml-org/llama.cpp": [
+      "ggml-org__llama.cpp-25245",
+      "ggml-org__llama.cpp-25538",
+      "ggml-org__llama.cpp-25787",
+      "ggml-org__llama.cpp-25823",
+      "ggml-org__llama.cpp-25830",
+      "ggml-org__llama.cpp-25871",
+      "ggml-org__llama.cpp-26574",
+      "ggml-org__llama.cpp-27034",
+      "ggml-org__llama.cpp-28704",
+      "ggml-org__llama.cpp-28895",
+      "ggml-org__llama.cpp-29115",
+      "ggml-org__llama.cpp-29231",
+      "ggml-org__llama.cpp-29382",
+      "ggml-org__llama.cpp-29486",
+      "ggml-org__llama.cpp-29615",
+      "ggml-org__llama.cpp-30416",
+      "ggml-org__llama.cpp-30514",
+      "ggml-org__llama.cpp-30994"
+    ],
+    "godotengine/godot": [
+      "godotengine__godot-120896",
+      "godotengine__godot-121560",
+      "godotengine__godot-121795",
+      "godotengine__godot-121958",
+      "godotengine__godot-121971",
+      "godotengine__godot-122175",
+      "godotengine__godot-122246",
+      "godotengine__godot-122253",
+      "godotengine__godot-122420",
+      "godotengine__godot-122533",
+      "godotengine__godot-122578",
+      "godotengine__godot-122667",
+      "godotengine__godot-122669",
+      "godotengine__godot-123148",
+      "godotengine__godot-123163",
+      "godotengine__godot-123199",
+      "godotengine__godot-123447",
+      "godotengine__godot-123908",
+      "godotengine__godot-123916",
+      "godotengine__godot-124017",
+      "godotengine__godot-124048",
+      "godotengine__godot-124170",
+      "godotengine__godot-124201",
+      "godotengine__godot-124267",
+      "godotengine__godot-124540"
+    ]
+  },
+  "tasks": 68,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "5e500e97e683a3a75ba36f26a8f11f63e8b60b5d",
+    "dirty": false
+  },
+  "created": "2026-10-26T09:13:44+00:00"
+}

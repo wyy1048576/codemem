@@ -1,0 +1,204 @@
+{
+  "run_id": "2026-10-26-py100",
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "aed438dea1330dae4f9d546ab5a987cc6c4676e6",
+    "dirty": false
+  },
+  "tasks_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/tasks/fresh-v1-py100.jsonl",
+  "tasks_sha256": "753a062e6379d521e4d917246627a14b1cf7dfd8f88afcd82c3558080011f3dd",
+  "config_file": "/Users/azhang/Documents/Projects/codemem project/codemem-run/eval/configs/main-python.toml",
+  "config_sha256": "f6355c2dad112cd56e17014e6931dd891153f9c26d839ca06f84eb6e2f758c66",
+  "config_text": "# The main comparison on the Python sample (tasks/fresh-v1-py100.jsonl, decision of 2026-10-25): the\n# three grep baselines and codemem's default, in one run. Needs: uv sync --extra codemem, and ripgrep.\n\n[[system]]\nname = \"grep\"\nadapter = \"grep\"\n\n[[system]]\nname = \"grep-fn\"\nadapter = \"grep_fn\"\n\n# The stronger grep baseline (2026-10-23), the baseline of the primary tests: Python files only,\n# rare keywords weigh more, noisy keywords dropped, tests last.\n[[system]]\nname = \"grep-fn-plus\"\nadapter = \"grep_fn\"\ntypes = [\"py\"]\nweighting = \"idf\"\nclean_keywords = true\ntests_last = true\n\n# codemem's default: the same definition as in configs/codemem-v3-full.toml (a test checks it).\n[[system]]\nname = \"cm3-full\"\nadapter = \"codemem\"\nsignals = [\"bm25\", \"code\", \"usage\"]\nconfig = { device = \"auto\", test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }\n",
+  "split": "dev",
+  "index_mode": "update",
+  "k": 50,
+  "systems": [
+    {
+      "name": "grep",
+      "adapter": "grep",
+      "granularity": "file",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227
+      }
+    },
+    {
+      "name": "grep-fn",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": null,
+        "weighting": "count",
+        "clean_keywords": false,
+        "tests_last": false
+      }
+    },
+    {
+      "name": "grep-fn-plus",
+      "adapter": "grep_fn",
+      "granularity": "line",
+      "index_key": "7eac3973463c2a2b",
+      "describe": {
+        "adapter": "grep_fn",
+        "rg": "ripgrep 15.2.0",
+        "max_keywords": 20,
+        "max_lines": 10,
+        "stop_words": 227,
+        "top_files": 50,
+        "languages": [
+          "python"
+        ],
+        "types": [
+          "py"
+        ],
+        "weighting": "idf",
+        "clean_keywords": true,
+        "tests_last": true
+      }
+    },
+    {
+      "name": "cm3-full",
+      "adapter": "codemem",
+      "granularity": "line",
+      "index_key": "5a69e9840b4432e6",
+      "describe": {
+        "adapter": "codemem",
+        "codemem_version": "0.2.0",
+        "codemem_git": {
+          "sha": "aed438dea1330dae4f9d546ab5a987cc6c4676e6",
+          "dirty": false
+        },
+        "device": "mps",
+        "signals": [
+          "bm25",
+          "code",
+          "usage"
+        ],
+        "index_key": "5a69e9840b4432e6",
+        "config": {
+          "device": "auto",
+          "vectors": {
+            "code": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true,
+              "embedder": null,
+              "version": null
+            },
+            "usage": {
+              "model": "jinaai/jina-code-embeddings-0.5b",
+              "enabled": true,
+              "embedder": null,
+              "version": null
+            }
+          },
+          "embedding": {
+            "provider": "local",
+            "model": "",
+            "base_url": "",
+            "api_key_env": "",
+            "dimensions": null,
+            "query_prefix": "",
+            "document_prefix": "",
+            "batch_size": 64,
+            "max_concurrency": 4,
+            "timeout_s": 60.0
+          },
+          "embedding_dim": null,
+          "dtype": "auto",
+          "batch_size": 16,
+          "max_seq_length": 1024,
+          "bm25_weights": [
+            10.0,
+            3.0,
+            5.0,
+            2.0,
+            1.0
+          ],
+          "bm25_stem": false,
+          "bm25_stopwords": false,
+          "bm25_query_terms": 32,
+          "bm25_common_share": 0.0,
+          "rrf_k": 60,
+          "rrf_weights": {
+            "bm25": 1.0,
+            "code": 1.0,
+            "usage": 1.0
+          },
+          "candidates": 50,
+          "max_defs_per_name": 5,
+          "max_usage_items": 20,
+          "include_commits": false,
+          "max_file_size": 10000000,
+          "ignore": [],
+          "use_default_ignore": true,
+          "skip_generated": true,
+          "languages": null,
+          "code_header": true,
+          "window_chars": null,
+          "window_overlap_lines": 3,
+          "max_block_lines": 200,
+          "vector_cache": "global",
+          "vector_backend": "faiss",
+          "kinds": null,
+          "test_weight": 1.0,
+          "kind_weights": {
+            "function": 1.0,
+            "method": 1.0,
+            "class": 1.0,
+            "block": 1.0
+          },
+          "steering": "light",
+          "preview_lines": 12,
+          "preview_chars": 800,
+          "debounce_ms": 500,
+          "debounce_max_wait_ms": 2000,
+          "catchup_budget_ms": 4000
+        }
+      }
+    }
+  ],
+  "machine": {
+    "platform": "macOS-26.5-arm64-arm-64bit",
+    "processor": "arm",
+    "python": "3.11.9"
+  },
+  "started": "2026-10-26T07:06:31+00:00",
+  "sessions": [
+    {
+      "started": "2026-10-26T07:06:31+00:00",
+      "cmeval_git": {
+        "sha": "aed438dea1330dae4f9d546ab5a987cc6c4676e6",
+        "dirty": false
+      },
+      "machine": {
+        "platform": "macOS-26.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.11.9"
+      }
+    }
+  ],
+  "status": "done",
+  "filters": {
+    "repos": null,
+    "limit_per_repo": null
+  },
+  "ended": "2026-10-26T12:05:06+00:00",
+  "error": null,
+  "searched": 400,
+  "skipped": 0
+}

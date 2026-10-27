@@ -175,7 +175,14 @@ Binary files /dev/null and b/assets/logo.py differ
         ("pkg/server/testdata/input.go", ("test", "go")),
         ("src/app.ts", ("code", "typescript")),
         ("src/app.test.ts", ("test", "typescript")),
-        ("src/components/Button.spec.tsx", ("test", "typescript")),
+        ("src/components/Button.spec.tsx", ("test", "tsx")),
+        ("src/components/Button.tsx", ("code", "tsx")),
+        ("src/server/index.mts", ("code", "typescript")),
+        ("src/server/index.test.mts", ("test", "typescript")),
+        # TypeScript: test/ and testing/ hold tests at any depth (vscode), except playwright's MCP test tools
+        ("src/vs/base/test/common/utils.ts", ("test", "typescript")),
+        ("extensions/copilot/test/simulation/fixture.ts", ("test", "typescript")),
+        ("packages/playwright/src/mcp/test/testTools.ts", ("code", "typescript")),
         ("src/__tests__/util.js", ("test", "javascript")),
         ("src/main/java/org/Foo.java", ("code", "java")),
         ("src/main/java/org/FooTest.java", ("test", "java")),
@@ -184,6 +191,16 @@ Binary files /dev/null and b/assets/logo.py differ
         ("src/util/strings_unittest.cc", ("test", "cpp")),
         ("include/util.hpp", ("code", "cpp")),
         ("kernel/sched.c", ("code", "c")),
+        ("ggml/src/ggml-cuda/mmq.cu", ("code", "cpp")),
+        ("ggml/src/ggml-cuda/common.cuh", ("code", "cpp")),
+        ("src/include/duckdb/common/vector.inl", ("code", "cpp")),
+        ("ggml/src/ggml-opencl/kernels/add.cl", ("code", "opencl")),  # code the labeler cannot read
+        ("ggml/src/ggml-vulkan/vulkan-shaders/add.comp", ("code", "glsl")),
+        ("ggml/src/ggml-metal/ggml-metal.metal", ("code", "metal")),
+        ("tools/server/webui/src/App.svelte", ("code", "svelte")),
+        ("tests/test-backend-ops.cpp", ("test", "cpp")),
+        ("test/sql/storage/test_wal.cpp", ("test", "cpp")),
+        ("django/test/runner.ts", ("test", "typescript")),
         ("pandas/_libs/tslibs/offsets.pyx", ("code", "cython")),
         ("pandas/_libs/lib.pxd", ("code", "cython")),
         ("Tests/AppTests.swift", ("test", "swift")),
@@ -236,3 +253,12 @@ def test_align_prefers_the_nearest_exact_match():
     assert align_file_diff(base, diff).changed == [5]  # the stated position wins when it matches
     diff_off = header("f.py") + "@@ -3,3 +3,3 @@\n a\n-x\n+y\n b\n"  # stated index 2: index 3 is 1 away, index 0 is 2 away
     assert align_file_diff(base, diff_off).changed == [5]
+
+
+def test_vscode_testing_feature_is_code():
+    from cmeval.patches import classify_path
+
+    # testing/ holds tests only at the top or under src/, also in TypeScript: vscode's Testing feature
+    assert classify_path("src/vs/workbench/contrib/testing/browser/testingExplorerView.ts") == ("code", "typescript")
+    assert classify_path("extensions/copilot/src/platform/testing/common/setup.ts") == ("code", "typescript")
+    assert classify_path("src/vs/workbench/contrib/testing/test/common/testStubs.ts") == ("test", "typescript")

@@ -282,3 +282,195 @@ def test_unparsable_patch_is_a_label_error():
 def test_dunder_names_count_only_with_their_class(query, expected):
     gold = Gold(files=["auth/sessions.py"], functions=[Span("auth/sessions.py", 2, 5, "SessionManager.__init__")])
     assert identifier_in_query(query, gold) is expected
+
+
+# ---- C, C++, TypeScript and TSX (cmeval-labels/4)
+
+CPP = (FIXTURES / "defs_sample.cpp").read_text()
+CPP_PATH = "src/store.cpp"
+TS = (FIXTURES / "defs_sample.ts").read_text()
+TS_PATH = "src/session.ts"
+
+# The macro makes tree-sitter fail: in Bar it is an error inside the function, and in Widget it
+# makes the class look like a function named Widget.
+MACRO = """\
+DUCKDB_API void Bar(int x) {
+    run(x);
+}
+
+int clean(int a) {
+    return a;
+}
+
+class DUCKDB_API Widget : public Base {
+public:
+    void draw() { }
+    int size() { return 1; }
+};
+"""
+MACRO_PATH = "src/widget.cpp"
+
+
+def test_find_definitions_cpp():
+    defs, has_error = find_definitions(CPP, "cpp")
+    assert not has_error
+    assert [(d.kind, d.symbol, d.start, d.end) for d in defs] == [
+        ("function", "store.add", 8, 10),  # namespaces are part of the symbol; struct Entry; is not a class
+        ("class", "store.Store", 12, 21),
+        ("function", "store.Store.count", 14, 14),  # ~Store(); is a declaration, not a definition
+        ("class", "store.Store.Options", 16, 18),
+        ("function", "store.Store.Options.load", 17, 17),
+        ("function", "store.Store.~Store", 23, 25),  # out of the class: Store:: gives the scope
+        ("function", "store.Cache.get", 27, 31),  # template line included, <T> dropped, the lambda is not one
+        ("function", "store.Store.operator==", 33, 35),
+        ("function", "store.Store.operator bool", 37, 39),
+        ("function", "store.detail.flush.run", 42, 44),
+    ]
+
+
+def test_find_definitions_typescript():
+    defs, has_error = find_definitions(TS, "typescript")
+    assert not has_error
+    assert [(d.kind, d.symbol, d.start, d.end) for d in defs] == [
+        ("function", "openSession", 3, 5),  # export included
+        ("function", "closeSession", 7, 9),  # an arrow function named by its const
+        ("function", "ids", 11, 13),
+        ("class", "Session", 15, 30),  # the class decorator before export included
+        ("function", "Session.onClose", 17, 17),  # an arrow function in a class field
+        ("function", "Session.constructor", 19, 21),
+        ("function", "Session.title", 23, 27),  # the method decorator included
+        ("function", "Session.title.format", 25, 25),  # a nested arrow const, like a nested def
+        ("class", "Closable", 32, 34),  # abstract close() and interface signatures have no body
+        ("class", "State", 36, 36),
+        ("function", "default", 38, 40),
+    ]
+
+
+def test_tsx_has_its_own_grammar():
+    source = "export const Card = (p: Props) => <div>{p.title}</div>;\n"
+    assert find_definitions(source, "typescript")[1] is True
+    defs, has_error = find_definitions(source, "tsx")
+    assert not has_error and [d.symbol for d in defs] == ["Card"]
+
+
+def test_c_header_falls_back_to_cpp():
+    header = "#pragma once\nnamespace ui {\nclass Panel {\n    int width() { return w; }\n};\n}\n"
+    defs, has_error = find_definitions(header, "c")  # .h files are "c"; this one is C++
+    assert not has_error and [d.symbol for d in defs] == ["ui.Panel", "ui.Panel.width"]
+    defs, has_error = find_definitions("struct point { int x; };\nint norm(int a) { return a; }\n", "c")
+    assert not has_error and [d.symbol for d in defs] == ["point", "norm"]
+
+
+def test_change_in_cpp_methods():
+    r = label(edit(CPP, 24, "    clear(true);"), old=CPP, path=CPP_PATH)
+    assert symbols(r.gold.functions) == ["store.Store.~Store"] and r.language == "cpp"
+    assert r.gold.classes == []  # an out-of-class method is not inside the class's lines
+    r = label(edit(CPP, 28, "    auto check = [](int x) { return x >= 0; };"), old=CPP, path=CPP_PATH)
+    assert symbols(r.gold.functions) == ["store.Cache.get"]
+    r = label(edit(CPP, 17, "        bool load() const { return false; }"), old=CPP, path=CPP_PATH)
+    assert symbols(r.gold.functions) == ["store.Store.Options.load"] and symbols(r.gold.classes) == ["store.Store.Options"]
+
+
+def test_change_in_cpp_class_body_outside_methods():
+    r = label(edit(CPP, 20, "    int count_ = 1;"), old=CPP, path=CPP_PATH)
+    assert r.gold.functions == [] and symbols(r.gold.classes) == ["store.Store"]
+    assert r.tags["module_level_change"] is True
+
+
+def test_new_cpp_overload_before_the_old_one_is_unretrievable():
+    r = label(insert(CPP, 7, "int add(int a, int b, int c) {\n    return a + b + c;\n}\n\n"), old=CPP, path=CPP_PATH)
+    assert r.gold.functions == []  # the old add (now second) matches by its signature; it did not change
+    assert symbols(r.unretrievable.functions) == ["store.add"] and r.unretrievable.functions[0].start == 8
+
+
+def test_changed_cpp_parameters_keep_the_function():
+    r = label(edit(CPP, 8, "int add(int a, int b, bool checked) {"), old=CPP, path=CPP_PATH)
+    assert symbols(r.gold.functions) == ["store.add"] and r.unretrievable.functions == []
+
+
+def test_typescript_changes():
+    r = label(insert(TS, 8, "  log(s);\n"), old=TS, path=TS_PATH)
+    assert symbols(r.gold.functions) == ["closeSession"] and r.language == "typescript"
+    r = label(edit(TS, 25, "    const format = (t: string) => t.trim().toLowerCase();"), old=TS, path=TS_PATH)
+    assert symbols(r.gold.functions) == ["Session.title.format"] and symbols(r.gold.classes) == ["Session"]
+    r = label(edit(TS, 23, "  @memoize()"), old=TS, path=TS_PATH)
+    assert symbols(r.gold.functions) == ["Session.title"]
+    r = label(edit(TS, 29, "  abstract close(force?: boolean): void;"), old=TS, path=TS_PATH)
+    assert r.gold.functions == [] and symbols(r.gold.classes) == ["Session"]
+
+
+def test_parse_errors_only_matter_where_the_change_is():
+    clean = label(edit(MACRO, 6, "    return a + 1;"), old=MACRO, path=MACRO_PATH)
+    assert symbols(clean.gold.functions) == ["clean"] and clean.tags["partial_labels"] is False
+    for line, new_line in [(2, "    run(x + 1);"),  # in Bar, which holds the macro error
+                           (11, "    void draw() { paint(); }")]:  # in the class the macro breaks
+        r = label(edit(MACRO, line, new_line), old=MACRO, path=MACRO_PATH)
+        assert r.gold.files == [MACRO_PATH] and r.gold.functions == [] and r.gold.classes == []
+        assert r.tags["partial_labels"] is True
+
+
+def test_parse_error_elsewhere_in_a_python_file_keeps_its_gold():
+    broken = SAMPLE + "\n\ndef broken(:\n    pass\n"
+    r = label(edit(broken, 30, "            helper(s, force=True)"), old=broken)
+    assert symbols(r.gold.functions) == ["SessionManager.revoke_session"]
+    assert r.tags["partial_labels"] is False
+    r = label(edit(broken, len(split_lines(broken)), "    return 1"), old=broken)
+    assert r.gold.functions == [] and r.tags["partial_labels"] is True
+
+
+# ---- review fixes (F7 B3 step 0)
+
+
+def test_cpp_defaulted_and_deleted_members_are_not_functions():
+    source = "class A {\n  A() = default;\n  A(const A&) = delete;\n  A(int x) try : y(x) {} catch (...) {}\n};\n"
+    defs, _ = find_definitions(source, "cpp")
+    assert [(d.symbol, d.start) for d in defs] == [("A", 1), ("A.A", 4)]  # a function-try-block is one
+
+
+def test_namespaces_are_part_of_the_symbol():
+    source = "namespace duckdb {\nvoid A::h() {}\n}\nvoid duckdb::A::k() {}\nnamespace a::b { void f() {} }\nnamespace { void anon() {} }\n"
+    assert [d.symbol for d in find_definitions(source, "cpp")[0]] == ["duckdb.A.h", "duckdb.A.k", "a.b.f", "anon"]
+    ts = "export namespace Event { export function once() {} }\nnamespace A.B { function once() {} }\ndeclare module 'x' { function d(): void; function e() {} }\n"
+    assert [d.symbol for d in find_definitions(ts, "typescript")[0]] == ["Event.once", "A.B.once", "e"]
+
+
+def test_new_function_in_a_file_with_a_lasting_macro_error_is_unretrievable(remote):
+    # A git diff: difflib would slide Bar's closing brace into the insertion (git does not).
+    added = "int added(int a) {\n    return a * 2;\n}\n\n"
+    base = remote.commit({MACRO_PATH: MACRO}, "add widget")
+    fixed = remote.commit({MACRO_PATH: insert(MACRO, 4, added)}, "add a function between Bar and clean")
+    r = label_at_commit(REMOTE_REPO, base, remote.diff(base, fixed))
+    assert symbols(r.unretrievable.functions) == ["added"] and r.tags["partial_labels"] is False
+    late = remote.commit({MACRO_PATH: insert(MACRO, 8, added)}, "add it right before the misread class")
+    r = label_at_commit(REMOTE_REPO, fixed, remote.diff(fixed, late))
+    assert r.tags["partial_labels"] is True  # an insertion next to an error region is not trusted
+
+
+def test_deep_nesting_does_not_hit_the_recursion_limit():
+    # Generated code (duckdb's constant tables) nests deeper than Python's recursion limit.
+    deep = "int f() {\n    return " + "(" * 3000 + "1" + ")" * 3000 + ";\n}\n"
+    defs, has_error = find_definitions(deep, "cpp")
+    assert not has_error and [(d.symbol, d.start, d.end) for d in defs] == [("f", 1, 3)]
+    deep_py = "def g():\n    return " + "[" * 3000 + "]" * 3000 + "\n"
+    assert [d.symbol for d in find_definitions(deep_py, "python")[0]] == ["g"]
+
+
+# ---- second review (cmeval-labels/5)
+
+
+def test_definitions_inside_a_misparsed_region_are_not_new():
+    base = "namespace n {\nclass S {\n  void a() {}\n  void b() {}\n  void c() {}\n};\n}\n"
+    new = base.replace("  void a() {}\n", "  void a() {}\n  MACRO(x) {\n")  # the fix leaves a misparse
+    r = label(new, old=base, path="src/s.cpp")
+    assert r.unretrievable.functions == []  # b and c exist in the base; their new scope is not trusted
+
+
+def test_inline_namespaces_drop_the_keyword():
+    source = "namespace a::inline b { void f() {} }\n"
+    assert [d.symbol for d in find_definitions(source, "cpp")[0]] == ["a.b.f"]
+
+
+def test_added_file_with_a_parse_error_lists_its_clean_functions():
+    added = "DUCKDB_API void Bar(int x) {\n    run(x);\n}\n\nint clean(int a) {\n    return a;\n}\n"
+    r = label_patch(make_diff(None, added, "src/new.cpp"), lambda p: None)
+    assert symbols(r.unretrievable.functions) == ["clean"]  # Bar holds the macro error

@@ -228,3 +228,14 @@ def test_grep_fn_counts_keywords_on_whole_lines_and_cuts_only_the_text(tmp_path)
     rg_text = subprocess.run(["rg", "--no-config", "-n", "--with-filename", "--max-columns", "300", "--max-columns-preview",
                               "-e", "special_widget", "long.py"], cwd=tmp_path, capture_output=True, text=True).stdout.strip()
     assert hits["long.py"].text == rg_text  # the hit text is cut exactly as rg shows it
+
+
+def test_grep_fn_maps_cpp_and_typescript_matches_to_functions(tmp_path):
+    (tmp_path / "store.cpp").write_text(
+        "namespace s {\nvoid Store::revoke_session(int id) {\n    drop(id);\n}\n}\n")
+    (tmp_path / "session.ts").write_text(
+        "export class Manager {\n  revoke() {\n    const run = () => revoke_session(1);\n    run();\n  }\n}\n")
+    grep_fn = GrepFnRetriever()
+    grep_fn.build(tmp_path, tmp_path)
+    hits = {(h.path, h.symbol, h.start_line, h.end_line) for h in grep_fn.search(QUERY, 5)}
+    assert hits == {("store.cpp", "s.Store.revoke_session", 2, 4), ("session.ts", "Manager.revoke.run", 3, 3)}

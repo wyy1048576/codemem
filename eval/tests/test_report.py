@@ -322,8 +322,50 @@ def test_main_configs_define_systems_as_their_references():
     for name in ("codemem-v3-full.toml", "grep.toml"):
         for spec in tomllib.loads((CONFIGS / name).read_text())["system"]:
             reference[spec["name"]] = spec
+    # grep-fn-plus searches the files of the config's language (rg types); all else is the same.
+    types = {"main-python.toml": ["py"], "main-cpp.toml": ["c", "cpp", "cuda"], "main-typescript.toml": ["ts"]}
     mains = sorted(CONFIGS.glob("main-*.toml"))
-    assert mains
+    assert [p.name for p in mains] == sorted(types)
     for path in mains:
         for spec in tomllib.loads(path.read_text())["system"]:
-            assert spec == reference[spec["name"]], (path.name, spec["name"])
+            expected = reference[spec["name"]]
+            if spec["name"] == "grep-fn-plus":
+                expected = {**expected, "types": types[path.name]}
+            assert spec == expected, (path.name, spec["name"])
+
+
+def test_cpp_tasks_get_their_own_groups(tagged):
+    """C++ and TypeScript tasks (F7) carry gold_all_cpp and repo_code_files; the report shows them."""
+    from dataclasses import replace
+
+    from cmeval.tasks import load_tasks
+
+    meta_path = tagged / "meta.json"
+    tasks_file = json.loads(meta_path.read_text())["tasks_file"]
+    tasks = load_tasks(tasks_file)
+    sizes = [500, 1500, 1500, 6000, None, 2000]
+    save_tasks(tasks_file, [replace(t, tags={**t.tags, "gold_all_cpp": i % 2 == 0, "repo_code_files": n})
+                            for i, (t, n) in enumerate(zip(tasks, sizes))])
+    edit_json(meta_path, tasks_sha256=hashlib.sha256(open(tasks_file, "rb").read()).hexdigest())
+    text = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).report_path.read_text()
+    assert "### By gold all C++" in text and "### By gold all TypeScript" not in text
+    assert "### By repo size (Python files)" not in text
+    section = text.split("### By repo size (code files of the task's language)")[1].split("###")[0]
+    assert "| small (< 1,000) | 1 |" in section and "| medium (1,000 to 5,000) | 3 |" in section
+    assert "| large (> 5,000) | 1 |" in section and "| unknown | 1 |" in section
+
+
+def test_tasks_without_repo_code_files_fall_back_to_python_files(tagged):
+    from dataclasses import replace
+
+    from cmeval.tasks import load_tasks
+
+    meta_path = tagged / "meta.json"
+    tasks_file = json.loads(meta_path.read_text())["tasks_file"]
+    tasks = load_tasks(tasks_file)
+    tasks[0] = replace(tasks[0], tags={**tasks[0].tags, "repo_code_files": 7000})  # one new task, the rest old
+    save_tasks(tasks_file, tasks)
+    edit_json(meta_path, tasks_sha256=hashlib.sha256(open(tasks_file, "rb").read()).hexdigest())
+    text = report("r1", baseline="grep-fn", primary=PRIMARY, resamples=500).report_path.read_text()
+    section = text.split("### By repo size (code files of the task's language)")[1].split("###")[0]
+    assert "| unknown | 1 |" in section  # only the task with neither tag

@@ -1,0 +1,171 @@
+{
+  "config": "fresh-ts-v1.toml",
+  "since": "2026-07-01",
+  "until": "2026-10-22",
+  "settings": {
+    "min_body_chars": 100,
+    "extra_bots": [],
+    "max_code_files": 5,
+    "max_code_lines": 200
+  },
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "c46af6360152f9c52f9333d4c3520dd4daab6770",
+    "dirty": false
+  },
+  "labeler": "cmeval-labels/4",
+  "created": "2026-10-26T08:52:59+00:00",
+  "funnel_steps": [
+    {
+      "key": "merged",
+      "text": "merged into the default branch in the date range"
+    },
+    {
+      "key": "opened_after_cutoff",
+      "text": "the fix PR was opened on or after the start date (its code was not public before)"
+    },
+    {
+      "key": "not_bot",
+      "text": "author is not a bot"
+    },
+    {
+      "key": "one_link",
+      "text": "links exactly one issue in the same repo (GitHub's list or the SWE-bench regex)"
+    },
+    {
+      "key": "is_issue",
+      "text": "the link is an issue that exists (not a PR)"
+    },
+    {
+      "key": "issue_before_pr",
+      "text": "the issue was opened before the fix PR (not written after the fix)"
+    },
+    {
+      "key": "body_ok",
+      "text": "body (as of when the fix PR was opened) has the minimum length"
+    },
+    {
+      "key": "no_leak",
+      "text": "query does not name the fix PR or a fix commit"
+    },
+    {
+      "key": "base_found",
+      "text": "base commit found from the merge type (Decision 7)"
+    },
+    {
+      "key": "files_match",
+      "text": "our patch touches exactly the PR's files"
+    },
+    {
+      "key": "applies",
+      "text": "the code patch applies at the base commit"
+    },
+    {
+      "key": "size_ok",
+      "text": "1 to max_code_files code files and at most max_code_lines changed code lines"
+    },
+    {
+      "key": "labeled",
+      "text": "labeled, with at least one gold file that exists at the base commit"
+    }
+  ],
+  "repos": {
+    "microsoft/vscode": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 6593,
+        "opened_after_cutoff": 6480,
+        "not_bot": 6100,
+        "one_link": 1326,
+        "is_issue": 1321,
+        "issue_before_pr": 1226,
+        "body_ok": 1202,
+        "no_leak": 1202,
+        "base_found": 1202,
+        "files_match": 1190,
+        "applies": 1190,
+        "size_ok": 773,
+        "labeled": 771
+      },
+      "link_methods": {
+        "both": 1128,
+        "list": 65,
+        "regex": 9
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 113,
+        "no linked issue": 4655,
+        "bot author": 380,
+        "several linked issues": 119,
+        "issue opened after the fix PR": 95,
+        "short body": 24,
+        "link is a PR, not an issue": 5,
+        "too many code files": 203,
+        "too many changed lines": 50,
+        "no code files": 164,
+        "only new files": 2,
+        "file list differs": 10,
+        "more than 100 files": 2
+      }
+    },
+    "microsoft/playwright": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 903,
+        "opened_after_cutoff": 886,
+        "not_bot": 768,
+        "one_link": 296,
+        "is_issue": 296,
+        "issue_before_pr": 294,
+        "body_ok": 294,
+        "no_leak": 293,
+        "base_found": 293,
+        "files_match": 293,
+        "applies": 293,
+        "size_ok": 209,
+        "labeled": 209
+      },
+      "link_methods": {
+        "both": 235,
+        "regex": 1,
+        "list": 57
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 17,
+        "bot author": 118,
+        "no linked issue": 463,
+        "several linked issues": 9,
+        "leak": 1,
+        "issue opened after the fix PR": 2,
+        "too many code files": 31,
+        "no code files": 49,
+        "too many changed lines": 4
+      }
+    }
+  },
+  "stats": {
+    "tasks": 980,
+    "tasks_per_repo": {
+      "microsoft/playwright": 209,
+      "microsoft/vscode": 771
+    },
+    "mean_gold_files": 1.85,
+    "mean_gold_classes": 1.52,
+    "mean_gold_functions": 2.76,
+    "share_no_gold_function": 0.066,
+    "share_module_level_change": 0.682,
+    "share_partial_labels": 0.012,
+    "share_identifier_in_query": 0.339,
+    "share_with_unretrievable_functions": 0.392,
+    "tasks_per_split": {
+      "dev": 187,
+      "test": 793
+    },
+    "share_gold_all_python": 0.0,
+    "merge_types": {
+      "merge": 107,
+      "rebase": 1,
+      "squash": 872
+    }
+  }
+}

@@ -13,6 +13,9 @@ Rules, for each code file the fix changes:
 - Blank lines are ignored for function and class gold.
 - A change outside every function adds no function gold and sets module_level_change.
 - Anonymous functions (lambdas) are not definitions; their lines belong to the enclosing one.
+- Parse errors (the narrow rule): a file with errors keeps its function and class gold if no
+  changed line is on an error line and no changed line's function contains an error. Otherwise
+  the file gets no function or class gold (partial_labels).
 """
 
 from __future__ import annotations
@@ -31,7 +34,12 @@ from .patches import PatchMismatch, align_file_diff, apply_file_diff, parse_patc
 from .tasks import Gold, Span, Unretrievable
 
 # 2: added lines are placed in the fixed file (4ec55f4). 3: Cython files (.pyx, .pxd) count as code.
-LABELER_VERSION = "cmeval-labels/3"
+# 4: C, C++, TypeScript and TSX definitions; the narrow parse-error rule; with the F7 path rules
+# in patches.py (.tsx, CUDA and GPU kernel files, TypeScript test folders at any depth); as of
+# c46af63, namespaces in symbols (all task sets with labels/4 were made at c46af63).
+# 5: a file with parse errors (fixed or added) gives as new only definitions clear of every error
+# line; C++ inline namespaces drop the keyword.
+LABELER_VERSION = "cmeval-labels/5"
 
 
 class LabelError(ValueError):
@@ -42,8 +50,16 @@ class LabelError(ValueError):
 class LangSpec:
     functions: frozenset[str]  # node types of named functions
     classes: frozenset[str]  # node types of classes
-    wrappers: frozenset[str]  # node types whose span includes the definition (decorators)
-    load: Callable[[], object]  # returns the tree-sitter language object
+    wrappers: frozenset[str]  # node types whose span includes the definition (decorators, export)
+    grammars: tuple[Callable[[], object], ...]  # tree-sitter language objects, tried in this order
+    # Names for definition nodes: (qualifier parts..., name), or None if the node is not a definition.
+    # Without it, a node is named by its "name" field.
+    name_of: Callable[[Node], list[str] | None] | None = None
+    needs_body: bool = False  # a class counts only with a body (C++ "struct S;" is not a class)
+    leading_decorators: bool = False  # decorators just before a definition belong to it (TS methods)
+    signature_of: Callable[[Node], str | None] | None = None  # tells overloads apart (C++)
+    scopes: frozenset[str] = frozenset()  # named scopes that are not definitions (namespaces)
+    misread: Callable[[Node], bool] | None = None  # a definition that is a misparse: its lines count as errors
 
 
 def _python():
@@ -52,59 +68,284 @@ def _python():
     return tree_sitter_python.language()
 
 
+def _c():
+    import tree_sitter_c
+
+    return tree_sitter_c.language()
+
+
+def _cpp():
+    import tree_sitter_cpp
+
+    return tree_sitter_cpp.language()
+
+
+def _typescript():
+    import tree_sitter_typescript
+
+    return tree_sitter_typescript.language_typescript()
+
+
+def _tsx():
+    import tree_sitter_typescript
+
+    return tree_sitter_typescript.language_tsx()
+
+
+def _text(node: Node) -> str:
+    return node.text.decode("utf-8", "replace")
+
+
+def _field_name(node: Node) -> list[str] | None:
+    name = node.child_by_field_name("name")
+    return [_text(name)] if name is not None else None
+
+
+# ---- C and C++: a function's name is inside its declarator (`int *Foo<T>::get(int x) const`)
+
+# Declarators around the name: pointers, references, attributes, parentheses, parameters.
+_C_WRAPPING_DECLARATORS = frozenset({
+    "pointer_declarator", "reference_declarator", "attributed_declarator", "parenthesized_declarator",
+    "function_declarator",
+})
+
+
+def _qualified(node: Node) -> list[str]:
+    """Name parts of a C++ name: A::B::f gives [A, B, f]. Template arguments are dropped."""
+    if node.type == "qualified_identifier":
+        scope, name = node.child_by_field_name("scope"), node.child_by_field_name("name")
+        parts = _qualified(scope) if scope is not None else []  # no scope: ::f
+        return parts + (_qualified(name) if name is not None else [])
+    if node.type in ("template_type", "template_function", "template_method"):
+        name = node.child_by_field_name("name")
+        return _qualified(name) if name is not None else []
+    if node.type == "operator_cast":  # operator bool
+        kind = node.child_by_field_name("type")
+        return ["operator " + _text(kind)] if kind is not None else []
+    return [" ".join(_text(node).split())]
+
+
+def _c_declarators(node: Node) -> tuple[Node | None, Node | None]:
+    """A function definition's function_declarator (or None) and the name node at the end of the chain."""
+    found = None
+    declarator = node.child_by_field_name("declarator")
+    while declarator is not None and declarator.type in _C_WRAPPING_DECLARATORS:
+        if declarator.type == "function_declarator" and found is None:
+            found = declarator
+        inner = declarator.child_by_field_name("declarator")
+        if inner is None and declarator.named_children:  # reference_declarator has no field names
+            inner = declarator.named_children[-1]
+        declarator = inner
+    return found, declarator
+
+
+def _c_names(node: Node) -> list[str] | None:
+    if node.type != "function_definition":
+        name = node.child_by_field_name("name")
+        return (_qualified(name) or None) if name is not None else None
+    if node.child_by_field_name("body") is None and not any(c.type == "try_statement" for c in node.children):
+        return None  # A() = default; and A(const A&) = delete; are declarations, like ~A();
+    name = _c_declarators(node)[1]
+    return (_qualified(name) or None) if name is not None else None
+
+
+def _c_signature(node: Node) -> str | None:
+    function = _c_declarators(node)[0] if node.type == "function_definition" else None
+    return " ".join(_text(function).split()) if function is not None else None
+
+
+def _c_misread(node: Node) -> bool:
+    """A function with no parameter list. Example: the C grammar reads C++ `namespace ui {` as a
+    function, and a macro can make a C++ class look like one. Not `Foo::operator bool() const`."""
+    if node.type != "function_definition":
+        return False
+    function, name = _c_declarators(node)
+    if function is not None or name is None:
+        return function is None
+    return not (name.type == "operator_cast" or name.type == "qualified_identifier" and "operator_cast" in {
+        c.type for c in name.named_children})
+
+
+# ---- TypeScript: functions can be values (`const f = () => {}`)
+
+_TS_FUNCTION_VALUES = frozenset({"arrow_function", "function_expression", "generator_function"})
+
+
+def _ts_names(node: Node) -> list[str] | None:
+    if node.type in _TS_FUNCTION_VALUES:  # a definition only as `export default function () {}`
+        parent = node.parent
+        return ["default"] if parent is not None and parent.type == "export_statement" else None
+    if node.type in ("variable_declarator", "public_field_definition"):
+        value = node.child_by_field_name("value")
+        if value is None or value.type not in _TS_FUNCTION_VALUES:
+            return None
+        name = node.child_by_field_name("name")
+        if name is None or (node.type == "variable_declarator" and name.type != "identifier"):
+            return None  # const { a, b } = ...
+        return [_text(name)]
+    return _field_name(node)
+
+
+def _scope_names(node: Node) -> list[str]:
+    """Name parts of a namespace: a::b (C++ 17) and A.B (TypeScript) give two. Anonymous: none."""
+    name = node.child_by_field_name("name")
+    if name is None or name.type == "string":  # declare module 'x' is not a name in code
+        return []
+    text = re.sub(r"\binline\s+", "", _text(name))  # namespace a::inline b (C++ 20)
+    return [part for part in re.split(r"::|\.", text) if part]
+
+
+_C_FAMILY = dict(
+    functions=frozenset({"function_definition"}),
+    classes=frozenset({"class_specifier", "struct_specifier"}),
+    wrappers=frozenset({"template_declaration"}),
+    name_of=_c_names,
+    needs_body=True,
+    signature_of=_c_signature,
+    misread=_c_misread,
+    scopes=frozenset({"namespace_definition"}),
+)
+_TS_FAMILY = dict(
+    functions=frozenset({
+        "function_declaration", "generator_function_declaration", "method_definition", "variable_declarator",
+        "public_field_definition", *_TS_FUNCTION_VALUES,
+    }),
+    classes=frozenset({"class_declaration", "abstract_class_declaration", "interface_declaration", "enum_declaration"}),
+    wrappers=frozenset({"export_statement", "lexical_declaration", "variable_declaration"}),
+    name_of=_ts_names,
+    leading_decorators=True,
+    scopes=frozenset({"internal_module", "module"}),
+)
+
 LANGUAGES: dict[str, LangSpec] = {
     "python": LangSpec(
         functions=frozenset({"function_definition"}),
         classes=frozenset({"class_definition"}),
         wrappers=frozenset({"decorated_definition"}),
-        load=_python,
+        grammars=(_python,),
     ),
+    "c": LangSpec(**_C_FAMILY, grammars=(_c, _cpp)),  # .h files are often C++
+    "cpp": LangSpec(**_C_FAMILY, grammars=(_cpp,)),
+    "typescript": LangSpec(**_TS_FAMILY, grammars=(_typescript,)),
+    "tsx": LangSpec(**_TS_FAMILY, grammars=(_tsx,)),
 }
 
 
 @lru_cache(maxsize=None)
-def _language(name: str) -> Language:
-    return Language(LANGUAGES[name].load())
+def _languages(name: str) -> tuple[Language, ...]:
+    return tuple(Language(load()) for load in LANGUAGES[name].grammars)
 
 
 @dataclass(frozen=True)
 class Definition:
     kind: str  # function | class
     name: str
-    symbol: str  # dotted path of enclosing classes and functions, for example Cls.method
+    symbol: str  # dotted path of enclosing namespaces, classes and functions, for example ns.Cls.method
     start: int  # 1-based, inclusive, decorators included
     end: int
+    has_error: bool = field(default=False, compare=False)  # its span contains a parse error
+    signature: str | None = field(default=None, compare=False)  # C and C++: the declarator, for overloads
 
     def contains(self, line: int) -> bool:
         return self.start <= line <= self.end
 
 
+@dataclass(frozen=True)
+class Parsed:
+    definitions: list[Definition]
+    error_lines: frozenset[int]  # lines of parse errors (ERROR and MISSING nodes); empty if clean
+
+
+def _end_line(node: Node) -> int:
+    row, col = node.end_point
+    return row if col == 0 and row > node.start_point[0] else row + 1
+
+
+def _error_lines(root: Node) -> frozenset[int]:
+    lines: set[int] = set()
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.is_error or node.is_missing:
+            lines.update(range(node.start_point[0] + 1, max(_end_line(node), node.start_point[0] + 1) + 1))
+        elif node.has_error:
+            stack.extend(node.children)
+    return frozenset(lines)
+
+
+def parse_definitions(source: str, language: str) -> Parsed:
+    """All named functions and classes in a source file, and its parse-error lines.
+
+    A language with several grammars (C, then C++) takes the first one that parses without
+    errors, or else the one with the fewest error lines. Misread definitions count as errors.
+    """
+    data = source.encode("utf-8")
+    best: Parsed | None = None
+    for grammar in _languages(language):
+        parsed = _parse_with(LANGUAGES[language], Parser(grammar).parse(data).root_node)
+        if best is None or len(parsed.error_lines) < len(best.error_lines):
+            best = parsed
+        if not best.error_lines:
+            break
+    return best
+
+
+def _parse_with(spec: LangSpec, root: Node) -> Parsed:
+    found: list[Definition] = []
+    errors = set(_error_lines(root)) if root.has_error else set()
+
+    def names(node: Node, kind: str) -> list[str] | None:
+        if kind == "class" and spec.needs_body and node.child_by_field_name("body") is None:
+            return None
+        return spec.name_of(node) if spec.name_of is not None else _field_name(node)
+
+    def outer_of(node: Node) -> Node:
+        # Wrappers can nest (export const f = () => {}). A wrapper that holds two definitions of
+        # the same type (const a = () => 1, b = () => 2) belongs to neither.
+        outer = node
+        while outer.parent is not None and outer.parent.type in spec.wrappers:
+            if sum(1 for c in outer.parent.named_children if c.type == outer.type) > 1:
+                break
+            outer = outer.parent
+        return outer
+
+    def start_of(outer: Node) -> Node:
+        first = outer
+        if spec.leading_decorators:
+            while first.prev_named_sibling is not None and first.prev_named_sibling.type == "decorator":
+                first = first.prev_named_sibling
+        return first
+
+    # Depth-first, parent before children, with an explicit stack: generated code can nest deeper
+    # than Python's recursion limit (duckdb's generated tables did, 2026-10-26).
+    stack: list[tuple[Node, tuple[str, ...]]] = [(child, ()) for child in reversed(root.children)]
+    while stack:
+        child, scope = stack.pop()
+        inner = scope
+        if child.type in spec.scopes:
+            inner = (*scope, *_scope_names(child))
+        else:
+            kind = "function" if child.type in spec.functions else "class" if child.type in spec.classes else None
+            parts = names(child, kind) if kind else None
+            if parts:
+                outer = outer_of(child)
+                start, end = start_of(outer).start_point[0] + 1, _end_line(outer)
+                misread = spec.misread is not None and spec.misread(child)
+                if misread:
+                    errors.update(range(start, end + 1))
+                signature = spec.signature_of(child) if spec.signature_of is not None else None
+                symbol = ".".join((*scope, *parts))
+                found.append(Definition(kind, parts[-1], symbol, start, end, outer.has_error or misread, signature))
+                inner = (*scope, *parts)
+        stack.extend((grandchild, inner) for grandchild in reversed(child.children))
+    found.sort(key=lambda d: (d.start, -d.end))
+    return Parsed(found, frozenset(errors))
+
+
 def find_definitions(source: str, language: str) -> tuple[list[Definition], bool]:
     """All named functions and classes in a source file, and whether the parse had errors."""
-    spec = LANGUAGES[language]
-    tree = Parser(_language(language)).parse(source.encode("utf-8"))
-    found: list[Definition] = []
-
-    def end_line(node: Node) -> int:
-        row, col = node.end_point
-        return row if col == 0 and row > node.start_point[0] else row + 1
-
-    def walk(node: Node, scope: tuple[str, ...]) -> None:
-        for child in node.children:
-            kind = "function" if child.type in spec.functions else "class" if child.type in spec.classes else None
-            name_node = child.child_by_field_name("name") if kind else None
-            if kind and name_node is not None:
-                name = name_node.text.decode("utf-8", "replace")
-                outer = child.parent if child.parent is not None and child.parent.type in spec.wrappers else child
-                symbol = ".".join((*scope, name))
-                found.append(Definition(kind, name, symbol, outer.start_point[0] + 1, end_line(outer)))
-                walk(child, (*scope, name))
-            else:
-                walk(child, scope)
-
-    walk(tree.root_node, ())
-    found.sort(key=lambda d: (d.start, -d.end))
-    return found, tree.root_node.has_error
+    parsed = parse_definitions(source, language)
+    return parsed.definitions, bool(parsed.error_lines)
 
 
 def innermost(defs: list[Definition], *lines: int) -> Definition | None:
@@ -156,8 +397,8 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
             continue
         if change.status == "added":
             unretrievable.files.append(change.new_path)
-            defs = _definitions_or_none(apply_file_diff(None, change.diff), change.language)
-            for d in defs or []:
+            added = _parsed_or_none(apply_file_diff(None, change.diff), change.language)
+            for d in _trusted(added) if added is not None else []:
                 _add_unretrievable(unretrievable, change.new_path, d)
             continue
 
@@ -177,18 +418,27 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
         for start, end in _ranges(applied.changed + [max(L, 1) for L in applied.insert_after]):
             gold.lines.append(Span(path, start, end))
 
-        defs = _definitions_or_none(base_text, change.language)
-        if defs is None:
+        base = _parsed_or_none(base_text, change.language)
+        if base is None:
             partial = True
             continue
-        new_defs = _definitions_or_none(new_text, change.language) if new_text is not None else None
-        file_module_level = _label_file(path, base_text, new_text, applied, defs, new_defs, gold)
+        defs = base.definitions
+        fixed = _parsed_or_none(new_text, change.language) if new_text is not None else None
+        # Added lines are placed in the fixed file only if it parses clean; else on the base side.
+        new_defs = fixed.definitions if fixed is not None and not fixed.error_lines else None
+        found = _trusted(fixed) if fixed is not None else []  # all of new_defs when the file is clean
+        mapping = _map_to_base(found, defs)
+        file_module_level = _label_file(path, base_text, new_text, applied, base, new_defs, mapping, gold)
+        if file_module_level is None:
+            partial = True  # a change touches a parse error
+            continue
         module_level = module_level or file_module_level
 
-        if new_defs is not None:
+        if fixed is not None:
+            # New in the fixed file: a symbol the base does not have, or (C and C++) a new overload.
             known = {(d.kind, d.symbol) for d in defs}
-            for d in new_defs:
-                if (d.kind, d.symbol) not in known:
+            for d in found:
+                if (d.kind, d.symbol) not in known or (d.signature is not None and d not in mapping):
                     _add_unretrievable(unretrievable, change.new_path, d)
 
     language = changed_by_language.most_common(1)[0][0] if changed_by_language else None
@@ -203,30 +453,48 @@ def label_patch(patch: str, read_base: Callable[[str], str | None]) -> LabelResu
     return LabelResult(gold, unretrievable, language, tags)
 
 
-def _definitions_or_none(source: str, language: str | None) -> list[Definition] | None:
-    """Definitions, or None if this file cannot be labeled (no language table or a parse error)."""
-    if language not in LANGUAGES:
-        return None
-    defs, has_error = find_definitions(source, language)
-    return None if has_error else defs
+def _parsed_or_none(source: str, language: str | None) -> Parsed | None:
+    """Definitions and parse-error lines, or None if the language has no table."""
+    return parse_definitions(source, language) if language in LANGUAGES else None
+
+
+def _trusted(parsed: Parsed) -> list[Definition]:
+    """Definitions whose name and scope can be trusted: no line of them is a parse-error line.
+
+    A definition inside a misparsed region can contain no error itself and still get a wrong
+    scope (its namespace or class was not seen), so its symbol would not match the base.
+    """
+    errors = parsed.error_lines
+    return [d for d in parsed.definitions if not any(line in errors for line in range(d.start, d.end + 1))]
 
 
 def _map_to_base(new_defs: list[Definition], base_defs: list[Definition]) -> dict[Definition, Definition]:
     """Match each definition in the fixed file to the base definition with the same kind and symbol.
 
-    A symbol can appear more than once (a property getter and setter); the k-th one in the fixed
-    file matches the k-th one in the base file.
+    A symbol can appear more than once (a property getter and setter, C++ overloads). Definitions
+    with a signature (C and C++) first match the one with the same signature. The rest match in
+    order: the k-th one left in the fixed file matches the k-th one left in the base file.
     """
-    by_key: dict[tuple[str, str], list[Definition]] = defaultdict(list)
-    for d in base_defs:
-        by_key[(d.kind, d.symbol)].append(d)
-    seen: Counter[tuple[str, str]] = Counter()
     mapping: dict[Definition, Definition] = {}
-    for d in new_defs:
-        key = (d.kind, d.symbol)
-        if seen[key] < len(by_key[key]):
-            mapping[d] = by_key[key][seen[key]]
-        seen[key] += 1
+
+    def match(key_of: Callable[[Definition], tuple]) -> None:
+        taken = set(mapping.values())
+        by_key: dict[tuple, list[Definition]] = defaultdict(list)
+        for d in base_defs:
+            if d not in taken:
+                by_key[key_of(d)].append(d)
+        seen: Counter[tuple] = Counter()
+        for d in new_defs:
+            if d in mapping:
+                continue
+            key = key_of(d)
+            if seen[key] < len(by_key[key]):
+                mapping[d] = by_key[key][seen[key]]
+            seen[key] += 1
+
+    if any(d.signature is not None for d in new_defs):
+        match(lambda d: (d.kind, d.symbol, d.signature))
+    match(lambda d: (d.kind, d.symbol))
     return mapping
 
 
@@ -242,13 +510,24 @@ def _is_blank(lines: list[str], line: int) -> bool:
     return not (1 <= line <= len(lines)) or not lines[line - 1].strip()
 
 
-def _label_file(path, base_text, new_text, applied, defs, new_defs, gold: Gold) -> bool:
-    """Add the file's gold classes and functions. Returns True if a change is outside every function."""
-    functions = [d for d in defs if d.kind == "function"]
-    classes = [d for d in defs if d.kind == "class"]
+class _TouchesError(Exception):
+    """A changed line is on a parse error or in a function that contains one."""
+
+
+def _label_file(path, base_text, new_text, applied, base: Parsed, new_defs, mapping, gold: Gold) -> bool | None:
+    """Add the file's gold classes and functions. Returns True if a change is outside every function,
+    or None (and adds nothing) if a change touches a parse error of the base file."""
+    functions = [d for d in base.definitions if d.kind == "function"]
+    classes = [d for d in base.definitions if d.kind == "class"]
+    errors = base.error_lines
     gold_functions: dict[Definition, None] = {}  # dicts keep insertion order
     gold_classes: dict[Definition, None] = {}
     module_level = False
+
+    def check(fn: Definition | None, *lines: int) -> Definition | None:
+        if any(line in errors for line in lines) or (fn is not None and fn.has_error):
+            raise _TouchesError
+        return fn
 
     def add(fn: Definition | None, cls: Definition | None) -> None:
         nonlocal module_level
@@ -259,27 +538,32 @@ def _label_file(path, base_text, new_text, applied, defs, new_defs, gold: Gold) 
         if cls is not None:
             gold_classes[cls] = None
 
-    base_lines = split_lines(base_text)
-    for line in applied.changed:
-        if not _is_blank(base_lines, line):
-            add(innermost(functions, line), innermost(classes, line))
+    try:
+        base_lines = split_lines(base_text)
+        for line in applied.changed:
+            if not _is_blank(base_lines, line):
+                add(check(innermost(functions, line), line), innermost(classes, line))
 
-    if new_defs is not None:
-        mapping = _map_to_base(new_defs, defs)
-        new_functions = [d for d in new_defs if d.kind == "function"]
-        new_classes = [d for d in new_defs if d.kind == "class"]
-        new_lines = split_lines(new_text)
-        for line in applied.added_lines:
-            if not _is_blank(new_lines, line):
-                add(_innermost_existing(new_functions, line, mapping), _innermost_existing(new_classes, line, mapping))
-    else:
-        # The fixed file cannot be parsed: fall back to the base side. An insertion between base
-        # lines L and L+1 belongs to the innermost definition that contains both.
-        for L in applied.insert_after:
-            if L < 1:
-                module_level = True
-            else:
-                add(innermost(functions, L, L + 1), innermost(classes, L, L + 1))
+        if new_defs is not None:
+            for L in applied.insert_after:
+                check(None, L, L + 1)  # the base side of an insertion must be clean too
+            new_functions = [d for d in new_defs if d.kind == "function"]
+            new_classes = [d for d in new_defs if d.kind == "class"]
+            new_lines = split_lines(new_text)
+            for line in applied.added_lines:
+                if not _is_blank(new_lines, line):
+                    add(check(_innermost_existing(new_functions, line, mapping)),
+                        _innermost_existing(new_classes, line, mapping))
+        else:
+            # The fixed file cannot be parsed: fall back to the base side. An insertion between base
+            # lines L and L+1 belongs to the innermost definition that contains both.
+            for L in applied.insert_after:
+                if L < 1:
+                    module_level = True
+                else:
+                    add(check(innermost(functions, L, L + 1), L, L + 1), innermost(classes, L, L + 1))
+    except _TouchesError:
+        return None
 
     gold.functions.extend(_span(path, d) for d in sorted(gold_functions, key=lambda d: d.start))
     gold.classes.extend(_span(path, d) for d in sorted(gold_classes, key=lambda d: d.start))
