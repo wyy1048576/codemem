@@ -725,7 +725,8 @@ class Indexer:
         with store.transaction():
             for vec_type in store.vec_types():
                 store.drop_vec_type(vec_type)
-            for table in ("chunks", "fts", "calls", "edges", "vectors", "files", "dirty_texts"):
+            store.conn.execute("INSERT INTO fts(fts) VALUES('delete-all')")  # it keeps no text to delete by row
+            for table in ("chunks", "calls", "edges", "vectors", "files", "dirty_texts"):
                 store.conn.execute(f"DELETE FROM {table}")
             store.conn.execute("DELETE FROM meta WHERE key IN ('index_settings', 'last_scan_at')")
         store.save_vectors()

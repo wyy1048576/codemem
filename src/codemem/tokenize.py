@@ -3,6 +3,9 @@
 The same function is applied to indexed text and to queries. Output tokens are
 lowercase and contain only [a-z0-9_], so FTS5's unicode61 tokenizer (configured
 with tokenchars '_') does no further splitting.
+
+A change to the output needs a SCHEMA_VERSION bump: the keyword table keeps no copy
+of its text, so removing a row recomputes the row's tokens with this code.
 """
 
 from __future__ import annotations

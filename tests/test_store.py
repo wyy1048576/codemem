@@ -101,6 +101,20 @@ def test_chunk_upsert_keeps_id_and_refreshes_fts_and_calls(store):
     assert store.bm25_search(fts_match_query("return"), 10, (10, 5, 1)) == []
 
 
+def test_the_keyword_table_keeps_its_word_lists_but_no_copy_of_the_text(store):
+    with store.transaction():
+        a = store.upsert_chunk(_chunk("revoke_session", code="def revoke_session():\n    purge_tokens()"))
+        b = store.upsert_chunk(_chunk("login", path="pkg/auth.py"))
+    assert store.conn.execute("SELECT body_tokens FROM fts WHERE rowid = ?", (a,)).fetchone()[0] is None
+    with store.transaction():  # replace one chunk's code, delete the other chunk
+        store.upsert_chunk(_chunk("revoke_session", code="def revoke_session():\n    expire()"))
+        store.delete_chunks([b])
+    vocab = {r[0]: r[1] for r in store.conn.execute("SELECT term, doc FROM fts_vocab")}
+    assert "purge_tokens" not in vocab and "login" not in vocab and "auth" not in vocab
+    assert vocab["expire"] == 1 and store.chunk_total() == 1
+    assert store.bm25_search(fts_match_query("expire"), 10, (10, 5, 1)) == [a]
+
+
 def test_add_update_delete_keeps_sqlite_and_faiss_in_sync(store):
     with store.transaction():
         ids = [store.upsert_chunk(_chunk(n)) for n in ("a", "b", "c")]

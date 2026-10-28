@@ -353,6 +353,12 @@ the whole identifier is kept too, and everything is lowercased. SQLite matches t
 columns **by position**, so the column order in the table, in `upsert_chunk` and in `BM25_FIELDS`
 must stay the same.
 
+The table keeps the word lists and each row's length, but no copy of the text (`content = ''`):
+search reads only scores and row ids. Removing a row, when its chunk changes or goes, passes the
+five fields again, recomputed from the chunk row before it changes (`Store._fts_fields`). They
+must come out exactly as when they were added, so the token options are index settings and a
+change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
+
 | # | Field | Content | Weight |
 |---|---|---|---|
 | 1 | `name` | qualname + name | 10 |
@@ -374,7 +380,7 @@ must stay the same.
 
 ```
 <index dir>/                         default ~/.codemem/indexes/<repo>-<hash8 of the repo path>/
-  index.db                           SQLite (WAL): meta, files, chunks, fts (+ fts_vocab), calls, edges, vectors,
+  index.db                           SQLite (WAL): meta, files, chunks, fts (word lists only, + fts_vocab), calls, edges, vectors,
                                      dirty_texts (the queue)
   vec_code.faiss, vec_code.json      a saved copy of the search index + a note {epoch, dim, count, embedder,
   vec_usage.faiss, vec_usage.json    backend, file}; another backend saves vec_<type><suffix>, or nothing.
@@ -461,7 +467,7 @@ What stays the same when code changes, and what is recomputed:
 
 | Stamp | Where | Changes when | Effect |
 |---|---|---|---|
-| `SCHEMA_VERSION` (3) | `store.py` | tables or columns change | an older index is wiped and rebuilt, with a warning (cheap with the vector cache); a newer one is refused, never wiped |
+| `SCHEMA_VERSION` (4) | `store.py` | tables or columns change, or `tokenize.py`'s output does | an older index is wiped and rebuilt, with a warning (cheap with the vector cache); a newer one is refused, never wiped |
 | `CHUNKER_VERSION` (2) | `config.py` | chunking changes (kinds, ranges, keys, calls) | part of `index_settings()`: the index is rebuilt, with vectors of unchanged texts from the cache |
 | `TEXT_FORMAT_VERSION` (3) | `config.py` | a text builder's output changes | part of `index_settings()`: every text is rebuilt and the changed ones re-embedded, and the eval keeps the indexes apart |
 | embedder key | `embedder.py` | automatic: another model, weights, settings or device | the vector type with a new key is re-embedded |
