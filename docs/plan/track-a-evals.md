@@ -855,6 +855,31 @@ similar one (same base class, same folder, similar code) already exists at the t
 existing one is recorded as the **pattern** in the answer key. This is the kind of task where we
 expect search by meaning to help most, and the label lets us test that.
 
+**Difficulty is logged for every task we create.** The retrieval eval asked only whether the right
+code was found, so it did not need this label. An end-to-end run asks whether the agent solved
+the issue, and that depends first on how hard the issue is. So:
+- the collector writes `difficulty` into each task's tags when the task is made, from the real
+  change, with the rule in the table above;
+- the task set's statistics (`*.meta.json`) give the count of easy, medium and hard tasks for each
+  repo and each split, and a sample drawn with `cmeval subset` reports its own counts;
+- every end-to-end report has its results by difficulty, next to the overall numbers;
+- measured difficulty is added after the baseline runs and is logged beside the first label, so
+  the two can be compared.
+
+Our fresh tasks do not carry the label yet. The tags they have (`n_code_files`,
+`code_lines_changed`) are enough to compute it, without the model's estimate of working time:
+
+| Task set | Tasks | Easy | Medium | Hard |
+|---|---|---|---|---|
+| Python (`fresh-v1`) | 2,084 | 916 (44%) | 827 (40%) | 341 (16%) |
+| C++ (`fresh-cpp-v1`) | 724 | 391 (54%) | 221 (31%) | 112 (15%) |
+| TypeScript (`fresh-ts-v1`) | 980 | 344 (35%) | 353 (36%) | 283 (29%) |
+| The three dev samples (100, 68 and 50 tasks) | 218 | 102 (47%) | 75 (34%) | 41 (19%) |
+
+Files are changed code files, and lines are changed code lines; test files do not count. The
+collector keeps only fixes of at most 5 code files and 200 changed code lines, so our hard tasks
+are bounded: none is a change of ten files.
+
 ---
 
 ## 11. The small-model study
