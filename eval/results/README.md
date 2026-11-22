@@ -1,7 +1,9 @@
 # Results
 
-Final runs that the team reports from. Each folder holds the metrics of one run, not the hit
-texts (those stay in `CMEVAL_HOME/runs/<run id>/`, outside git).
+Final runs that the team reports from. Each folder holds the metrics of one run. The hit texts
+stay in `CMEVAL_HOME/runs/<run id>/`, outside git, with one exception: the three main runs of
+2026-10-26 also hold the ranked results of `cm3-full` (`cm3-full.jsonl.gz`), so that a miss can be
+studied without building the indexes again.
 
 | Folder | What it is |
 |---|---|
@@ -26,6 +28,11 @@ Files in a run folder:
 - `scores.jsonl.gz`: one row for each task, system, level, IoU, and metric (gzip).
 - `meta.json`, `score-meta.json`: inputs, code commits, machine, token counter, and the merged parts.
 - `index.jsonl`: build and update cost for each task.
+- `cm3-full.jsonl.gz` (only in `2026-10-26-py100`, `-cpp68` and `-ts50`): the run's hit file for
+  `cm3-full` (gzip), as written by `cmeval run`. One row for each task: `task_id`, `commit`,
+  `search_ms` and `hits`, the 50 ranked results. A hit has `path`, `start_line`, `end_line`,
+  `symbol`, `score`, `text` (the card codemem returned) and `extra` (the rank in each signal, and
+  the kind). The reports do not read it.
 
 To make the report again from these files, unpack `scores.jsonl.gz` next to the other files and run
 `cmeval report <folder>`. The tasks file must be the run's (`tasks/swebv-dev50.jsonl` or
