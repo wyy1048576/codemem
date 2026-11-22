@@ -43,7 +43,7 @@ from .vectorcache import from_blob, to_blob
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -85,8 +85,11 @@ CREATE TABLE IF NOT EXISTS edges (
     caller_id INTEGER NOT NULL, callee_id INTEGER NOT NULL, PRIMARY KEY (caller_id, callee_id)
 );
 CREATE INDEX IF NOT EXISTS edges_callee ON edges(callee_id);
+-- Keyword search reads only the word lists, so the table keeps no copy of its text (content = '').
+-- Removing a row passes its five fields again (Store._fts_fields).
 CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(
-    name_tokens, path_tokens, signature_tokens, doc_tokens, body_tokens, tokenize = "unicode61 tokenchars '_'"
+    name_tokens, path_tokens, signature_tokens, doc_tokens, body_tokens, content = '',
+    tokenize = "unicode61 tokenchars '_'"
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS fts_vocab USING fts5vocab(fts, 'row');
 CREATE TABLE IF NOT EXISTS vectors (
@@ -663,13 +666,13 @@ class Store:
         row = conn.execute("SELECT chunk_id FROM chunks WHERE key = ?", (chunk.key,)).fetchone()
         if row:
             chunk_id = row[0]
+            self._fts_delete([chunk_id])  # before the update: the old fields name the words to remove
             conn.execute(
                 "UPDATE chunks SET path=?, language=?, kind=?, subkind=?, name=?, qualname=?, class_name=?, "
                 "parent_key=?, start_line=?, end_line=?, signature=?, docstring=?, code=?, skeleton=?, "
                 "content_hash=?, is_test=?, lead_comment=? WHERE chunk_id=?",
                 (*values, chunk_id),
             )
-            conn.execute("DELETE FROM fts WHERE rowid = ?", (chunk_id,))
             conn.execute("DELETE FROM calls WHERE caller_id = ?", (chunk_id,))
         else:
             cur = conn.execute(
@@ -679,17 +682,15 @@ class Store:
                 (chunk.key, *values),
             )
             chunk_id = int(cur.lastrowid)
-        body = chunk.skeleton if chunk.kind == "class" and chunk.skeleton else chunk.code
         conn.execute(
             "INSERT INTO fts(rowid, name_tokens, path_tokens, signature_tokens, doc_tokens, body_tokens) "
             "VALUES(?, ?, ?, ?, ?, ?)",
             (
                 chunk_id,
-                to_fts_text(f"{chunk.qualname} {chunk.name}", **self.tok_opts),
-                to_fts_text(chunk.path, **self.tok_opts),
-                to_fts_text(chunk.signature, **self.tok_opts),
-                to_fts_text(f"{chunk.docstring}\n{chunk.lead_comment}", **self.tok_opts),
-                to_fts_text(body, **self.tok_opts),
+                *self._fts_fields(
+                    chunk.qualname, chunk.name, chunk.path, chunk.signature, chunk.docstring, chunk.lead_comment,
+                    chunk.kind, chunk.skeleton, chunk.code,
+                ),
             ),
         )
         lines = list(chunk.call_lines) + [0] * (len(chunk.calls) - len(chunk.call_lines))
@@ -699,6 +700,40 @@ class Store:
         )
         chunk.chunk_id = chunk_id
         return chunk_id
+
+    def _fts_fields(
+        self, qualname: str, name: str, path: str, signature: str, docstring: str, lead_comment: str,
+        kind: str, skeleton: str, code: str,
+    ) -> tuple[str, str, str, str, str]:
+        """A chunk's five keyword fields: name, path, signature, doc, body. The keyword table keeps no
+        copy of them, and removing a row must pass exactly what was added, so both go through here.
+        The token options are index settings, fixed for an index's life."""
+        body = skeleton if kind == "class" and skeleton else code
+        opts = self.tok_opts
+        return (
+            to_fts_text(f"{qualname} {name}", **opts),
+            to_fts_text(path, **opts),
+            to_fts_text(signature, **opts),
+            to_fts_text(f"{docstring}\n{lead_comment}", **opts),
+            to_fts_text(body, **opts),
+        )
+
+    def _fts_delete(self, ids: Sequence[int]) -> None:
+        """Remove chunks' keyword rows. Call it while their chunk rows still hold what was indexed."""
+        conn = self.conn
+        for batch in _batches(list(ids)):
+            marks = ",".join("?" * len(batch))
+            rows = [
+                tuple(r) for r in conn.execute(
+                    "SELECT chunk_id, qualname, name, path, signature, docstring, lead_comment, kind, skeleton, code "
+                    f"FROM chunks WHERE chunk_id IN ({marks})", tuple(batch),
+                )
+            ]
+            conn.executemany(
+                "INSERT INTO fts(fts, rowid, name_tokens, path_tokens, signature_tokens, doc_tokens, body_tokens) "
+                "VALUES('delete', ?, ?, ?, ?, ?, ?)",
+                [(r[0], *self._fts_fields(*r[1:])) for r in rows],
+            )
 
     def delete_chunks(self, ids: Iterable[int]) -> None:
         ids = list(ids)
@@ -712,8 +747,8 @@ class Store:
             marks = ",".join("?" * len(batch))
             for r in conn.execute(f"SELECT vector_id, vec_type FROM vectors WHERE chunk_id IN ({marks})", batch):
                 by_type[r[1]].append(r[0])
+        self._fts_delete(ids)
         conn.executemany("DELETE FROM chunks WHERE chunk_id = ?", params)
-        conn.executemany("DELETE FROM fts WHERE rowid = ?", params)
         conn.executemany("DELETE FROM calls WHERE caller_id = ?", params)
         conn.executemany("DELETE FROM edges WHERE caller_id = ? OR callee_id = ?", [(i, i) for i in ids])
         conn.executemany("DELETE FROM dirty_texts WHERE chunk_id = ?", params)
@@ -1423,9 +1458,17 @@ class Store:
         calls: dict[str, list[tuple[str, int]]] = defaultdict(list)
         for r in c.execute("SELECT caller_id, callee_name, line FROM calls"):
             calls[key_of[r[0]]].append((r[1], r[2]))
-        fts = {}
-        for r in c.execute("SELECT rowid, name_tokens, path_tokens, signature_tokens, doc_tokens, body_tokens FROM fts"):
-            fts[key_of.get(r[0], f"<missing chunk {r[0]}>")] = tuple(r[1:])
+        # The keyword table keeps no text, so read back what it indexed: each field's words in order.
+        c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS temp.fts_words USING fts5vocab(main, fts, instance)")
+        fields = ("name_tokens", "path_tokens", "signature_tokens", "doc_tokens", "body_tokens")
+        column = {name: i for i, name in enumerate(fields)}
+        words: dict[int, list[list[str]]] = defaultdict(lambda: [[] for _ in fields])
+        for r in c.execute("SELECT doc, col, term FROM temp.fts_words ORDER BY doc, col, offset"):
+            words[r[0]][column[r[1]]].append(r[2])
+        fts = {
+            key_of.get(doc, f"<missing chunk {doc}>"): tuple(" ".join(w) for w in per_field)
+            for doc, per_field in words.items()
+        }
         vectors = {}
         for r in c.execute("SELECT chunk_id, vec_type, part, n_parts, start_off, end_off, text_hash, embedder FROM vectors"):
             vectors[(key_of.get(r[0], f"<missing chunk {r[0]}>"), r[1], r[2])] = tuple(r[3:])

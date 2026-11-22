@@ -480,7 +480,7 @@ and reports any difference.
  ├── index.db ............ SQLite, the source of truth
  │     files        every file seen: hash, size, date, and why it was skipped, if it was
  │     chunks       every chunk (§3.2)
- │     fts          keywords: five fields per chunk (§6)
+ │     fts          keywords: the word lists of five fields per chunk, no copy of the text (§6)
  │     calls        the names each chunk calls
  │     edges        the links, caller ──► callee (§3.3)
  │     vectors      every vector, as float16 numbers, with its chunk, window and text hash
