@@ -237,47 +237,68 @@ container, which has no GPU. With a local model there are two ways, and the pilo
 Either way, codemem's own log splits a search into its steps (§5.5), and the embedding step is
 reported apart. A slow CPU in a container must not be mistaken for codemem's cost on a laptop.
 
-### 2.1 Index two repos first
+### 2.4 Which tasks serve which measurement
 
-Before the INDEX stage runs on every repo, it runs on two: **pandas** (Python) and **playwright**
-(TypeScript). The other repos are indexed only after these two pass the checks below.
+Three measurements, two sources of tasks. The split follows from one fact: to know whether an
+agent fixed an issue, the project's tests must run on what it wrote, and that needs a working
+build of the project for every task.
 
-**Why these two.**
-- They are the smallest repos of the retrieval eval: 43,870 and 27,483 texts to embed at the first
-  build. On the M5 a cold build took 16 and 12 minutes. A mistake costs minutes, not hours.
-- They cover the two languages that go first end to end ([overview.md](overview.md) §7).
-- Both have a recorded reference: their October builds, updates and searches are in
-  `eval/results/2026-10-26-py100` and `-ts50`, so a new index can be compared with a known one.
+| Measurement | The question | An agent? | Tests? | Tasks come from |
+|---|---|---|---|---|
+| Retrieval | given the issue text, does codemem rank the right function near the top? | no | no | our own task sets: 12 repos, 3,788 fresh tasks |
+| Agent localization (§12.1) | how much does an agent spend to name the functions it would change, and is it right? | yes | no | our own task sets |
+| End to end | does the agent fix the issue, and at what cost in tokens and time? | yes | yes | SWE-bench-Live, which ships an image and tests for each task (§8.1) |
 
-**What "the two work" means.** All four, for both repos:
-1. the index builds cold by the route we plan to use for the rest (the same machine, the same
-   embedding model, the same key setup), and a stopped build resumes;
-2. the update-against-rebuild check passes: an index stepped through the task commits gives the
-   same top 10 as an index built from zero at the last commit;
-3. one task of the repo runs through the pipeline in both setups, `grep` and `tool`, and the
-   agent's codemem calls are answered from that index;
-4. build time, update time, and for an API the tokens and the cost are recorded. The estimate for
-   the other repos is made from these numbers, not from this plan's.
+Our own tasks are newer than the models and come from large repos, but they have no test
+environment. The public tasks have one, and most of them are older than the models. So the two
+sources are not rivals: each serves the measurement the other cannot.
 
-**What the two do not test.** Both builds are short. They do not show how a provider's rate limit
-behaves over hours, and they have no update as large as vscode's (a median of 8,730 texts for
-each step). So the third repo indexed is a large one, and its build is watched.
+### 2.5 The proposed pilot, in two steps
 
-**The rest, after the two pass.** The other seven repos of the retrieval eval are airflow,
-transformers, home-assistant, duckdb, llama.cpp, Godot and vscode. If embeddings come from an
-API, one machine runs three processes side by side. Each process has its own key and its own
-repos, so no process waits on another's rate limit, and `cmeval merge` combines the run folders.
-A split that balances the work, with the two test repos already done:
+This answers §2.2. Step 1 needs no container, so it can start today. Step 2 is the pilot of §2.2.
 
-| Process | Repos | Texts to embed, first builds and updates |
-|---|---|---|
-| 1 | vscode | about 518,000 |
-| 2 | Godot, home-assistant | about 600,000 |
-| 3 | duckdb, transformers, airflow, llama.cpp | about 566,000 |
+**Step 1: the index and localization check, on pandas and playwright.** These are two repos of
+our own task sets, so this step uses no public task and no test.
 
-The counts are from the October run logs: the first build of each repo, and the updates along
-its sample task commits. Three processes that share one vector cache have not been tried. Check 1
-above is the place to try it, with pandas and playwright built at the same time.
+- **Why these two.** They are the smallest repos of the retrieval eval: 43,870 and 27,483 texts to
+  embed at the first build, 16 and 12 minutes cold on the M5. They are Python and TypeScript. Both
+  have October results to compare with (`eval/results/2026-10-26-py100` and `-ts50`).
+- **Passed when,** for both repos: (1) the index builds cold with the local model, and a stopped
+  build resumes; (2) the update-against-rebuild check passes; (3) one task runs through the runner
+  in the localization tier in both setups, `grep` and `tool`, and the agent's codemem calls are
+  answered from that index; (4) build time and update time are recorded.
+- **What it does not test.** Both builds are short. They have no update as large as vscode's (a
+  median of 8,730 texts for each step), and they say nothing about an API's rate limit over hours.
+- **After it passes,** the other seven repos of the retrieval eval are indexed when a batch needs
+  them. For the later API route (§2.3), one machine runs three processes, each with its own key
+  and its own repos, and `cmeval merge` combines the run folders: vscode; Godot and
+  home-assistant; duckdb, transformers, airflow and llama.cpp. That split balances the texts to
+  embed (about 518,000, 600,000 and 566,000, from the October run logs). Three processes that
+  share one vector cache have not been tried yet.
+
+**Step 2: the graded pilot, on three repos from SWE-bench-Live.** The task tables were downloaded
+on Nov 22 (the `verified` split of the Python set, and the `ts`, `go` and `rust` splits of the
+multi-language set). Difficulty is the rule of §10, counted from each task's real change.
+
+| Language | Proposed | Files in the language | Tasks: easy, medium, hard | Reserve |
+|---|---|---|---|---|
+| Python | **keras-team/keras** | 1,001 (12.0 MB) | 13: 4, 3, 6 | conan-io/conan (1,110 files; 29 tasks: 19, 8, 2), pylint-dev/pylint (29 tasks: 13, 9, 7) |
+| TypeScript | **mui/base-ui** | 2,171 (10.1 MB) | 5: 1, 3, 1 | TanStack/router (8,993 files; 8 tasks: 4, 1, 3) |
+| Rust | **rust-lang/rust-analyzer** | 1,510 (17.8 MB) | 12: 7, 3, 2 | biomejs/biome (5,568 files; 8 tasks: 2, 5, 1) |
+
+- **Why keras.** It is the Python repo that passes the size rule with real product code and has
+  the most hard tasks. matplotlib (26 tasks) has 914 files and is also in SWE-bench Verified, so
+  models know it better. pylint's 2,539 Python files are 4.1 MB in all: most are small test inputs.
+- **Why base-ui.** Of the six TypeScript repos with five tasks or more, it is the one with tasks
+  at all three levels and a medium size.
+- **Why Rust as the third language, and rust-analyzer.** Rust has 12 repos with five tasks or
+  more; Go has 3. And 7 of rust-analyzer's 12 tasks were created after June 2026, so they are
+  newer than the model. Go's best repo is gohugoio/hugo (913 files; 7 tasks: 3, 3, 1).
+- **No overlap with our own repos,** except apache/datafusion (9 Rust tasks, none easy).
+- **Not checked yet.** Rule 5 of §2.2: nobody has pulled an image and run a task's tests on our
+  machine. The images are x86 only, so this is done on the x86 machine, and a repo whose tests
+  take over 5 minutes gives way to its reserve. The file counts are from today's default branch
+  and include test files. Index times are not measured.
 
 ---
 
@@ -802,8 +823,11 @@ environments. SWE-bench Pro's second version is the alternative: it already runs
 the Harbor format *(reported)*.
 
 **Two limits, both stated in the paper.**
-- **These tasks are older than the models.** The newest Python task we saw was created in August
-  2025, and the multi-language page shows no dates. Both setups run the same model on the same
+- **Most of these tasks are older than the models.** The newest Python task we saw was created in
+  August 2025, and the multi-language page shows no dates. The task tables do (downloaded Nov 22):
+  the `verified` Python split runs from July 2024 to April 2025; the TypeScript and Go splits end
+  in April 2026; the Rust split ends in July 2026, and 68 of its 171 tasks were created after
+  June 2026. Both setups run the same model on the same
   task, so a memorized fix cannot favour one side. It can hide a saving, because a model that
   remembers a fix has less to search for. Every table says how many of its tasks are newer than
   the model.
