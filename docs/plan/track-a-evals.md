@@ -371,10 +371,11 @@ still carries its token counts under a subscription; that `--setting-sources use
 repo's hooks out; and that the proxy passes the subscription's `Authorization` and
 `anthropic-beta` headers through untouched, which is what a login needs.
 
-**Keys.** Claude Code needs none. The runner unsets `ANTHROPIC_API_KEY`, so that a stray key
-cannot take over from the login. API keys appear in two places only: codemem's embedding API,
-when embeddings are not local, and the open models of the small-model study, when they are not
-self-hosted (§11).
+**Keys.** Claude Code needs none. The runner unsets `ANTHROPIC_API_KEY` in the agent's
+environment, so that a stray key cannot take over from the login. Model calls with an API key
+happen in two places only: codemem's embedding API, when embeddings are not local, and the open
+models of the small-model study, when they are not self-hosted (§11). The token counter of §5.4
+also reads an Anthropic key, in the scoring step. It only counts, and counting is free.
 
 **Codex** runs the same way under its own subscription: `codex exec --json` reports token use per
 turn, and it reads MCP servers from its config file *(reported)*. It is a second agent for
@@ -525,9 +526,10 @@ plan's usage limit weighs cached tokens is not public.
 
 **The reference tokenizer** for "tokens read" is Anthropic's token-counting endpoint, cached by
 text hash, as `cmeval` already uses for the retrieval eval. It is the same for every model, so
-"tokens read" can be compared between a Claude run and a 9B run. Counting is free, but the
-endpoint does ask for an Anthropic key. A fixed local tokenizer is the alternative if we want no
-such key. Either works, as long as it is the same one everywhere.
+"tokens read" can be compared between a Claude run and a 9B run. Counting is free. The endpoint
+asks for an Anthropic key, which `cmeval` already reads from the environment or the Keychain, and
+no model is called with it. A fixed local tokenizer would be the alternative if we wanted no key
+at all.
 
 ### 5.5 What "time" means: four clocks
 

@@ -36,8 +36,8 @@ product.
    the task, how long did it take, how many tokens did it use. The saving is the result (§4).
 4. **Who it is for.** Students and engineers who already have Claude Code or Codex on a
    subscription. So Claude runs under our own subscriptions, with codemem attached as an MCP
-   tool. API keys appear in two places only: the embedding API, and the open models of the
-   small-model study (§7).
+   tool. Model calls with an API key happen in two places only: the embedding API, and the open
+   models of the small-model study (§7).
 5. **Three tracks.**
    - **A builds the pipeline first.** One command runs chosen tasks, setups and models, and records
      tokens and time from two sources that must agree. Once it runs, B and C change codemem and
@@ -318,11 +318,15 @@ three places a new stage must touch, in one search.
 Claude Code, or Codex. So Claude runs under the subscriptions the three of us already have, each
 of us on our own, with codemem attached as an MCP tool. No Claude API key is involved.
 
-**Where API keys are used.** In two places only:
+**Where API keys are used.** For model calls, in two places only:
 - **the embedding API,** when embeddings are not computed locally;
 - **the small-model study.** Open models are not part of any subscription, so they are called
   through an API: a hosted endpoint, or a server we host ourselves on our Macs
   ([track A](track-a-evals.md) §11).
+
+One more key is already in use and costs nothing: the eval counts tokens with Anthropic's free
+counting endpoint ([track A](track-a-evals.md) §5.4). No model is called with it, and codemem
+itself never needs it.
 
 **Models.**
 
