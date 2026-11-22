@@ -111,6 +111,48 @@ cmeval e2e check  main-1                         # did every run pass its integr
 It lives in `cmeval`, next to the retrieval eval, and shares its task format, token cache,
 dashboard and statistics code.
 
+### 2.1 Index two repos first
+
+Before the INDEX stage runs on every repo, it runs on two: **pandas** (Python) and **playwright**
+(TypeScript). The other repos are indexed only after these two pass the checks below.
+
+**Why these two.**
+- They are the smallest repos of the retrieval eval: 43,870 and 27,483 texts to embed at the first
+  build. On the M5 a cold build took 16 and 12 minutes. A mistake costs minutes, not hours.
+- They cover the two languages that go first end to end ([overview.md](overview.md) §7).
+- Both have a recorded reference: their October builds, updates and searches are in
+  `eval/results/2026-10-26-py100` and `-ts50`, so a new index can be compared with a known one.
+
+**What "the two work" means.** All four, for both repos:
+1. the index builds cold by the route we plan to use for the rest (the same machine, the same
+   embedding model, the same key setup), and a stopped build resumes;
+2. the update-against-rebuild check passes: an index stepped through the task commits gives the
+   same top 10 as an index built from zero at the last commit;
+3. one task of the repo runs through the pipeline in both setups, `grep` and `tool`, and the
+   agent's codemem calls are answered from that index;
+4. build time, update time, and for an API the tokens and the cost are recorded. The estimate for
+   the other repos is made from these numbers, not from this plan's.
+
+**What the two do not test.** Both builds are short. They do not show how a provider's rate limit
+behaves over hours, and they have no update as large as vscode's (a median of 8,730 texts for
+each step). So the third repo indexed is a large one, and its build is watched.
+
+**The rest, after the two pass.** The other seven repos of the retrieval eval are airflow,
+transformers, home-assistant, duckdb, llama.cpp, Godot and vscode. If embeddings come from an
+API, one machine runs three processes side by side. Each process has its own key and its own
+repos, so no process waits on another's rate limit, and `cmeval merge` combines the run folders.
+A split that balances the work, with the two test repos already done:
+
+| Process | Repos | Texts to embed, first builds and updates |
+|---|---|---|
+| 1 | vscode | about 518,000 |
+| 2 | Godot, home-assistant | about 600,000 |
+| 3 | duckdb, transformers, airflow, llama.cpp | about 566,000 |
+
+The counts are from the October run logs: the first build of each repo, and the updates along
+its sample task commits. Three processes that share one vector cache have not been tried. Check 1
+above is the place to try it, with pandas and playwright built at the same time.
+
 ---
 
 ## 3. Choosing what to run
