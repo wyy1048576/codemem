@@ -1018,13 +1018,53 @@ before the first right function).
 | Python | yes: pandas, transformers, home-assistant, airflow | — | — |
 | C++ | yes: Godot, duckdb, llama.cpp | — | — |
 | TypeScript | yes: vscode, playwright | — | — |
-| Go | no | a labeler; two repos | kubernetes, prometheus, grafana |
+| Go | no | a labeler; three repos | kubernetes, tidb, gitea (probed, below) |
 | Java | no | a labeler; two repos | kafka, elasticsearch, spring-boot |
-| Rust | no | a labeler; two repos | ruff, tokio, rust-analyzer |
+| Rust | no | a labeler; three repos | rust, zed, datafusion; ruff as a medium repo (probed, below) |
 
 "A labeler" is the part of `cmeval` that turns a fix into gold line ranges with tree-sitter. It is
 written separately from codemem on purpose, so that a codemem bug cannot grade itself. Each new
 language needs one, as C++ and TypeScript did.
+
+**Go and Rust go first of the three, from big repos.** A probe of 24 candidate repos on GitHub
+(Nov 22) gave the counts below, for the window of the other task sets (fixes merged from
+2026-07-01 to 2026-10-22). "Linked" is the number of merged pull requests with a linked issue. It
+is an upper limit on tasks: in our other sets, 58 to 87% of the pull requests with exactly one
+linked issue became tasks.
+
+| Language | Repo | Code in the language | Merged pull requests | Linked | Role |
+|---|---|---|---|---|---|
+| Go | kubernetes/kubernetes | 109 MB (98%) | 1,421 | 246 | the largest |
+| Go | pingcap/tidb | 64 MB (95%) | 851 | 280 | large |
+| Go | go-gitea/gitea | 16 MB (83%) | 970 | 238 | medium |
+| Rust | rust-lang/rust | 152 MB (91%) | 3,211 | 707 | the largest |
+| Rust | zed-industries/zed | 68 MB (98%) | 2,017 | 485 | large |
+| Rust | apache/datafusion | 40 MB (99%) | 1,531 | 607 | large |
+| Rust | astral-sh/ruff | 30 MB (97%) | 1,806 | 395 | medium |
+
+What the probe ruled out:
+- **golang/go and cockroachdb/cockroach** do not merge through GitHub pull requests (0 and 17 in
+  the window), so the collector finds nothing there;
+- **prometheus and tokio** have too few linked pull requests (74 and 34);
+- **grafana** is 47% Go and half TypeScript, so many of its fixes are not all Go. It is a reserve,
+  with servo, bevy, deno and nushell.
+
+What each language needs beyond a labeler:
+- **Go:** skip generated files (the `// Code generated ... DO NOT EDIT.` header) and `vendor/`;
+- **Rust:** unit tests live in the same file as the code, in `#[cfg(test)]` modules. Today a file
+  is code or test by its path. Rust needs a rule inside the file, so that a change to a test
+  module counts as a test change. Code inside a macro call is not parsed, and the share of fixes
+  that land there is reported.
+
+File counts, chunk counts and cold build times are not measured yet. `cmeval repo-stats` and a
+build-time estimate come before a repo is admitted. By their size, kubernetes and rust may take
+longer to index than Godot (2 h cold on the M5). These tasks serve the retrieval eval and the
+localization tier (§12.1). Graded end-to-end runs on them would need a build container for each
+repo, and they are not planned.
+
+**When is open.** This section says "after the paper". Andrew proposes the repo measurements now
+and the labelers and the collection from Dec 2, about 2 to 3 working days, so the two languages
+can be in the paper's retrieval table.
 
 **Add a second query per task.** Each task also gets its vague rewrite (§9). The headline table
 then has two columns per language: the issue text, and the vague request. Tracks B and C tune on
