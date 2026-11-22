@@ -380,7 +380,7 @@ Sizes are rough working days for one person.
 
 | By | Packages | What it gives |
 |---|---|---|
-| **Nov 25** | from C5, the install without PyTorch for API users | track A's task containers need it |
+| when track A moves to API embeddings | from C5, the install without PyTorch for API users | track A's task containers need it then. Its first runs use the local model |
 | **Dec 1** | C1, C2, C3 | the compression table, the compact store and one copy on disk, in the configuration that is presented |
 | **Dec 8** | C6, and from C5 the memory table per embedding option | memory, disk and scan time from 100,000 to 1,000,000 vectors, and what each embedding option costs in memory, for the paper |
 | **Later, no date** | C4, the idle unload of C5, and C7 if its gate opens | the cache cap, a model that leaves memory when idle, the reranker study |
@@ -394,7 +394,15 @@ C1 goes first: it is cheap, it needs nothing from the other tracks, and it decid
 | With | C needs | C gives |
 |---|---|---|
 | **Track B** | which vector types exist (code only, or code and usage); the embedding options and their vector lengths; the branch design the cache must serve | a vector store that returns **exact** scores for its top results, so B can merge by score and not only by rank; the memory and time cost of each of B's options |
-| **Track A** | vague rewrites of the dev tasks, for C1; end-to-end runs for the reranker gate | a frozen, named configuration for each agent run (for example `codemem-compact`), with its memory and disk numbers for the paper; by Nov 25, an install without PyTorch for the task containers |
+| **Track A** | vague rewrites of the dev tasks, for C1; end-to-end runs for the reranker gate | a frozen, named configuration for each agent run (for example `codemem-compact`), with its memory and disk numbers for the paper; an install without PyTorch for the task containers, before A's first runs that embed through an API |
+
+**Tell track A as soon as the compact store works.** Track A starts on today's index, the heaviest
+it will ever be, and for that reason on two or three pilot repos only
+([track A](track-a-evals.md) §2.2). Once the compact store builds one repo, write it in the work
+log ([CONTRIBUTING.md](../../CONTRIBUTING.md) §4): the configuration name, the commit, and the
+measured memory and disk next to today's. Track A then indexes its pilot repos again and expects a
+much smaller footprint: for 200,000 vectors, under 30 MB of memory for vector search against 358 MB
+today (§3). That drop is what lets track A index every task repo.
 
 **One interface change.** Today a `VectorStore` gets vectors and returns ids with scores. A store
 that rescores must be able to read full vectors by id. Proposed: the store is built with a

@@ -15,7 +15,8 @@ track C makes the index small.
 | [track-b-retrieval.md](track-b-retrieval.md) | you work on what codemem stores and how it ranks |
 | [track-c-memory.md](track-c-memory.md) | you work on memory, disk and speed |
 
-Each track file can be read on its own. This page holds what all three share.
+Each track file can be read on its own. This page holds what all three share. Who has which
+track, and how progress is recorded, is in [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 **How claims are marked.** Numbers from our own runs have no mark. *(pilot)* means a quick
 measurement made while writing this plan. *(reported)* means a research pass found it on a primary
@@ -36,8 +37,8 @@ product.
    the task, how long did it take, how many tokens did it use. The saving is the result (§4).
 4. **Who it is for.** Students and engineers who already have Claude Code or Codex on a
    subscription. So Claude runs under our own subscriptions, with codemem attached as an MCP
-   tool. API keys appear in two places only: the embedding API, and the open models of the
-   small-model study (§7).
+   tool. Model calls with an API key happen in two places only: the embedding API, and the open
+   models of the small-model study (§7).
 5. **Three tracks.**
    - **A builds the pipeline first.** One command runs chosen tasks, setups and models, and records
      tokens and time from two sources that must agree. Once it runs, B and C change codemem and
@@ -282,11 +283,11 @@ three places a new stage must touch, in one search.
           shared between B and C: the vector store interface, and the vector cache
 ```
 
-| Track | Owns | First deliverable | Its file |
-|---|---|---|---|
-| **A** | how we measure, and the task set | the pipeline skeleton: 10 public tasks, an agent with and without codemem, tokens counted two ways that agree | [track-a-evals.md](track-a-evals.md) |
-| **B** | what codemem stores and how it ranks | a table of why today's searches miss, which orders the rest | [track-b-retrieval.md](track-b-retrieval.md) |
-| **C** | memory, disk and speed | the compression table on our own vectors | [track-c-memory.md](track-c-memory.md) |
+| Track | Owner | Owns | First deliverable | Its file |
+|---|---|---|---|---|
+| **A** | Andrew | how we measure, and the task set | the pipeline skeleton on a pilot of two or three repos: an agent with and without codemem, tokens counted two ways that agree | [track-a-evals.md](track-a-evals.md) |
+| **B** | Wilson | what codemem stores and how it ranks | a table of why today's searches miss, which orders the rest | [track-b-retrieval.md](track-b-retrieval.md) |
+| **C** | Andre | memory, disk and speed | the compression table on our own vectors | [track-c-memory.md](track-c-memory.md) |
 
 **What passes between the tracks:**
 
@@ -295,20 +296,24 @@ three places a new stage must touch, in one search.
 | `codemem-today`: the current default, frozen as the reference for every comparison | B → A | Nov 23 |
 | The pipeline's first version, and the small plan B and C can run themselves ([track A](track-a-evals.md) §3.4) | A → B, C | Nov 25 |
 | The vector store interface, with exact scores for the top results | C ↔ B | Nov 25, before B builds the query path |
-| A codemem install without PyTorch, for the `api` embedding option | C → A | Nov 25: the task containers need it |
+| A note in the work log each time a new piece of retrieval or a new index format can run | B, C → A | as soon as it works on one repo, not only at a freeze |
+| A codemem install without PyTorch, for the `api` embedding option | C → A | before track A's first runs that embed through an API. Its first runs use the local model |
 | `codemem-final`, frozen for the presentation | B, C → A | Nov 28, evening |
 | `codemem-final`, the last freeze, for the test split | B, C → A | Dec 3, evening |
 | Memory, disk and build-time numbers per repo | C → A | with each frozen configuration |
 | Vague rewrites of the retrieval eval's dev tasks | A → B, C | a first subset by Nov 27, so gates can be judged on them before the freeze; the rest by Dec 3 |
 | End-to-end verdicts on card formats and on reranking | A → B, C | after the first full batches |
 
-**Three rules that keep the tracks from blocking each other:**
+**Four rules that keep the tracks from blocking each other:**
 1. **The eval stays independent of codemem.** It reaches codemem through the MCP server, the
    command line and one adapter file. Nothing else.
 2. **Contracts change only with notice.** Tool names, the card layout and the adapter's calls
    ([data-model.md](../data-model.md) §12) are what track A's runs depend on.
 3. **Every index-time change shows up in `index_settings()`.** A new tokenizer, new edges or a new
    vector format must each change it, so two eval systems never share an index by mistake.
+4. **Progress is written down.** Every finished piece of work goes into the work log
+   ([CONTRIBUTING.md](../../CONTRIBUTING.md) §4), so each track knows what the others have done
+   and what they are waiting for.
 
 ---
 
@@ -318,11 +323,15 @@ three places a new stage must touch, in one search.
 Claude Code, or Codex. So Claude runs under the subscriptions the three of us already have, each
 of us on our own, with codemem attached as an MCP tool. No Claude API key is involved.
 
-**Where API keys are used.** In two places only:
+**Where API keys are used.** For model calls, in two places only:
 - **the embedding API,** when embeddings are not computed locally;
 - **the small-model study.** Open models are not part of any subscription, so they are called
   through an API: a hosted endpoint, or a server we host ourselves on our Macs
   ([track A](track-a-evals.md) §11).
+
+One more key is already in use and costs nothing: the eval counts tokens with Anthropic's free
+counting endpoint ([track A](track-a-evals.md) §5.4). No model is called with it, and codemem
+itself never needs it.
 
 **Models.**
 
@@ -372,6 +381,15 @@ task. `codemem-today` runs on medium tasks only, which is enough to show the ste
 version to the final one. Small models run on easy and medium tasks, plus about ten hard ones as a
 probe. The full table is in [track A](track-a-evals.md) §3.3.
 
+**Start small.** Track A first runs the whole chain on two or three repos in different languages,
+on the codemem that exists today. Nothing larger is indexed until that pilot passes
+([track A](track-a-evals.md) §2.2).
+
+**Which embedding model the eval uses.** A local one first: today's default, or the local model
+track B picks in its place. Qwen3-Embedding-8B through Nebius comes later, as one more codemem
+configuration. An index holds one model's vectors, so each model gets its own index of each repo
+([track A](track-a-evals.md) §2.3).
+
 **What it costs us.**
 
 | Resource | Cost | The real limit |
@@ -410,8 +428,8 @@ turns everything else into a result, so its first version exists on day 3.
 
 | Days | Track A | Track B | Track C | Check at the end |
 |---|---|---|---|---|
-| **Nov 23–25** | A1: the pipeline skeleton on 10 public tasks. A2: the recording proxy and the cross-check | `codemem-today` frozen on day 1. B1: why today's searches miss. B2: stemming and exact lookup. B5: the `api` preset and its fixes | C1: the compression table, on real queries. The install without PyTorch that track A's containers need | one task runs end to end in both setups, and its tokens are counted two ways that agree |
-| **Nov 26–28** | A3: flags, plans, resume. A7: the labels that can be computed. From A6: mini-SWE-agent and the localization tier. From A8: vague rewrites for a first subset. Batches: the baseline on every dev task, which does not depend on codemem, and today's codemem on the medium ones | B3: typed edges and the linking rule, for Python and TypeScript. B4: the query path, with relation lines on cards. B5: the `light` preset chosen | C2: the compact store, behind the interface agreed with B. C3: one copy on disk | **Nov 28, evening: the configuration we present is frozen** as `codemem-final` |
+| **Nov 23–25** | A1: the pilot repos chosen, then the pipeline skeleton on their tasks. A2: the recording proxy and the cross-check | `codemem-today` frozen on day 1. B1: why today's searches miss. B2: stemming and exact lookup. B5: the `api` preset and its fixes | C1: the compression table, on real queries | one task runs end to end in both setups, and its tokens are counted two ways that agree |
+| **Nov 26–28** | A3: flags, plans, resume. A7: the labels that can be computed. From A6: mini-SWE-agent and the localization tier. From A8: vague rewrites for a first subset. Once the pilot passes, batches: the baseline on every dev task, which does not depend on codemem, and today's codemem on the medium ones | B3: typed edges and the linking rule, for Python and TypeScript. B4: the query path, with relation lines on cards. B5: the `light` preset chosen | C2: the compact store, behind the interface agreed with B. C3: one copy on disk | **Nov 28, evening: the configuration we present is frozen** as `codemem-final` |
 | **Nov 29–30** | the rest of the run matrix on the dev tasks: the final codemem on all of them, with the vague subset; small models on easy and medium, with the hard probe. A first report | the retrieval table, layer by layer, on the dev tasks | memory, disk and scan time from 100,000 to 1,000,000 vectors | every run in the tables passed its integrity checks |
 | **Dec 1** | present, and hand in the report | | | |
 
@@ -612,7 +630,7 @@ documents. Decide from that whether it is an extension of this paper or a second
 
 | # | Decision | Suggested default |
 |---|---|---|
-| 1 | Who takes which track | by current ownership: A to Andrew (the eval), B to Andre (the backend and retrieval), C to Wilson (the vector-store plugin and installation) |
+| 1 | Who takes which track | decided: A is Andrew's, B is Wilson's, C is Andre's ([CONTRIBUTING.md](../../CONTRIBUTING.md)) |
 | 2 | Which public task set the results come from | SWE-bench-Live: its Python set, and its multi-language set for the other five languages, which has over 100 tasks in each with x86 images *(checked Nov 22)*. SWE-bench Pro's second version if its ready-made Claude Code setup saves a day |
 | 3 | Where containers run | the team's x86 machine; a rented Linux machine if it is not free in time |
 | 4 | Which Claude model carries the main comparison | Sonnet 5.5 for the matrix; Haiku 5.5 for building the pipeline and for the loop B and C run |
@@ -622,6 +640,7 @@ documents. Decide from that whether it is an extension of this paper or a second
 | 8 | Where the small models run | a hosted endpoint under an API key, if a provider serves the 9B and the 14B; self-hosted on our Macs otherwise |
 | 9 | Who helps track A before December 1 | whoever is ahead takes one of: the recording proxy, the second harness with the small models, the vague rewrites |
 | 10 | Whether the task generator gets a trial in this phase | only if we accept a model key and a search key for its image builder; otherwise it waits (§8.3) |
+| 11 | Whether to replace today's local embedding model | not yet: track B's test of the candidates decides ([track B](track-b-retrieval.md) §5). Track A starts on today's model |
 
 ---
 
