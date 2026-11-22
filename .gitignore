@@ -11,3 +11,4 @@ __pycache__/
 .eval-data/
 .DS_Store
 .personal/
+.worklog/

@@ -18,6 +18,8 @@ exact strings.
 | [docs/decisions.md](docs/decisions.md) | running it: dependencies and what happens when one is down, limits, keys, files |
 | [docs/advanced-design.md](docs/advanced-design.md) | exploratory: research directions (anchors, routing, multi-vector, training, highlights, compression) |
 | [docs/exa.md](docs/exa.md) | exploratory: what we take from Exa's engineering blog |
+| [docs/plan/overview.md](docs/plan/overview.md) | the next phase: the plan, its three tracks and the dates. Nothing in it is built yet |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | how we work: who has which track, what to read first, the work log |
 
 ## Install
 

@@ -26,6 +26,9 @@ comes first. Once it runs, tracks B and C change codemem and rerun it, many time
 **When.** Items 1 and 2 by Nov 25. First results on the rest by December 1, refined by December 8,
 when the paper goes to arXiv (§14).
 
+**Where to start.** Not with everything: with a pilot on two or three repos (§2.2), on the codemem
+that exists today (§2.3).
+
 **What this track does not judge.** Retrieval accuracy is not the goal here. The agent may solve a
 task any way it likes. What counts is whether it solved it, how long it took, and how many tokens
 it used.
@@ -109,7 +112,130 @@ cmeval e2e check  main-1                         # did every run pass its integr
 ```
 
 It lives in `cmeval`, next to the retrieval eval, and shares its task format, token cache,
-dashboard and statistics code.
+dashboard and statistics code (§2.1).
+
+### 2.1 What is reused from today's eval
+
+`cmeval` was built to grade search systems. Its frame carries over. The part that runs an agent is
+new.
+
+| Reused as it is | New |
+|---|---|
+| task files, dev and test splits, `subset` and `--where` selection | running an agent: the container, the Claude Code launch, mini-SWE-agent |
+| `collect`, `repo-stats` and the gold labels | the recording proxy and the cross-check (§5) |
+| `report`: intervals, paired tests, grouping by label | grading with hidden tests |
+| `dashboard`, for long jobs | an importer for SWE-bench-Live (today's knows SWE-bench Verified only) |
+| the token counter and its cache | the vague-prompt rewriter (§9) |
+| the codemem adapter and the grep baselines | |
+
+The existing plug is a `Retriever` with `build`, `update` and `search`. An agent run does not have
+that shape, so the end-to-end runner is a new module beside it, not a new adapter. The
+localization tier (§12.1) is the cheapest bridge: it grades an agent's answer with the gold labels
+and accuracy metrics that exist.
+
+### 2.2 Start small: two or three repos first
+
+This file designs the whole study. The build does not start with the whole study. Before any large
+batch, and before every task's repo is indexed, the whole chain has to run on a small pilot, where
+an error is cheap to see and to fix.
+
+**The first job of whoever picks up this track, person or agent: propose the pilot repos, with
+reasons, before building on them.**
+
+| The pilot | |
+|---|---|
+| Repos | two or three, each in a different language: Python, TypeScript, and one of Go, Rust, Java or C++ |
+| Tasks | 3 to 5 per repo, 10 to 12 in all, of mixed difficulty: easy, medium, and at least two hard ones (§10) |
+| Setups | `grep` and `tool` |
+| codemem | what exists today, with its local embedding model (§2.3) |
+| Agent model | Haiku 5.5 while the chain is being built, then Sonnet 5.5 |
+
+**How to choose the repos:**
+1. **From SWE-bench-Live** (§8.1), so every task already has an image, test commands and a grader.
+2. **A language codemem indexes:** Python, JavaScript or TypeScript, Go, Java, Rust, C or C++
+   (`src/codemem/languages/`).
+3. **Medium size.** Large enough that search matters: at least 1,000 source files. Small enough
+   that today's codemem indexes it in minutes with the local model, not hours.
+4. **At least five tasks, spread over easy, medium and hard,** counted from the files and lines of
+   the real change (§10).
+5. **It works on our machine.** For one task per repo, pull the image, apply the real change and
+   run its tests by hand. Keep the repo only if they pass, in under 5 minutes.
+6. **If possible, one task of the OCR kind:** a change that adds something modelled on code that
+   already exists.
+
+**The pilot has passed when all of this is true:**
+- every stage runs for every pilot task in both setups: plan, index, run, grade, score, report;
+- the grader is right: for every pilot task the real change passes, and an empty change fails;
+- the two token counts agree within 1% on every run (§5.3);
+- the first event of every `tool` run lists codemem's tools, and some runs call them;
+- a batch can be stopped and resumed, and a deliberately broken setup is caught (§7);
+- one of us has read three whole transcripts, one per repo.
+
+Only then do more tasks, more repos and the dev batch follow.
+
+**Small also because the index is about to shrink.** Today's index keeps every vector in memory at
+full size and loads a 2.2 GB model: for 200,000 vectors, 358 MB of memory and 717 MB of disk
+([track C](track-c-memory.md) §3). Tracks B and C are changing what is indexed and how it is
+stored, and track C's target for the same vectors is under 30 MB of memory. Every repo indexed
+today is indexed again when that lands. So index the pilot repos now, and the rest when a batch
+needs them. Tracks B and C announce each new configuration in the work log
+([CONTRIBUTING.md](../../CONTRIBUTING.md) §3), and the pilot repos are where it is tried first.
+
+### 2.3 Which codemem, and which embedding model
+
+**The pipeline is general on purpose.** It does not know what is inside codemem. It is handed a
+codemem configuration file and treats codemem as a black box: an MCP server, a command and an
+index folder (§15). So it runs whatever codemem can build: today's version, a branch of track B or
+C, the final one. Tracks B and C are still changing retrieval and storage, and the pipeline must
+not need a change when they do.
+
+**Now: what exists today, with a local embedding model.** The first runs use today's codemem and
+its default local model (`jinaai/jina-code-embeddings-0.5b`), or the local model track B chooses
+in its place ([track B](track-b-retrieval.md) §5).
+
+**Later: Qwen3-Embedding-8B through Nebius.** codemem can already do this. Its configuration takes
+any OpenAI-style embedding API:
+
+```toml
+[embedding]
+provider = "openai"
+base_url = "https://api.tokenfactory.nebius.com/v1"
+model = "Qwen/Qwen3-Embedding-8B"
+api_key_env = "NEBIUS_API_KEY"
+dimensions = 1024
+```
+
+So for the pipeline, another embedding model is another codemem configuration, and nothing else.
+Four things make that swap work, and they are built from the start:
+
+1. **Embedding settings live in the codemem configuration,** never in pipeline code.
+2. **The key travels safely.** The runner passes the variable named by `api_key_env` to wherever
+   codemem runs, which is the index stage and the agent's container, and never writes it to disk.
+3. **The network rule has one exception.** A run may reach the embedding API's host, and nothing
+   else besides the model API (§4.5).
+4. **Every run records its index key,** so a result always says which model made its vectors.
+
+**One index holds one embedding model's vectors.** Vectors from two models cannot be compared, so
+they never share an index.
+- *In codemem,* a repo has one index. Changing the model embeds the repo again and replaces the
+  old vectors. Keywords and structure stay.
+- *In the pipeline,* indexes are stored per configuration key, and that key includes the embedding
+  provider, the model and the vector length. Two models give two separate indexes of the same
+  repo, side by side. Neither replaces the other.
+
+Comparing embedding models is worth doing, and it costs one full build per model for every repo.
+So it is done on the pilot repos first.
+
+**Where the embedding happens during a run.** The index is built before the run, on the host. At
+search time codemem still embeds the query, and any code the agent has edited, inside the
+container, which has no GPU. With a local model there are two ways, and the pilot decides:
+- **in the container, on the CPU:** the simplest. Measure how long one search takes there;
+- **from a server on the host:** the local model behind an OpenAI-style endpoint, which codemem
+  reaches through the same `provider = "openai"` setting with no key. It uses the host's GPU,
+  keeps PyTorch out of the container, and is the same path as Nebius.
+
+Either way, codemem's own log splits a search into its steps (§5.5), and the embedding step is
+reported apart. A slow CPU in a container must not be mistaken for codemem's cost on a laptop.
 
 ---
 
@@ -398,8 +524,9 @@ later: nothing in the paper depends on it.
 ```
 
 - **The agent runs inside the container**, so it can build and run code the way a developer would.
-- **codemem embeds through an API during a run** (the query, and the agent's own edits). The
-  container then needs no GPU and no PyTorch, and every machine produces the same vectors.
+- **codemem embeds the query, and the agent's own edits, during a run.** First with the local
+  model. Later through an API, where the container needs no GPU and no PyTorch and every machine
+  produces the same vectors (§2.3).
 - **Run on x86 Linux, not on the Macs.** Published test images are built for x86 only: SWE-bench's
   maintainers closed ARM support as "not planned" in August 2026, and a contributor measured tests
   6 to 9 times slower under emulation *(reported)*.
@@ -419,8 +546,8 @@ later: nothing in the paper depends on it.
 2. **The index is built before the clock starts**, once per task and configuration, and every run
    starts from a copy of it. Its build time, disk and memory are reported separately, and added
    back in one analysis that spreads the build over the tasks of a repo.
-3. **The agent cannot look up the answer.** No web tools, no network except the model API, and a
-   clone whose history ends at the task's commit.
+3. **The agent cannot look up the answer.** No web tools, no network except the model API (and the
+   embedding API, when codemem uses one), and a clone whose history ends at the task's commit.
 4. **The tests stay hidden** until the agent stops.
 5. **At least three repetitions** of every run. Current Claude models reject a temperature
    setting, so repetitions are the only way to see run-to-run noise.
@@ -1038,12 +1165,12 @@ person.
 
 | # | Work | Deliverable | Done when | Days |
 |---|---|---|---|---|
-| A1 | **The pipeline skeleton,** end to end on 10 public tasks: plan, run in a container, record, grade, score. Claude Code only, setups `grep` and `tool`, a cheap model | `cmeval e2e plan / run / grade / score` | one command produces a table of completion, tokens and time for 10 tasks × 2 setups × 3 repetitions | 6 |
-| A2 | **Measurement** (§5): the recording proxy, the cross-check, the six token numbers, the four clocks, the file watcher | the run record of §6 | on the 60 runs of A1, proxy and agent summary agree within 1% on every run, and the proxy adds no measurable delay to the first byte | 4 |
+| A1 | **The pipeline skeleton,** end to end on the pilot of §2.2 (10 to 12 tasks from two or three repos): plan, run in a container, record, grade, score. Claude Code only, setups `grep` and `tool`, a cheap model | `cmeval e2e plan / run / grade / score` | the pilot's checklist (§2.2) passes, and one command produces a table of completion, tokens and time for the pilot tasks × 2 setups × 3 repetitions | 6 |
+| A2 | **Measurement** (§5): the recording proxy, the cross-check, the six token numbers, the four clocks, the file watcher | the run record of §6 | on the runs of A1, proxy and agent summary agree within 1% on every run, and the proxy adds no measurable delay to the first byte | 4 |
 | A3 | **Selection and plans** (§3): the flags, plan files, the run matrix, the iteration plan for tracks B and C | `plans/main.toml`, `plans/iterate.toml` | a plan can be previewed with `--dry-run`, stopped, and resumed without rerunning anything | 3 |
 | A4 | **Robustness** (§7): integrity checks, failure classes, the canary, the spending cap, the dashboard view | `cmeval e2e check`; a canary plan | a deliberately broken setup (MCP server missing, wrong context size) is detected and its runs discarded | 3 |
 | A5 | **Reports and statistics** (§13) | `cmeval e2e report` | a report can be rebuilt byte for byte from the run records | 3 |
-| A6 | **The other setups and the second harness:** `upfront`, `placebo`, `tool-strong`; mini-SWE-agent in text mode with codemem as a command; the localization tier | every setup of §4.1; `--harness mini-swe-agent`; `--tier locate` | the same 10 tasks run in every setup and both harnesses; the small-model floor is measured (30 easy tasks, 9B and 14B, `grep` only) | 6 |
+| A6 | **The other setups and the second harness:** `upfront`, `placebo`, `tool-strong`; mini-SWE-agent in text mode with codemem as a command; the localization tier | every setup of §4.1; `--harness mini-swe-agent`; `--tier locate` | the pilot tasks run in every setup and both harnesses; the small-model floor is measured (30 easy tasks, 9B and 14B, `grep` only) | 6 |
 | A7 | **Labels** (§10), first on public tasks | every label in the task file | a hand check of 50 tasks agrees with the difficulty and kind labels at least 85% of the time | 3 |
 | A8 | **Vague prompts** (§9): the rewriter and its three checks | L1 and L2 for every task, and for the retrieval eval's dev tasks | check 2 passes on at least 80% of rewrites; the human agreement is reported | 4 |
 | A9 | **Our own tasks** (§8): the RepoLaunch trial; then the generator for Python and TypeScript, then Go, Java, Rust and C++ | `cmeval generate <repo link>`; validated fresh tasks | 30 validated dev tasks per language | 10 |
@@ -1073,8 +1200,8 @@ nothing in the paper depends on it.
 
 | With | A needs | A gives |
 |---|---|---|
-| **Track B** | `codemem-today` frozen now, the final configuration on Nov 28 and again on Dec 3; a timing log from codemem for each search (§5.5); no change to tool names or card layout without notice | the iteration plan (§3.4); vague rewrites of the dev tasks, a first subset by Nov 27; end-to-end comparisons of card formats |
-| **Track C** | by Nov 25, a codemem install that works in a container without PyTorch when embeddings come from an API; the compact configuration frozen; memory, disk and build-time numbers per repo | the same iteration plan and vague rewrites |
+| **Track B** | `codemem-today` frozen now, the final configuration on Nov 28 and again on Dec 3; a timing log from codemem for each search (§5.5); no change to tool names or card layout without notice; a note in the work log each time a new piece of retrieval can run | the iteration plan (§3.4); vague rewrites of the dev tasks, a first subset by Nov 27; end-to-end comparisons of card formats |
+| **Track C** | a note in the work log as soon as the compact store works on one repo; before the first runs that embed through an API, a codemem install that works in a container without PyTorch; the compact configuration frozen; memory, disk and build-time numbers per repo | the same iteration plan and vague rewrites |
 
 **The eval stays independent of codemem.** `cmeval` never imports codemem except in its one
 adapter file, and the labelers stay separate implementations. The end-to-end runner treats codemem
