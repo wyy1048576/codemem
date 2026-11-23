@@ -15,8 +15,8 @@
 - **Track B is the retrieval algorithm and its own eval:** keywords, the graph and the query
   path. Each new piece passes its gate on the retrieval eval before it goes into a configuration
   that track A runs.
-- **Sections were renumbered.** Track B: experiments §5, work packages §6, needs and gives §7,
-  risks §8. Track C: experiments §8, work packages §9, needs and gives §10, risks §11.
+- **Sections were renumbered.** Track B: experiments §6, work packages §7, needs and gives §8,
+  risks §9, after its new §5 on the MCP integration. Track C: experiments §8, work packages §9, needs and gives §10, risks §11.
 - **Dates did not change.** The `api` and `light` embedding presets by Dec 1, the local Qwen 8B
   preset by Dec 8, the branch work and the cache cap later, with no date.
 
