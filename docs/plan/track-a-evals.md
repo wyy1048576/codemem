@@ -964,12 +964,12 @@ repo is, because search should matter most in large ones; and the spread of lang
 | 2 | microsoft/playwright | TypeScript | 182 with tests; medium size; a second language from the first day | medium: its tests need browsers, and official images with browsers exist |
 | 3 | home-assistant/core | Python | the largest pool (618) in a very large, pure-Python repo, where search should matter | medium: a very long dependency list, installed once |
 | 4 | microsoft/vscode | TypeScript | 644 with tests and the largest pool of hard tasks (217); very large | high: a long build, and tests that need a display |
-| 5 | astral-sh/ruff | Rust | a third language. Not collected yet | low, if `cargo test` is as quick as expected |
-| 6 | kubernetes/kubernetes | Go | a fourth language, in a very large repo. Not collected yet | medium: tests run per package; a large build cache |
+| 5 | astral-sh/ruff | Rust | a third language. Not collected yet: 395 merged pull requests with a linked issue *(probed Nov 22, below)* | low, if `cargo test` is as quick as expected |
+| 6 | kubernetes/kubernetes | Go | a fourth language, in a very large repo. Not collected yet: 246 with a linked issue *(probed)* | medium: tests run per package; a large build cache |
 | 7 | apache/airflow | Python | 205 with tests, and the highest share of pull requests with tests (89%) | medium to high: many optional parts, and a database |
 | 8 | vllm-project/vllm | Python | 284 with tests on paper | high: a GPU build, and many tests load models. Only tests that run on a CPU would count |
 | 9 | ggml-org/llama.cpp | C++ | the only C++ repo of ours with a usable number (43) | medium: a CMake build |
-| 10 | apache/kafka | Java | a sixth language. Not collected yet | medium to high: a Gradle build |
+| 10 | apache/kafka | Java | a sixth language. **It cannot be collected as it is:** 0 of its merged pull requests link a GitHub issue *(probed)*. Another Java repo takes this place (below) | medium to high: a Gradle build |
 
 - **1 and 2** are the two repos of the first end-to-end test (§2.2).
 - **3 and 4** are the large repos, where the hypothesis says an index helps most. They come once
@@ -977,6 +977,33 @@ repo is, because search should matter most in large ones; and the spread of lang
 - **5 and 6** add Rust and Go. For Rust, ruff is chosen over the Rust compiler itself, whose own
   build takes far longer than a task should.
 - **7 to 10** add breadth, then C++ and Java.
+
+**What GitHub says about the repos that are not collected yet** *(probed Nov 22)*. The window is
+the one of the collected sets, July 1 to October 22, 2026. "Linked" is the number of merged pull
+requests with a linked issue. It is an upper limit on tasks: in the collected sets, 58 to 87% of
+the pull requests with exactly one linked issue became tasks, before the filter for tests.
+
+| Repo | Language | Code in the language | Merged pull requests | Linked |
+|---|---|---|---|---|
+| astral-sh/ruff | Rust | 30 MB | 1,806 | 395 |
+| kubernetes/kubernetes | Go | 109 MB | 1,421 | 246 |
+| apache/kafka | Java | 75 MB | 789 | **0** |
+
+- **kafka does not work with our collector.** It keeps its issues in Jira, and GitHub issues are
+  switched off for the repo, so no pull request links one. `cmeval collect` starts from that
+  link. apache/flink is the same. Java repos that do link issues on GitHub: keycloak/keycloak
+  (54 MB, 1,007 linked), quarkusio/quarkus (74 MB, 414), trinodb/trino (92 MB, 140), and
+  elastic/elasticsearch (322 MB, 1,562), which is very large. Their environments are not judged
+  yet.
+- **golang/go and cockroachdb/cockroach** cannot be used either: they do not merge through GitHub
+  pull requests (0 and 17 merged in the window).
+- **Reserves, if a repo fails its admission check.** Rust: apache/datafusion (40 MB, 607 linked)
+  and zed-industries/zed (68 MB, 485). Go: pingcap/tidb (64 MB, 280) and go-gitea/gitea (16 MB,
+  238).
+- **Rust has a trap for the test filter.** Rust unit tests live in the same file as the code, in
+  `#[cfg(test)]` modules. Today a changed file is code or test by its path, so a Rust pull
+  request that adds only such tests looks as if it had none. The file-level labeler for Rust
+  needs a rule for it.
 
 **The repos that are not collected yet need one small addition.** `cmeval collect` labels Python,
 C++ and TypeScript. End-to-end tasks are graded by tests, so they need gold files only, and those
@@ -1019,7 +1046,10 @@ script grades a patch. So it needs an importer and nothing else.
 
 **Why it is not the main source.**
 - **Its tasks are older than the models.** The newest Python task we saw was created in August
-  2025, and the multi-language page shows no dates. A model that remembers a fix has less to
+  2025, and the multi-language page shows no dates. The task tables do *(downloaded Nov 22)*:
+  the `verified` Python split runs from July 2024 to April 2025; the TypeScript and Go splits
+  end in April 2026; the Rust split ends in July 2026, and 68 of its 171 tasks were created
+  after June 2026. So only some Rust tasks are newer. A model that remembers a fix has less to
   search for, which can hide a saving. So these tasks are reported apart and never mixed into the
   headline.
 - **Its images are x86 only,** and slow on our Macs (§4.4).
