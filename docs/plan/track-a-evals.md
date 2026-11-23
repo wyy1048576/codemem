@@ -8,16 +8,21 @@
 records whether the agent completed it, how long it took and how many tokens it used. The pipeline
 comes first. Once it runs, tracks B and C change codemem and rerun it, many times.
 
+**Where this track sits.** It carries the project's primary goal: the end-to-end study, and the
+model gap that is part of it ([overview.md](overview.md), "What we are after"). Tracks B and C
+give it a good system to test.
+
 **The order of work.**
 1. **The eval set-up, end to end.** Our own tasks, generated from repos we choose and taken in a
    fixed order (§8), and the pipeline that runs and grades them: one command for a chosen set of
    tasks, setups and models, with tokens and time from two sources that must agree (§2 to §7).
 2. **The first end-to-end test:** two repos, with the codemem that exists today (§2.2).
 3. **The main comparison.** When tracks B and C deliver the improved codemem, everything is
-   indexed again and the remaining repos follow. The index should be much smaller by then, which
-   is why only two repos are indexed before it.
-4. **Afterwards, the model gap:** the same tasks, with open models in open harnesses, to see
-   whether codemem helps a small model more (§4.6, §11).
+   indexed again and the full runs start, on tasks in several languages (§8.3). The index should
+   be much smaller by then, which is why only two repos are indexed before it.
+4. **The model gap, in the same days:** the same tasks, with open models in open harnesses, to
+   see whether codemem helps a small model more (§4.6, §11). At least one open model is in the
+   presentation.
 
 **What exists at the end:**
 - the task generator and its tasks, with labels (§10) and a vague version of each prompt (§9);
@@ -25,9 +30,11 @@ comes first. Once it runs, tracks B and C change codemem and rerun it, many time
 - the retrieval eval kept short, with a vague query per task and two stronger baselines (§12.2);
 - a release with the paper: the generator, the pipeline, the tasks and the run records.
 
-**When.** Tasks for the first two repos, and the pipeline's first version, by Nov 25. The first
-end-to-end test by Nov 27. Results on every repo that is up by December 1. The test split, the
-model gap and the paper by December 8 (§14).
+**When.** The pipeline is being tested on two repos with today's codemem now. The improved codemem
+is frozen on the evening of Nov 25. The full runs start on Nov 26, and the model gap runs beside
+them on its own endpoint. The freeze is aimed at Nov 30, 23:59. The
+hard limit is the presentation on Dec 1 at 14:00. Six more
+days of refining follow, to the paper on December 7. The schedule, night by night, is in §14.
 
 **What this track does not judge.** Retrieval accuracy is not the goal here. The agent may solve a
 task any way it likes. What counts is whether it solved it, how long it took, and how many tokens
@@ -75,6 +82,12 @@ One **run** is one agent working once on one task in one setup:
 If codemem helps, the second run reaches the transcribe stage and the registry in one search
 instead of several greps and file reads, and the difference shows up as fewer tokens and seconds.
 If it doesn't, the two runs look the same, and that is a finding too.
+
+**How a run is judged.** The agent gets the prompt, and the repo as it was just before the real
+fix. It works until it stops or hits a limit. Then the real pull request's own tests, which the
+agent never saw, are run on what it left behind. If they pass, the run completed the task. Time
+and tokens are counted over the whole run, whether it completed or not. The exact rules are in
+§4.7.
 
 ---
 
@@ -182,8 +195,8 @@ C, the final one. Tracks B and C are still changing retrieval and storage, and t
 not need a change when they do.
 
 **Now: what exists today, with a local embedding model.** The first runs use today's codemem and
-its default local model (`jinaai/jina-code-embeddings-0.5b`), or the local model track B chooses
-in its place ([track B](track-b-retrieval.md) §5).
+its default local model (`jinaai/jina-code-embeddings-0.5b`), or the local model track C chooses
+in its place ([track C](track-c-memory.md) §6).
 
 **Later: Qwen3-Embedding-8B through Nebius.** codemem can already do this. Its configuration takes
 any OpenAI-style embedding API:
@@ -269,17 +282,18 @@ cells, where each cell is "these setups, these models, on these tasks".
 ```toml
 # plans/main.toml
 [plan]
-tasks = "tasks/e2e-v1.jsonl"
+tasks = "tasks/e2e-v1.jsonl"          # every validated task, from every repo that is up
+sample = { per_repo = 20, strata = "difficulty", seed = "main-1" }
 reps = 3
+order = "by-repetition"               # repetition 1 of everything before repetition 2
 harness = "claude-code"
 models = ["claude-sonnet-5-5"]
-where = { split = "dev" }      # "test" for the one run before the paper
 
-[[cell]]                       # the reference: Claude doing its thing, on every task
+[[cell]]                       # the reference: Claude with its own tools
 name = "baseline"
 setups = ["grep"]
 
-[[cell]]                       # our final solution, on every task
+[[cell]]                       # our final solution, on the same tasks
 name = "final"
 setups = ["tool"]
 codemem = "final"
@@ -290,28 +304,32 @@ setups = ["tool"]
 codemem = "today"
 where = { difficulty = "medium" }
 
-[[cell]]                       # small models: tasks they have a chance on
-name = "small"
+[[cell]]                       # the model gap: an open model in an open harness
+name = "gap"
 harness = "mini-swe-agent"
 endpoint = "hosted"            # or "local": a server on one of our Macs
-models = ["qwen3.5-9b", "qwen3-14b"]
+models = ["qwen3.5-9b"]        # then "qwen3.8-27b", then "qwen3-14b"
 setups = ["grep", "tool"]
 codemem = "final"
 where = { difficulty = ["easy", "medium"] }
 
 [[cell]]                       # a few hard tasks, to see whether a small model can do them at all
-name = "small-probe"
+name = "gap-probe"
 harness = "mini-swe-agent"
 endpoint = "hosted"
-models = ["qwen3-14b"]
+models = ["qwen3.5-9b"]
 setups = ["grep", "tool"]
 codemem = "final"
 where = { difficulty = "hard" }
 sample = 10
 ```
 
-A `where` under `[plan]` applies to every cell, on top of the cell's own. `endpoint` says where an
-open model is served: a hosted API, or a server we host (§11).
+- **`sample`** under `[plan]` draws the same tasks for every cell: a fixed number per repo, spread
+  over the difficulty levels, from a seed. The drawn list is written to a file and committed
+  before the first run. No run may change it afterwards.
+- **`order`** makes a batch that is cut short still useful: after repetition 1, every task has one
+  complete result in every setup.
+- **`endpoint`** says where an open model is served: a hosted API, or a server we host (§11).
 
 ### 3.3 The run matrix
 
@@ -322,19 +340,40 @@ The plan above, as a table. This is the proposal for what the paper's numbers co
 | **Baseline:** Claude with its own tools, no codemem | every task, including the large and hard ones | the reference for everything |
 | **Final:** Claude with the final codemem | every task | the headline: tokens and time against the baseline, and completion |
 | **Today's codemem,** the simple version that exists now | medium tasks only | enough to show the step from today's version to the final one. The large tasks would be wasted on it |
-| **Small models** (9B and 14B), with and without codemem | easy and medium tasks | the model-gap question. A 14B model is not expected to finish hard, spread-out tasks |
-| **Small models, a probe** | about 10 hard tasks | to check that expectation instead of assuming it |
+| **The model gap:** an open model, the 9B first, with and without codemem | the easy and medium tasks of the same sample | the second part of the study. At least one open model before the presentation. A small model is not expected to finish hard, spread-out tasks |
+| **The model gap, a probe** | about 10 hard tasks | to check that expectation instead of assuming it |
 | **Mechanism setups:** results up front, placebo, stronger wording (§4.1) | a medium subset | to explain the headline, not to be it |
 
-**Dev tasks first, test tasks once.** Every task is marked dev or test. Our own tasks keep the
-mark they already carry from the retrieval eval (§8.1). The matrix runs on the dev tasks by December 1. It
-runs once on the test tasks in the week before arXiv, with the frozen configuration
-([overview.md](overview.md) §8.2). Planning sizes, to be replaced by what the first batch
-measures: about 50 dev tasks and 75 to 100 test tasks.
+**Many tasks are prepared, and a sample is run.** The generator prepares 30 to 40 validated tasks
+per repo. The full runs take a fixed sample of them: 20 per repo, spread over easy, medium and
+hard, drawn once from a seed and committed before the first run. If usage runs short, the sample
+shrinks to 15 per repo, then to 12. The languages stay. The number of tasks gives way.
+
+**Dev and test.** Every task is marked dev or test, and our own tasks keep the mark they already
+carry from the retrieval eval (§8.1). The sample holds both. Tracks B and C tune on dev tasks
+only, so the test tasks of the sample are run once, with the configuration frozen on Nov 25
+([overview.md](overview.md) §8).
+
+**Runs are scheduled by repetition.** Repetition 1 of every task in every setup comes first, then
+repetition 2, then 3. If a batch is cut short, what exists is a complete table with fewer
+repetitions, never a table with holes.
+
+**What comes first when seats are scarce:**
+1. baseline and final, on the whole sample;
+2. today's codemem, on the medium tasks;
+3. the vague subset;
+4. the mechanism setups.
+
+The model gap is not in this list. It does not use the seats: it runs on its own endpoint at the
+same time.
 
 **The baseline is run once and reused.** A baseline run does not depend on codemem. So when track
 B or C changes codemem, only the codemem cells are rerun, and they are compared with baseline runs
 already on disk. This roughly halves the cost of every iteration.
+
+**One measure is exempt: wall time.** The API is faster on some days than on others. So time is
+compared only between runs of the same batch, made turn about (§4.5, rule 8). A reused baseline
+serves tokens and completion. In the main batch, baseline and final run together.
 
 ### 3.4 The loop tracks B and C use
 
@@ -348,7 +387,9 @@ cmeval e2e report try-stemming --compare baseline tool
 
 `plans/iterate.toml` is 20 to 30 medium dev tasks, one cheap model, the `tool` setup, 2
 repetitions. The baseline side is already on disk. One try should take under an hour and a small
-part of one seat's usage window. It is a smoke signal, not a result: nothing is claimed from it.
+part of one seat's usage window. It is a smoke signal, not a result: nothing is claimed from it. Its
+report also shows how often codemem was called and at which turn first. Track B needs those
+numbers for its adoption check ([track B](track-b-retrieval.md) §5).
 
 ---
 
@@ -359,7 +400,7 @@ part of one seat's usage window. It is a smoke signal, not a result: nothing is 
 | Setup | The agent has | Why |
 |---|---|---|
 | `grep` | its shipped tools: grep, file listing, file reads, a shell, and its own built-in search subagent if it has one | the baseline is the agent as people use it |
-| `tool` | the same, plus codemem's tools, loaded before the first turn, with the `light` wording. The agent decides whether to call them | this is how codemem ships |
+| `tool` | the same, plus codemem's tools, loaded before the first turn, with the wording that ships, which is `light` today and is track B's to set ([track B](track-b-retrieval.md) §5). The agent decides whether to call them | this is how codemem ships |
 | `upfront` | the same as `grep`, but the first message also holds the top results of one codemem search on the prompt. No codemem tool | separates two questions that `tool` mixes: does the information help, and does the agent choose to ask for it |
 | `placebo` | a tool with codemem's name and card format that returns random chunks | is a gain from what codemem returns, or from merely having one more tool? |
 | `tool-strong` | `tool`, with the `strong` wording | how much depends on telling the agent to use the tool? |
@@ -532,8 +573,8 @@ later: nothing in the paper depends on it.
 
 ### 4.5 Rules that keep the comparison fair
 
-1. **One difference.** The same prompt, repo snapshot, model, limits and container. Only the
-   setup changes.
+1. **One difference.** The same prompt, repo snapshot, model, limits, container and machine.
+   Only the setup changes.
 2. **The index is built before the clock starts**, once per task and configuration, and every run
    starts from a copy of it. Its build time, disk and memory are reported separately, and added
    back in one analysis that spreads the build over the tasks of a repo.
@@ -642,6 +683,43 @@ if Qwen Code does not.
 - **Harbor with a model server on the host:** pass `--skip-model-parsing-and-provider-mapping`,
   and reach the server as `host.docker.internal`. Inside the container, `localhost` is the
   container.
+
+### 4.7 How a run is judged
+
+**What the agent gets.** The prompt, and the repo checked out at the commit just before the real
+fix, in a container where the project's tests can run. Nothing else: no hidden tests, no web, and
+no history after that commit.
+
+**When it ends.** The agent works until it stops by itself or reaches a limit: 150 turns or 50
+minutes, whichever comes first. Both setups of a task get the same limits.
+
+**What is graded.** Whatever the agent left behind: the difference between its working tree and
+the task's commit, with new files, without build output. A run that ended at a limit is graded
+like any other, on what it left. How it ended is recorded beside the verdict.
+
+**How it is graded.** In a fresh container at the task's commit:
+1. the agent's changes are applied;
+2. the hidden test files are put in place. They are the test files of the real pull request, and
+   they overwrite any version of those files the agent wrote;
+3. the task's test command is run.
+
+**The verdict.** A run has **completed** the task if every test that had to start passing passes,
+and every test that had to keep passing still passes. Both lists were fixed when the task was
+validated (§8.1). Everything else is "not completed": changes that do not apply, a build that
+breaks, a failing test, an empty change.
+
+**What is measured beside it,** on every run, completed or not:
+- **time:** from the agent's start to its exit. Building the index and starting the container are
+  timed apart (§5.5);
+- **tokens:** every token the model read and wrote over the whole run (§5.4);
+- **what it did:** its searches, the files it read, and whether it called codemem (§6).
+
+**From runs to a result.** Each task is run three times in each setup. A task's completion in a
+setup is the share of its three runs that completed. Its time and its tokens are averaged the
+same way. The result is the difference between the setups on the same task, over all tasks (§13).
+
+**What this does not judge.** Whether the change is as good as the real one, or written as a
+maintainer would write it. The tests are the only judge, as in SWE-bench.
 
 ---
 
@@ -795,7 +873,7 @@ One JSON file per run, plus the raw transcript and proxy log beside it.
 | Tokens | the six numbers of §5.4, and the agent's own summary beside the proxy's |
 | Time | the four clocks of §5.5 |
 | Steps | turns; tool calls by tool; turns before the first edit |
-| Search behaviour | files read; whether and when a gold file was read; whether codemem was called, how often, and what it returned |
+| Search behaviour | files read; whether and when a gold file was read; whether codemem was called, how often, at which turn first, and what it returned |
 | Integrity | setup check passed; cross-check passed; proxy complete; container and network checks passed |
 
 A run can be repeated from its record alone.
@@ -873,9 +951,9 @@ step writes to disk, and a run that stops can be resumed, as in the rest of the 
 ten repos that we choose. So the environment is not worked out by an agent for every task. It is
 written down once per repo, as a recipe, and applied to every task of that repo.
 
-A recipe says four things: the base image; how to install the repo's dependencies; what to run
-again after a task's commit is checked out; and how to run a given set of test files and read the
-result.
+A recipe says five things: the base image; how to install the repo's dependencies; what to run
+again after a task's commit is checked out; which files count as tests; and how to run a given set
+of test files and read the result.
 
 ```toml
 # eval/envs/pandas.toml: a sketch of the shape, not a tested recipe
@@ -883,6 +961,7 @@ repo = "pandas-dev/pandas"
 base_image = "python:3.12"
 setup = ["pip install -r requirements-dev.txt"]           # once, when the base image is built
 refresh = ["pip install -e . --no-build-isolation"]       # after a task's commit is checked out
+test_paths = ["pandas/tests/**"]                          # which files count as tests
 test = "pytest -q {test_files}"                           # the task's own tests
 parser = "pytest"
 timeout_min = 10
@@ -941,53 +1020,94 @@ means the pull request also changed test files, which a hidden-test task needs. 
 | huggingface/transformers | Python | 132 | 85 (64%) | 43 / 27 / 15 |
 | python/cpython | Python and C | 89 | 63 (70%) | 33 / 26 / 4 |
 | ggml-org/llama.cpp | C++ | 165 | 43 (26%) | 13 / 18 / 12 |
-| duckdb/duckdb | C++ | 209 | 9 (4%) | 3 / 5 / 1 |
+| duckdb/duckdb | C++ | 209 | 9 by the classifier; about 200 in fact (see below) | not counted yet |
 | godotengine/godot | C++ | 350 | 7 (2%) | 5 / 1 / 1 |
 
 Three things to read from it:
 - **Python and TypeScript have far more candidates than we need.** The limit there is the
   environment, not the supply.
-- **Godot and duckdb cannot carry end-to-end tasks:** 7 and 9 tasks come with tests. They stay in
-  the retrieval eval. For C++, llama.cpp is the only one of ours with a usable number.
+- **The count for duckdb is wrong, and the reason matters for every repo.** The classifier knows a
+  test file by its folder and its extension. DuckDB writes its tests as `.test` files, which the
+  classifier does not know, so it counted 9 tasks with tests. We read 25 of the other 200 pull
+  requests on GitHub on Nov 22, and 24 of them changed a `.test` file. So duckdb has about 200
+  tasks with tests, and it is our C++ repo. **What counts as a test is set per repo, in its
+  recipe** (§8.2). Rust has the same trap in another form (below).
+- **Godot cannot carry end-to-end tasks.** 7 of its tasks come with tests, and of 10 further pull
+  requests we read, 1 changed a test. It stays in the retrieval eval. llama.cpp has 43, and none
+  of 10 further ones we read had a test: it is the reserve for C++.
 - **Large changes are missing.** The collection kept changes of at most 5 code files and 200
   lines, so "hard" here means 3 to 5 files or 100 to 200 lines. Almost no task adds a new file (0
   to 5% per repo), so tasks of the OCR kind are rare in this set. A second collection pass with a
   higher limit is how to get them.
 
-**The order.** Four things decide it: how many tasks come with tests (measured, above); how hard
-the environment is to build (expected only: the admission check of §8.2 decides); how large the
-repo is, because search should matter most in large ones; and the spread of languages.
+**The order.** Languages come first. The main results have to cover several languages, so the
+first five repos are five languages: Python, TypeScript, Rust, Go and C++. After that, four
+things decide: how many tasks come with tests (measured, above); how hard the environment is to
+build (expected only: the admission check of §8.2 decides); how large the repo is, because search
+should matter most in large ones; and the spread of languages.
 
 | # | Repo | Language | Why here | The environment, as expected |
 |---|---|---|---|---|
 | 1 | pandas-dev/pandas | Python | 298 tasks with tests; a medium-size repo that today's codemem indexes quickly; a well-known build | low to medium: one compiled extension |
 | 2 | microsoft/playwright | TypeScript | 182 with tests; medium size; a second language from the first day | medium: its tests need browsers, and official images with browsers exist |
-| 3 | home-assistant/core | Python | the largest pool (618) in a very large, pure-Python repo, where search should matter | medium: a very long dependency list, installed once |
-| 4 | microsoft/vscode | TypeScript | 644 with tests and the largest pool of hard tasks (217); very large | high: a long build, and tests that need a display |
-| 5 | astral-sh/ruff | Rust | a third language. Not collected yet | low, if `cargo test` is as quick as expected |
-| 6 | kubernetes/kubernetes | Go | a fourth language, in a very large repo. Not collected yet | medium: tests run per package; a large build cache |
-| 7 | apache/airflow | Python | 205 with tests, and the highest share of pull requests with tests (89%) | medium to high: many optional parts, and a database |
-| 8 | vllm-project/vllm | Python | 284 with tests on paper | high: a GPU build, and many tests load models. Only tests that run on a CPU would count |
-| 9 | ggml-org/llama.cpp | C++ | the only C++ repo of ours with a usable number (43) | medium: a CMake build |
-| 10 | apache/kafka | Java | a sixth language. Not collected yet | medium to high: a Gradle build |
+| 3 | astral-sh/ruff | Rust | a third language, and part of the main results. Not collected yet: 395 merged pull requests with a linked issue *(probed Nov 22, below)* | low, if `cargo test` is as quick as expected |
+| 4 | kubernetes/kubernetes | Go | a fourth language, in a very large repo, and part of the main results. Not collected yet: 246 with a linked issue *(probed)* | medium: tests run per package; a large build cache |
+| 5 | duckdb/duckdb | C++ | a fifth language, and part of the main results. About 200 tasks with tests, once its `.test` files count as tests | medium: a CMake build of a large code base, done once for the image. One test file runs in seconds |
+| 6 | home-assistant/core | Python | the largest pool (618) in a very large, pure-Python repo, where search should matter most | medium: a very long dependency list, installed once |
+| 7 | microsoft/vscode | TypeScript | 644 with tests and the largest pool of hard tasks (217); very large | high: a long build, and tests that need a display |
+| 8 | apache/airflow | Python | 205 with tests, and the highest share of pull requests with tests (89%) | medium to high: many optional parts, and a database |
+| 9 | vllm-project/vllm | Python | 284 with tests on paper | high: a GPU build, and many tests load models. Only tests that run on a CPU would count |
+| bonus | a Java repo | Java | a sixth language, as a bonus. apache/kafka **cannot be collected as it is:** 0 of its merged pull requests link a GitHub issue *(probed)*. Another Java repo would take its place (below) | medium to high: a Gradle build |
 
 - **1 and 2** are the two repos of the first end-to-end test (§2.2).
-- **3 and 4** are the large repos, where the hypothesis says an index helps most. They come once
-  the improved codemem has made the index small.
-- **5 and 6** add Rust and Go. For Rust, ruff is chosen over the Rust compiler itself, whose own
-  build takes far longer than a task should.
-- **7 to 10** add breadth, then C++ and Java.
+- **3, 4 and 5** add Rust, Go and C++, so that the main results cover five languages. llama.cpp
+  is the reserve for C++. For Rust,
+  ruff is chosen over the Rust compiler itself, whose own build takes far longer than a task
+  should.
+- **6 and 7** are the large repos, where the hypothesis says an index helps most.
+- **8 and 9** add breadth.
+- **Java is a bonus:** a sixth language, if time is left and a Java repo can be collected.
+
+**What GitHub says about the repos that are not collected yet** *(probed Nov 22)*. The window is
+the one of the collected sets, July 1 to October 22, 2026. "Linked" is the number of merged pull
+requests with a linked issue. It is an upper limit on tasks: in the collected sets, 58 to 87% of
+the pull requests with exactly one linked issue became tasks, before the filter for tests.
+
+| Repo | Language | Code in the language | Merged pull requests | Linked |
+|---|---|---|---|---|
+| astral-sh/ruff | Rust | 30 MB | 1,806 | 395 |
+| kubernetes/kubernetes | Go | 109 MB | 1,421 | 246 |
+| apache/kafka | Java | 75 MB | 789 | **0** |
+
+- **kafka does not work with our collector.** It keeps its issues in Jira, and GitHub issues are
+  switched off for the repo, so no pull request links one. `cmeval collect` starts from that
+  link. apache/flink is the same. Java repos that do link issues on GitHub: keycloak/keycloak
+  (54 MB, 1,007 linked), quarkusio/quarkus (74 MB, 414), trinodb/trino (92 MB, 140), and
+  elastic/elasticsearch (322 MB, 1,562), which is very large. Their environments are not judged
+  yet.
+- **golang/go and cockroachdb/cockroach** cannot be used either: they do not merge through GitHub
+  pull requests (0 and 17 merged in the window).
+- **Reserves, if a repo fails its admission check.** Rust: apache/datafusion (40 MB, 607 linked)
+  and zed-industries/zed (68 MB, 485). Go: pingcap/tidb (64 MB, 280) and go-gitea/gitea (16 MB,
+  238).
+- **Rust has a trap for the test filter.** Rust unit tests live in the same file as the code, in
+  `#[cfg(test)]` modules. Today a changed file is code or test by its path, so a Rust pull
+  request that adds only such tests looks as if it had none. The file-level labeler for Rust
+  needs a rule for it.
 
 **The repos that are not collected yet need one small addition.** `cmeval collect` labels Python,
 C++ and TypeScript. End-to-end tasks are graded by tests, so they need gold files only, and those
 come straight from the change. A file-level labeler for other languages is small. Function-level
 labels for them can wait (§12.2).
 
-**How many tasks per repo.** 30 to 40 validated tasks: about 10 easy, 15 medium and 10 hard,
-drawn with a fixed seed from the candidates with tests, as `cmeval subset` already draws.
+**How many tasks per repo.** Prepare 30 to 40 validated tasks: about 10 easy, 15 medium and 10
+hard, drawn with a fixed seed from the candidates with tests, as `cmeval subset` already draws.
+The full runs then use a sample of these (§3.3). So a repo is worth preparing even when there is
+no time to run all of it.
 
-**If time runs short, stop anywhere in the list.** Each repo is complete on its own. Two repos in
-two languages are already a result. Four add the large repos. Six give four languages.
+**If time runs short, run fewer tasks per repo before dropping a language.** Each repo is complete
+on its own. Two repos in two languages are already a result. Five give five languages. Seven add
+the large repos.
 
 **What every repo must meet,** whatever its place in the list:
 
@@ -1019,7 +1139,10 @@ script grades a patch. So it needs an importer and nothing else.
 
 **Why it is not the main source.**
 - **Its tasks are older than the models.** The newest Python task we saw was created in August
-  2025, and the multi-language page shows no dates. A model that remembers a fix has less to
+  2025, and the multi-language page shows no dates. The task tables do *(downloaded Nov 22)*:
+  the `verified` Python split runs from July 2024 to April 2025; the TypeScript and Go splits
+  end in April 2026; the Rust split ends in July 2026, and 68 of its 171 tasks were created
+  after June 2026. So only some Rust tasks are newer. A model that remembers a fix has less to
   search for, which can hide a saving. So these tasks are reported apart and never mixed into the
   headline.
 - **Its images are x86 only,** and slow on our Macs (§4.4).
@@ -1138,8 +1261,22 @@ gains from search tools are at 4B.
 So the first result of this study is the plain baseline: what a 9B and a 14B model complete on
 tasks newer than they are.
 
-**When.** After the main comparison. This study reuses its tasks, its pipeline and its design, and
-changes only the agent's model and its harness.
+**When.** In the same days as the main comparison, with at least one model before the
+presentation. This study reuses the tasks, the pipeline and the design, and changes only the
+agent's model and its harness. Its runs go to their own endpoint, so they do not wait for the
+Claude seats.
+
+**In what order.** Which models are run is settled by Andrew with Andre. This is the starting
+proposal.
+1. One model first: Qwen3.5-9B. It has the long context window, and it fits a 24 GB Mac if no
+   provider is at hand.
+2. Its localization runs first (§12.1). They need no container and finish in hours.
+3. Then its end-to-end runs on the easy and medium tasks of the sample, with the hard probe.
+4. Then Qwen3.8-27B, the larger model the gap is measured against.
+5. Then Qwen3-14B.
+
+With one model only, the result is the plain difference with and without codemem. The gap measure
+below needs the 27B model as well.
 
 **Other model families.** The model is a setting (§4.6), so a model from another family, for
 example a Llama model, is one more row. Qwen comes first because it has current models at each of
@@ -1150,7 +1287,7 @@ probe. Small models complete a narrow kind of task: on SWE-bench Verified, the t
 models solve are 95 to 100% single-file, with a median real change of 2 to 4 lines, and a 32B
 model from 2024 solved 16.5% of the tasks humans rate under 15 minutes and none of those over an
 hour *(reported)*. The small-model set of §10 marks the tasks with the best chance. Each is run at
-L0 and L1.
+L0 first. The vague versions follow when the main cells are done.
 
 **Where they run.** Through an API or self-hosted. This study is the one part of the plan where
 the agent's own model is not on a subscription.
@@ -1250,16 +1387,18 @@ completed, which is why it supports the end-to-end tier and does not replace it.
 tuned grep baseline, paired tests, and the two headline numbers (function MRR, and tokens read
 before the first right function).
 
-**Add languages, after the paper.** codemem indexes nine languages. The eval grades three.
+**Add languages: Go and Rust now, Java as a bonus.** codemem indexes nine languages. The eval grades
+three. Go and Rust are part of the main results, on kubernetes and ruff, the same two repos the
+end-to-end tasks use (§8.3).
 
 | Language | Graded today | To add | Candidate repos (to check with `cmeval repo-stats`) |
 |---|---|---|---|
 | Python | yes: pandas, transformers, home-assistant, airflow | — | — |
 | C++ | yes: Godot, duckdb, llama.cpp | — | — |
 | TypeScript | yes: vscode, playwright | — | — |
-| Go | no | a labeler; two repos | kubernetes, prometheus, grafana |
-| Java | no | a labeler; two repos | kafka, elasticsearch, spring-boot |
-| Rust | no | a labeler; two repos | ruff, tokio, rust-analyzer |
+| Go | no | a labeler; kubernetes first | kubernetes; then tidb, gitea |
+| Java | no | a bonus: a labeler, and a repo that links its issues on GitHub | keycloak, quarkus, trino. kafka cannot be collected (§8.3) |
+| Rust | no | a labeler; ruff first | ruff; then datafusion, zed |
 
 "A labeler" is the part of `cmeval` that turns a fix into gold line ranges with tree-sitter. It is
 written separately from codemem on purpose, so that a codemem bug cannot grade itself. Each new
@@ -1278,7 +1417,7 @@ so the retrieval eval gains:
 - **grep with guessed identifiers:** a model reads the prompt, proposes names that might appear
   in the code, and those are added to the search. This is what a strong agent does on its own.
 
-**Keep it short in the paper:** one table, three languages, two query kinds.
+**Keep it short in the paper:** one table, five languages once Go and Rust are in, two query kinds.
 
 ---
 
@@ -1326,7 +1465,8 @@ turns before the first edit; share of runs that called codemem; how failed runs 
 | a 10-point change in completion | 20% of tasks are completed by only one of the two setups | about 150 |
 | a 5-point change in completion | 15% of tasks are completed by only one of the two setups | about 470 |
 
-**What fits before the paper** is near the first row: 75 to 100 test tasks. Under the same
+**What fits before the paper** is near the first row: 80 to 120 tasks, from four to six repos at
+20 each. Under the same
 assumptions they can show a saving of 13 to 15% in tokens or time, and a change in completion of
 12 to 15 points, not less. So a frontier model's completion is likely to come out as "no
 detectable difference", and the claim for frontier models rests on tokens and time. The exact
@@ -1334,44 +1474,155 @@ number of test tasks follows from how many runs our seats allow, which the first
 
 ---
 
-## 14. Work packages, in order
+## 14. Work packages, and how they are run
 
-The tasks and the pipeline come first, side by side. The vague prompts are added to a pipeline
-that already works, and the small models come last. Sizes are rough working days for one
-person.
+The tasks and the pipeline come first, side by side. The full runs and the model gap follow in the
+same days. Most of this work can go on unattended, at night, if every job has a clear end and a
+clear answer to "what if it fails". §14.2 to §14.5 are written for that.
 
-| # | Work | Deliverable | Done when | Days |
-|---|---|---|---|---|
-| A1 | **The pipeline skeleton,** end to end on the first two repos (§2.2): plan, run in a container, record, grade, score. Claude Code only, setups `grep` and `tool`, a cheap model | `cmeval e2e plan / run / grade / score` | the checklist of §2.2 passes, and one command produces a table of completion, tokens and time for the two repos' tasks × 2 setups × 3 repetitions | 6 |
-| A2 | **Measurement** (§5): the recording proxy, the cross-check, the six token numbers, the four clocks, the file watcher | the run record of §6 | on the runs of A1, proxy and agent summary agree within 1% on every run, and the proxy adds no measurable delay to the first byte | 4 |
-| A3 | **Selection and plans** (§3): the flags, plan files, the run matrix, the iteration plan for tracks B and C | `plans/main.toml`, `plans/iterate.toml` | a plan can be previewed with `--dry-run`, stopped, and resumed without rerunning anything | 3 |
-| A4 | **Robustness** (§7): integrity checks, failure classes, the canary, the spending cap, the dashboard view | `cmeval e2e check`; a canary plan | a deliberately broken setup (MCP server missing, wrong context size) is detected and its runs discarded | 3 |
-| A5 | **Reports and statistics** (§13) | `cmeval e2e report` | a report can be rebuilt byte for byte from the run records | 3 |
-| A6 | **The other setups and the open harnesses:** `upfront`, `placebo`, `tool-strong`; mini-SWE-agent with codemem as a command; Qwen Code with codemem over MCP; the harness trial of §4.6; the localization tier | every setup of §4.1; `--harness mini-swe-agent`, `--harness qwen-code`; `--tier locate` | the harness trial is done and its outcome written down; the pilot tasks run in every setup and every harness; the small-model floor is measured (30 easy tasks, 9B and 14B, `grep` only) | 6 |
-| A7 | **Labels** (§10), first on public tasks | every label in the task file | a hand check of 50 tasks agrees with the difficulty and kind labels at least 85% of the time | 3 |
-| A8 | **Vague prompts** (§9): the rewriter and its three checks | L1 and L2 for every task, and for the retrieval eval's dev tasks | check 2 passes on at least 80% of rewrites; the human agreement is reported | 4 |
-| A9 | **Our own tasks** (§8): the build and validate steps of the generator; one recipe per repo, in the order of §8.3; a file-level labeler for the languages that have none | `cmeval generate <repo>`; validated fresh tasks | the first two repos each have 30 or more validated tasks of mixed difficulty by Nov 25; each later repo passes the admission check of §8.2 | 10 |
-| A10 | **Retrieval eval additions** (§12.2): labelers for Go, Java and Rust; the vague column; the two baselines | the six-language retrieval table | labels hand-checked on 15 tasks per language, as for C++ | 6 |
-| A11 | **The small-model study** (§11) | the gap-closed table and the failure endings | the 9B and 14B models, on easy and medium tasks, 3 repetitions; the hard probe; a local repeat of a subset on a Mac | 6 |
-| A12 | **The matrix on the test split** (§3.3) | the paper's main tables and figure | every primary measure reported with its interval | 5 |
-| A13 | **Release:** tasks, images, the task-layer tool, a datasheet | a public dataset and repo | a stranger can add vague prompts and labels to a new set of tasks by following the README | 4 |
+| # | Work | Deliverable | Done when |
+|---|---|---|---|
+| A1 | **The pipeline skeleton,** end to end on the first two repos (§2.2): plan, run in a container, record, grade, score. Claude Code only, setups `grep` and `tool`, a cheap model | `cmeval e2e plan / run / grade / score` | the checklist of §2.2 passes, and one command produces a table of completion, tokens and time for the two repos' tasks × 2 setups × 3 repetitions |
+| A2 | **Measurement** (§5): the recording proxy, the cross-check, the six token numbers, the four clocks, the file watcher | the run record of §6 | on the runs of A1, proxy and agent summary agree within 1% on every run, and the proxy adds no measurable delay to the first byte |
+| A3 | **Selection and plans** (§3): the flags, plan files, the run matrix, the iteration plan for tracks B and C | `plans/main.toml`, `plans/iterate.toml` | a plan can be previewed with `--dry-run`, stopped, and resumed without rerunning anything |
+| A4 | **Robustness** (§7): integrity checks, failure classes, the canary, the spending cap, the dashboard view | `cmeval e2e check`; a canary plan | a deliberately broken setup (MCP server missing, wrong context size) is detected and its runs discarded |
+| A5 | **Reports and statistics** (§13) | `cmeval e2e report` | a report can be rebuilt byte for byte from the run records |
+| A6 | **The other setups and the open harnesses:** `upfront`, `placebo`, `tool-strong`; mini-SWE-agent with codemem as a command; Qwen Code with codemem over MCP; the harness trial of §4.6; the localization tier | every setup of §4.1; `--harness mini-swe-agent`, `--harness qwen-code`; `--tier locate` | the harness trial is done and its outcome written down; the pilot tasks run in every setup and every harness; the small-model floor is measured (30 easy tasks, 9B and 14B, `grep` only) |
+| A7 | **Labels** (§10) | every label in the task file | a hand check of 50 tasks agrees with the difficulty and kind labels at least 85% of the time |
+| A8 | **Vague prompts** (§9): the rewriter and its three checks | L1 and L2 for every task, and for the retrieval eval's dev tasks | check 2 passes on at least 80% of rewrites; the human agreement is reported |
+| A9 | **Our own tasks** (§8): the build and validate steps of the generator; one recipe per repo, in the order of §8.3; `collect` for ruff and kubernetes, with a file-level labeler and the Rust rule for tests | `cmeval generate <repo>`; validated fresh tasks | pandas and playwright each have 30 or more validated tasks of mixed difficulty by Nov 25, and ruff, kubernetes and duckdb by Nov 27. Every repo passes the admission check of §8.2 |
+| A10 | **Retrieval eval additions** (§12.2): labelers for Go and Rust, on kubernetes and ruff; the vague column; the two baselines. Java is a bonus | the retrieval table in five languages | labels hand-checked on 15 tasks per language, as for C++ |
+| A11 | **The model gap** (§11): one open model first, the 9B; then the 27B; then the 14B | for each model, the difference with and without codemem, and how failed runs ended; the gap-closed table once the 27B has run | the 9B model on the easy and medium tasks of the sample, 3 repetitions, with the hard probe, before Nov 30. The other models as time allows. A local repeat of a subset on a Mac |
+| A12 | **The main batch** (§3.3): baseline and final on the sample, with today's codemem on the medium tasks | the paper's main tables and figure | every primary measure reported with its interval |
+| A13 | **Release:** tasks, images, the task-layer tool, a datasheet | a public dataset and repo | a stranger can add vague prompts and labels to a new set of tasks by following the README |
 
-**When** (the dates are in [overview.md](overview.md) §8):
+Nothing here is sized in working days. The deadlines are in §14.1, and the lanes and the nights
+below are how the work fits into them.
+
+### 14.1 When
+
+The dates are in [overview.md](overview.md) §8.
 
 | By | Packages | What it gives the team |
 |---|---|---|
-| **Nov 25** | A9 for the first two repos; A1 and A2 | tasks generated from two repos, and the pipeline's first version: one of those tasks runs end to end in both setups, with tokens counted two ways that agree |
-| **Nov 27** | the first end-to-end test (§2.2); A3 | both repos, every validated task, today's codemem against the baseline. Tracks B and C can now run the pipeline themselves |
-| **Dec 1:** the solution and the results | A9 for the next repos of §8.3; a first A5; the computed labels of A7; a first subset of A8 | the run matrix on the dev tasks of every repo that is up: baseline and final on all of them, today's codemem on the medium ones, the vague subset |
-| **Dec 8:** the paper | A4, the full A5, A6, A7 and A8 on the test tasks, A11, A12, the vague column and the two baselines of A10, and the part of A13 that goes with a paper | the matrix run once on the test split with the frozen configuration; then the model gap, with open models in open harnesses; the `upfront` and `placebo` setups and the vague prompts on subsets; the release that goes with the paper |
-| **Later, no date** | a generator that takes any repo without a recipe; the three new languages of A10; the rest of A13 | tasks from any GitHub link; the six-language retrieval table; a dataset release with its datasheet |
+| **Nov 25** | A1, A2, A3 and the integrity checks of A4; A9 for pandas and playwright, then ruff, kubernetes and duckdb; from A6, mini-SWE-agent and the localization tier; the computed labels of A7; the sample and the analysis plan | the pipeline tested end to end on two repos with today's codemem; validated tasks for every repo that is ready; the open harness working with one model; the sample of tasks and the measures fixed before the full runs. Tracks B and C can run the pipeline themselves |
+| **Nov 26–30, first:** the runs for the presentation | A12, with a first A5; A11 with the 9B model | baseline and final on the sample of every repo that is up, three repetitions; today's codemem on the medium tasks; the model gap for at least one open model. The freeze is aimed at Nov 30, 23:59. The hard limit is the presentation of Dec 1 at 14:00 |
+| **Nov 26–30, beside the runs** | the rest of A6 and A11; A9 for further repos; A10; A7 and A8 completed; the rest of A4 and A5; the part of A13 that goes with a paper | everything else in the track, as far as the lanes allow without slowing the runs: the other open models, more repos, the retrieval table with Go and Rust, its vague column and its two baselines, a vague version of every prompt. The aim is to leave nothing open after December 1 |
+| **Dec 7:** the paper and final report | the writing, and whatever is still open | the paper, with the code, the task list and the run records |
+| **No date** | Java, in A9 and A10, as a bonus. As future work: a generator that takes any repo without a recipe, and the rest of A13 | a sixth language; tasks from any GitHub link; a dataset release with its datasheet |
 
-A9 and A1 start on the same day and run side by side: tasks need no pipeline to be generated, and
-the pipeline can be built on the control tasks until ours exist. The first rows are more than one
-person can do. A repo's recipe is the natural piece to hand to someone else: each one is
-independent. A2 (the proxy and the cross-check) and the vague rewrites of A8 also stand on their
-own. A9 is the least certain piece of the plan, which is why the repos are in a fixed order and
-each one is complete on its own.
+### 14.2 Five lanes that do not wait for each other
+
+Each lane uses a different scarce thing. So all five can be busy at the same time, and a lane
+that is stuck does not stop the others.
+
+| Lane | What is scarce | Its jobs |
+|---|---|---|
+| 1. Claude seats | subscription usage | the first end-to-end test; the main batch; the vague subset; the mechanism setups |
+| 2. Docker | the Mac's cores, memory and disk | generating tasks: build the image, validate the tests. Grading finished runs |
+| 3. The local GPU | the Mac's GPU | building codemem indexes for the tasks about to run |
+| 4. The open-model endpoint | a few dollars | the model gap: the harness trial, localization, then end to end |
+| 5. Nothing scarce | — | `collect`, the labelers, labels, the sample, plan files, reports, the analysis plan |
+
+**Two machines carry lanes 1 to 3:** Andrew's M5 Mac and his PC. Spread the lanes over them, so
+that several jobs run at once. Three rules:
+- **A repo's tasks are validated and run on one machine.** An image built on the Mac and one built
+  on the PC are different images.
+- **Both setups of a task run on the same machine,** turn about. Then the machine cannot look like
+  a difference between setups.
+- **Watch each machine's memory.** Start with three agent runs at once in all, one per seat, and
+  on each machine two build or validate containers and one indexing job. Lower the containers
+  first if a machine starts to swap.
+
+How an index that was built on the Mac is used on the PC is for the first runs to settle. Until
+then, build an index on the machine that runs the task.
+
+### 14.3 Night by night
+
+What each night should leave behind. A lane moves on to its next row as soon as it finishes one.
+It does not wait for the date.
+
+| Night of | Lane 1: seats | Lane 2: Docker | Lane 3: GPU | Lane 4: endpoint | Lane 5 |
+|---|---|---|---|---|---|
+| **Sun Nov 22** | bring-up runs on a few pandas tasks, with Haiku, in `grep` and `tool` | pandas: the recipe and its admission check, then validation of 60 candidates. Then playwright | index the pandas and playwright task commits with today's codemem | — | `collect` for ruff and kubernetes; the file-level labeler; the Rust rule for tests |
+| **Mon Nov 23** | the first end-to-end test (§2.2) on pandas and playwright: Haiku, then Sonnet | playwright: validation. ruff: the recipe and its admission check | — | the harness trial with the 9B model (§4.6) | labels; draw the sample for the two repos |
+| **Tue Nov 24** | today's codemem against the baseline on both repos, three repetitions, turn about. The iteration plan for tracks B and C | ruff and kubernetes: validation. duckdb: the recipe | index the medium tasks of every validated repo with today's codemem | localization with the 9B model on pandas and playwright | the plan file and a dry run of it; the analysis plan |
+| **Wed Nov 25** | the canary; the adoption check for track B | duckdb: validation. home-assistant: the recipe | after the evening freeze: index every sampled task with `codemem-final`, pandas and playwright first | localization with the 9B model on every repo that is up | the sample and the analysis plan committed, before the freeze |
+| **Thu Nov 26** | **the main batch, repetition 1:** `grep`, final and today's turn about, repo by repo in the order of §8.3 | grading as runs finish. home-assistant and vscode: validation | index the next repos | end to end with the 9B model, easy and medium, repetition 1 | a first report, after repetition 1 of the first two repos |
+| **Fri Nov 27** | repetition 1 for the remaining repos; repetition 2 starts | grading; further repos | index what is left | the 9B model: repetitions 2 and 3, and the hard probe | the Go and Rust labelers; the retrieval eval on ruff and kubernetes |
+| **Sat Nov 28** | repetitions 2 and 3 | grading | — | the 27B model: localization, then end to end | vague rewrites for a subset, with their checks |
+| **Sun Nov 29** | repetition 3; then the vague subset | grading | — | the 14B model, if the 27B is done | the tables, per language and overall |
+| **Mon Nov 30** | only what is missing. No new run after 18:00 | grading | — | only what is missing | the final tables, by 23:59 |
+
+**Nov 30, 23:59 is the freeze we aim for.** The hard limit is Dec 1, before the presentation at
+14:00, and that morning is for preparing the presentation, not for runs.
+
+### 14.4 Decisions already made
+
+An agent that runs at night must not have to ask. These are the answers.
+
+| Question | Answer |
+|---|---|
+| Which Claude model | `claude-sonnet-5-5` for everything that is reported. `claude-haiku-5-5` for bring-up and for the iteration plan |
+| How many repetitions | three, scheduled by repetition (§3.3) |
+| The limits of a run | 150 turns or 50 minutes, the same in every setup (§4.7) |
+| Which tasks | a sample of 20 per repo: 6 easy, 8 medium, 6 hard, with seed `main-1`. If usage runs short: 15, then 12. Never fewer languages before fewer tasks |
+| Which prompt | the issue as written (L0) in the main batch. The short request (L2) only in the vague subset |
+| Which repos, in what order | §8.3 |
+| Which setups in the main batch | `grep`, and `tool` with `codemem-final`. `tool` with `codemem-today` on the medium tasks |
+| Which embedding model | today's local model, until Andre announces another one in the work log |
+| Which open model | Qwen3.5-9B first, then Qwen3.8-27B, then Qwen3-14B, in mini-SWE-agent. The action mode is the one the harness trial chose (§4.6). Andrew settles the choice of models with Andre, in the log; this order is the starting point |
+| Where open models run | a hosted endpoint if its key is in the environment. If it is not, the 9B on the Mac, while lane 3 is idle |
+| Where runs happen | on Andrew's M5 Mac and on his PC. A repo stays on one machine. The SWE-bench-Live control tasks go to the PC, which is x86 |
+| A model for helper jobs: a judge, the rewriter, reading labels | a seat, when one is idle. The team also holds $200 of Claude API credit as a reserve for jobs like these. Ask Andre in the log before spending from it |
+| How work reaches `main` | on a branch, through a pull request. Never a push to `main`. The `worklog` branch is pushed freely |
+
+### 14.5 Rules for running unattended
+
+**Keep going when:**
+- **a task fails.** Record it and move on. A failed task is a result;
+- **a repo fails its admission check** (§8.2). Write why in the log, and take the next repo of
+  §8.3;
+- **a seat reaches its usage limit.** That seat pauses until its reset. The run that was cut off
+  is thrown away and queued again. The other lanes carry on;
+- **a question is answered in §14.4.** Use that answer, and say in the log that you did.
+
+**Stop the lane, not the night, when:**
+- a credential is missing, or a login has expired;
+- the same job has failed three times with the same error;
+- less than 20 GB of disk is free;
+- going on would need a change to something frozen: the sample, a prompt, a limit, the analysis
+  plan, a frozen configuration.
+
+Then write a log entry that says what is blocked and what you tried, and work on another lane.
+
+**When track A needs help,** whether more machines, more hands or a decision: say so in the work
+log, addressed to Andre, under "Blocked on, or needed from others". Say it early. He moves people
+and work to where the plan is falling behind.
+
+**Stop every agent run when** the two token counts disagree on more than 1 run in 20 of a batch
+(§5.3). The measurement is broken, and more runs would only spend usage.
+
+**Never:**
+- change the sample, the prompts, the limits or the analysis plan after the first run of the main
+  batch;
+- change a frozen configuration, or run a batch on one that is not frozen;
+- score a run that failed an integrity check, or delete a run's records;
+- give one setup something the other does not get: a longer limit, another model, a retry;
+- report something as done without the output of its check.
+
+**Before a long batch starts:** save the dry run of the plan (how many runs, in what order). Run
+the canary. Record the versions of the agent, the model and codemem.
+
+**At least every four hours, and at the end of every session,** write a log entry
+([CONTRIBUTING.md](../../CONTRIBUTING.md) §4) and bring the status file up to date. In the entry,
+give for each lane:
+- what ran, in numbers: runs finished, thrown away and still queued; tasks validated per repo;
+- what failed, by kind;
+- what is running now;
+- what needs a person.
+
+That entry is what the three of us read in the morning.
 
 ---
 
@@ -1379,8 +1630,8 @@ each one is complete on its own.
 
 | With | A needs | A gives |
 |---|---|---|
-| **Track B** | `codemem-today` frozen now, the final configuration on Nov 28 and again on Dec 3; a timing log from codemem for each search (§5.5); no change to tool names or card layout without notice; a note in the work log each time a new piece of retrieval can run | the iteration plan (§3.4); vague rewrites of the dev tasks, a first subset by Nov 27; end-to-end comparisons of card formats |
-| **Track C** | a note in the work log as soon as the compact store works on one repo; before the first runs that embed through an API, a codemem install that works in a container without PyTorch; the compact configuration frozen; memory, disk and build-time numbers per repo | the same iteration plan and vague rewrites |
+| **Track B** | `codemem-today` frozen now, the final configuration on the evening of Nov 25; a timing log from codemem for each search (§5.5); no change to tool names or card layout without notice; a note in the work log each time a new piece of retrieval has passed its gate on the retrieval eval and can run | the iteration plan (§3.4); vague rewrites of the dev tasks, a first subset by Nov 24 if it is to count for the freeze; end-to-end comparisons of card formats; the adoption numbers track B needs |
+| **Track C** | a note in the work log as soon as the compact store works on one repo; before the first runs that embed through an API, a codemem install that works in a container without PyTorch; the compact configuration frozen; the embedding configuration for each batch, a local model first and Qwen through Nebius later; memory, disk and build-time numbers per repo | the same iteration plan and vague rewrites |
 
 **The eval stays independent of codemem.** `cmeval` never imports codemem except in its one
 adapter file, and the labelers stay separate implementations. The end-to-end runner treats codemem
@@ -1392,10 +1643,11 @@ as a black box: an MCP server, a command, and an index folder.
 
 | Risk or question | Why it matters | What we do |
 |---|---|---|
-| Agents don't call codemem | no call, no effect; one vendor saw 1 call in 143 sessions *(reported)* | tools loaded up front; adoption measured in the first runs; `upfront` and `tool-strong` as separate setups |
+| Agents don't call codemem | no call, no effect; one vendor saw 1 call in 143 sessions *(reported)* | **track B owns this** ([track B](track-b-retrieval.md) §5): tools loaded up front, the text that tells the agent when to call. Track A measures it in every run and reports it to track B; `upfront` and `tool-strong` are separate setups |
+| Baseline and final are run days apart | the API is faster on some days, which would look like a saving in time | wall time is compared only inside one batch, turn about (§3.3; §4.5, rule 8) |
 | The token numbers are wrong and nobody notices | every claim rests on them | two independent counts that must agree (§5.3); the canary |
 | Building environments is slow and fragile | it is the longest and least certain job in the track | one recipe per repo, written once; a check on 10 tasks before a repo is admitted; repos in a fixed order, each complete on its own; SWE-bench-Live as the control and the fallback (§8) |
-| C++ has few testable tasks | Godot and duckdb gave 7 and 9 tasks with tests | llama.cpp for C++; the other two stay in the retrieval eval (§8.3) |
+| A repo's tests are not recognised | the classifier goes by folder and extension. It counted 9 duckdb tasks with tests where there are about 200, and Rust keeps unit tests inside code files | what counts as a test is set in each repo's recipe (§8.2). Before a repo's count is trusted, 10 of its pull requests are read by hand |
 | Public benchmarks we borrow are flawed | OpenAI estimated that about 30% of SWE-bench Pro's public tasks were broken and stopped recommending it; it had already dropped SWE-bench Verified *(reported)* | tasks are spot-checked by hand before they enter the test split, and a task whose gold patch fails its own tests in our container is dropped |
 | Vague prompts become unsolvable | failures would then say nothing about search | check 2 in §9 |
 | Usage limits slow everything down | three seats, each with a session and a weekly limit, are all the Claude time we have, and we code on the same seats | the run matrix spends large tasks only on the baseline and the final configuration; the baseline is reused; `--dry-run` sizes a plan first; the first batch tells us how many runs fit in a window |

@@ -8,6 +8,21 @@ help a coding agent that already has grep?* The work splits into three tracks. T
 end-to-end evaluation, track B rebuilds retrieval as three complementary representations, and
 track C makes the index small.
 
+**What we are after.** Everyone works to the same order of goals.
+
+1. **Primary: the study.** An end-to-end account of what an index costs and what it gains for a
+   coding agent that already has grep: task completion, time and tokens, over the whole agent
+   run. Most earlier studies stop at retrieval, and the few that follow the whole run are small,
+   cover one model or test a vendor's own product (§3). If the answer is that grep is simply
+   better and an index is not worth its cost, we report that. The analysis is the contribution,
+   whatever its sign. This is why track A matters most.
+2. **Part of the study: the model gap.** A result for Claude may not hold for smaller open models
+   such as Qwen or Llama. So the same comparison is run with them, to see whether an index helps
+   a weaker model more.
+3. **Secondary: the system.** A codemem that is small and fast, and that finds what grep misses,
+   so that it works beside grep or better than it. This is the work of tracks B and C. It also
+   serves the study: a fair test needs a good index, and one that agents actually use.
+
 | File | Read it if |
 |---|---|
 | `overview.md` (this file) | you are on the team: where we stand, what we want to show, how the tracks connect, the timeline, the paper |
@@ -43,17 +58,20 @@ product.
    - **A builds the eval set-up first:** our own tasks, generated from repos we choose, and the
      pipeline that runs them and records tokens and time from two sources that must agree. It is
      tested end to end on two repos with today's codemem. B and C then change codemem and rerun
-     it. The model gap comes after.
+     it. The model gap runs in the same days, with at least one open model before the presentation.
    - **B rebuilds retrieval as three layers:** keywords with stemming, dense vectors, and a graph.
-     The embedding model becomes a choice of three.
-   - **C makes the index small:** 15 to 45 times less memory for vectors, with exact rescoring
-     from disk.
-6. **What runs on what.** The baseline and the final codemem on every task. Today's codemem on
-   medium tasks only. Small models (9B and 14B) on easy and medium tasks, with a few hard ones as
-   a probe.
-7. **Dates.** December 1: the solution and the results are done and presented. December 8: the
-   paper is on arXiv, after a week of refining. What does not fit has no date, and search beyond
-   code is one of those (§8).
+     It checks each one on the retrieval eval before the end-to-end runs use it. It also owns
+     the MCP integration: agents have to actually call codemem.
+   - **C makes the index small,** in memory and on disk: 15 to 45 times less memory for vectors,
+     with exact rescoring from disk. C also owns the embedding model options and how an index
+     follows git branches.
+6. **What runs on what.** The baseline and the final codemem on a fixed sample of tasks from
+   every repo, in several languages. Today's codemem on the medium tasks only. An open model, the
+   9B first, on easy and medium tasks, with a few hard ones as a probe.
+7. **Dates.** November 25, evening: tracks B and C have delivered, and the improved codemem is
+   frozen. November 26: the full runs start. November 30, 23:59: the freeze we aim for.
+   December 1, 14:00: the presentation, which is the hard deadline. December 7: the paper, after
+   six more days of refining. Bonus goals and future work have no date (§8.3).
 
 **Seven things the research changed.** Each is explained where it is used. The middle column is
 *(reported)*, except the last row.
@@ -61,7 +79,7 @@ product.
 | We assumed | The research says | Where |
 |---|---|---|
 | Claude and Codex have both said grep works better | only Anthropic has. OpenAI has published no comparison | §3.1 |
-| Qwen3-Embedding-8B is the strongest open embedding model | it ranks fourth overall, and on finding code for an issue it scores no better than the 0.5B model we already use (20.3 against 20.8) *(reported)* | [track B](track-b-retrieval.md) §5.2 |
+| Qwen3-Embedding-8B is the strongest open embedding model | it ranks fourth overall, and on finding code for an issue it scores no better than the 0.5B model we already use (20.3 against 20.8, read in the paper's own tables) | [track C](track-c-memory.md) §6.2 |
 | Stemming will help keyword search | on code the one study found it hurts more queries than it helps, except short verb-like ones. It gets a gate | [track B](track-b-retrieval.md) §3.2 |
 | A graph will make search more precise | studies disagree: callers help, unfiltered spreading hurts, and every study used bug fixes. Ours tests feature requests too | [track B](track-b-retrieval.md) §3.3 |
 | Small models will complete easier tasks | given the right files, small models repaired 2 tasks of 100 in one study. Localization becomes their primary measure | [track A](track-a-evals.md) §11 |
@@ -155,13 +173,13 @@ layers exist in a basic form.
 
 | Layer | Today | Next phase | Track |
 |---|---|---|---|
-| Dense vectors (meaning) | one small local model, full-size vectors | three model options (a light Mac model, local Qwen 8B, an API), shorter vectors | B, C |
+| Dense vectors (meaning) | one small local model, full-size vectors | three model options (a light Mac model, local Qwen 8B, an API), shorter vectors | C |
 | Keywords (exact words) | BM25, no stemming, no exact-name lookup | BM25 with stemming on the natural-language tokens, plus an exact lookup for names the query spells out | B |
 | Graph (relationships) | call links by name, used only to build a text | typed, scored edges that search walks to pull in callers, tests and sibling implementations | B |
 | Merging | three lists merged by rank | route the query, merge, expand along the graph, then rescore the top results | B |
 | Vector storage | 2 bytes per number, in RAM and on disk | 1 bit per number in RAM, full vectors on disk for rescoring only | C |
-| Branches | one index per checkout, a cache that only grows | one shared store, a small view per checkout, a size cap | B, C |
-| Evaluation | retrieval only, three languages | end-to-end agent runs on public tasks in up to six languages, vague prompts, small models; a task generator later | A |
+| Branches | one index per checkout, a cache that only grows | one shared store, a small view per checkout, a size cap | C |
+| Evaluation | retrieval only, three languages | end-to-end agent runs on our own generated tasks, vague prompts, small models | A |
 
 ---
 
@@ -278,31 +296,34 @@ three places a new stage must touch, in one search.
       │                                  │                                ▼
  ┌────┴──────── TRACK B: retrieval ──────┴───┐      ┌──────── TRACK C: memory ──────────┐
  │ keywords + dense vectors + graph          │      │ shorter vectors, 1-bit codes,     │
- │ the query path · embedding options        │◄────►│ exact rescoring, one copy on      │
- │ branch switches                           │      │ disk, the cache cap               │
+ │ the query path · its own retrieval eval   │◄────►│ exact rescoring, one copy on disk,│
+ │ the MCP integration: agents have to       │      │ the cache cap · embedding options │
+ │ actually call codemem                     │      │ branch switches                   │
  └───────────────────────────────────────────┘      └───────────────────────────────────┘
-          shared between B and C: the vector store interface, and the vector cache
+          shared between B and C: the vector store interface, and which vectors exist
 ```
 
 | Track | Owner | Owns | First deliverable | Its file |
 |---|---|---|---|---|
 | **A** | Andrew | how we measure, and the task set | tasks generated from two of our own repos, and one end-to-end run on them with and without codemem, with tokens counted two ways that agree | [track-a-evals.md](track-a-evals.md) |
-| **B** | Wilson | what codemem stores and how it ranks | a table of why today's searches miss, which orders the rest | [track-b-retrieval.md](track-b-retrieval.md) |
-| **C** | Andre | memory, disk and speed | the compression table on our own vectors | [track-c-memory.md](track-c-memory.md) |
+| **B** | Wilson | how codemem finds and ranks code, its own retrieval eval, and the MCP integration that makes agents use it | a table of why today's searches miss, which orders the rest | [track-b-retrieval.md](track-b-retrieval.md) |
+| **C** | Andre | memory, disk and speed; the embedding model options; how an index follows branches | the compression table on our own vectors | [track-c-memory.md](track-c-memory.md) |
 
 **What passes between the tracks:**
 
 | What | From → to | When |
 |---|---|---|
 | `codemem-today`: the current default, frozen as the reference for every comparison | B → A | Nov 23 |
-| The pipeline's first version, and the small plan B and C can run themselves ([track A](track-a-evals.md) §3.4) | A → B, C | Nov 25 |
-| The vector store interface, with exact scores for the top results | C ↔ B | Nov 25, before B builds the query path |
+| The pipeline's first version, and the small plan B and C can run themselves ([track A](track-a-evals.md) §3.4) | A → B, C | as soon as it runs on the two repos, and by Nov 24 at the latest |
+| The vector store interface, with exact scores for the top results | C ↔ B | Nov 23, before B builds the query path |
+| Every change to the algorithm, the index or the tool's text, announced in the work log with its result on the retrieval eval | B → everyone | on the day it lands, and before it goes into a configuration that track A runs |
+| The embedding configuration the eval uses: a local model first, Qwen through Nebius later | C → A, B | with each frozen configuration |
 | A note in the work log each time a new piece of retrieval or a new index format can run | B, C → A | as soon as it works on one repo, not only at a freeze |
 | A codemem install without PyTorch, for the `api` embedding option | C → A | before track A's first runs that embed through an API. Its first runs use the local model |
-| `codemem-final`, frozen for the presentation | B, C → A | Nov 28, evening |
-| `codemem-final`, the last freeze, for the test split | B, C → A | Dec 3, evening |
+| `codemem-final`, frozen for the full runs | B, C → A | Nov 25, evening |
+| The analysis plan: the measures and the tests, fixed before the full runs | A → everyone | Nov 25 |
 | Memory, disk and build-time numbers per repo | C → A | with each frozen configuration |
-| Vague rewrites of the retrieval eval's dev tasks | A → B, C | a first subset by Nov 27, so gates can be judged on them before the freeze; the rest by Dec 3 |
+| Vague rewrites of the retrieval eval's dev tasks | A → B, C | a first subset by Nov 24 if it is to count for the freeze; the rest during the full runs |
 | End-to-end verdicts on card formats and on reranking | A → B, C | after the first full batches |
 
 **Four rules that keep the tracks from blocking each other:**
@@ -316,13 +337,21 @@ three places a new stage must touch, in one search.
    ([CONTRIBUTING.md](../../CONTRIBUTING.md) §4), so each track knows what the others have done
    and what they are waiting for.
 
+**Tracks B and C work at the same time.** Whatever track B changes in what is embedded and how it
+is ranked ends up as vectors, and track C compresses vectors whatever they hold. Two things are
+settled between them on the first day, Nov 23. After that neither waits for the other.
+1. **The vector store interface.** The store returns exact scores for its top results, because
+   track B merges by score.
+2. **Which vectors exist:** code only, or code and usage. Track C's storage and its cache depend
+   on it.
+
 ---
 
 ## 7. Shared ground rules
 
 **Who we build for.** A student or an engineer who already has a coding agent on a subscription:
 Claude Code, or Codex. So Claude runs under the subscriptions the three of us already have, each
-of us on our own, with codemem attached as an MCP tool. No Claude API key is involved.
+of us on our own, with codemem attached as an MCP tool. Agent runs use no Claude API key.
 
 **Where API keys are used.** For model calls, in two places only:
 - **the embedding API,** when embeddings are not computed locally;
@@ -334,6 +363,9 @@ One more key is already in use and costs nothing: the eval counts tokens with An
 counting endpoint ([track A](track-a-evals.md) §5.4). No model is called with it, and codemem
 itself never needs it.
 
+**A reserve.** The team also holds $200 of Claude API credit. It is not for agent runs. It is there
+for helper jobs that need a model outside a subscription, such as an LLM judge.
+
 **Models.**
 
 | Tier | Model | Runs under | Harness |
@@ -341,12 +373,12 @@ itself never needs it.
 | Frontier | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | our Claude subscriptions | Claude Code |
 | Cheap closed | Claude Haiku 5.5 (`claude-haiku-5-5`) | our Claude subscriptions | Claude Code |
 | Small open | Qwen3.5-9B and Qwen3-14B, today's models in the 7B and 13B classes | an API: a hosted endpoint at cents per run where a provider serves the model, or a server on our Macs, which is free and slower | mini-SWE-agent, and Qwen Code as a second harness |
-| Larger open | Qwen3.8-27B | a hosted endpoint: it does not fit a 24 GB Mac. Added in the week before arXiv if the two smaller ones are done | mini-SWE-agent |
+| Larger open | Qwen3.8-27B | a hosted endpoint: it does not fit a 24 GB Mac. It is the second open model to run, after the 9B, because the gap is measured against it | mini-SWE-agent |
 
-**Languages.** Python, C++, Go, Java, Rust and TypeScript, on medium to large repos. End to end,
-the repos are taken in a fixed order ([track A](track-a-evals.md) §8.3): Python and TypeScript
-first, then Rust and Go, then C++ and Java. The retrieval eval stays at Python, C++ and TypeScript
-in this phase.
+**Languages.** Python, TypeScript, Rust, Go and C++, on medium to large repos. End to end, the
+repos are taken in a fixed order that brings in these five languages first
+([track A](track-a-evals.md) §8.3). The retrieval eval has Python, C++ and TypeScript today, and
+gains Go and Rust. Java is a bonus.
 
 **Our own tasks first.** The end-to-end tasks are generated from our own repos, from pull requests
 merged after July 1, 2026, so they are newer than the models we test. They carry the headline.
@@ -362,10 +394,10 @@ reported by the retrieval eval and used for tuning. It is not a headline.
 is a saving, the difference between two runs of one task, so both runs are always measured by the
 same instrument ([track A](track-a-evals.md) §5).
 
-**Dev and test.** Everything is built and tuned on the dev split, and the December 1 results are
-dev results. The test split is run once, in the week before arXiv, with the frozen configuration
-and after the analysis plan is written down. Writing the plan first is what "pre-registered"
-means, and the strongest prior study did it.
+**Dev and test.** Everything is built and tuned on the dev split. The configuration is frozen on
+Nov 25, and the analysis plan is written down the same day. From Nov 26 the frozen configuration
+runs on every task, and the test tasks are run once. Writing the plan first is what
+"pre-registered" means, and the strongest prior study did it.
 
 **Names for configurations.** No version numbers.
 
@@ -374,19 +406,21 @@ means, and the strongest prior study did it.
 | `codemem-today` | the current default, frozen on Nov 23. The "simple version" in every comparison |
 | `codemem-layered` | track B's retrieval on today's storage |
 | `codemem-compact` | track C's storage under today's retrieval |
-| `codemem-final` | both together: the configuration we present. Frozen before each batch we report, and the freeze date goes into the report |
+| `codemem-final` | both together: the configuration we present. Frozen on Nov 25, before the full runs. A later change is a new freeze, and its date goes into the report |
 
-**What runs on what.** The baseline (the agent without codemem) and `codemem-final` run on every
-task. `codemem-today` runs on medium tasks only, which is enough to show the step from today's
-version to the final one. Small models run on easy and medium tasks, plus about ten hard ones as a
-probe. The full table is in [track A](track-a-evals.md) §3.3.
+**What runs on what.** The baseline (the agent without codemem) and `codemem-final` run on a fixed
+sample of the prepared tasks: 20 per repo, spread over easy, medium and hard. `codemem-today` runs
+on the medium tasks only, which is enough to show the step from today's version to the final one.
+The open models run on the easy and medium tasks, plus about ten hard ones as a probe. If usage
+runs short, the sample shrinks before any language is dropped. The full table is in
+[track A](track-a-evals.md) §3.3.
 
 **Start small.** Track A first runs the whole chain on two repos in different languages, on the
 codemem that exists today. No other repo is indexed until that test passes, and by then the
 index should be much smaller ([track A](track-a-evals.md) §2.2).
 
 **Which embedding model the eval uses.** A local one first: today's default, or the local model
-track B picks in its place. Qwen3-Embedding-8B through Nebius comes later, as one more codemem
+track C picks in its place. Qwen3-Embedding-8B through Nebius comes later, as one more codemem
 configuration. An index holds one model's vectors, so each model gets its own index of each repo
 ([track A](track-a-evals.md) §2.3).
 
@@ -397,7 +431,8 @@ configuration. An index holds one model's vectors, so each model gets its own in
 | Claude Code runs | nothing beyond our subscriptions | each seat's usage limit, which our own coding in these weeks draws on too. The pipeline pauses when a seat reaches its limit and resumes after the reset. Three seats run side by side |
 | Embeddings through an API | $0.01 per million tokens: about $0.40 for a 40M-token repo *(reported)* | none that matters |
 | Small open models | cents per run on a hosted endpoint *(reported prices)*; free on our Macs: the 9B on 16 GB, the 14B on 24 GB | hosted: Nebius serves the 27B and, as far as we found, neither the 9B nor the 14B. DeepInfra lists all three *(reported)*. On a Mac: laptop speed |
-| Containers for hidden tests | free on the team's x86 machine | Macs emulate x86 slowly. A rented Linux machine is about $0.50 to $1.50 an hour if we need one |
+| Helper jobs that need a model: a judge, the vague rewriter | a seat when one is idle; otherwise the $200 of Claude API credit the team holds | the credit is a reserve: ask before spending from it |
+| Containers for the runs and the hidden tests | free on Andrew's two machines: our own images on his M5 Mac and on his PC, SWE-bench-Live's x86 images on the PC | a Mac emulates x86 slowly, so x86 images go to the PC. A rented Linux machine is about $0.50 to $1.50 an hour if we need more |
 
 **Tokens are still the measure, for a different reason.** On a subscription, a token is not a
 fraction of a cent. It is a fraction of your usage limit. An agent that needs fewer tokens per task
@@ -413,39 +448,56 @@ pipeline's first runs give us, and it sizes everything after it.
 
 ## 8. Timeline
 
-Two dates. What does not fit before them has no date.
+Four dates. The aim is to leave nothing open after December 1 except the paper. Nothing in this plan
+is sized in working days: these are the deadlines, and we work towards them.
 
 | Date | What is due | What "done" means |
 |---|---|---|
-| **Tue Dec 1, 2026** | **the solution and the results:** the course report and presentation | our own tasks exist for the first repos of the list; the evaluation pipeline runs them end to end with trusted token and time counts; the solution we present is built and frozen; the run matrix has run on the dev tasks; the retrieval and memory tables exist |
-| **Tue Dec 8, 2026** | **the paper, on arXiv** | the same results, refined: one last freeze, the test split run once, three repetitions, every integrity check passing, limits stated plainly |
-| no date | what §8.3 lists, including search beyond code | designed in this plan; built after the paper, if at all |
+| **Wed Nov 25, evening** | **the improved codemem is frozen** as `codemem-final` | tracks B and C have delivered. The configuration holds what has passed its gate, and nothing else. The analysis plan is written down |
+| **Mon Nov 30, 23:59** | **the freeze we aim for** | the full runs have finished on a sample of tasks from every repo that is up, in several languages; the model gap has at least one open model; the tables and the slides are final. This date is soft |
+| **Tue Dec 1, 14:00** | **the presentation: the hard deadline** | the slides are submitted and everything is ready before then. The morning is for preparing the presentation, which is why the freeze is aimed at the night before |
+| **Mon Dec 7** | **the paper and final report,** in the style of a conference paper | the same results, refined for six more days, with the runs that were still open and the limits stated plainly |
+| no date | bonus goals and future work (§8.3) | a bonus is taken up if time is left; future work is beyond this timeline |
 
-### 8.1 Nine days to December 1
+### 8.1 Now to November 30
 
-Three of us, working long days. The order matters more than the hours. Track A's pipeline is what
-turns everything else into a result, so its first version exists on day 3.
+Three of us, working long days. The full runs need the most clock time, so everything else is
+arranged to let them start on Nov 26.
 
 | Days | Track A | Track B | Track C | Check at the end |
 |---|---|---|---|---|
-| **Nov 23–25** | A9: tasks generated for the first two repos (recipes, validation). A1: the pipeline skeleton on those tasks. A2: the recording proxy and the cross-check | `codemem-today` frozen on day 1. B1: why today's searches miss. B2: stemming and exact lookup. B5: the `api` preset and its fixes | C1: the compression table, on real queries | two repos have validated tasks; one task runs end to end in both setups, and its tokens are counted two ways that agree |
-| **Nov 26–28** | **The first end-to-end test,** by Nov 27: both repos, today's codemem. A3: flags, plans, resume. A9: recipes for the next repos, in order. A7: the labels that can be computed. From A8: vague rewrites for a first subset. Once the test passes, batches: the baseline on every dev task, which does not depend on codemem, and today's codemem on the medium ones | B3: typed edges and the linking rule, for Python and TypeScript. B4: the query path, with relation lines on cards. B5: the `light` preset chosen | C2: the compact store, behind the interface agreed with B. C3: one copy on disk | **Nov 28, evening: the configuration we present is frozen** as `codemem-final` |
-| **Nov 29–30** | everything indexed again with the final codemem; the rest of the run matrix on the dev tasks of every repo that is up, with the vague subset. A first report | the retrieval table, layer by layer, on the dev tasks | memory, disk and scan time from 100,000 to 1,000,000 vectors | every run in the tables passed its integrity checks |
-| **Dec 1** | present, and hand in the report | | | |
+| **Nov 23–25** | the pipeline tested end to end on two repos with today's codemem, which is running now: A1, A2, A3 and the integrity checks of A4. A9: tasks for the next repos, with ruff (Rust) and kubernetes (Go) next. From A6: the open harness for the model gap. A7: the labels that can be computed. The sample and the analysis plan | `codemem-today` tagged on day 1. B1, then B2, B8, B4, and B3 for Python, TypeScript, Go, Rust, C and C++. B8 is tools loaded up front and the text that ships, with an adoption check on track A's two repos. Each piece passes its gate on the retrieval eval before it goes in | C1, then C2 and C3. C8: the `api` and `light` embedding presets | **Nov 25, evening: `codemem-final` is frozen.** It holds what has passed its gate |
+| **Nov 26–30** | **the full runs start on Nov 26:** baseline and final on the sample of every repo that is up, three repetitions; today's codemem on the medium tasks; the vague subset. **The model gap runs beside them** on its own endpoint, with the 9B model first. More repos join as their tasks validate. Reports as batches finish | the retrieval table, layer by layer, and everything else in the track. Help with the runs. No change to the frozen configuration | memory, disk and scan time from 100,000 to 1,000,000 vectors, and what each embedding option costs. The rest of the track: the third embedding option, the cache cap, branches. Help with the runs | **Nov 30, 23:59: the freeze we aim for.** The hard limit is the presentation on Dec 1 |
+| **Dec 1, 14:00** | the presentation | | | |
 
-**Track A is the tightest.** Its rows are more than one person's nine days. Three parts stand on
-their own, so whoever is ahead can take one: a repo's recipe, the recording proxy, and the vague
-rewrites (§12).
+**The order within tracks B and C.** Each track works in the order below. The freeze takes what
+has passed its gate by the evening of Nov 25. A piece that passes later goes into the retrieval
+table, and into a later freeze if there is one.
+- **Track B:** B1, then B2 (keywords and exact lookup), then B8 (the integration), then B4 (the
+  query path), then B3 (the linking rule, for Python, TypeScript, Go, Rust, C and C++), then the
+  merging experiments.
+- **Track C:** C1, then C2 (the compact store), then C3 (one copy on disk), then the `api` and
+  `light` presets of C8, then the rest: the local Qwen 8B preset, the cache cap, branches and the
+  shared vector store, the idle unload.
 
-### 8.2 December 2 to 8: refine, then arXiv
+**Track A carries the most,** and its runs for the presentation come before everything else in it.
+Andrew has two machines, an M5 Mac and a PC, so several jobs run at once. Three parts stand on
+their own, so whoever is ahead takes one: a repo's recipe, the recording proxy, and the vague
+rewrites (§12). If track A needs more help, its agent says so in the work log, to Andre.
+
+### 8.2 December 2 to 7: refine, and write the paper
+
+The presentation is not the end. Six more days follow, so November 30 does not have to be
+perfect.
 
 | Days | What happens |
 |---|---|
-| **Dec 2–3** | Fix what the first runs exposed, on the dev tasks only. One last freeze of `codemem-final`, by the evening of Dec 3. The analysis plan is written down and committed before any test run of codemem. The baseline starts on the test tasks on Dec 2, since it does not depend on codemem |
-| **Dec 4–6** | **The test split, once:** the frozen configuration on every test task, three repetitions, with every check of [track A](track-a-evals.md) §7 switched on |
-| alongside | **The model gap:** open models in open harnesses on the same tasks ([track A](track-a-evals.md) §4.6 and §11), started once the main runs are under way. What explains the headline, each on a subset: results up front, the placebo, the vague prompts. Any repos left on the list. The third embedding option (local Qwen 8B), the two extra retrieval baselines, the memory and cost report |
-| **Dec 7** | the last numbers go into the paper |
-| **Dec 8** | arXiv, with the code, the task list and the run records |
+| **Dec 2–6** | Write the paper and the final report. Finish what is still open: the other open models of the model gap and the second open harness ([track A](track-a-evals.md) §4.6 and §11); what explains the headline, each on a subset (results up front, the placebo, the vague prompts); any repos left on the list; anything in tracks B and C that was not finished by December 1. Fix what the presentation exposed |
+| **Dec 7** | the paper and final report are finished, with the code, the task list and the run records |
+
+**If codemem changes after the freeze of Nov 25,** the changed configuration is run on the same
+tasks, and the paper reports both and says which numbers belong to which. No number from the
+first run is replaced silently.
 
 Writing runs through the whole week. The paper says plainly what it rests on:
 
@@ -454,26 +506,23 @@ Writing runs through the whole week. The paper says plainly what it rests on:
 | measured differences in tokens and time between Claude Code with and without codemem, with intervals, on our own tasks, which are newer than the models, and on a test split that was run once | differences in completion under about 12 to 15 points: the task set is too small to show them |
 | the step from today's codemem to the final one, on medium tasks | the languages at the end of the repo list, if it is not finished |
 | the effect on vague requests, on a checked subset | vague requests on every task |
-| a small-model result at 9B and 14B: localization first, completion second | a small-model study as large as the main one |
-| retrieval per layer, on our own fresh tasks in three languages | retrieval in six languages |
-| the memory and disk cost of the index, on a laptop | branch switching and the reranker: designed, not built |
+| a model-gap result for at least one open model: localization first, completion second | the same for every model size, and in a second harness |
+| retrieval per layer, on our own fresh tasks in three languages, and in Go and Rust if their labelers are done | retrieval in Java |
+| the memory and disk cost of the index, on a laptop | whatever of branch switching and the reranker study is not finished by then |
 
 Stating these limits in the paper is part of not compromising on quality.
 
-### 8.3 Left for later, with no date
+### 8.3 Bonus and future work, with no date
 
-Designed in the track files, and part of neither deadline. Each is picked up only if the paper is
-taken further, for example to a conference (§9).
+None of these has a deadline. A bonus is taken up if time is left. Future work lies beyond this
+timeline.
 
-| What | Where it is designed | Why it waits |
+| What | Where it is designed | Why it has no date |
 |---|---|---|
-| A generator that takes any repo without a recipe | [track A](track-a-evals.md) §8.2 | an agent that builds each environment needs a model key and a search key of its own, and this phase needs about ten repos, not hundreds |
-| The retrieval eval in Go, Java and Rust | [track A](track-a-evals.md) §12.2 | each language needs its own labeler and hand-checked labels |
-| The linking rule for Go, Java, Rust, C and C++ | [track B](track-b-retrieval.md) §3.3 | until then those languages keep name-only links at low confidence |
-| Branch switching and the cache cap, built | [track B](track-b-retrieval.md) §6, [track C](track-c-memory.md) §4.7 | the design and its measured costs are in the plan; the paper's claims do not need the build |
-| The reranker study | [track C](track-c-memory.md) §4.5 | it is judged end to end, and that takes usage the main matrix needs |
-| Codex as a second agent; Opus on a subset | [track A](track-a-evals.md) §4.3 | the same pipeline, more usage |
-| Search beyond code | §11.2 | a stretch goal |
+| **Bonus:** Java as a sixth language: tasks, the linking rule, the retrieval eval | [track A](track-a-evals.md) §8.3 and §12.2, [track B](track-b-retrieval.md) §3.3 | it needs a Java repo that can be collected, and kafka cannot |
+| **Bonus:** Codex as a second agent; Opus on a subset | [track A](track-a-evals.md) §4.3 | the same pipeline, more usage |
+| **Future work:** a task generator that takes any repo without a recipe | [track A](track-a-evals.md) §8.2 | an agent that builds each environment needs a model key and a search key of its own, and this phase needs about ten repos, not hundreds |
+| **Future work:** search beyond code: PDFs and other documents, and in the end everything on a computer, indexed and searched by meaning | §11.2 | a stretch goal |
 
 ### 8.4 What the early results can change
 
@@ -491,17 +540,17 @@ Cut scope, never the checks.
 
 | Can give | Cannot give |
 |---|---|
-| repos, from the end of the list in [track A](track-a-evals.md) §8.3 | two token counts that agree, on every run |
+| the number of tasks per repo, down to 12, before any language is dropped ([track A](track-a-evals.md) §3.3) | two token counts that agree, on every run |
 | the smaller setups: the placebo, the stronger wording, the repo map | three repetitions |
-| the number of tasks in the small-model study, and the 27B model | a frozen configuration before any batch we report |
+| the open models after the first one | a frozen configuration before any batch we report |
 | the SWE-bench-Live add-on, and the third embedding option | a dev split to build on and a test split run once |
 
 ---
 
 ## 9. The paper
 
-**One paper, on arXiv on December 8, 2026,** written to the standard of a conference paper, with
-its limits stated (§8.2).
+**One paper, targeted for December 7, 2026,** written in the style of a conference paper, with
+its limits stated (§8.2). It is also the course's final report.
 
 **Where it could go afterwards.** This is not part of the plan's deadlines. It is listed so the
 paper is written with a venue's rules in mind. All *(reported)*.
@@ -551,7 +600,7 @@ suites, generators and tools. Review is double-blind by default.
 | Figure 2: the same effect by repo size and by prompt vagueness | A12 |
 | Figure 3: tool against up-front results against placebo | A12 |
 | Table 1: the task set, by language, size, kind and vagueness | A7 to A9 |
-| Table 2: retrieval in three languages, issue texts and vague requests, per layer | A10, B7 |
+| Table 2: retrieval in three to five languages, issue texts and vague requests, per layer | A10, B7 |
 | Figure 4: memory, disk and build time against repo size; cost per task with the index counted | C6 |
 | Appendix: adoption by wording; how failed runs ended; link quality | A12, A11, B-E6 |
 
@@ -570,12 +619,12 @@ suites, generators and tools. Review is double-blind by default.
 
 | Risk | Why it matters | What we do |
 |---|---|---|
-| Agents don't call codemem | no call, no effect | tools loaded up front; adoption measured in the first batch; the up-front setup separates information from asking |
+| Agents don't call codemem | no call, no effect | track B owns the integration and its adoption check ([track B](track-b-retrieval.md) §5); tools loaded up front; adoption measured in the first batch; the up-front setup separates information from asking |
 | Small models complete nothing | H3 could not be tested on completion | localization as their primary measure; the first small-model batch measures the floor |
 | Environments are slow to build | it is the longest job in track A, and the least certain | one recipe per repo, written once; a check on 10 tasks before a repo is admitted; repos in a fixed order, each complete on its own; SWE-bench-Live's ready-made tasks as the fallback |
 | The result is null for frontier models | the headline changes | designed for: a null with tight intervals is a result, and H3 and H5 stand on their own |
 | We tune to our own eval | the gains would not transfer | every gate is judged on vague prompts too; the test split is run once |
-| Nine days is short | a rushed pipeline gives numbers nobody can trust | the checks are not optional (§8.5); scope gives way first; the paper states its limits |
+| The time is short | a rushed pipeline gives numbers nobody can trust | the checks are not optional (§8.5); scope gives way first; the paper states its limits |
 | Usage limits | three subscription seats are all the Claude time we have, and we code on the same seats | the run matrix spends large tasks only on the baseline and the final configuration; the baseline is reused; the pipeline pauses and resumes; the first batch measures how many runs a seat allows, and the number of tasks follows from it |
 | The ready-made tasks are older than the models | a model may remember a fix | the headline rests on our own tasks, which are newer. The ready-made ones are reported apart |
 | The field moves | a new model or a new vendor statement can change the story | the pipeline lets us rerun on newer tasks and models in days |
@@ -589,12 +638,13 @@ suites, generators and tools. Review is double-blind by default.
 The 27B class is the natural next point on the curve: Qwen3.8-27B is served by Nebius at $0.45 in
 and $3.00 out per million tokens, and published budgets for 24 to 35B models on fresh tasks are 2
 to 3.7 million tokens and $0.09 to $0.62 per task *(reported)*. It needs no new harness, only an
-endpoint. It does not run on a 24 GB Mac, so it is not part of the claim about laptops. It is run
-in the week before arXiv if the 9B and 14B runs are done (§8.2), and stays a follow-up otherwise.
+endpoint. It does not run on a 24 GB Mac, so it is not part of the claim about laptops. It is the
+second open model to run, after the 9B ([track A](track-a-evals.md) §11).
 
 ### 11.2 Beyond code: search a folder, or a whole machine
 
-**A stretch goal.** It is outside both deadlines of §8, and nothing in this phase waits for it.
+**A stretch goal, and future work.** It has no deadline and lies beyond this timeline. Nothing in
+this phase waits for it.
 
 **The idea.** Nothing in codemem's engine is specific to code except the chunker. The same index
 could cover a folder of documents, so an agent can search your files by meaning. macOS's own file
@@ -631,16 +681,16 @@ documents. Decide from that whether it is an extension of this paper or a second
 | # | Decision | Suggested default |
 |---|---|---|
 | 1 | Who takes which track | decided: A is Andrew's, B is Wilson's, C is Andre's ([CONTRIBUTING.md](../../CONTRIBUTING.md)) |
-| 2 | The order of the repos our tasks come from | pandas, playwright, home-assistant, vscode, ruff, kubernetes, airflow, vllm, llama.cpp, kafka ([track A](track-a-evals.md) §8.3). Godot and duckdb have 7 and 9 tasks with tests, so they stay in the retrieval eval only |
+| 2 | The order of the repos our tasks come from | pandas, playwright, ruff, kubernetes and duckdb for five languages, then home-assistant, vscode, airflow and vllm. A Java repo is a bonus ([track A](track-a-evals.md) §8.3). kafka cannot be collected, because its issues are not on GitHub; keycloak, quarkus and trino are the candidates *(probed by track A)*. Godot has 7 tasks with tests and stays in the retrieval eval only. llama.cpp is the reserve for C++ |
 | 3 | Where containers run | the team's x86 machine; a rented Linux machine if it is not free in time |
 | 4 | Which Claude model carries the main comparison | Sonnet 5.5 for the matrix; Haiku 5.5 for building the pipeline and for the loop B and C run |
 | 5 | Is agent localization in scope | yes: it needs no containers, and it is the measure small models need |
 | 6 | The small models | Qwen3.5-9B and Qwen3-14B, on our Macs |
 | 7 | The frozen reference | `codemem-today` = the current `main`, tagged on Nov 23 |
 | 8 | Where the small models run | a hosted endpoint under an API key: DeepInfra lists all three models, Nebius only the 27B *(reported)*. Self-hosted on our Macs otherwise |
-| 9 | Who helps track A before December 1 | whoever is ahead takes one of: a repo's recipe, the recording proxy, the vague rewrites |
+| 9 | Who helps track A before the freeze of November 30 | whoever is ahead takes one of: a repo's recipe, the recording proxy, the vague rewrites |
 | 10 | Which ready-made set is the add-on | SWE-bench-Live: its Python set and its multi-language set *(checked Nov 22)* |
-| 11 | Whether to replace today's local embedding model | not yet: track B's test of the candidates decides ([track B](track-b-retrieval.md) §5). Track A starts on today's model |
+| 11 | Which embedding model to use | Andre decides on Nov 24, from the candidates in [track C](track-c-memory.md) §6.8. Until then, and for track A's first runs, today's model |
 | 12 | Whether to add Claude Code driving an open model as an extra arm | decide after the harness trial ([track A](track-a-evals.md) §4.6). It is the only way to one harness on both sides of the model gap, and Anthropic does not support it |
 
 ---

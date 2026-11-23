@@ -1,11 +1,12 @@
-# Track C: memory and speed
+# Track C: memory and disk, embedding models, branches
 
 **Status:** a plan, written Nov 22, 2026. Nothing here is built yet, except the small pilot in §5.
 The shared context is in [overview.md](overview.md). How codemem stores vectors today is in
 [architecture.md](../architecture.md) §5.
 
-**Goal.** Make the index small enough that memory is no longer a reason not to run codemem on a Mac
-with 16 to 24 GB, without losing accuracy. Searches are already fast; they only have to stay fast.
+**Goal.** Make the index small enough, in memory and on disk, that neither is a reason not to run
+codemem on a Mac with 16 to 24 GB, without losing accuracy. Make the embedding model a choice.
+Settle how an index follows git branches. Searches are already fast; they only have to stay fast.
 
 **Done means:**
 1. a measured table of what each compression choice costs in accuracy, on our own code vectors and
@@ -15,10 +16,18 @@ with 16 to 24 GB, without losing accuracy. Searches are already fast; they only 
 3. each vector stored once on disk, not two or three times;
 4. a size cap on the machine-wide vector cache;
 5. a memory, disk and latency report for 50,000 to 1,000,000 chunks, which becomes the cost figure
-   of the paper.
+   of the paper;
+6. three embedding options that a user picks with one setting, with the local default chosen by a
+   test on our own tasks (§6);
+7. a design for branches and worktrees, with a size cap (§7).
 
-**Track C works with track B.** B decides which vectors exist and how a query flows. C decides how
-those vectors are stored, scanned and re-checked. The two meet at one interface (§8).
+**Where this track sits.** The system is the project's secondary goal, after the study
+([overview.md](overview.md), "What we are after"). This track makes that system affordable: small
+in memory and on disk, with an embedding model the user can choose.
+
+**Track C works with track B.** B decides which vectors exist and how a query flows. C decides
+which model makes those vectors, and how they are stored, scanned and re-checked. The two meet at
+one interface (§10).
 
 ---
 
@@ -281,17 +290,16 @@ GPU or an API.
 The model is the largest block of RAM, and how big it is depends on which of track B's three
 embedding options the user picks.
 
-| Option (track B §5) | Model RAM | Lever |
+| Option (§6) | Model RAM | Lever |
 |---|---|---|
 | an embedding API | 0 | also make PyTorch an optional install, which saves about 1 GB of disk |
 | the light local model | 2.2 GB for today's model in PyTorch. For EmbeddingGemma 2 on a 16 GB M4: 0.8 to 1.2 GB under llama.cpp, 5 to 7 GB under MLX or PyTorch *(reported)* | the runtime matters more than the model here: measure each. Unload after some idle minutes; a reload takes 7 to 13 s today, during which searches answer from keywords with a note |
-| Qwen 8B, run locally | 8 GB at 8 bits. A 4-bit file is 4.7 GB, but its vectors differ too much from the full model's to share an index (track B §5.3) | the same idle unload. On 16 GB it leaves too little for an IDE and an agent; the option is documented for 24 GB and up |
+| Qwen 8B, run locally | 8 GB at 8 bits. A 4-bit file is 4.7 GB, but its vectors differ too much from the full model's to share an index (§6.3) | the same idle unload. On 16 GB it leaves too little for an IDE and an agent; the option is documented for 24 GB and up |
 
 ### 4.7 The cache cap
 
-The vector cache makes branch switches and rebuilds free, and it only grows. Track B owns how
-branches use it ([track-b-retrieval.md](track-b-retrieval.md) §6). Track C owns its format and its
-limit:
+The vector cache makes branch switches and rebuilds free, and it only grows. How branches use it
+is in §7. Its format and its limit:
 - store cache entries in the same compact format as the index rows;
 - record when each entry was last used;
 - when the cache passes its cap, delete the entries unused for longest;
@@ -343,7 +351,252 @@ Raw numbers and the script are in `.personal/benchmarks/` (`2026-11-22-quantizat
 
 ---
 
-## 6. Experiments and gates
+## 6. Embedding model options
+
+**In plain words.** The embedding model turns code and questions into vectors. A larger model
+usually understands more, and costs more memory and more time per text. Today codemem has one
+default, chosen for laptops. The plan is three options behind one setting.
+
+### 6.1 The three options
+
+Figures marked *(reported)* come from model cards, leaderboards and provider pages read on Nov 22.
+
+| | `light` (the default) | `qwen8b-local` | `api` |
+|---|---|---|---|
+| For | any Mac with 16 GB | a Mac with 32 GB, or 24 GB with little else running; code must not leave the machine | anyone with a key; no model on the machine |
+| Model | to be chosen among the candidates of §6.8, which include **EmbeddingGemma 2** (0.27B, Oct 2026), **Qwen3-Embedding-0.6B**, **SweRankEmbed-Small** (137M, trained on issues), and today's `jina-code-embeddings-0.5b` as the baseline. C-E7 is the test | Qwen3-Embedding-8B, weights stored in 8 bits (an 8 GB file) | Qwen3-Embedding-8B on Nebius, full-precision weights |
+| Vector | 768 to 1,024 numbers, stored shorter (§4.1) | 4,096, stored as 1,024 | 4,096, stored as 1,024 |
+| Runs as | inside codemem, or a local server (llama.cpp or MLX) | a local server: `llama-server --embedding --pooling last`, or MLX | HTTPS |
+| First build of a large repo (about 40M tokens) | about 2 hours on a 16 GB M4 for EmbeddingGemma 2 *(reported)*; 4.4 hours on an M1 with today's model | not practical: 9 to 10 hours on an M3 Max, 40 to 70 hours on an M1 *(reported, scaled)*. Build through the API, or accept days | $0.40. About 100 minutes at the rate limit Nebius shows as an example, 400,000 tokens a minute. Its page says a limit can grow to at most 4 times the base, and names no low-priority tier *(checked by track A, Nov 22)*. At the example limit the API is not faster than an M5 Mac |
+| One query | 15 to 70 ms | under a second for a short query *(estimate)* | 0.3 s on a good day; provider medians of several seconds have been observed *(reported; to measure)* |
+| Model memory | 0.3 to 2.2 GB | 8 to 9 GB | none |
+| Code leaves the machine | no | no | yes |
+
+**The three options exist for different people, not for different quality levels.** That is the
+main thing the research changed.
+
+### 6.2 Is a bigger embedding model better for us? Both sides
+
+All *(reported)*, except the CORE-Bench figures, which were read in the paper's own tables on
+Nov 22 (its Tables 3, 16, 17 and 18; the scores are NDCG@10).
+
+| For | Against |
+|---|---|
+| On classic code search (find code from a description), Qwen3-Embedding-8B scores 80.7 and its 0.6B sibling 75.4. It is the best model on that board that did not train on the board's own data | On finding the code to change for an issue, which is our task, Qwen3-8B scores 20.3 on CORE-Bench and today's jina 0.5B scores 20.8. The 0.6B sibling scores 17.0. When the issue is rewritten as a developer's request, jina 0.5B scores 18.1 and Qwen3-8B 17.2 |
+| On the same benchmark's classic code search, Qwen3-8B scores 71.7 and jina 0.5B 63.5 | Every off-the-shelf model is weak on issue-to-code: 17 to 22, with plain keyword search at 13 |
+| Its vectors can be cut to any length, and keep about 99% of their quality at 512 numbers and 96% at 256 in third-party tests on general text | It is no longer the strongest open model overall: it ranks fourth on the MTEB multilingual board, behind models of 12B and 27B (as read on Nov 22; the board could not be re-checked) |
+| EmbeddingGemma 2, at 0.27B, scores 77.9 on the same code board: most of the 8B's score at one thirtieth of the size | No issue-to-code numbers exist yet for EmbeddingGemma 2. It is six weeks old |
+| | Training on the task beats size: fine-tuning Qwen3-8B on issues lifts it from 20.3 to 32.8, a fine-tuned 0.6B reaches 26.5, and a 7B model trained for issue localization scores 22.4 |
+
+**Reading.** Size alone buys little on the task we care about, and the model we already use is
+competitive on it. The 8B options are worth building because they are a clean way to test this on
+our own tasks, and because an API removes the model from the laptop. But the default is whatever
+C-E7 shows on our tasks and on vague requests, not the largest model. Training a model on issue
+and code pairs is the stronger lever. It is idea 4 in
+[advanced-design.md](../advanced-design.md) and is outside this phase.
+
+### 6.3 Rules that keep vectors from different setups apart
+
+1. **One index per vector space.** The model, the precision of its weights and the runtime are
+   all part of the embedder key. Vectors with different keys never mix.
+2. **Which setups make the same vectors?** For a model fine-tuned from Qwen3-8B, weights at 8 bits
+   give almost the same vectors as full precision (cosine 0.9995 on average). Weights at 4 bits do
+   not: 0.973 on average, 0.937 at worst, and the top result changes for about 2% of queries
+   *(reported)*. So "build through the API, then update and search locally at 8 bits" is plausible
+   and nobody has tested it. Experiment C-E7b tests it. A 4-bit local model always gets its own
+   index.
+3. **Cut and re-normalise ourselves.** Nebius accepts a `dimensions` setting but does not document
+   whether this model honours it. codemem forwards the setting today and does not check the length
+   that comes back. It should check, cut and re-normalise.
+4. **Each model gets its own query instruction.** Qwen wants `Instruct: <one sentence>\nQuery:`
+   before a query and nothing before a document. EmbeddingGemma 2 wants `task: code retrieval |
+   query: `. Today the local path gives jina's prefixes to any model that lacks jina's prompt
+   names (`embedder.py`), which would quietly cost other models accuracy.
+5. **Precision on the Mac GPU is per model.** Today `auto` means half precision there.
+   EmbeddingGemma 2's card says half precision silently degrades its vectors *(reported)*.
+
+### 6.4 Local Qwen 8B: what goes wrong
+
+Small mistakes here change the vectors without any error *(reported)*:
+
+| Mistake | Effect |
+|---|---|
+| llama.cpp without `--pooling last`, or without the closing end-of-text token | about 20% lower scores |
+| closing with the chat end-of-turn token instead of the end-of-text token | vectors that barely resemble the right ones (cosine 0.5 to 0.8) |
+| Ollama's `qwen3-embedding:8b` tag | it is the 4-bit file, and Ollama adds no query instruction |
+| a host that returns vectors that are not normalised (Fireworks does) | wrong scores unless we normalise |
+
+So the `qwen8b-local` option ships with a check: embed 20 fixed texts at start-up and compare
+them with stored reference vectors. If they don't match, refuse to index and say why.
+
+### 6.5 The API: batching, limits, failure, privacy
+
+```toml
+[embedding]
+preset = "api"                 # light | qwen8b-local | api; the lines below are what "api" fills in
+provider = "openai"
+base_url = "https://api.tokenfactory.nebius.com/v1"
+model = "Qwen/Qwen3-Embedding-8B"
+api_key_env = "NEBIUS_API_KEY"
+dimensions = 1024
+query_prefix = "Instruct: Given a question about a codebase, retrieve the code that answers it\nQuery:"
+```
+
+The older host in today's README, `api.studio.nebius.com`, still answers; Nebius's current
+documentation gives the host above.
+
+| Topic | Today | Change |
+|---|---|---|
+| Batching | 64 texts per request, 4 requests at once, 6 tries | batch by tokens, not by count, with texts sorted by length; back off on the provider's rate-limit reply |
+| Resuming | stage B's queue already survives a stop | show progress and remaining cost in `codemem status` |
+| Cost | not shown | print the estimate before a first build ("about 38M tokens, $0.38") |
+| The API is down | each search waits about 31 s, then fails | answer at once from keywords and the graph, with a note, and show the error in `index_status` |
+| Query time | one request per search | keep the cache of recent query vectors; measure the real delay (C-E7 reports it) |
+| Privacy | `codemem status` says code is sent to the provider | add the provider's terms in one line. Nebius's documents disagree: its quick guide says content is not used for training; its terms say inputs are stored and used to train small helper models unless you opt out *(reported)* |
+| A second provider | any OpenAI-compatible endpoint works | list DeepInfra as the tested fallback: same model, same price |
+
+### 6.6 Faster first builds, whatever the model
+
+The first build is the worst moment of every option. Two changes help all three:
+- **Progressive indexing.** Keywords and the graph are ready about a minute after indexing starts.
+  Vectors follow in priority order: files the agent touches or searches first, the rest after.
+  Search notes already say what is still pending.
+- **Build once, reuse.** The vector cache is keyed by model and text, so a cache built by one
+  teammate or by CI serves the others. Cursor found teammates' copies of a repo 92% alike.
+
+### 6.7 Experiments for this section
+
+| # | Experiment | Pass |
+|---|---|---|
+| C-E7 | jina 0.5B, EmbeddingGemma 2, Qwen3-0.6B, SweRankEmbed-Small, papr-embed-code-1-0.6b and Qwen3-8B (API), at full length and at 256, 512 and 1,024 numbers, on the dev tasks in both query kinds. Reported with build time, query time and memory | chooses the `light` default: the best accuracy among models that build a 100k-chunk repo in under 3 hours on a 16 GB Mac |
+| C-E7b | The same 1,000 chunks and 100 queries embedded by the API and by the local 8-bit model | the two top-10 lists share at least 95% of their entries; then the two setups may share an index |
+| C-E7c | Query delay through the API, 200 searches at different times of day, for two providers | reported. A query must be embedded by the same model as the code, so a slow API cannot be patched with a small local model. If the median is over 1 s, the remedies are a faster provider, or, on a Mac that can hold it and if C-E7b passes, the local 8-bit model for queries |
+
+### 6.8 Choosing the model
+
+**Who decides, and when.** Which embedding model the eval and the release use is this track's
+decision. Andre makes it on Nov 24. Until then everything runs on today's model, jina 0.5B.
+
+**The candidates.**
+
+| Model | Size | Trained for | What is known |
+|---|---|---|---|
+| `jina-code-embeddings-0.5b`, today's model | 0.5B | code search in general | 20.8 on CORE-Bench's issue-to-code level, the best small model in that paper (§6.2) |
+| SweRankEmbed-Small | 137M | finding code for an issue, on Python repos | the right function in its top 10 for 74.5% of SWE-bench Lite issues, against 58.8% for the same model untrained *(its model card, read Nov 22)* |
+| papr-embed-code-1-0.6b | 0.6B | code search in general. A fine-tune of Qwen3-Embedding-0.6B | 77.2 on classic code search *(its model card, read Nov 22)*. No issue-to-code number. A small publisher |
+| Qwen3-Embedding-0.6B | 0.6B | general text | 17.0 on CORE-Bench's issue-to-code level |
+| EmbeddingGemma 2 | 0.27B | general text | 77.9 on the code board *(reported)*. No issue-to-code number |
+| Qwen3-Embedding-8B, through Nebius | 8B | general text | 20.3 on CORE-Bench's issue-to-code level, and 71.7 on its classic code search |
+
+The fine-tuned 0.6B models that the papers report (26.5 on CORE-Bench) are not published, as far
+as we found: the paper has no release statement, and a search of the model hub on Nov 22 found
+none.
+
+**Four things that bear on the choice.**
+- **A licence does not rule a model out.** All of our work is research output, not commercial. A
+  model under a non-commercial licence, such as jina's or SweRankEmbed's, can be used, with
+  credit.
+- **A model trained on issues may have seen our repos.** SweRankEmbed was trained on issues from
+  public Python repos. Check its training repos against ours before its numbers are trusted.
+- **Each model needs its own query prefix** (§6.3, rule 4). Today codemem gives jina's prefixes to
+  every local model, so a fair test of another model needs that fixed first.
+- **A switch means every index is built again,** because vectors from two models never share an
+  index (§6.3). So the choice has to be made before the freeze of Nov 25, or the full runs use
+  today's model.
+
+---
+
+## 7. Branch switches and worktrees
+
+**The worry.** If the user keeps switching branches, will codemem be embedding all the time? Does
+it need one index per branch? How big does the cache get?
+
+### 7.1 What happens today
+
+1. The watcher sees the branch head change and waits for git to finish writing files.
+2. A full check finds the files whose content changed: 0.3 to 0.5 s on vLLM.
+3. Stage A re-chunks only those files, in milliseconds each.
+4. Stage B looks up every changed text in the machine-wide vector cache, by model and text hash.
+   Only a text never seen before on this machine goes to the model.
+5. Searches meanwhile answer at once, with a note naming the files still pending.
+
+So there is **one index per checkout, not per branch**, and switching back to a branch seen
+before costs no model time at all.
+
+### 7.2 What a switch costs
+
+The eval's logs give real numbers. Each run stepped one index through 24 task commits per repo,
+a few days apart. That is close to "switch to a branch a few days of commits away".
+
+| Repo (chunks) | Texts needing new vectors: median | 9 in 10 updates stay under | Whole update, M5 GPU, today's model (median) |
+|---|---|---|---|
+| Godot (195k) | 626 | 3,994 | 32 s |
+| home-assistant (176k) | 2,758 | 8,536 | 87 s |
+| airflow (104k) | 1,635 | 4,278 | 59 s |
+| transformers (89k) | 2,044 | 4,018 | 64 s |
+| vscode (229k) | 8,730 | 25,987 | 323 s |
+| llama.cpp (32k) | 3,182 | 7,583 | 124 s |
+
+The time covers re-chunking and embedding. On an M1 the model is about 4 times slower. Through an
+embedding API the provider's rate limit sets the time: at Nebius's example limit it is about the
+same as on the M5 (§6.1). Each new vector adds about 4.5 KB to the cache today,
+and 0.5 to 2 KB in the compact format of §4.4. A switch that brings 3,000 new texts therefore adds about
+14 MB today, and 2 to 6 MB in that format.
+
+**In plain words:** the first visit to a branch costs one to five minutes of background embedding
+on a laptop, during which keyword and graph search are already current. Every later visit is free.
+The storage is small.
+
+### 7.3 What to change
+
+| Change | Why | Size |
+|---|---|---|
+| **Drop obsolete work when the head moves again.** Queued chunks that no longer exist after the next switch are removed from the queue | switching back and forth quickly must not leave a pile of embedding for branches the user already left | small |
+| **Embed in priority order after a switch:** files the agent searched or edited first, the rest after | the queue can be minutes long; the part the agent needs is usually seconds | small |
+| **Keep vector bytes in one shared store.** Today each index holds its own copy of every vector, and the cache holds another. Proposed: the index row keeps only the text hash, and the bytes live once per machine | removes a copy (§4.4), and makes a new worktree cost no vector storage | medium; a schema change |
+| **A size cap with least-recently-used eviction** on that store (§4.7) | the cache only grows today | small |
+| **A new worktree starts from a copy of the main checkout's structure**, then updates the difference | measured on vLLM: 23 s to a first current search this way, against 99 s from scratch. With vectors out of the index file the copy shrinks from 0.8 GB to under 0.5 GB | built and tested on a shelved branch |
+
+Eviction is safe by construction. The store is a cache: the code is the source of truth. If a
+vector that a live chunk needs was evicted, the chunk goes back on the queue and is embedded
+again, and the search note says so meanwhile.
+
+### 7.4 What other tools do
+
+All *(reported)*, from each tool's own documentation.
+
+| Tool | On a branch switch | Limit it states |
+|---|---|---|
+| Cursor, until mid-2026 | a tree of file hashes found what changed; embeddings were cached by chunk content; a new checkout started from the most similar existing index, which cut the slowest first queries from 4 hours to 21 seconds | 250,000 files |
+| Cursor, since July 2026 | no embeddings; a local text index tied to a commit, with edits layered on top, rebuilt after a big pull or switch | about half the source size |
+| Continue | branch tags over a cache keyed by file content; an entry is deleted when no tag uses it | none documented |
+| Zoekt (Sourcegraph) | one index for all branches, with a mark per file saying which branches hold it | 64 branches per repo |
+| GitHub code search | keyed by file content; the default branch only | — |
+| claude-context | one index per folder path; cleared by hand | — |
+
+Our design is the same family as Cursor's old one and Continue's: vectors keyed by content, and
+one small view per checkout. No tool in this list documents a size cap or an eviction rule. Ours
+would.
+
+### 7.5 What stays open
+
+- **Agents in several worktrees through one MCP server.** A tool call does not say which folder it
+  came from. The shelved design added a `root` argument to every tool, which agents must
+  remember to pass. Whether an agent host starts one server per worktree is undocumented. This
+  needs a test with a real agent before any design is chosen.
+- **How large real branch differences are.** The table above is drift along one branch. A
+  long-lived feature branch can differ more. Experiment C-E8 measures it on real pull-request
+  branches.
+- **The eval's copies.** Track A builds an index for each task commit and gives every run its own
+  copy ([track A](track-a-evals.md) §4.5). At 30 to 40 tasks per repo that is tens of GB for a
+  large repo, unless copies are deleted after use. With the shared store of §7.3, a copy holds no
+  vectors at all. The store is built in this phase, as C9. It changes
+  where vector bytes live, as the compact store does (§4.2, §4.4), so the two are designed
+  together.
+
+---
+
+## 8. Experiments and gates
 
 Each experiment has a question and a rule for what counts as a pass. Thresholds are proposals to
 agree as a team before running.
@@ -356,45 +609,53 @@ agree as a team before running.
 | C-E4 | Scale: memory, start-up time and search time at 50k, 100k, 200k, 500k and 1M vectors, with edits and filtered searches mixed in | Does the exact scan hold up? | the vector step under 10 ms at 200k and under 60 ms at 1M on an M1; a one-function edit still searchable in under 0.5 s |
 | C-E5 | Reranker gate (§4.5) | Does a cross-encoder pay for its time? | only judged end to end by track A: fewer tokens or less time at equal completion |
 | C-E6 | Model memory: resident memory of the codemem process for each embedding option, idle and busy, with and without idle unload | What does a user actually give up? | reported, no threshold |
+| C-E7 | Embedding models at several vector lengths (§6) | How much does a bigger model buy, on our tasks and on vague queries? | reported as a curve of accuracy against cost; picks the default per option |
+| C-E8 | Branch differences: changed chunks between a repo's main branch and 50 open pull-request branches, for three repos | How big is a real switch? | reported; sets the default cap |
 
 **The grid costs no model time.** Vectors are stored at full size, so C-E1 and C-E3 only reread
 them. C-E2 needs one API build per repo, about $1 to $2 for a repo the size of Godot.
 
 ---
 
-## 7. Work packages
+## 9. Work packages
 
-Sizes are rough working days for one person.
+Nothing is sized in working days: the deadlines are below.
 
-| # | Work | Deliverable | Done when | Needs | Days |
-|---|---|---|---|---|---|
-| C1 | **Measure first.** A script that runs the grid of C-E1 on any index, with real queries, and writes one table | the table for Python, C++ and TypeScript dev tasks; a recommended default (stored length, memory format, candidates) | the team has agreed the default and the pass rule | the eval's dev tasks; A's vague rewrites when they exist | 3 |
-| C2 | **The compact vector store.** A `VectorStore` that keeps 1-bit codes in memory and rescoring candidates from SQLite | the store, selectable with `vector_backend`, then the default | on every dev query, its top 10 after rescoring equals the exact store's top 10 in at least 99% of cases; adds, deletes, filters and restart pass the existing store tests | C1's default; the interface change in §8 | 5 |
-| C3 | **One copy on disk.** Drop the saved FAISS files; store rows at the agreed length; fold in the keyword-table branch | a smaller index and its new size table for the nine eval repos | index size per chunk reported before and after; update and rebuild still give the same results (the eval's existing check) | C1 | 3 |
-| C4 | **The cache cap.** Last-used dates, a size cap, eviction, the compact format | a bounded cache and a `codemem status` line showing its size | a test fills the cache past its cap and sees the oldest entries go; a branch switch back to a cached branch still embeds nothing | B's branch design | 3 |
-| C5 | **Model memory.** Idle unload; PyTorch as an optional install for API users | measured resident memory per embedding option | C-E6's table exists; an API-only install has no PyTorch | B's embedding options | 3 |
-| C6 | **Scale and cost report.** The benchmark of C-E4, rerun on every release candidate | one figure: memory and time against repo size, today's design against the new one | numbers for 50k to 1M vectors on an M1 and one newer Mac | C2, C3 | 2 |
-| C7 | **Reranker study** (only if the gate in §4.5 opens) | a yes or no, with end-to-end numbers | track A's runs with and without it | A's harness | 4 |
+| # | Work | Deliverable | Done when | Needs |
+|---|---|---|---|---|
+| C1 | **Measure first.** A script that runs the grid of C-E1 on any index, with real queries, and writes one table | the table for Python, C++ and TypeScript dev tasks; a recommended default (stored length, memory format, candidates) | the team has agreed the default and the pass rule | the eval's dev tasks; A's vague rewrites when they exist |
+| C2 | **The compact vector store.** A `VectorStore` that keeps 1-bit codes in memory and rescoring candidates from SQLite | the store, selectable with `vector_backend`, then the default | on every dev query, its top 10 after rescoring equals the exact store's top 10 in at least 99% of cases; adds, deletes, filters and restart pass the existing store tests | C1's default; the interface change in §10 |
+| C3 | **One copy on disk.** Drop the saved FAISS files; store rows at the agreed length; fold in the keyword-table branch | a smaller index and its new size table for the nine eval repos | index size per chunk reported before and after; update and rebuild still give the same results (the eval's existing check) | C1 |
+| C4 | **The cache cap.** Last-used dates, a size cap, eviction, the compact format | a bounded cache and a `codemem status` line showing its size | a test fills the cache past its cap and sees the oldest entries go; a branch switch back to a cached branch still embeds nothing | B's branch design |
+| C5 | **Model memory.** Idle unload; PyTorch as an optional install for API users | measured resident memory per embedding option | C-E6's table exists; an API-only install has no PyTorch | B's embedding options |
+| C6 | **Scale and cost report.** The benchmark of C-E4, rerun on every release candidate | one figure: memory and time against repo size, today's design against the new one | numbers for 50k to 1M vectors on an M1 and one newer Mac | C2, C3 |
+| C7 | **Reranker study** (only if the gate in §4.5 opens) | a yes or no, with end-to-end numbers | track A's runs with and without it | A's harness |
+| C8 | **Embedding options** (§6): three presets, the local Qwen runtime, API batching and its failure handling | one setting that selects an option; C-E7's curve | each option builds and searches the sample repo from a clean machine by following the README | — |
+| C9 | **Branches:** drop obsolete queue work, priority order, the shared vector store, the worktree start | §7.3 built; C-E8's numbers | switching between two cached branches embeds nothing and finishes stage A in seconds | C4 |
 
 **When** (the dates are in [overview.md](overview.md) §8):
 
 | By | Packages | What it gives |
 |---|---|---|
 | when track A moves to API embeddings | from C5, the install without PyTorch for API users | track A's task containers need it then. Its first runs use the local model |
-| **Dec 1** | C1, C2, C3 | the compression table, the compact store and one copy on disk, in the configuration that is presented |
-| **Dec 8** | C6, and from C5 the memory table per embedding option | memory, disk and scan time from 100,000 to 1,000,000 vectors, and what each embedding option costs in memory, for the paper |
-| **Later, no date** | C4, the idle unload of C5, and C7 if its gate opens | the cache cap, a model that leaves memory when idle, the reranker study |
+| **Nov 25, evening:** the freeze | C1, C2, C3, then from C8 the `api` and `light` presets, in that order | the compression table; the compact store and one copy on disk, in the configuration that is frozen; two embedding options. Each piece is in only if it has passed its check by then |
+| **Nov 30** | C6; all of C5; the rest of C8 (the local Qwen 8B preset, and the test of API against local vectors); C4 and C9 (the cache cap, the shared vector store, branches); C7 if its gate opens; anything that missed the freeze | memory, disk and scan time from 100,000 to 1,000,000 vectors, and what each embedding option costs in memory, for the presentation; the third embedding option; the cache cap and branch switching, built; a model that leaves memory when idle; the reranker study, if its gate opens. Nothing in this track is planned for later than this |
+
+The aim is to leave nothing open after December 1. What is still open then is finished in the week
+of the paper.
 
 C1 goes first: it is cheap, it needs nothing from the other tracks, and it decides what C2 builds.
+The `api` preset of C8 does not touch the storage work and goes beside it. C9 changes where vector
+bytes live, as C2 and C3 do, so the three are designed together.
 
 ---
 
-## 8. What track C needs from, and gives to, the others
+## 10. What track C needs from, and gives to, the others
 
 | With | C needs | C gives |
 |---|---|---|
-| **Track B** | which vector types exist (code only, or code and usage); the embedding options and their vector lengths; the branch design the cache must serve | a vector store that returns **exact** scores for its top results, so B can merge by score and not only by rank; the memory and time cost of each of B's options |
-| **Track A** | vague rewrites of the dev tasks, for C1; end-to-end runs for the reranker gate | a frozen, named configuration for each agent run (for example `codemem-compact`), with its memory and disk numbers for the paper; an install without PyTorch for the task containers, before A's first runs that embed through an API |
+| **Track B** | which vector types exist (code only, or code and usage) | a vector store that returns **exact** scores for its top results, so B can merge by score and not only by rank; the embedding model and vector length the eval uses, so B's own eval runs on what will ship; the memory and time cost of each of B's options |
+| **Track A** | vague rewrites of the dev tasks, for C1; end-to-end runs for the reranker gate | a frozen, named configuration for each agent run (for example `codemem-compact`), with its memory and disk numbers for the paper; an install without PyTorch for the task containers, before A's first runs that embed through an API; the embedding configurations the eval runs, a local model first and Qwen through Nebius later (§6) |
 
 **Tell track A as soon as the compact store works.** Track A starts on today's index, the heaviest
 it will ever be, and for that reason on two pilot repos only
@@ -418,7 +679,7 @@ one index.
 
 ---
 
-## 9. Risks and open questions
+## 11. Risks and open questions
 
 | Risk or question | Why it matters | What we do |
 |---|---|---|
@@ -429,6 +690,7 @@ one index.
 | Storing short vectors closes the door on later experiments | today's full-size rows let us test any format without embedding again | keep "store full size" as a setting, on for research and off by default |
 | A smaller index hides an accuracy loss in one language | averages hide it | every table is reported per language, and for vague queries separately |
 | Is the usage vector still needed? | it is a quarter of all vectors | B decides (its ablation of usage vectors against graph expansion); C reports what each answer costs |
+| A bigger embedding model changes little on code | the Nov 4 memo found small gains from size alone on public code benchmarks | C-E7 measures it on our tasks before the default is chosen |
 
 ---
 
@@ -468,7 +730,32 @@ page before citing it in the paper. Items marked *(pilot)* are our own measureme
 - Reranker timings, https://aimultiple.com/rerankers · hosted prices,
   https://deepinfra.com/models/reranker
 
+**Embedding models**
+- The MTEB leaderboard, https://huggingface.co/spaces/mteb/leaderboard
+- Qwen3-Embedding, https://huggingface.co/Qwen/Qwen3-Embedding-8B and
+  https://arxiv.org/abs/2506.05176
+- EmbeddingGemma 2, https://huggingface.co/google/embeddinggemma-2 · its timings on a 16 GB M4,
+  https://github.com/junmo-kim/ANERun
+- jina-code-embeddings, https://arxiv.org/abs/2508.21290
+- 4-bit and 8-bit weights compared with full precision,
+  https://huggingface.co/juliensimon/Octen-Embedding-8B-mlx-4bit
+- llama.cpp pooling issue, https://github.com/ggml-org/llama.cpp/issues/14234 · Ollama's 8B tag,
+  https://github.com/ollama/ollama/issues/16076
+- Nebius Token Factory: models, https://tokenfactory.nebius.com/api/public/models_info · rate
+  limits, https://docs.tokenfactory.nebius.com/ai-models-inference/rate-limits.md · terms,
+  https://docs.tokenfactory.nebius.com/legal/terms-of-service
+- DeepInfra, https://deepinfra.com/Qwen/Qwen3-Embedding-8B
+
+**Branches in other tools**
+- Cursor, https://cursor.com/blog/secure-codebase-indexing and
+  https://cursor.com/blog/fast-regex-search
+- Continue, https://github.com/continuedev/continue/blob/main/core/indexing/README.md
+- Zoekt, https://github.com/sourcegraph/zoekt/blob/main/doc/design.md
+- GitHub code search,
+  https://github.blog/engineering/architecture-optimization/the-technology-behind-githubs-new-code-search
+
 **Ours**
 - The pilot: `.personal/benchmarks/2026-11-22-quantization-pilot.json` and `quant_pilot.py`
   (outside git).
 - Today's sizes: [architecture.md](../architecture.md) §5 and §10, and the checkpoint slides.
+- Branch update sizes: the eval's run logs in `eval/results/` (§7.2).

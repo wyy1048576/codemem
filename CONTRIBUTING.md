@@ -10,6 +10,9 @@ Codex). Agents follow this file in every session.
 2. **The plan of your own track** (§2). This is your main job.
 3. **The work log** (§4): where each track stands today.
 
+The overview opens with the order of goals, and everyone works to it: the end-to-end study
+first, with the model gap as part of it, and the system second.
+
 Be aware of the other two tracks as well. You do not have to read them end to end. Read the
 places where they meet yours: the table "What passes between the tracks" in the overview (§6), and
 the section "What track … needs from, and gives to, the others" in each track file. Much of the
@@ -23,8 +26,8 @@ what is not built yet.
 | Track | Owner | Plan | In short |
 |---|---|---|---|
 | **A**, evaluation | Andrew | [docs/plan/track-a-evals.md](docs/plan/track-a-evals.md) | the end-to-end pipeline: an agent with and without codemem, measured by completion, time and tokens |
-| **B**, retrieval | Wilson | [docs/plan/track-b-retrieval.md](docs/plan/track-b-retrieval.md) | what codemem stores and how it ranks: keywords, dense vectors, a graph, the embedding options |
-| **C**, memory | Andre | [docs/plan/track-c-memory.md](docs/plan/track-c-memory.md) | a small index: shorter vectors, 1-bit codes with exact rescoring |
+| **B**, retrieval | Wilson | [docs/plan/track-b-retrieval.md](docs/plan/track-b-retrieval.md) | how codemem finds and ranks code: keywords, dense vectors, a graph and the query path, each checked on the retrieval eval before the end-to-end runs use it; and the MCP integration that makes agents actually call codemem |
+| **C**, memory and storage | Andre | [docs/plan/track-c-memory.md](docs/plan/track-c-memory.md) | a small index in memory and on disk (shorter vectors, 1-bit codes with exact rescoring), the embedding model options, and how an index follows git branches |
 
 **Agents:** you work on the track of the person you are working for. If you cannot tell who that
 is, ask before you start.
@@ -39,6 +42,10 @@ is, ask before you start.
   the log: the configuration name, the commit, what changed at index time, and what it does to
   memory and disk. Track A then indexes its pilot repos again and reruns them. Do not wait for a
   freeze.
+- **Track B announces every change to the algorithm, the index or the tool's text on the day it
+  lands.** Such changes are expected. The entry says what changed, whether indexes must be
+  rebuilt, whether a tool name, a description or the card layout changed, the result on the
+  retrieval eval, and the configuration and commit to run.
 - **A keeps B and C informed.** Each time the pipeline changes how B and C use it (a flag, a plan
   file, the format of a result), say so in the log.
 - **If you are waiting on someone, write it down** in your track's status file, with the date you

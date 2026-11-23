@@ -5,18 +5,30 @@
 §3 and §6.
 
 **Goal.** Find the right code more often and rank it higher, by giving codemem three
-representations that cover each other's blind spots. Make the embedding model a choice. Settle
-what happens when the user switches branches.
+representations that cover each other's blind spots. Show on the retrieval eval that each one
+earns its place, before the end-to-end runs use it. And make sure agents actually call codemem: a
+better ranking changes nothing if the agent keeps using grep.
+
+**Where this track sits.** The system is the project's secondary goal, after the study
+([overview.md](overview.md), "What we are after"). One part of this track serves the primary goal
+directly: if agents do not use codemem, the study has nothing to measure (§5).
 
 **Done means:**
 1. keyword search with stemming, and an exact lookup for names the query spells out;
 2. a typed graph of the code that search walks;
 3. a query path that routes, merges, expands and tidies, where each step can be switched off and
    measured on its own;
-4. three embedding options that a user picks with one setting;
-5. a branch and worktree design with a size cap;
-6. an ablation table that says which layer earns its place, and one frozen configuration
-   (`codemem-layered`) handed to track A.
+4. an MCP integration that agents actually use: tools they see from the first turn, text that
+   tells them when to call, and a first answer worth calling for (§5);
+5. track B's own eval: an ablation table on the retrieval eval that says which layer earns its
+   place (§6);
+6. one frozen configuration (`codemem-layered`) handed to track A, which runs it together with
+   track C's storage;
+7. every change announced to the other tracks on the day it lands (§8).
+
+**What is not here.** The embedding model options, and how an index follows git branches, belong
+to track C ([track-c-memory.md](track-c-memory.md) §6 and §7). Track B takes the embedding model
+as given.
 
 **What stays.** The two-stage indexer, the catch-up before every search, the freshness note,
 SQLite as the source of truth, and the four MCP tools. Every new layer must fit the rule that
@@ -124,7 +136,8 @@ way, when the model or the API is unavailable.
 that the code alone doesn't state.
 
 **Change:**
-- the model becomes a choice of three (§5);
+- the model becomes a choice of three, which track C owns
+  ([track-c-memory.md](track-c-memory.md) §6);
 - vectors are stored shorter, and scanned as 1-bit codes with exact rescoring. Track C owns this.
   What B relies on is that the top results come back with **exact** similarity scores.
 
@@ -341,213 +354,61 @@ repos it never saw.
 
 ---
 
-## 5. Embedding model options
+## 5. Making agents use it: the MCP integration
 
-**In plain words.** The embedding model turns code and questions into vectors. A larger model
-usually understands more, and costs more memory and more time per text. Today codemem has one
-default, chosen for laptops. The plan is three options behind one setting.
+**Why this is track B's job.** A better ranking changes nothing if the agent never asks. An agent
+that has grep, and a search tool it does not know, often keeps using grep. In published studies,
+tools the agent could choose were left unused in most runs: 0 to 6% of runs for one
+language-server tool, 0 to 40% in another study, and one vendor counted 1 call in 143 sessions
+*(reported: [track A](track-a-evals.md) §4.1 and §16)*. If that happens to codemem, the study
+measures nothing and the system helps nobody. So the integration is part of retrieval quality,
+and it belongs to this track.
 
-### 5.1 The three options
+**What "robust enough to be used" means.**
 
-Figures marked *(reported)* come from model cards, leaderboards and provider pages read on Nov 22.
-
-| | `light` (the default) | `qwen8b-local` | `api` |
-|---|---|---|---|
-| For | any Mac with 16 GB | a Mac with 32 GB, or 24 GB with little else running; code must not leave the machine | anyone with a key; no model on the machine |
-| Model | to be chosen by B-E5 among: **EmbeddingGemma 2** (0.27B, Oct 2026), **Qwen3-Embedding-0.6B**, and today's `jina-code-embeddings-0.5b` as the baseline | Qwen3-Embedding-8B, weights stored in 8 bits (an 8 GB file) | Qwen3-Embedding-8B on Nebius, full-precision weights |
-| Vector | 768 to 1,024 numbers, stored shorter (track C) | 4,096, stored as 1,024 | 4,096, stored as 1,024 |
-| Runs as | inside codemem, or a local server (llama.cpp or MLX) | a local server: `llama-server --embedding --pooling last`, or MLX | HTTPS |
-| First build of a large repo (about 40M tokens) | about 2 hours on a 16 GB M4 for EmbeddingGemma 2 *(reported)*; 4.4 hours on an M1 with today's model | not practical: 9 to 10 hours on an M3 Max, 40 to 70 hours on an M1 *(reported, scaled)*. Build through the API, or accept days | $0.40. About 100 minutes at the rate limit Nebius shows as an example; less with a raised limit or its low-priority tier *(reported)* |
-| One query | 15 to 70 ms | under a second for a short query *(estimate)* | 0.3 s on a good day; provider medians of several seconds have been observed *(reported; to measure)* |
-| Model memory | 0.3 to 2.2 GB | 8 to 9 GB | none |
-| Code leaves the machine | no | no | yes |
-
-**The three options exist for different people, not for different quality levels.** That is the
-main thing the research changed.
-
-### 5.2 Is a bigger embedding model better for us? Both sides
-
-All *(reported)*.
-
-| For | Against |
-|---|---|
-| On classic code search (find code from a description), Qwen3-Embedding-8B scores 80.7 and its 0.6B sibling 75.4. It is the best model on that board that did not train on the board's own data | On finding the code to change for an issue, which is our task, Qwen3-8B scores 20.3 on CORE-Bench and today's jina 0.5B scores 20.8. The 0.6B sibling scores 17.0 |
-| Its vectors can be cut to any length, and keep about 99% of their quality at 512 numbers and 96% at 256 in third-party tests on general text | It is no longer the strongest open model overall: it ranks fourth on the multilingual board, behind models of 12B and 27B |
-| EmbeddingGemma 2, at 0.27B, scores 77.9 on the same code board: most of the 8B's score at one thirtieth of the size | No issue-to-code numbers exist yet for EmbeddingGemma 2. It is six weeks old |
-| | Training on the task beats size: fine-tuning Qwen3-8B on issues lifts it from 20.3 to 32.8, and a 7B model trained for issue localization scores 22.4 |
-
-**Reading.** Size alone buys little on the task we care about, and the model we already use is
-competitive on it. The 8B options are worth building because they are a clean way to test this on
-our own tasks, and because an API removes the model from the laptop. But the default is whatever
-B-E5 shows on our tasks and on vague requests, not the largest model. Training a model on issue
-and code pairs is the stronger lever. It is idea 4 in
-[advanced-design.md](../advanced-design.md) and is outside this phase.
-
-### 5.3 Rules that keep vectors from different setups apart
-
-1. **One index per vector space.** The model, the precision of its weights and the runtime are
-   all part of the embedder key. Vectors with different keys never mix.
-2. **Which setups make the same vectors?** For a model fine-tuned from Qwen3-8B, weights at 8 bits
-   give almost the same vectors as full precision (cosine 0.9995 on average). Weights at 4 bits do
-   not: 0.973 on average, 0.937 at worst, and the top result changes for about 2% of queries
-   *(reported)*. So "build through the API, then update and search locally at 8 bits" is plausible
-   and nobody has tested it. Experiment B-E5b tests it. A 4-bit local model always gets its own
-   index.
-3. **Cut and re-normalise ourselves.** Nebius accepts a `dimensions` setting but does not document
-   whether this model honours it. codemem forwards the setting today and does not check the length
-   that comes back. It should check, cut and re-normalise.
-4. **Each model gets its own query instruction.** Qwen wants `Instruct: <one sentence>\nQuery:`
-   before a query and nothing before a document. EmbeddingGemma 2 wants `task: code retrieval |
-   query: `. Today the local path gives jina's prefixes to any model that lacks jina's prompt
-   names (`embedder.py`), which would quietly cost other models accuracy.
-5. **Precision on the Mac GPU is per model.** Today `auto` means half precision there.
-   EmbeddingGemma 2's card says half precision silently degrades its vectors *(reported)*.
-
-### 5.4 Local Qwen 8B: what goes wrong
-
-Small mistakes here change the vectors without any error *(reported)*:
-
-| Mistake | Effect |
-|---|---|
-| llama.cpp without `--pooling last`, or without the closing end-of-text token | about 20% lower scores |
-| closing with the chat end-of-turn token instead of the end-of-text token | vectors that barely resemble the right ones (cosine 0.5 to 0.8) |
-| Ollama's `qwen3-embedding:8b` tag | it is the 4-bit file, and Ollama adds no query instruction |
-| a host that returns vectors that are not normalised (Fireworks does) | wrong scores unless we normalise |
-
-So the `qwen8b-local` option ships with a check: embed 20 fixed texts at start-up and compare
-them with stored reference vectors. If they don't match, refuse to index and say why.
-
-### 5.5 The API: batching, limits, failure, privacy
-
-```toml
-[embedding]
-preset = "api"                 # light | qwen8b-local | api; the lines below are what "api" fills in
-provider = "openai"
-base_url = "https://api.tokenfactory.nebius.com/v1"
-model = "Qwen/Qwen3-Embedding-8B"
-api_key_env = "NEBIUS_API_KEY"
-dimensions = 1024
-query_prefix = "Instruct: Given a question about a codebase, retrieve the code that answers it\nQuery:"
-```
-
-The older host in today's README, `api.studio.nebius.com`, still answers; Nebius's current
-documentation gives the host above.
-
-| Topic | Today | Change |
+| The agent must | So codemem must | Where that lives today |
 |---|---|---|
-| Batching | 64 texts per request, 4 requests at once, 6 tries | batch by tokens, not by count, with texts sorted by length; back off on the provider's rate-limit reply; use the low-priority tier for first builds |
-| Resuming | stage B's queue already survives a stop | show progress and remaining cost in `codemem status` |
-| Cost | not shown | print the estimate before a first build ("about 38M tokens, $0.38") |
-| The API is down | each search waits about 31 s, then fails | answer at once from keywords and the graph, with a note, and show the error in `index_status` |
-| Query time | one request per search | keep the cache of recent query vectors; measure the real delay (B-E5 reports it) |
-| Privacy | `codemem status` says code is sent to the provider | add the provider's terms in one line. Nebius's documents disagree: its quick guide says content is not used for training; its terms say inputs are stored and used to train small helper models unless you opt out *(reported)* |
-| A second provider | any OpenAI-compatible endpoint works | list DeepInfra as the tested fallback: same model, same price |
+| see the tools from its first turn | be registered so that its tools are loaded up front, not hidden behind a tool-search step | `codemem init` (`agents.py`). It writes `.mcp.json` for Claude Code and prints a snippet for Codex. It does not ask for up-front loading yet |
+| understand in one read when to call them | describe each tool by the tasks it is for, with examples, and say what grep is still better at | all agent-facing text is in `prompts.py`, in three strengths: `none`, `light` (the default) and `strong` |
+| get something useful the first time | answer the first search fast, with results it can act on: file and line, signature, a preview, relation lines | the cards (§4), and the catch-up before a search |
+| never be stopped by the tool | start quickly, never hang, and say plainly when the index is still building or the model is loading, with keyword results meanwhile | the indexing and loading notices. The case of an embedding API that is down is track C's ([track-c-memory.md](track-c-memory.md) §6.5) |
+| keep trusting it after its own edits | return fresh results for code it has just changed | the two-stage indexer, which stays |
 
-### 5.6 Faster first builds, whatever the model
+**How it is measured.** For every run of the `tool` setup, track A's pipeline records whether
+codemem was called, how often, at which turn first, and what it returned
+([track A](track-a-evals.md) §6). Track B runs track A's small iteration plan (track A §3.4) for
+each variant of the text or the registration, and reads four numbers:
 
-The first build is the worst moment of every option. Two changes help all three:
-- **Progressive indexing.** Keywords and the graph are ready about a minute after indexing starts.
-  Vectors follow in priority order: files the agent touches or searches first, the rest after.
-  Search notes already say what is still pending.
-- **Build once, reuse.** The vector cache is keyed by model and text, so a cache built by one
-  teammate or by CI serves the others. Cursor found teammates' copies of a repo 92% alike.
+1. **the share of runs that call codemem at least once,** on tasks whose prompt names no file;
+2. **the turn of the first call:** does the agent reach for it first, or only after grep failed;
+3. **calls per run,** and whether the agent still calls it late in a run;
+4. **tokens and time of the runs that call it,** against the baseline.
 
-### 5.7 Experiments for this section
+**The aim is use where it helps, not a high call count.** A text that orders the agent to call
+codemem on every task also forces a call where grep is the better tool, and that costs tokens.
+The fourth number is there to catch that. The proposed bar, to settle after the first
+measurement: with the text that ships, codemem is called in at least two thirds of the runs on
+tasks that name no file, and those runs cost no more than the baseline.
 
-| # | Experiment | Pass |
-|---|---|---|
-| B-E5 | jina 0.5B, EmbeddingGemma 2, Qwen3-0.6B and Qwen3-8B (API), at full length and at 256, 512 and 1,024 numbers, on the dev tasks in both query kinds. Reported with build time, query time and memory | chooses the `light` default: the best accuracy among models that build a 100k-chunk repo in under 3 hours on a 16 GB Mac |
-| B-E5b | The same 1,000 chunks and 100 queries embedded by the API and by the local 8-bit model | the two top-10 lists share at least 95% of their entries; then the two setups may share an index |
-| B-E5c | Query delay through the API, 200 searches at different times of day, for two providers | reported. A query must be embedded by the same model as the code, so a slow API cannot be patched with a small local model. If the median is over 1 s, the remedies are a faster provider, or, on a Mac that can hold it and if B-E5b passes, the local 8-bit model for queries |
+**Both agents.** Claude Code is measured first, because track A runs it. The registration is also
+checked on Codex by hand: the tools appear, and a search returns. Codex joins the measurement when
+track A adds it.
+
+**What is frozen with a configuration.** The tool names, their descriptions, the server
+instructions and the card layout are part of `codemem-final`. Track A's `tool` setup means
+"codemem as it ships", so a change to any of them changes what that setup measures.
 
 ---
 
-## 6. Branch switches and worktrees
+## 6. Experiments and gates
 
-**The worry.** If the user keeps switching branches, will codemem be embedding all the time? Does
-it need one index per branch? How big does the cache get?
+**This is track B's own eval, and it comes before the end-to-end runs.** A new piece of retrieval
+goes into a configuration that track A runs only after it has passed its gate here. A pass on the
+retrieval eval takes minutes. An end-to-end batch takes hours of usage. So this is where track B
+finds out whether a change is worth an end-to-end run.
 
-### 6.1 What happens today
-
-1. The watcher sees the branch head change and waits for git to finish writing files.
-2. A full check finds the files whose content changed: 0.3 to 0.5 s on vLLM.
-3. Stage A re-chunks only those files, in milliseconds each.
-4. Stage B looks up every changed text in the machine-wide vector cache, by model and text hash.
-   Only a text never seen before on this machine goes to the model.
-5. Searches meanwhile answer at once, with a note naming the files still pending.
-
-So there is **one index per checkout, not per branch**, and switching back to a branch seen
-before costs no model time at all.
-
-### 6.2 What a switch costs
-
-The eval's logs give real numbers. Each run stepped one index through 24 task commits per repo,
-a few days apart. That is close to "switch to a branch a few days of commits away".
-
-| Repo (chunks) | Texts needing new vectors: median | 9 in 10 updates stay under | Whole update, M5 GPU, today's model (median) |
-|---|---|---|---|
-| Godot (195k) | 626 | 3,994 | 32 s |
-| home-assistant (176k) | 2,758 | 8,536 | 87 s |
-| airflow (104k) | 1,635 | 4,278 | 59 s |
-| transformers (89k) | 2,044 | 4,018 | 64 s |
-| vscode (229k) | 8,730 | 25,987 | 323 s |
-| llama.cpp (32k) | 3,182 | 7,583 | 124 s |
-
-The time covers re-chunking and embedding. On an M1 the model is about 4 times slower. Through an
-embedding API the same work takes seconds. Each new vector adds about 4.5 KB to the cache today,
-and 0.5 to 2 KB in track C's format. A switch that brings 3,000 new texts therefore adds about
-14 MB today, and 2 to 6 MB after track C.
-
-**In plain words:** the first visit to a branch costs one to five minutes of background embedding
-on a laptop, during which keyword and graph search are already current. Every later visit is free.
-The storage is small.
-
-### 6.3 What to change
-
-| Change | Why | Size |
-|---|---|---|
-| **Drop obsolete work when the head moves again.** Queued chunks that no longer exist after the next switch are removed from the queue | switching back and forth quickly must not leave a pile of embedding for branches the user already left | small |
-| **Embed in priority order after a switch:** files the agent searched or edited first, the rest after | the queue can be minutes long; the part the agent needs is usually seconds | small |
-| **Keep vector bytes in one shared store.** Today each index holds its own copy of every vector, and the cache holds another. Proposed: the index row keeps only the text hash, and the bytes live once per machine | removes a copy (track C §4.4), and makes a new worktree cost no vector storage | medium; a schema change |
-| **A size cap with least-recently-used eviction** on that store (track C §4.7) | the cache only grows today | small |
-| **A new worktree starts from a copy of the main checkout's structure**, then updates the difference | measured on vLLM: 23 s to a first current search this way, against 99 s from scratch. With vectors out of the index file the copy shrinks from 0.8 GB to under 0.5 GB | built and tested on a shelved branch |
-
-Eviction is safe by construction. The store is a cache: the code is the source of truth. If a
-vector that a live chunk needs was evicted, the chunk goes back on the queue and is embedded
-again, and the search note says so meanwhile.
-
-### 6.4 What other tools do
-
-All *(reported)*, from each tool's own documentation.
-
-| Tool | On a branch switch | Limit it states |
-|---|---|---|
-| Cursor, until mid-2026 | a tree of file hashes found what changed; embeddings were cached by chunk content; a new checkout started from the most similar existing index, which cut the slowest first queries from 4 hours to 21 seconds | 250,000 files |
-| Cursor, since July 2026 | no embeddings; a local text index tied to a commit, with edits layered on top, rebuilt after a big pull or switch | about half the source size |
-| Continue | branch tags over a cache keyed by file content; an entry is deleted when no tag uses it | none documented |
-| Zoekt (Sourcegraph) | one index for all branches, with a mark per file saying which branches hold it | 64 branches per repo |
-| GitHub code search | keyed by file content; the default branch only | — |
-| claude-context | one index per folder path; cleared by hand | — |
-
-Our design is the same family as Cursor's old one and Continue's: vectors keyed by content, and
-one small view per checkout. No tool in this list documents a size cap or an eviction rule. Ours
-would.
-
-### 6.5 What stays open
-
-- **Agents in several worktrees through one MCP server.** A tool call does not say which folder it
-  came from. The shelved design added a `root` argument to every tool, which agents must
-  remember to pass. Whether an agent host starts one server per worktree is undocumented. This
-  needs a test with a real agent before any design is chosen.
-- **How large real branch differences are.** The table above is drift along one branch. A
-  long-lived feature branch can differ more. Experiment B-E8 measures it on real pull-request
-  branches.
-
----
-
-## 7. Experiments and gates
-
-All of these run on the retrieval eval, which needs no agent and no API money. Each is run with two
+All of these run on the retrieval eval, which needs no agent and no API money. The embedding model
+is the one track C sets for the eval, and track B does not vary it. Each is run with two
 kinds of query: the issue text, and track A's vague rewrite of the same task. Thresholds are
 proposals to agree before running.
 
@@ -558,10 +419,11 @@ proposals to agree before running.
 | B-E2 | Exact lookup and pinning | Does it fix the "names the fix site" misses? | every dev query that names a unique right chunk has it in the top 3 |
 | B-E3 | Relationships, four ways: the usage vector (today), callers as a keyword field, one-step graph expansion, and combinations. Then one edge kind at a time, name-only links against the new linking rule, and a random-neighbour placebo. Reported by kind of task (bug fix, pattern-following feature) and by how many steps the right function is from the nearest hit | Does walking the graph replace the usage vector? Which edges matter, and for which tasks? | expansion must beat the placebo; without the usage vector it must be within noise of today's default, or better, before the usage vector is dropped |
 | B-E4 | Merging variants (§4, step 3) | Is rank fusion leaving accuracy on the table? | a variant is adopted only at +2 points on both query kinds |
-| B-E5 | Embedding models at several vector lengths (§5) | How much does a bigger model buy, on our tasks and on vague queries? | reported as a curve of accuracy against cost; picks the default per option |
 | B-E6 | Link quality: 200 hand-checked calls per language, and one Python repo compared with a language server | How precise are the new links? | at least 90% of high-confidence links correct |
 | B-E7 | Cards: relation lines on and off; 5, 8, 10 cards | Do richer cards save an agent turns? | judged end to end by track A |
-| B-E8 | Branch differences: changed chunks between a repo's main branch and 50 open pull-request branches, for three repos | How big is a real switch? | reported; sets the default cap |
+| B-E9 | **Adoption** (§5): variants of the tool descriptions, the server instructions and the registration, on track A's iteration plan | Do agents call codemem when the prompt names no file, and do those runs cost less? | with the text that ships, called in at least two thirds of such runs, and those runs cost no more than the baseline. A proposal, to settle after the first measurement |
+
+The numbers skip B-E5 and B-E8. Those two experiments are track C's now, as C-E7 and C-E8.
 
 **B-E0 comes first, and is cheap.** It only rereads results the eval already produces. If almost
 no miss is one edge away from a hit, the graph work shrinks to relation lines. If most are, it
@@ -569,41 +431,54 @@ moves to the front.
 
 ---
 
-## 8. Work packages
+## 7. Work packages
 
-Sizes are rough working days for one person. "Core" marks what the paper needs. The rest improves
-the product and can slip.
+"Core" marks what the paper needs. Nothing is sized in working days: the deadlines are below.
 
-| # | Work | Deliverable | Done when | Needs | Days |
-|---|---|---|---|---|---|
-| B1 | **Headroom analysis** (B-E0), and a per-step switch for every stage of the query path | the miss table; settings that turn each step on and off | the team has ordered the rest of this list from it | the eval's dev runs | 2 |
-| B2 **(core)** | **Keywords:** Snowball stemming on words, the exact lookup with pinning, callers as a field | a new tokenizer version; B-E1 and B-E2 results | gates of B-E1 and B-E2 judged; update and rebuild give the same results | — | 4 |
-| B3 **(core)** | **Graph:** the typed edge table; the linking rule for Python and TypeScript first, then Go, Java, Rust, C and C++; `imports`, `inherits`, `refs`, `tests` | edges in the index; B-E6's precision numbers | a one-function edit still updates in under 0.5 s on vLLM; `codemem index --verify` passes | B1 | 9 |
-| B4 **(core)** | **Query path:** routing, merging variants, one-step expansion, tidying, relation lines | the path of §4, every step switchable; B-E3 and B-E4 results | the frozen `codemem-layered` configuration is handed to track A | B2, B3, C2 | 6 |
-| B5 **(core)** | **Embedding options** (§5): three presets, the local Qwen runtime, API batching and its failure handling | one setting that selects an option; B-E5's curve | each option builds and searches the sample repo from a clean machine by following the README | — | 5 |
-| B6 | **Branches:** drop obsolete queue work, priority order, the shared vector store, the worktree start | §6.3 built; B-E8's numbers | switching between two cached branches embeds nothing and finishes stage A in seconds | C4 | 5 |
-| B7 | **Ablations and freeze:** run the whole ladder on the test split once | the paper's retrieval table | numbers for three languages, both query kinds; six once track A has labelers for the other three | A's task sets | 3 |
+| # | Work | Deliverable | Done when | Needs |
+|---|---|---|---|---|
+| B1 | **Headroom analysis** (B-E0), and a per-step switch for every stage of the query path | the miss table; settings that turn each step on and off | the team has ordered the rest of this list from it | the eval's dev runs |
+| B2 **(core)** | **Keywords:** Snowball stemming on words, the exact lookup with pinning, callers as a field | a new tokenizer version; B-E1 and B-E2 results | gates of B-E1 and B-E2 judged; update and rebuild give the same results | — |
+| B3 **(core)** | **Graph:** the typed edge table; the linking rule for Python, TypeScript, Go, Rust, C and C++, in that order. Java is a bonus; `imports`, `inherits`, `refs`, `tests` | edges in the index; B-E6's precision numbers | a one-function edit still updates in under 0.5 s on vLLM; `codemem index --verify` passes | B1 |
+| B4 **(core)** | **Query path:** routing, merging variants, one-step expansion, tidying, relation lines | the path of §4, every step switchable; B-E3 and B-E4 results | the frozen `codemem-layered` configuration is handed to track A | B2, B3, C2 |
+| B7 | **Ablations and freeze:** run the whole ladder on the test split once | the paper's retrieval table | numbers for three languages, both query kinds; six once track A has labelers for the other three | A's task sets |
+| B8 **(core)** | **The MCP integration** (§5): tools loaded up front for every supported agent, the agent-facing text, the notices, a start that never hangs | the text and registration that ship; B-E9's numbers | the bar of B-E9 is met on the pilot repos, and `codemem init` is checked by hand on Claude Code and Codex | A's iteration plan (track A §3.4) |
 
 **When** (the dates are in [overview.md](overview.md) §8):
 
 | By | Packages | What it gives |
 |---|---|---|
-| **Dec 1** | B1, B2, B3 for Python and TypeScript, B4, and from B5 the `api` and `light` presets | the layered retrieval we present: stemming and exact lookup if they pass their gates, typed edges, the query path with relation lines on cards, two embedding options |
-| **Dec 8** | the rest of B5 (the local Qwen 8B preset, and the test of API against local vectors); the merging experiments; B7 in three languages, on the test split, once | the third embedding option, and the paper's retrieval table, layer by layer |
-| **Later, no date** | B3 for Go, Java, Rust, C and C++; B6 | the linking rule in every language; branch switching, built |
+| **Nov 25, evening:** the freeze | B1, B2, B8, B4, and B3 for Python, TypeScript, Go, Rust, C and C++, in that order | the layered retrieval we present, in every language of the main runs: stemming and exact lookup, the integration that ships with its adoption numbers, the query path with relation lines on cards, typed edges. Each piece is in only if it has passed its gate on the retrieval eval by then |
+| **Nov 30** | B7 on the test split, once; the merging experiments; anything that missed the freeze and has passed its gate since | the retrieval table, layer by layer, for the presentation. Nothing in this track is planned for later than this, except Java in B3, which is a bonus |
 
-B1 comes first because it orders everything else. B2 and B5 do not touch each other and go side by
-side. B4 needs B2, B3 and track C's vector store interface, which the two tracks agree on by
-Nov 25.
+The aim is to leave nothing open after December 1. What is still open then is finished in the week
+of the paper.
+
+B1 comes first because it orders everything else. B2 and B3 do not touch each other and go side by
+side. B4 needs both, and track C's vector store interface, which the two tracks agree on by
+Nov 23. B8 needs track A's pipeline, which is running on two repos now, so the adoption check is
+made on those before the freeze. The numbers skip B5 and B6: the embedding options and the branch work are track C's now,
+as C8 and C9.
 
 ---
 
-## 9. What track B needs from, and gives to, the others
+## 8. What track B needs from, and gives to, the others
 
 | With | B needs | B gives |
 |---|---|---|
-| **Track A** | vague rewrites of the dev tasks, a first subset by Nov 27; end-to-end runs that compare card formats (B-E7); later, gold labels for Go, Java and Rust | two frozen configurations: `codemem-today` (the current default, frozen now as the baseline) and `codemem-layered`. Stable tool names and card format, with any change announced before A's runs |
-| **Track C** | a vector store that returns exact scores for its top results; the cost of each embedding option | which vector types exist; the embedding options and their vector lengths; the branch design the cache must serve |
+| **Track A** | vague rewrites of the dev tasks, a first subset by Nov 24 if it is to count for the freeze; the iteration plan, with the adoption numbers in its report (§5); end-to-end runs that compare card formats (B-E7); later, gold labels for Go, Java and Rust | two frozen configurations: `codemem-today` (the current default, frozen now as the baseline) and `codemem-layered`; the tool text and registration that ship; an announcement of every change on the day it lands (below) |
+| **Track C** | a vector store that returns exact scores for its top results; which embedding model and vector length the eval uses | which vector types exist (code only, or code and usage). Track C's storage, its cache and its branch design all depend on that |
+
+**Announce every change, to everyone.** Track B will change the algorithm and what the index
+stores. That is expected. What must not happen is that the others learn of a change from a broken
+run. So every change that reaches `main` is announced in the work log
+([CONTRIBUTING.md](../../CONTRIBUTING.md) §3 and §4) on the day it lands. The entry says:
+- what changed, in one sentence;
+- whether indexes must be rebuilt. A change to any index-time setting makes every existing index
+  of that configuration out of date;
+- whether a tool name, a description, the server instructions or the card layout changed;
+- its result on the retrieval eval, and on the adoption check if it touches the integration;
+- the configuration name and the commit to run.
 
 **Tell track A as soon as something can run.** Track A starts on today's codemem, on two
 pilot repos ([track A](track-a-evals.md) §2.2). Each time a new piece of retrieval works on one
@@ -620,16 +495,16 @@ an index by mistake.
 
 ---
 
-## 10. Risks and open questions
+## 9. Risks and open questions
 
 | Risk or question | Why it matters | What we do |
 |---|---|---|
 | The graph adds noise instead of signal | hubs and wrong links can flood the top 10 | confidence on every edge, shares divided among neighbours, B-E6 before B4, and a switch to turn expansion off |
 | Stemming hurts name-heavy queries | codemem must not get worse where grep is already good | names are never stemmed; B-E1 reports the two query kinds separately |
 | Tuning to the eval | issue texts are not what agents type | every gate is judged on vague rewrites too; the test split is run once, at the end |
-| The linking rule differs by language | nine languages, one rule | Python and TypeScript first; a language without the rule keeps name-only links at low confidence |
+| The linking rule differs by language | nine languages, one rule | the languages of the main runs come before the freeze: Python, TypeScript, Go, Rust, C and C++. A language without the rule keeps name-only links at low confidence |
 | Richer cards cost tokens | relation lines add about 50 tokens per card | B-E7: keep them only if they save an agent turns end to end |
-| A bigger embedding model changes little on code | the Nov 4 memo found small gains from size alone on public code benchmarks | B-E5 measures it on our tasks before the default is chosen |
+| Agents do not call codemem | then no ranking improvement reaches the result | §5: tools loaded up front, text that says when to call, a fast first answer; B-E9 measured through track A's pipeline before the freeze |
 | Should README and docs files be indexed? | a vague request often matches a "how to add a stage" page better than any function | not in this phase's core; it is the first step of the beyond-code follow-up ([overview.md](overview.md) §11) |
 
 ---
@@ -664,30 +539,5 @@ page before citing it in the paper.
 - Sourcegraph on BM25F, https://sourcegraph.com/blog/keeping-it-boring-and-relevant-with-bm25f ·
   SQLite FTS5, https://sqlite.org/fts5.html
 
-**Embedding models**
-- The MTEB leaderboard, https://huggingface.co/spaces/mteb/leaderboard
-- Qwen3-Embedding, https://huggingface.co/Qwen/Qwen3-Embedding-8B and
-  https://arxiv.org/abs/2506.05176
-- EmbeddingGemma 2, https://huggingface.co/google/embeddinggemma-2 · its timings on a 16 GB M4,
-  https://github.com/junmo-kim/ANERun
-- jina-code-embeddings, https://arxiv.org/abs/2508.21290
-- 4-bit and 8-bit weights compared with full precision,
-  https://huggingface.co/juliensimon/Octen-Embedding-8B-mlx-4bit
-- llama.cpp pooling issue, https://github.com/ggml-org/llama.cpp/issues/14234 · Ollama's 8B tag,
-  https://github.com/ollama/ollama/issues/16076
-- Nebius Token Factory: models, https://tokenfactory.nebius.com/api/public/models_info · rate
-  limits, https://docs.tokenfactory.nebius.com/ai-models-inference/rate-limits.md · terms,
-  https://docs.tokenfactory.nebius.com/legal/terms-of-service
-- DeepInfra, https://deepinfra.com/Qwen/Qwen3-Embedding-8B
-
-**Branches in other tools**
-- Cursor, https://cursor.com/blog/secure-codebase-indexing and
-  https://cursor.com/blog/fast-regex-search
-- Continue, https://github.com/continuedev/continue/blob/main/core/indexing/README.md
-- Zoekt, https://github.com/sourcegraph/zoekt/blob/main/doc/design.md
-- GitHub code search,
-  https://github.blog/engineering/architecture-optimization/the-technology-behind-githubs-new-code-search
-
 **Ours**
-- The eval's run logs in `eval/results/` (the update sizes of §6.2), and
-  [advanced-design.md](../advanced-design.md) §1 (the failure analysis).
+- [advanced-design.md](../advanced-design.md) §1 (the failure analysis).
