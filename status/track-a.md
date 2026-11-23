@@ -1,14 +1,14 @@
 # Track A, evaluation: status
 
 **Owner:** Andrew. **Plan:** `docs/plan/track-a-evals.md` on `main`.
-**Updated:** 2026-11-22 23:43 UTC, by Andrew (with Claude Code). Nothing is built yet.
+**Updated:** 2026-11-23 00:23 UTC, by Andrew (with Claude Code). Nothing is built yet.
 
 | | |
 |---|---|
-| Now | the pilot repos are proposed in pull request #17, which waits for Andre's review |
-| Done | the plan checked against the code, the run logs and the primary pages; the pilot proposal (plan §2.5 in the pull request); difficulty counts for our 3,788 tasks; candidate Go and Rust repos for our own task sets |
-| Next | 1. Step 1 of the pilot: index pandas and playwright with the local model, and run the update-against-rebuild check. 2. A1: the pipeline skeleton, first on the localization tier. 3. A2: the recording proxy and the cross-check, against `modelUsage` |
-| Blocked on | nothing for step 1. The graded pilot needs an x86 machine with Docker: Andrew's home PC (Windows, 16 cores, 64 GB, Docker through WSL 2). He sets it up on Mon Nov 23. Rule 5 of plan §2.2 is checked there first |
-| Needs from other tracks | B: `codemem-today` tagged, Nov 23. Andre: review of pull request #17 |
-| Gives to other tracks | the `cm3-full` hit files of the three October runs, on `main` since `84b0088` (for B1); the checked facts in `log/2026-11-22-2318-a-plan-review-and-pilot-proposal.md` (public task dates, Claude Code token fields, Nebius limits, October index cost). The pipeline's first version is due Nov 25 |
-| Dates | Nov 25: the pipeline's first version. Dec 1: results on the dev tasks. Dec 8: the paper on arXiv |
+| Now | ready to start the admission check of plan §8.2 on pandas |
+| Done | the plan checked against the code, the run logs and the primary pages; the `cm3-full` hit files of the October runs on `main` (`84b0088`); a GitHub probe of the repos that are not collected yet (pull request #19) |
+| Next | 1. A recipe for pandas, and its admission check on 10 sampled tasks. 2. The same for playwright. 3. A9: the build and validate steps of the generator, for these two repos. 4. A1 and A2 beside it: the pipeline skeleton, the recording proxy and the cross-check against `modelUsage` |
+| Blocked on | nothing. Our own images run on the Mac. The five SWE-bench-Live control tasks need x86: Andrew's home PC (Windows, Docker through WSL 2), set up on Mon Nov 23 |
+| Needs from other tracks | B: `codemem-today` tagged, Nov 23. Andre: review of pull request #19. The team: a Java repo in place of kafka, which cannot be collected (see the log) |
+| Gives to other tracks | the `cm3-full` hit files (for B1); the checked facts in the log entries of 2026-11-22 (public task dates, Claude Code token fields, Nebius limits, October index cost, the repo probe) |
+| Dates | Nov 25: tasks for the first two repos, and the pipeline's first version. Nov 27: the first end-to-end test. Dec 1: results on every repo that is up. Dec 8: the paper on arXiv |
