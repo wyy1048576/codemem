@@ -8,9 +8,9 @@
 |---|---|
 | Now | not started |
 | Done | a pilot only (plan §5): on 30,977 stored vectors, a 40-byte one-bit code kept 99.9% of the exact top 10 within its top 100. The queries were code vectors, not real questions |
-| Next | 1. C1: the compression table on real queries. 2. Agree the vector store interface with B, on Nov 23. 3. C2: the compact store. 4. C3: one copy on disk. 5. C8: the `api` embedding preset |
+| Next | 1. C1: the compression table on real queries. 2. Agree the vector store interface with B, on Nov 23. 3. C2: the compact store. 4. C3: one copy on disk. 5. C8: the `api` and `light` embedding presets. Then, by Nov 30: the local Qwen 8B preset, the cache cap, the shared vector store and branches (C4, C9), the idle unload |
 | Blocked on | nothing |
 | Needs from other tracks | B: which vector types stay (code only, or code and usage). A: vague rewrites of the dev tasks, for C1, when they exist |
 | Gives to other tracks | the embedding configuration the eval uses: a local model first, Qwen through Nebius later. Nothing built yet. Tell A in the log as soon as the compact store builds one repo |
-| Open | which embedding model to use: Andre decides on Nov 24 (plan §6.8). Whether the shared vector store (C9) is built in this phase (plan §7.5) |
+| Open | which embedding model to use: Andre decides on Nov 24 (plan §6.8). The shared vector store (C9) is in this phase, due by Nov 30 |
 | Dates | Nov 25, evening: `codemem-final` frozen. Nov 26: track A's full runs start. Nov 30, 23:59: everything frozen. Dec 1, 14:00: the presentation. Dec 7: the paper |
