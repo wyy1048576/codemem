@@ -12,5 +12,5 @@
 | Blocked on | nothing |
 | Needs from other tracks | B: which vector types stay (code only, or code and usage). A: vague rewrites of the dev tasks, for C1, when they exist |
 | Gives to other tracks | the embedding configuration the eval uses: a local model first, Qwen through Nebius later. Nothing built yet. Tell A in the log as soon as the compact store builds one repo |
-| Open | whether the shared vector store (C9) is built in this phase (plan §7.5) |
+| Open | which embedding model to use: Andre decides on Nov 24 (plan §6.8). Whether the shared vector store (C9) is built in this phase (plan §7.5) |
 | Dates | Nov 25, evening: `codemem-final` frozen. Nov 26: track A's full runs start. Nov 30, 23:59: everything frozen. Dec 1, 14:00: the presentation. Dec 7: the paper |
