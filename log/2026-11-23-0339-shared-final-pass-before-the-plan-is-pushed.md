@@ -12,8 +12,8 @@
   limit is the presentation on Dec 1 at 14:00. The morning of Dec 1 is for preparing the
   presentation, not for runs.
 - **Five languages come first in the repo order** (track A §8.3): pandas (Python), playwright
-  (TypeScript), ruff (Rust), kubernetes (Go), llama.cpp (C++). Then home-assistant and vscode,
-  then airflow and vllm. llama.cpp moved up from ninth place.
+  (TypeScript), ruff (Rust), kubernetes (Go), duckdb (C++). Then home-assistant and vscode,
+  then airflow and vllm. The entry that follows this one says why the C++ repo is duckdb.
 - **Java is a bonus,** in all three tracks. It has no date.
 - **Search beyond code** (PDFs, documents, everything on a computer) is future work, with no
   date.
@@ -30,7 +30,7 @@
 
 ## Left
 
-- llama.cpp has 43 candidate tasks with tests, so its sample may be smaller than 20.
+Nothing.
 
 ## Blocked on, or needed from others
 
@@ -38,4 +38,4 @@ Nothing.
 
 ## Next
 
-- Andrew: the recipes in the new order. llama.cpp comes after kubernetes.
+- Andrew: the recipes in the new order. duckdb comes after kubernetes.
