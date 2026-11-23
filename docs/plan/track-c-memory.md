@@ -397,7 +397,7 @@ C1 goes first: it is cheap, it needs nothing from the other tracks, and it decid
 | **Track A** | vague rewrites of the dev tasks, for C1; end-to-end runs for the reranker gate | a frozen, named configuration for each agent run (for example `codemem-compact`), with its memory and disk numbers for the paper; an install without PyTorch for the task containers, before A's first runs that embed through an API |
 
 **Tell track A as soon as the compact store works.** Track A starts on today's index, the heaviest
-it will ever be, and for that reason on two or three pilot repos only
+it will ever be, and for that reason on two pilot repos only
 ([track A](track-a-evals.md) §2.2). Once the compact store builds one repo, write it in the work
 log ([CONTRIBUTING.md](../../CONTRIBUTING.md) §4): the configuration name, the commit, and the
 measured memory and disk next to today's. Track A then indexes its pilot repos again and expects a

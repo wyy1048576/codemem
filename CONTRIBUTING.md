@@ -34,7 +34,7 @@ is, ask before you start.
 - **Announce a change that another track depends on before it lands:** a tool name, the card
   layout, a flag of the pipeline, the vector store interface. The contracts are listed in
   [docs/data-model.md](docs/data-model.md) §12. The work log is where it is announced.
-- **B and C keep A informed.** Track A starts on the codemem that exists today, on two or three
+- **B and C keep A informed.** Track A starts on the codemem that exists today, on two
   repos. Each time a new piece of retrieval or a new index format works on one repo, say so in
   the log: the configuration name, the commit, what changed at index time, and what it does to
   memory and disk. Track A then indexes its pilot repos again and reruns them. Do not wait for a

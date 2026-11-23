@@ -605,7 +605,7 @@ Nov 25.
 | **Track A** | vague rewrites of the dev tasks, a first subset by Nov 27; end-to-end runs that compare card formats (B-E7); later, gold labels for Go, Java and Rust | two frozen configurations: `codemem-today` (the current default, frozen now as the baseline) and `codemem-layered`. Stable tool names and card format, with any change announced before A's runs |
 | **Track C** | a vector store that returns exact scores for its top results; the cost of each embedding option | which vector types exist; the embedding options and their vector lengths; the branch design the cache must serve |
 
-**Tell track A as soon as something can run.** Track A starts on today's codemem, on two or three
+**Tell track A as soon as something can run.** Track A starts on today's codemem, on two
 pilot repos ([track A](track-a-evals.md) §2.2). Each time a new piece of retrieval works on one
 repo, write it in the work log ([CONTRIBUTING.md](../../CONTRIBUTING.md) §4): the configuration
 name, the commit, and which index-time settings changed. Track A then indexes its pilot repos

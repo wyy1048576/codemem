@@ -8,26 +8,26 @@
 records whether the agent completed it, how long it took and how many tokens it used. The pipeline
 comes first. Once it runs, tracks B and C change codemem and rerun it, many times.
 
-**Done means, in this order:**
-1. **the pipeline:** one command runs a chosen set of tasks, setups and models, and can be stopped,
-   resumed and repeated; flags and a plan file choose what runs;
-2. **trusted measurement:** tokens and time for every run, from two independent sources that must
-   agree;
-3. **tasks:** from public sets that already ship containers. Our own, generated from a GitHub
-   repo link and newer than the models, get a trial at most in this phase (§8.2);
-4. **labels** on every task, so a plan can say "medium tasks only" before anything runs;
-5. **vague versions** of each prompt, checked to be still solvable;
-6. **the small-model study** at about 9B and 14B, which are today's models in the 7B and 13B
-   classes, with a 27B follow-up;
-7. the retrieval eval kept short, with a vague query per task and two stronger baselines;
-8. a release with the paper: the pipeline, the task list with its labels and vague prompts, and
-   the run records.
+**The order of work.**
+1. **The eval set-up, end to end.** Our own tasks, generated from repos we choose and taken in a
+   fixed order (§8), and the pipeline that runs and grades them: one command for a chosen set of
+   tasks, setups and models, with tokens and time from two sources that must agree (§2 to §7).
+2. **The first end-to-end test:** two repos, with the codemem that exists today (§2.2).
+3. **The main comparison.** When tracks B and C deliver the improved codemem, everything is
+   indexed again and the remaining repos follow. The index should be much smaller by then, which
+   is why only two repos are indexed before it.
+4. **Afterwards, the model gap:** the same tasks, with open models in open harnesses, to see
+   whether codemem helps a small model more (§4.6, §11).
 
-**When.** Items 1 and 2 by Nov 25. First results on the rest by December 1, refined by December 8,
-when the paper goes to arXiv (§14).
+**What exists at the end:**
+- the task generator and its tasks, with labels (§10) and a vague version of each prompt (§9);
+- the pipeline, with flags and plan files that choose what runs (§3);
+- the retrieval eval kept short, with a vague query per task and two stronger baselines (§12.2);
+- a release with the paper: the generator, the pipeline, the tasks and the run records.
 
-**Where to start.** Not with everything: with a pilot on two or three repos (§2.2), on the codemem
-that exists today (§2.3).
+**When.** Tasks for the first two repos, and the pipeline's first version, by Nov 25. The first
+end-to-end test by Nov 27. Results on every repo that is up by December 1. The test split, the
+model gap and the paper by December 8 (§14).
 
 **What this track does not judge.** Retrieval accuracy is not the goal here. The agent may solve a
 task any way it likes. What counts is whether it solved it, how long it took, and how many tokens
@@ -133,53 +133,45 @@ that shape, so the end-to-end runner is a new module beside it, not a new adapte
 localization tier (§12.1) is the cheapest bridge: it grades an agent's answer with the gold labels
 and accuracy metrics that exist.
 
-### 2.2 Start small: two or three repos first
+### 2.2 The first end-to-end test: two repos
 
-This file designs the whole study. The build does not start with the whole study. Before any large
-batch, and before every task's repo is indexed, the whole chain has to run on a small pilot, where
-an error is cheap to see and to fix.
+This file designs the whole study. The build does not start with the whole study. Once tasks exist
+for two repos (§8), the whole chain runs on those two, with the codemem that exists today, before
+any other repo is indexed. An error is cheap to see and to fix there.
 
-**The first job of whoever picks up this track, person or agent: propose the pilot repos, with
-reasons, before building on them.**
+**The first job of whoever picks up this track, person or agent: run the admission check of §8.2
+on the first two repos of §8.3, and confirm them or say why another repo takes a place.**
 
-| The pilot | |
+| The first test | |
 |---|---|
-| Repos | two or three, each in a different language: Python, TypeScript, and one of Go, Rust, Java or C++ |
-| Tasks | 3 to 5 per repo, 10 to 12 in all, of mixed difficulty: easy, medium, and at least two hard ones (§10) |
+| Repos | two, in different languages: the first two of the list in §8.3, pandas (Python) and playwright (TypeScript), unless the admission check rejects one |
+| Tasks | first 10 to 12 of them, of mixed difficulty (easy, medium, and at least two hard ones, §10), to bring the chain up. Then every validated task of the two repos |
 | Setups | `grep` and `tool` |
 | codemem | what exists today, with its local embedding model (§2.3) |
 | Agent model | Haiku 5.5 while the chain is being built, then Sonnet 5.5 |
+| Control | five ready-made SWE-bench-Live tasks (§8.4). Their environments are known to work, so a failure there is the pipeline's fault, and a failure only on our own tasks is the generator's |
 
-**How to choose the repos:**
-1. **From SWE-bench-Live** (§8.1), so every task already has an image, test commands and a grader.
-2. **A language codemem indexes:** Python, JavaScript or TypeScript, Go, Java, Rust, C or C++
-   (`src/codemem/languages/`).
-3. **Medium size.** Large enough that search matters: at least 1,000 source files. Small enough
-   that today's codemem indexes it in minutes with the local model, not hours.
-4. **At least five tasks, spread over easy, medium and hard,** counted from the files and lines of
-   the real change (§10).
-5. **It works on our machine.** For one task per repo, pull the image, apply the real change and
-   run its tests by hand. Keep the repo only if they pass, in under 5 minutes.
-6. **If possible, one task of the OCR kind:** a change that adds something modelled on code that
-   already exists.
-
-**The pilot has passed when all of this is true:**
-- every stage runs for every pilot task in both setups: plan, index, run, grade, score, report;
-- the grader is right: for every pilot task the real change passes, and an empty change fails;
+**The test has passed when all of this is true:**
+- every stage runs for every task in both setups: plan, index, run, grade, score, report;
+- the grader is right: for every task the real change passes, and an empty change fails;
 - the two token counts agree within 1% on every run (§5.3);
 - the first event of every `tool` run lists codemem's tools, and some runs call them;
 - a batch can be stopped and resumed, and a deliberately broken setup is caught (§7);
-- one of us has read three whole transcripts, one per repo.
+- one of us has read three whole transcripts, at least one per repo.
 
-Only then do more tasks, more repos and the dev batch follow.
+Only then are the other repos of §8.3 indexed and run, in order.
 
-**Small also because the index is about to shrink.** Today's index keeps every vector in memory at
-full size and loads a 2.2 GB model: for 200,000 vectors, 358 MB of memory and 717 MB of disk
-([track C](track-c-memory.md) §3). Tracks B and C are changing what is indexed and how it is
-stored, and track C's target for the same vectors is under 30 MB of memory. Every repo indexed
-today is indexed again when that lands. So index the pilot repos now, and the rest when a batch
-needs them. Tracks B and C announce each new configuration in the work log
-([CONTRIBUTING.md](../../CONTRIBUTING.md) §3), and the pilot repos are where it is tried first.
+**Why two repos first.** Tracks B and C are still improving codemem. Today's index keeps every
+vector in memory at full size and loads a 2.2 GB model: for 200,000 vectors, 358 MB of memory and
+717 MB of disk ([track C](track-c-memory.md) §3). Track C's target for the same vectors is under
+30 MB of memory, and track B changes what is indexed. Every repo indexed today is indexed again
+when that lands. So two repos are indexed now, and the others when the improved codemem is ready.
+Tracks B and C announce each new configuration in the work log
+([CONTRIBUTING.md](../../CONTRIBUTING.md) §3), and these two repos are where it is tried first.
+The rest of the plan calls them the pilot repos.
+
+**What does not wait.** Generating tasks for the other repos needs no index, so it goes on in the
+meantime. So do baseline runs, which do not use codemem.
 
 ### 2.3 Which codemem, and which embedding model
 
@@ -334,8 +326,8 @@ The plan above, as a table. This is the proposal for what the paper's numbers co
 | **Small models, a probe** | about 10 hard tasks | to check that expectation instead of assuming it |
 | **Mechanism setups:** results up front, placebo, stronger wording (§4.1) | a medium subset | to explain the headline, not to be it |
 
-**Dev tasks first, test tasks once.** The task file marks every task as dev or test, split at
-random within each language before any run. The matrix runs on the dev tasks by December 1. It
+**Dev tasks first, test tasks once.** Every task is marked dev or test. Our own tasks keep the
+mark they already carry from the retrieval eval (§8.1). The matrix runs on the dev tasks by December 1. It
 runs once on the test tasks in the week before arXiv, with the frozen configuration
 ([overview.md](overview.md) §8.2). Planning sizes, to be replaced by what the first batch
 measures: about 50 dev tasks and 75 to 100 test tasks.
@@ -388,30 +380,28 @@ different.
 
 ### 4.2 The agents
 
-Two harnesses, because no single one fits every model.
+Claude models and open models cannot share a harness (§4.6 explains why), so there are two arms.
 
-| Harness | Models | codemem reaches the agent as | Why this one |
-|---|---|---|---|
-| **Claude Code, headless** | Claude models: a frontier one and a cheap one | MCP tools | it is the product people use, and every team member has it |
-| **mini-SWE-agent, in its text mode** | the open models: 9B, 14B and 27B | a shell command, `codemem search "..."`, on the sandbox's path and described in the system prompt | it asks nothing of the model but to write one shell command per turn, so small models that are bad at tool calls can still be compared fairly. It is also the harness the official SWE-bench board uses to compare models |
+| Arm | Harness | Models | codemem reaches the agent as | Why this one |
+|---|---|---|---|---|
+| Claude | **Claude Code, headless** | Claude Sonnet 5.5 and Haiku 5.5 | MCP tools | it is the product people use, and the only harness our subscriptions cover |
+| Open models, main | **mini-SWE-agent** | 9B, 14B and 27B | a shell command, `codemem search "..."`, on the sandbox's path and described in the system prompt | it is the harness the official SWE-bench board uses to compare models. Its fixed prompt is about 800 tokens. It takes actions as plain text or as a single tool call, so it does not depend on how well a model calls tools |
+| Open models, second | **Qwen Code** | 9B and 27B | MCP tools, as in Claude Code | the open harness made for these models. It attaches codemem the way codemem ships |
 
-Claude runs only in Claude Code, under our subscriptions. The open models run only in
-mini-SWE-agent, through an API or a server we host. So the model gap is measured inside
-mini-SWE-agent, from the 9B model up to the 27B one, and the Claude results stand beside it.
+Claude runs only in Claude Code, under our subscriptions. The open models run only in the open
+harnesses, through an API or a server we host. So the model gap is measured inside one open
+harness, from the 9B model up to the 27B one, and the Claude results stand beside it.
 
-Two details about mini-SWE-agent *(reported)*: since version 2 its default is native tool calling,
-so the text mode has to be selected (`mini_textbased.yaml` or `swebench_backticks.yaml`); and it
-has no MCP support, which is why codemem reaches it as a command.
+**Any endpoint will do.** Every open harness here takes an OpenAI-style endpoint: a base URL, a
+key and a model name. The same model on Nebius, on another provider or on our own server is the
+same run with a different address.
 
 **The harness matters as much as the model.** One 2026 study of 1,100 failed runs found that
 changing the harness moved the same open model by 28 to 44 points *(reported)*. So results are
 never compared across harnesses, only within one.
 
-**Why not Claude Code for the small models.** Ollama documents how to point Claude Code at a local
-model. But Anthropic's documentation says routing it to non-Claude models through a gateway is not
-supported, and in one report an 8B model answered in plain text instead of calling tools once many
-tools were loaded *(reported)*. A result that depends on an unsupported setup would be hard to
-defend.
+The candidates, the evidence behind this choice, and the short trial that confirms or changes it
+are in §4.6.
 
 ### 4.3 Running Claude Code under a subscription
 
@@ -527,9 +517,10 @@ later: nothing in the paper depends on it.
 - **codemem embeds the query, and the agent's own edits, during a run.** First with the local
   model. Later through an API, where the container needs no GPU and no PyTorch and every machine
   produces the same vectors (§2.3).
-- **Run on x86 Linux, not on the Macs.** Published test images are built for x86 only: SWE-bench's
-  maintainers closed ARM support as "not planned" in August 2026, and a contributor measured tests
-  6 to 9 times slower under emulation *(reported)*.
+- **Published test images need x86 Linux.** They are built for x86 only: SWE-bench's maintainers
+  closed ARM support as "not planned" in August 2026, and a contributor measured tests 6 to 9
+  times slower under emulation *(reported)*. Our own images are built for the machine that runs
+  them, so on our Macs they run at full speed (§8.2).
 - **Containers are cheap next to model calls.** At 4 cores, 16 GB and 10 minutes a run, 100 runs
   cost about $11 on Modal's sandboxes, or $3 to $6 on one rented cloud machine *(reported prices,
   our arithmetic)*.
@@ -553,13 +544,104 @@ later: nothing in the paper depends on it.
    setting, so repetitions are the only way to see run-to-run noise.
 6. **Tool use is measured, not assumed.** The main analysis keeps every run of the `tool` setup,
    whether or not the agent called codemem. A second analysis looks only at the runs that did.
-7. **Freshness is recorded.** Every task carries the date its fix was merged, and every table
-   says how many of its tasks are newer than the model's training cutoff. The public sets are
-   mostly older (§8.1).
+7. **Tasks are newer than the model.** Our own tasks come from pull requests merged after the
+   model's training cutoff. The ready-made add-on is older, and is reported apart (§8.4).
 8. **Setups take turns.** The runs of one task are started alternately (`grep`, `tool`, `grep`,
    `tool`), not one whole setup after the other, so a slow hour at the API hits both.
 9. **A dev split for building, a test split run once.** Prompts, limits and codemem settings are
    fixed on the dev split before any test-split run.
+
+### 4.6 Open harnesses for the open models: what exists
+
+**The problem.** The open models run on our own server or on a provider such as Nebius. Claude
+Code and Codex are built around their vendors' models. We need a harness whose model is a
+setting. Everything in this section is *(reported)*: it was read on the projects' own pages on
+Nov 22, and nothing was run.
+
+**Can the vendors' agents take another model?** In part, and not as our main route.
+
+| Agent | With an open model | Why it is not the main route |
+|---|---|---|
+| Claude Code | it works against any endpoint that speaks Anthropic's API, which Ollama offers. Alibaba's own model card says its 27B model was evaluated in the Claude Code harness | Anthropic's documentation says it "doesn't support routing Claude Code to non-Claude models through any gateway". Its fixed prompt is about 16,600 tokens on every call, and the 14B model's whole window is 32,768 |
+| Codex CLI | only against an endpoint that serves OpenAI's Responses API. Support for the usual chat API was removed | it depends on each provider's version of that API |
+| Any other harness, with a Claude model | not under a subscription. OpenCode's documentation: "Anthropic explicitly prohibits this" | it would need a Claude API key, which this plan does not use |
+
+**Open harnesses.** All of them take any OpenAI-style endpoint, hosted or local.
+
+| Harness | Must the model make native tool calls? | codemem attaches as | What a headless run reports | Note |
+|---|---|---|---|---|
+| **mini-SWE-agent** 2.4 | no: it has a plain-text mode and a one-tool mode | a shell command | a trajectory file with every raw response. Token counts are inside those responses | the SWE-bench board's harness. Its runner takes any SWE-bench-format file with a Docker image per task, which SWE-bench-Live has |
+| **Qwen Code** 0.28 | yes | MCP | JSON, with token usage per run and per message; limits on turns, time and tool calls | made for Qwen models. It sends every tool definition on every request |
+| OpenCode | yes | MCP | JSON lines, with tokens per step | two version lines in parallel. With the same 27B model it scored 9 points under mini-SWE-agent in one study |
+| Goose | yes | MCP | JSON, with tokens per run only | one binary |
+| OpenHands, through its SDK | no: it has a mode without native calls | MCP | through the SDK's metrics | its command-line tool is no longer maintained |
+| Inspect's ReAct agent | no: it can emulate tool calls | MCP | token usage per task, in its log | part of an eval framework (below) |
+| Terminus 2 | no: it types plain keystrokes | a shell command | through Harbor (below) | built as a neutral test bed for models |
+
+**Do small models manage native tool calls? Both sides.**
+
+| They do | They do not, or not reliably |
+|---|---|
+| Qwen3.5-9B resolved 54.8% of SWE-bench Verified in Claude Code and 60.6% in mini-SWE-agent, in one vendor's report | In the same report the weakest of seven harnesses was 24 points under the best. At 27B the spread in another study was 9 |
+| At 27B, Claude Code and mini-SWE-agent came out "equivalent within five points" (347 against 353 of 444 tasks) | The prompt alone: 16,581 tokens a call in Claude Code, 7,025 in OpenCode, 829 in mini-SWE-agent. Qwen3-14B's window is 32,768 |
+| Plain-text actions are not automatically safer. A 4B Qwen broke mini-SWE-agent's text format in 16 of 18 runs and did far better with native calls, in a small study that compared against its authors' own harness. On a function-calling benchmark, Qwen3-14B scores 34.75 on multi-turn tasks with native calls and 26.13 with prompted ones | Local servers still mis-read Qwen3.5 tool calls: reports against Ollama, llama.cpp and mlx-lm from February to November 2026 |
+| | With 259 tools loaded, an 8B model answered in plain text instead of calling one (one report) |
+
+**Reading.** Native calls work better than this plan first assumed, and they fail in ways that
+depend on the server and on how much the harness puts into the prompt. Nothing was measured for
+the base 14B model. So the choice of §4.2 has two parts:
+1. **mini-SWE-agent is the main harness, and both of its modes are tried** for each model. The
+   mode with fewer broken actions is used for that model.
+2. **Qwen Code is the second harness** for the 9B and 27B models, so that codemem is also
+   measured the way it ships, as an MCP tool. The 14B model's window is too small for it.
+
+**Claude Code with an open model is an option, not part of the plan.** It is the only way to have
+one harness on both sides of the model gap without a Claude API key, and others have published
+results that way. Against it: Anthropic does not support it, and its prompt leaves a small model
+little room. Decide after the trial below. If it is run, it is reported as a separate arm.
+
+**Frameworks that run a harness over the tasks.**
+
+| Framework | What it would save us | What is missing, or to check |
+|---|---|---|
+| **Harbor** 0.27 | one job file runs Claude Code, Qwen Code, OpenCode or mini-SWE-agent over the same tasks. An MCP server is declared per run, so "with codemem" and "without" are two entries on identical tasks. It records tokens (input, cached, output) and separate times for the environment, the agent and the tests. A task is a small folder: an image name, the prompt, a test script | it knows neither our own tasks nor SWE-bench-Live's, so our exporter writes the folders. For mini-SWE-agent and Terminus 2 it only mentions an MCP server in the prompt and does not connect it. To check: that its Claude Code agent accepts a subscription login, the clean-run switches of §4.3 and our proxy |
+| **Inspect AI** | a simple agent that takes MCP tools and can emulate tool calls; token usage per task; SWE-bench with ready images, and other task sets through a parameter. It can also drive Claude Code, OpenCode and mini-SWE-agent | our tasks need a short task and a scorer in Python. It routes the agents' model calls through itself: check what that does to a subscription login |
+| mini-SWE-agent's own runner | nothing to build for the main open arm: `mini-extra swebench --subset <our file>` | it produces patches only. Grading, token totals and timings stay ours |
+
+Tasks are already planned in Harbor's format (§4.4), so Harbor is tried first, for both arms. If
+it cannot run Claude Code the way §4.3 requires, our own runner starts each harness. The recording
+proxy stays either way: the cross-check of §5.3 needs a count that does not come from the harness.
+
+**The harness trial.** Run it on the pilot tasks (§2.2) as soon as the open arm exists, with the
+9B model on one server:
+
+| Run | What it shows |
+|---|---|
+| mini-SWE-agent, plain-text mode | the floor: no tool calling is needed |
+| mini-SWE-agent, one-tool mode | whether native calls help or hurt this model on this server |
+| Qwen Code, with codemem over MCP | whether an MCP harness is usable at 9B, and whether the model calls codemem |
+
+For every run, record how it ended: finished, a broken or missing action, a full context window,
+or the turn limit. Record also whether codemem was called and whether token counts were captured.
+Ten tasks cannot rank harnesses: in one study, reruns alone flipped 13% of tasks. The trial
+answers one question: does each harness work at all with this model? OpenCode is the replacement
+if Qwen Code does not.
+
+**Traps the research found.** Each one changes results without an error.
+- **mini-SWE-agent:** in version 2.4.6 the text mode must be chosen with
+  `--model-class litellm_textbased`. The text configuration files alone do not select it (read in
+  its source; confirm it). A model it has no price for needs `cost_tracking: "ignore_errors"`.
+- **The server's tool-call parser:** Qwen3.5 and Qwen3.8 write tool calls in an XML form, and
+  vLLM needs `--enable-auto-tool-choice --tool-call-parser qwen3_coder --reasoning-parser qwen3`.
+  Qwen3-14B uses the older form: `--tool-call-parser hermes`.
+- **Context length:** Ollama defaults to 4,096 tokens (§11). Qwen Code assumes a local model has
+  a window of a million tokens unless `contextWindowSize` is set. OpenCode assumes 200,000 unless
+  `limit.context` is set.
+- **OpenCode, version 2:** an MCP server is hidden behind a code-writing tool unless it is
+  declared with `codemode: false`.
+- **Harbor with a model server on the host:** pass `--skip-model-parsing-and-provider-mapping`,
+  and reach the server as `host.docker.internal`. Inside the container, `localhost` is the
+  container.
 
 ---
 
@@ -695,7 +777,7 @@ run, and the source for per-tool time.
 
 ### 5.7 The same thing for open models
 
-mini-SWE-agent talks to open models through an OpenAI-style endpoint. The same proxy sits in
+The open harnesses talk to open models through an OpenAI-style endpoint. The same proxy sits in
 front of it, and those responses carry their own usage counts. A model running locally also
 reports, for each request, how many tokens it read and wrote and how long each took. So the six
 numbers and four clocks are defined for every model in the study.
@@ -741,79 +823,85 @@ that safe.
 
 ## 8. Tasks: where they come from
 
-### 8.1 Tasks that already exist
+Two sources. **Our own tasks are the main one:** generated from repos we choose, newer than the
+models, and made by a tool we keep. **SWE-bench-Live is an add-on:** it is ready-made, so
+including it costs little.
 
-The pipeline does not wait for our own tasks. Its runs use a public set that already ships a
-container and hidden tests for each task. In this phase, these are the tasks the results come
-from.
-
-**SWE-bench-Live is the first choice** *(checked on its pages, Nov 22)*:
-
-| Set | Tasks | Languages |
-|---|---|---|
-| the Python set | about 1,890 in its full split, with frozen splits of 300 and 500 | Python |
-| the multi-language set | 1,077, from 431 repos | C 111, C++ 142, C# 136, Go 138, Java 160, JavaScript 108, Rust 171, TypeScript 111 |
-
-Each task names an x86 Docker image, its test commands and a log parser, and the project's own
-script grades a patch. So all six of our languages are a matter of choosing tasks, not of building
-environments. SWE-bench Pro's second version is the alternative: it already runs Claude Code in
-the Harbor format *(reported)*.
-
-**Two limits, both stated in the paper.**
-- **These tasks are older than the models.** The newest Python task we saw was created in August
-  2025, and the multi-language page shows no dates. Both setups run the same model on the same
-  task, so a memorized fix cannot favour one side. It can hide a saving, because a model that
-  remembers a fix has less to search for. Every table says how many of its tasks are newer than
-  the model.
-- **Public sets have flaws** (§16). Tasks are spot-checked by hand before they enter the test
-  split.
-
-### 8.2 Our own: the generator
-
-**In this phase: a trial at most.** What follows is the design the trial would test. Building
-tasks at scale waits until after the paper ([overview.md](overview.md) §8.3).
+### 8.1 Our own tasks: the generator
 
 **In plain words.** Point it at a GitHub repo. It finds merged pull requests that fixed an issue
 and came with tests, rebuilds the repo as it was just before each one, checks that the tests fail
 before the change and pass after it, and writes out a task.
 
 ```
- a GitHub repo link, and a date range after the model's cutoff
+ a GitHub repo, and a date range after the model's cutoff
       │
       ▼
- 1. COLLECT    merged pull requests with one linked issue written before the fix   ┐ exists in
+ 1. COLLECT    merged pull requests with one linked issue written before the fix   ┐ exists:
  2. SPLIT      the change into code and tests; record the commit just before it    ┘ cmeval collect
       │
       ▼
- 3. BUILD      a container image of the repo at that commit; find the test command  ┐ reuse
- 4. VALIDATE   run the new tests before and after the real change, three times:      │ RepoLaunch
-               keep the task if some tests go from failing to passing, and none      │ (below)
-               that passed before now fail or flicker                                ┘
+ 3. BUILD      an image of the repo at that commit, from the repo's recipe (§8.2)   ┐
+ 4. VALIDATE   run the pull request's tests before and after the real change,       │ new
+               three times: keep the task if some tests go from failing to          │
+               passing, and none that passed before now fail or flicker             ┘
       │
       ▼
- 5. LABEL      gold files and functions (exists); size, kind and difficulty (§10)   ┐ ours:
- 6. REWRITE    the vague versions of the prompt, with their checks (§9)             ┘ the new part
+ 5. LABEL      gold files and functions (exists); size, kind and difficulty (§10)   ┐ new, and
+ 6. REWRITE    the vague versions of the prompt, with their checks (§9)             ┘ ours alone
       │
       ▼
  7. PACKAGE    one JSON line per task, a task folder in the Harbor format, a datasheet
 ```
 
-**What our own funnel says about yield.** For the nine repos of the retrieval eval:
+**The first half exists, and has already run.** Steps 1 and 2 are `cmeval collect`. For twelve
+repos, 3,788 tasks from pull requests merged between July 1 and October 22, 2026 are on disk in
+`eval/tasks/`. Each holds the issue text, the commit before the fix, the code change, the test
+change and gold labels.
 
-| Step | Kept |
-|---|---|
-| merged pull requests, July to October 2026 | 33,568 |
-| with one linked issue, written before the fix | 5,334 |
-| small enough, and labelled | 3,788 |
-| of those, with tests in the same pull request | 80% of Python tasks, 84% of TypeScript tasks, **8% of C++ tasks** |
+**They are already split into dev and test.** The end-to-end tasks keep that split. So nothing
+that tracks B and C tune on can end up in the end-to-end test set.
 
-So steps 1 and 2 already give about 2,500 candidates with tests. Steps 3 and 4 are the unknown.
-The C++ row is a warning: Godot, duckdb and llama.cpp rarely add a test in the same pull request,
-so C++ needs repos chosen for their test habits.
+**What is new** is steps 3 and 4, the new labels of step 5, and step 6.
 
-### 8.3 What to build on
+**The command.** `cmeval generate <repo>` runs steps 3 to 7 for a repo that has a recipe. Each
+step writes to disk, and a run that stops can be resumed, as in the rest of the pipeline.
 
-Steps 3 and 4 are the expensive part, and others have built them. All *(reported)*.
+### 8.2 One recipe per repo
+
+**The idea.** We are not making tasks for hundreds of unknown repos. We are making them for about
+ten repos that we choose. So the environment is not worked out by an agent for every task. It is
+written down once per repo, as a recipe, and applied to every task of that repo.
+
+A recipe says four things: the base image; how to install the repo's dependencies; what to run
+again after a task's commit is checked out; and how to run a given set of test files and read the
+result.
+
+```toml
+# eval/envs/pandas.toml: a sketch of the shape, not a tested recipe
+repo = "pandas-dev/pandas"
+base_image = "python:3.12"
+setup = ["pip install -r requirements-dev.txt"]           # once, when the base image is built
+refresh = ["pip install -e . --no-build-isolation"]       # after a task's commit is checked out
+test = "pytest -q {test_files}"                           # the task's own tests
+parser = "pytest"
+timeout_min = 10
+```
+
+**Who writes it.** One of us with a coding agent, on our subscriptions. Expect an hour or two for
+a plain Python repo and up to a day for one with a heavy build. This is the part that is prepared
+by hand. Everything after it is automatic.
+
+**The admission check.** Before a repo is admitted, its recipe is run on 10 sampled candidates.
+The repo is in if at least 6 validate, each in under 10 minutes. If fewer do, fix the recipe or
+move to the next repo of the list (§8.3).
+
+**Images for our own machines.** We build the images, so we choose their architecture. On our Macs
+they are built for ARM and run at full speed. SWE-bench-Live's images are x86 only and run several
+times slower there (§4.4).
+
+**Why not an agent that builds every environment.** Such tools exist, and they are what makes the
+large public sets possible. All *(reported)*.
 
 | Pipeline | What it automates | Languages | Yield and cost | Can it take any repo? |
 |---|---|---|---|---|
@@ -823,38 +911,85 @@ Steps 3 and 4 are the expensive part, and others have built them. All *(reported
 | SWE-smith (MIT) | one image per repo, then **synthetic** bugs with generated issue texts | Python, plus profiles for C, C++, Go, Java, JavaScript, Rust, TypeScript | half of candidate bugs are valid; $1,360 for 50,000 tasks | yes, but the tasks are made up |
 | SWE-bench's own scripts (MIT) | scraping and validation; the install steps are written by hand | Python | 2.5% of pull requests | not the environments |
 
-**The recommendation.** Build on SWE-bench-Live's scripts and RepoLaunch, and feed them the
-pull-request list that `cmeval collect` already produces. It is the only maintained, permissively
-licensed pipeline that covers all six of our languages from an arbitrary repo. Borrow log parsers,
-base images and labelling prompts from SWE-rebench V2.
-
-**Three cautions.**
-- An independent benchmark measured RepoLaunch much lower, at 8.9% of tasks validated on average,
-  with older models and an earlier version. So the first step is a trial on about 20 pull requests
-  per language, before the plan depends on it.
-- The two research passes behind this plan read SWE-rebench V2's repository differently. One took
-  the paper's word that the collection code is released. The other opened the repository and did
-  not find it. Check before relying on either.
-- RepoLaunch needs keys of its own: a model API key, through LiteLLM (any provider, or an
-  OpenAI-style endpoint), and a Tavily search key *(checked Nov 22)*. A subscription login does
-  not serve it. The open-model endpoint of §11 is one way to feed it.
+They solve a problem this phase does not have. They also bring costs: RepoLaunch needs a model API
+key of its own (through LiteLLM) and a Tavily search key *(checked Nov 22)*, and an independent
+benchmark measured it at 8.9% of tasks validated, with older models and an earlier version.
+RepoLaunch stays the route for later, when the generator should take any GitHub link without a
+recipe. One caution for that day: the two research passes behind this plan read SWE-rebench V2's
+repository differently. One took the paper's word that its collection code is released. The other
+opened the repository and did not find it.
 
 **What we add, which none of these has.** Steps 5 and 6: prompts at three levels of vagueness that
 are checked to be still solvable, and labels for how hard a task is to *search* for. That layer
-works on any task that has a container and hidden tests, whoever harvested it. It is the part we
-release as ours.
+works on any task that has a container and hidden tests, whoever made it.
 
-**Why our own fresh tasks still matter.** The public sets are older than the models we test
-(§8.1). Only tasks we harvest ourselves can be newer. That is the case for building the generator
-after the paper.
+### 8.3 Which repos, and in what order
 
-**Synthetic bugs have one use here:** as a pool of easy tasks for the small models, if real fresh
-pull requests give too few that pass the small-model filter.
+**What we already hold.** Counted on Nov 22 from the task files in `eval/tasks/`. "With tests"
+means the pull request also changed test files, which a hidden-test task needs. Difficulty follows
+§10.
 
-### 8.4 Choosing repos
+| Repo | Language | Tasks collected | With tests | Easy / medium / hard, among those with tests |
+|---|---|---|---|---|
+| home-assistant/core | Python | 756 | 618 (81%) | 289 / 247 / 82 |
+| microsoft/vscode | TypeScript | 771 | 644 (83%) | 175 / 252 / 217 |
+| pandas-dev/pandas | Python | 352 | 298 (84%) | 139 / 121 / 38 |
+| vllm-project/vllm | Python | 381 | 284 (74%) | 97 / 129 / 58 |
+| apache/airflow | Python | 229 | 205 (89%) | 64 / 93 / 48 |
+| microsoft/playwright | TypeScript | 209 | 182 (87%) | 85 / 64 / 33 |
+| ray-project/ray | Python | 145 | 114 (78%) | 32 / 47 / 35 |
+| huggingface/transformers | Python | 132 | 85 (64%) | 43 / 27 / 15 |
+| python/cpython | Python and C | 89 | 63 (70%) | 33 / 26 / 4 |
+| ggml-org/llama.cpp | C++ | 165 | 43 (26%) | 13 / 18 / 12 |
+| duckdb/duckdb | C++ | 209 | 9 (4%) | 3 / 5 / 1 |
+| godotengine/godot | C++ | 350 | 7 (2%) | 5 / 1 / 1 |
 
-The retrieval eval chose repos for size. End-to-end tasks also need repos that build and test
-inside a container in minutes. Proposed criteria, each checked before a repo is admitted:
+Three things to read from it:
+- **Python and TypeScript have far more candidates than we need.** The limit there is the
+  environment, not the supply.
+- **Godot and duckdb cannot carry end-to-end tasks:** 7 and 9 tasks come with tests. They stay in
+  the retrieval eval. For C++, llama.cpp is the only one of ours with a usable number.
+- **Large changes are missing.** The collection kept changes of at most 5 code files and 200
+  lines, so "hard" here means 3 to 5 files or 100 to 200 lines. Almost no task adds a new file (0
+  to 5% per repo), so tasks of the OCR kind are rare in this set. A second collection pass with a
+  higher limit is how to get them.
+
+**The order.** Four things decide it: how many tasks come with tests (measured, above); how hard
+the environment is to build (expected only: the admission check of §8.2 decides); how large the
+repo is, because search should matter most in large ones; and the spread of languages.
+
+| # | Repo | Language | Why here | The environment, as expected |
+|---|---|---|---|---|
+| 1 | pandas-dev/pandas | Python | 298 tasks with tests; a medium-size repo that today's codemem indexes quickly; a well-known build | low to medium: one compiled extension |
+| 2 | microsoft/playwright | TypeScript | 182 with tests; medium size; a second language from the first day | medium: its tests need browsers, and official images with browsers exist |
+| 3 | home-assistant/core | Python | the largest pool (618) in a very large, pure-Python repo, where search should matter | medium: a very long dependency list, installed once |
+| 4 | microsoft/vscode | TypeScript | 644 with tests and the largest pool of hard tasks (217); very large | high: a long build, and tests that need a display |
+| 5 | astral-sh/ruff | Rust | a third language. Not collected yet | low, if `cargo test` is as quick as expected |
+| 6 | kubernetes/kubernetes | Go | a fourth language, in a very large repo. Not collected yet | medium: tests run per package; a large build cache |
+| 7 | apache/airflow | Python | 205 with tests, and the highest share of pull requests with tests (89%) | medium to high: many optional parts, and a database |
+| 8 | vllm-project/vllm | Python | 284 with tests on paper | high: a GPU build, and many tests load models. Only tests that run on a CPU would count |
+| 9 | ggml-org/llama.cpp | C++ | the only C++ repo of ours with a usable number (43) | medium: a CMake build |
+| 10 | apache/kafka | Java | a sixth language. Not collected yet | medium to high: a Gradle build |
+
+- **1 and 2** are the two repos of the first end-to-end test (§2.2).
+- **3 and 4** are the large repos, where the hypothesis says an index helps most. They come once
+  the improved codemem has made the index small.
+- **5 and 6** add Rust and Go. For Rust, ruff is chosen over the Rust compiler itself, whose own
+  build takes far longer than a task should.
+- **7 to 10** add breadth, then C++ and Java.
+
+**The repos that are not collected yet need one small addition.** `cmeval collect` labels Python,
+C++ and TypeScript. End-to-end tasks are graded by tests, so they need gold files only, and those
+come straight from the change. A file-level labeler for other languages is small. Function-level
+labels for them can wait (§12.2).
+
+**How many tasks per repo.** 30 to 40 validated tasks: about 10 easy, 15 medium and 10 hard,
+drawn with a fixed seed from the candidates with tests, as `cmeval subset` already draws.
+
+**If time runs short, stop anywhere in the list.** Each repo is complete on its own. Two repos in
+two languages are already a result. Four add the large repos. Six give four languages.
+
+**What every repo must meet,** whatever its place in the list:
 
 | Criterion | Threshold |
 |---|---|
@@ -862,7 +997,40 @@ inside a container in minutes. Proposed criteria, each checked before a repo is 
 | activity after the cutoff | at least 50 merged pull requests with a linked issue and tests |
 | build | a clean image builds in under 20 minutes |
 | tests | the tests of one pull request run in under 5 minutes, with stable results |
-| languages covered | Python, C++, Go, Java, Rust, TypeScript: two or three repos each |
+
+### 8.4 Ready-made tasks: SWE-bench-Live, the add-on
+
+SWE-bench-Live ships a container and hidden tests for every task *(checked on its pages,
+Nov 22)*:
+
+| Set | Tasks | Languages |
+|---|---|---|
+| the Python set | about 1,890 in its full split, with frozen splits of 300 and 500 | Python |
+| the multi-language set | 1,077, from 431 repos | C 111, C++ 142, C# 136, Go 138, Java 160, JavaScript 108, Rust 171, TypeScript 111 |
+
+Each task names an x86 Docker image, its test commands and a log parser, and the project's own
+script grades a patch. So it needs an importer and nothing else.
+
+**What it is for here:**
+1. **A control while the pipeline is built.** Its environments are known to work. A failed run
+   there is our pipeline's fault. A failure only on our own tasks is the generator's (§2.2).
+2. **Languages our own repos have not reached,** if the list of §8.3 is not finished.
+3. **An outside check for the paper:** the same comparison on tasks we did not make.
+
+**Why it is not the main source.**
+- **Its tasks are older than the models.** The newest Python task we saw was created in August
+  2025, and the multi-language page shows no dates. A model that remembers a fix has less to
+  search for, which can hide a saving. So these tasks are reported apart and never mixed into the
+  headline.
+- **Its images are x86 only,** and slow on our Macs (§4.4).
+- **Public sets have flaws** (§16). Tasks are spot-checked by hand before they enter a test
+  split.
+
+SWE-bench Pro's second version is another ready-made set, already in the Harbor format
+*(reported)*.
+
+**Synthetic bugs have one use here:** as a pool of easy tasks for the small models, if real fresh
+pull requests give too few that pass the small-model filter.
 
 ---
 
@@ -958,7 +1126,7 @@ strongest current models near those sizes, as of November 2026 *(reported)*:
 | Size class | Pick | Why this one | Where it runs |
 |---|---|---|---|
 | about 9B | **Qwen3.5-9B** (Apache-2.0, 262K context) | the strongest open model of its size with published agent scores: 53 to 60% on SWE-bench Verified, as reported by vendors, depending on the harness | hosted, at about $0.08 to $0.17 per million input tokens; locally 6.6 GB at 4 bits |
-| about 14B | **Qwen3-14B** | the newer Qwen generations have no size between 9B and 27B. In a published 30-turn agent loop it finished 99.4% of episodes, where Gemma 4 12B finished 44.5% | hosted, at about $0.12 per million input tokens; locally 9.2 GB at 4 bits |
+| about 14B | **Qwen3-14B** | the newer Qwen generations have no size between 9B and 27B. In a published 30-turn agent loop it finished 99.4% of episodes, where Gemma 4 12B finished 44.5%. Its window is 32,768 tokens, the smallest of the three, so it runs in mini-SWE-agent only (§4.6) | hosted, at about $0.12 per million input tokens; locally 9.2 GB at 4 bits |
 | about 27B: the top of the curve in this harness | **Qwen3.8-27B** (Apache-2.0) | 86% on SWE-bench Verified with mini-SWE-agent; served by Nebius. Qwen3.6-27B is the runner-up and the only one with an independent score on fresh tasks (31%) | hosted only: Nebius, $0.45 in and $3.00 out per million tokens. At 18 GB it does not fit a 24 GB Mac next to anything else |
 | for context | Claude Haiku 5.5 and Claude Sonnet 5.5 | the cheap and the frontier end, from the main runs. A different harness, so they are shown beside the open models and not compared with them | Claude Code, under our subscriptions |
 
@@ -970,6 +1138,13 @@ gains from search tools are at 4B.
 So the first result of this study is the plain baseline: what a 9B and a 14B model complete on
 tasks newer than they are.
 
+**When.** After the main comparison. This study reuses its tasks, its pipeline and its design, and
+changes only the agent's model and its harness.
+
+**Other model families.** The model is a setting (§4.6), so a model from another family, for
+example a Llama model, is one more row. Qwen comes first because it has current models at each of
+these sizes. Whether another family has was not checked.
+
 **Which tasks.** Easy and medium tasks, as in the run matrix (§3.3), and about ten hard ones as a
 probe. Small models complete a narrow kind of task: on SWE-bench Verified, the tasks that weak
 models solve are 95 to 100% single-file, with a median real change of 2 to 4 lines, and a 32B
@@ -980,9 +1155,11 @@ L0 and L1.
 **Where they run.** Through an API or self-hosted. This study is the one part of the plan where
 the agent's own model is not on a subscription.
 - **A hosted endpoint,** for the batches: the same open weights, at cents per run, many runs side
-  by side. Which provider serves the 9B and the 14B is to be checked on day one. Nebius's
-  documentation names the 27B (`Qwen/Qwen3.8-27B`), and we did not find the two smaller ones
-  there *(checked Nov 22)*.
+  by side. What we found on Nov 22 *(reported)*, in dollars per million tokens in and out:
+  DeepInfra lists all three models (the 9B at 0.10 and 0.15, the 14B at 0.12 and 0.24, the 27B at
+  0.15 and 1.875 on a promotion). Together lists the 9B (0.17 and 0.25). Nebius serves the 27B
+  (0.45 and 3.00) and, as far as we could see, neither of the smaller two. Most of these offer
+  function calling for the 9B and the 27B; for the 14B only DeepInfra does.
 - **Self-hosted on our Macs,** for a repeat of a subset, and for everything if no provider serves
   a model. This is the point of these sizes: they are the models people can run themselves, and
   it costs nothing. A laptop is slow, though: an M1 generates about 14 tokens a second and reads
@@ -1159,21 +1336,21 @@ number of test tasks follows from how many runs our seats allow, which the first
 
 ## 14. Work packages, in order
 
-The pipeline comes first, on tasks that already exist. The vague prompts and the small models are
-added to a pipeline that already works. Sizes are rough working days for one
+The tasks and the pipeline come first, side by side. The vague prompts are added to a pipeline
+that already works, and the small models come last. Sizes are rough working days for one
 person.
 
 | # | Work | Deliverable | Done when | Days |
 |---|---|---|---|---|
-| A1 | **The pipeline skeleton,** end to end on the pilot of §2.2 (10 to 12 tasks from two or three repos): plan, run in a container, record, grade, score. Claude Code only, setups `grep` and `tool`, a cheap model | `cmeval e2e plan / run / grade / score` | the pilot's checklist (§2.2) passes, and one command produces a table of completion, tokens and time for the pilot tasks × 2 setups × 3 repetitions | 6 |
+| A1 | **The pipeline skeleton,** end to end on the first two repos (§2.2): plan, run in a container, record, grade, score. Claude Code only, setups `grep` and `tool`, a cheap model | `cmeval e2e plan / run / grade / score` | the checklist of §2.2 passes, and one command produces a table of completion, tokens and time for the two repos' tasks × 2 setups × 3 repetitions | 6 |
 | A2 | **Measurement** (§5): the recording proxy, the cross-check, the six token numbers, the four clocks, the file watcher | the run record of §6 | on the runs of A1, proxy and agent summary agree within 1% on every run, and the proxy adds no measurable delay to the first byte | 4 |
 | A3 | **Selection and plans** (§3): the flags, plan files, the run matrix, the iteration plan for tracks B and C | `plans/main.toml`, `plans/iterate.toml` | a plan can be previewed with `--dry-run`, stopped, and resumed without rerunning anything | 3 |
 | A4 | **Robustness** (§7): integrity checks, failure classes, the canary, the spending cap, the dashboard view | `cmeval e2e check`; a canary plan | a deliberately broken setup (MCP server missing, wrong context size) is detected and its runs discarded | 3 |
 | A5 | **Reports and statistics** (§13) | `cmeval e2e report` | a report can be rebuilt byte for byte from the run records | 3 |
-| A6 | **The other setups and the second harness:** `upfront`, `placebo`, `tool-strong`; mini-SWE-agent in text mode with codemem as a command; the localization tier | every setup of §4.1; `--harness mini-swe-agent`; `--tier locate` | the pilot tasks run in every setup and both harnesses; the small-model floor is measured (30 easy tasks, 9B and 14B, `grep` only) | 6 |
+| A6 | **The other setups and the open harnesses:** `upfront`, `placebo`, `tool-strong`; mini-SWE-agent with codemem as a command; Qwen Code with codemem over MCP; the harness trial of §4.6; the localization tier | every setup of §4.1; `--harness mini-swe-agent`, `--harness qwen-code`; `--tier locate` | the harness trial is done and its outcome written down; the pilot tasks run in every setup and every harness; the small-model floor is measured (30 easy tasks, 9B and 14B, `grep` only) | 6 |
 | A7 | **Labels** (§10), first on public tasks | every label in the task file | a hand check of 50 tasks agrees with the difficulty and kind labels at least 85% of the time | 3 |
 | A8 | **Vague prompts** (§9): the rewriter and its three checks | L1 and L2 for every task, and for the retrieval eval's dev tasks | check 2 passes on at least 80% of rewrites; the human agreement is reported | 4 |
-| A9 | **Our own tasks** (§8): the RepoLaunch trial; then the generator for Python and TypeScript, then Go, Java, Rust and C++ | `cmeval generate <repo link>`; validated fresh tasks | 30 validated dev tasks per language | 10 |
+| A9 | **Our own tasks** (§8): the build and validate steps of the generator; one recipe per repo, in the order of §8.3; a file-level labeler for the languages that have none | `cmeval generate <repo>`; validated fresh tasks | the first two repos each have 30 or more validated tasks of mixed difficulty by Nov 25; each later repo passes the admission check of §8.2 | 10 |
 | A10 | **Retrieval eval additions** (§12.2): labelers for Go, Java and Rust; the vague column; the two baselines | the six-language retrieval table | labels hand-checked on 15 tasks per language, as for C++ | 6 |
 | A11 | **The small-model study** (§11) | the gap-closed table and the failure endings | the 9B and 14B models, on easy and medium tasks, 3 repetitions; the hard probe; a local repeat of a subset on a Mac | 6 |
 | A12 | **The matrix on the test split** (§3.3) | the paper's main tables and figure | every primary measure reported with its interval | 5 |
@@ -1183,16 +1360,18 @@ person.
 
 | By | Packages | What it gives the team |
 |---|---|---|
-| **Nov 25** | A1, A2 | the pipeline's first version: a task runs end to end in both setups, with tokens counted two ways that agree. Tracks B and C can start using it |
-| **Dec 1:** the solution and the results | A3, a first A5, the computed labels of A7, a first subset of A8, and from A6 the second harness with the localization tier. From A11, the first small-model runs | the run matrix on the dev tasks: baseline and final on all of them, today's codemem on the medium ones, the vague subset, small models on easy and medium with the hard probe |
-| **Dec 8:** the paper | A4, the full A5, the rest of A6, A7 and A8 on the test tasks, A11 at its planned size, A12, the vague column and the two baselines of A10, and the part of A13 that goes with a paper | the matrix run once on the test split with the frozen configuration, three repetitions and every integrity check; the `upfront` and `placebo` setups and the vague prompts on subsets; the code, the task list and the run records released with the paper |
-| **Later, no date** | A9 beyond a trial; the three new languages of A10; the rest of A13 | our own fresh tasks in six languages, the six-language retrieval table, a dataset release with its datasheet |
+| **Nov 25** | A9 for the first two repos; A1 and A2 | tasks generated from two repos, and the pipeline's first version: one of those tasks runs end to end in both setups, with tokens counted two ways that agree |
+| **Nov 27** | the first end-to-end test (§2.2); A3 | both repos, every validated task, today's codemem against the baseline. Tracks B and C can now run the pipeline themselves |
+| **Dec 1:** the solution and the results | A9 for the next repos of §8.3; a first A5; the computed labels of A7; a first subset of A8 | the run matrix on the dev tasks of every repo that is up: baseline and final on all of them, today's codemem on the medium ones, the vague subset |
+| **Dec 8:** the paper | A4, the full A5, A6, A7 and A8 on the test tasks, A11, A12, the vague column and the two baselines of A10, and the part of A13 that goes with a paper | the matrix run once on the test split with the frozen configuration; then the model gap, with open models in open harnesses; the `upfront` and `placebo` setups and the vague prompts on subsets; the release that goes with the paper |
+| **Later, no date** | a generator that takes any repo without a recipe; the three new languages of A10; the rest of A13 | tasks from any GitHub link; the six-language retrieval table; a dataset release with its datasheet |
 
-A1 to A3 are what the other tracks wait for, so they go first and stay small. The December 1 row
-is more than one person can do in nine days. Three parts stand on their own, so someone else can
-take them: A2 (the proxy and the cross-check), the mini-SWE-agent part of A6 with the small
-models, and the vague rewrites of A8. A9 is the least certain piece of the plan, which is why
-nothing in the paper depends on it.
+A9 and A1 start on the same day and run side by side: tasks need no pipeline to be generated, and
+the pipeline can be built on the control tasks until ours exist. The first rows are more than one
+person can do. A repo's recipe is the natural piece to hand to someone else: each one is
+independent. A2 (the proxy and the cross-check) and the vague rewrites of A8 also stand on their
+own. A9 is the least certain piece of the plan, which is why the repos are in a fixed order and
+each one is complete on its own.
 
 ---
 
@@ -1215,14 +1394,16 @@ as a black box: an MCP server, a command, and an index folder.
 |---|---|---|
 | Agents don't call codemem | no call, no effect; one vendor saw 1 call in 143 sessions *(reported)* | tools loaded up front; adoption measured in the first runs; `upfront` and `tool-strong` as separate setups |
 | The token numbers are wrong and nobody notices | every claim rests on them | two independent counts that must agree (§5.3); the canary |
-| Building environments is slow and fragile | published yields range from 9% to 50% of candidates, and the builder needs keys of its own | this phase's results use public tasks that already have images; the generator gets a trial at most |
+| Building environments is slow and fragile | it is the longest and least certain job in the track | one recipe per repo, written once; a check on 10 tasks before a repo is admitted; repos in a fixed order, each complete on its own; SWE-bench-Live as the control and the fallback (§8) |
+| C++ has few testable tasks | Godot and duckdb gave 7 and 9 tasks with tests | llama.cpp for C++; the other two stay in the retrieval eval (§8.3) |
 | Public benchmarks we borrow are flawed | OpenAI estimated that about 30% of SWE-bench Pro's public tasks were broken and stopped recommending it; it had already dropped SWE-bench Verified *(reported)* | tasks are spot-checked by hand before they enter the test split, and a task whose gold patch fails its own tests in our container is dropped |
 | Vague prompts become unsolvable | failures would then say nothing about search | check 2 in §9 |
 | Usage limits slow everything down | three seats, each with a session and a weekly limit, are all the Claude time we have, and we code on the same seats | the run matrix spends large tasks only on the baseline and the final configuration; the baseline is reused; `--dry-run` sizes a plan first; the first batch tells us how many runs fit in a window |
-| The public tasks are older than the models | a model may remember a fix | the same model runs in both setups, so it cannot favour one side; every table says how many tasks are fresh; the closed-book probe below tags tasks a model answers from memory |
+| The ready-made tasks are older than the models | a model may remember a fix | the headline rests on our own tasks, which are newer; the ready-made ones are reported apart; the closed-book probe below tags tasks a model answers from memory |
 | The harness changes under us | Claude Code updates often | pin the version; record it in every run; the canary after any upgrade |
 | Small models complete almost nothing | given the gold files, small models repaired 2 tasks of 100 in one study *(reported)*; a base rate that low cannot show a change | the floor is measured first (A6); localization is the primary measure for small models; easy and medium tasks only, plus a small probe |
 | The answer leaks | a fresh fix is public on GitHub | no network, no web tools, history cut at the task's commit; a closed-book probe that asks the model for the gold files from the prompt alone, and tags tasks it answers |
+| A small model fails the harness, not the task | a broken tool call or a full context window looks like a failed task | the harness trial (§4.6); how every run ended is recorded; the server's parser and context settings are checked before each batch |
 | Two harnesses, two sets of numbers | results may not line up | nothing is compared across harnesses: the model gap is measured inside mini-SWE-agent, and the Claude results inside Claude Code |
 
 ---
@@ -1255,6 +1436,33 @@ page before citing it in the paper.
 - JetBrains, IDE-native search tools (corrected July 2026),
   https://blog.jetbrains.com/ai/2026/05/what-happens-when-you-give-agents-ide-native-seach-tools/
 - A study of 1,100 failed agent runs across harnesses, https://arxiv.org/abs/2610.32131
+
+**Open harnesses and frameworks for open models** (§4.6)
+- mini-SWE-agent: models, https://mini-swe-agent.com/latest/models/local_models/ · its SWE-bench
+  runner, https://mini-swe-agent.com/latest/usage/swebench/
+- Qwen Code, https://github.com/QwenLM/qwen-code and
+  https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/ · OpenCode,
+  https://opencode.ai/docs · Goose, https://github.com/aaif-goose/goose · OpenHands,
+  https://docs.openhands.dev
+- Codex CLI and the Responses API, https://github.com/openai/codex/discussions/7782
+- Claude Code with other models: Anthropic, https://code.claude.com/docs/en/llm-gateway.md ·
+  Ollama, https://docs.ollama.com/integrations/claude-code · the 259-tool report,
+  https://github.com/anthropics/claude-code/issues/25857
+- Harbor: agents, https://docs.harborframework.com/agents/pre-integrated-agents.md · job files,
+  https://docs.harborframework.com/jobs/configs.md
+- Inspect AI: MCP tools, https://inspect.aisi.org.uk/tools-mcp.html · providers,
+  https://inspect.aisi.org.uk/providers.html · its agents, https://meridianlabs-ai.github.io/inspect_swe/
+- Small models and tool calls: Qwen3.5-9B in seven harnesses (the MiMo-V2.6 report),
+  https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Pro-RL/blob/main/MiMo_V2_6_technical_report.pdf ·
+  Qwen3.8-27B in three harnesses, https://arxiv.org/abs/2610.04433 · Qwen3.5 at 0.8B to 4B,
+  https://arxiv.org/abs/2611.21407 · the function-calling board,
+  https://gorilla.cs.berkeley.edu/leaderboard.html
+- Serving: Qwen's function-calling notes,
+  https://qwen.readthedocs.io/en/latest/framework/function_call.html · vLLM's recipe,
+  https://recipes.vllm.ai/Qwen/Qwen3.8-27B · Ollama's context length,
+  https://docs.ollama.com/context-length
+- Hosted prices: https://deepinfra.com/Qwen/Qwen3.5-9B · https://openrouter.ai/api/v1/models ·
+  https://docs.together.ai/docs/serverless/models.md
 
 **Task pipelines and benchmarks**
 - SWE-bench-Live and RepoLaunch, https://arxiv.org/abs/2603.05026 and
