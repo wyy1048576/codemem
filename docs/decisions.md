@@ -139,7 +139,7 @@ Values in the code, not in the config.
 
 | Constant | Value | Where | What it controls |
 |---|---|---|---|
-| `CATCHUP_MAX_CHUNKS` | 1,000 | `service.py` | above this many queued chunks, a search answers without embedding first |
+| `CATCHUP_MAX_CHUNKS` | 1,000 | `service.py` | above this many queued chunks, a search embeds its own keyword results only, and reports the rest |
 | `_BATCH` | 64 chunks | `service.py` | the background writer's stage B batch; a fresh edit waits behind at most one |
 | `_CALL_CHARS` | 3,000 characters | `service.py` | the largest model call outside a build, so one call can't overrun a search's 4 s |
 | `SAVE_AFTER_IDLE` | 30 s | `service.py` | writing the search index to disk |

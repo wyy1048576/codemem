@@ -47,7 +47,7 @@ log = logging.getLogger(__name__)
 _LONG_CLASS_LINES = 80
 # Rough share of total work per phase, for a single progress percentage.
 _PHASE_SPAN = {"chunk": (0.0, 0.15), "embed": (0.15, 1.0), "done": (1.0, 1.0)}
-CATCHUP_MAX_CHUNKS = 1000  # beyond this many queued chunks the index is being built: don't wait
+CATCHUP_MAX_CHUNKS = 1000  # beyond this many queued chunks a search embeds only its own keyword results
 SAVE_AFTER_IDLE = 30.0  # write the FAISS files once nothing changed for this long
 RECONCILE_EVERY = 300.0  # a full scan, in case a file event was missed
 POLL_EVERY = 10.0  # the scan interval when file events don't work

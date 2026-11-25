@@ -547,9 +547,9 @@ The tool names stay stable, so other front-ends can be compared.
 the signature (not for blocks), the first doc line, and up to 6 preview lines.
 
 **The freshness note.** `search_code` catches up first (architecture.md §4): the background writer
-applies every save the watcher has seen, then the search embeds the queue, newest edits first, all
-within `catchup_budget_ms` (4 s). If something is still missing, the results end with one line
-naming it, for example:
+applies every save the watcher has seen, then the search embeds the queue, its own keyword results
+first and then the newest edits, all within `catchup_budget_ms` (4 s). If something is still
+missing, the results end with one line naming it, for example:
 
 ```
 Note: 3 code chunks in 1 file (auth/sessions.py) are still being embedded: keyword matches for them
