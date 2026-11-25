@@ -119,29 +119,23 @@ def test_turn_counter_counts_message_ids():
     assert sum(starts) == 5  # a second event of msg_1 and the subagent's events start no turn
 
 
-def test_search_words():
-    assert e2e_run.search_words("cd /testbed && grep -rn foo . | head -20") == ["grep", "head"]
-    assert e2e_run.search_words("sed -n '1,20p' a.py; sed -i s/a/b/ a.py") == ["sed -n"]
-    assert e2e_run.search_words("LC_ALL=C /usr/bin/find . -name '*.py'\nls -la") == ["find", "ls"]
-    assert e2e_run.search_words("git grep -n x || rg y") == ["git grep", "rg"]
-    assert e2e_run.search_words("python -c 'print(1)'") == []
-    assert e2e_run.search_words("echo 'unclosed") == []
-
-
 def test_count_steps():
     steps = e2e_run.count_steps(_events(), ["auth/sessions.py"])
-    assert steps == {
-        "turns": 5,
-        "subagent_turns": 2,
-        "tool_calls": {"Bash": 1, "Task": 1, "Read": 1, "Edit": 1},
-        "subagent_tool_calls": {"Read": 1},
-        "turns_before_first_edit": 3,
-        "search_bash_calls": 1,
-        "search_words": {"grep": 1, "head": 1},
-        "files_read": ["tests/test_sessions.py", "auth/sessions.py"],
-        "gold_file_read": True,
-        "first_gold_read_turn": 3,
-    }
+    assert (steps["turns"], steps["subagent_turns"]) == (5, 2)
+    assert steps["tool_calls"] == {"Bash": 1, "Task": 1, "Read": 1, "Edit": 1}
+    assert steps["subagent_tool_calls"] == {"Read": 1}
+    assert steps["searches"] == {"content": 1, "files": 0, "programs": {"grep": 1}}
+    # The subagent's Read is counted apart.
+    assert steps["views"]["files_viewed"] == ["auth/sessions.py"]
+    assert steps["subagent_files_viewed"] == ["tests/test_sessions.py"]
+    assert steps["first_edit_turn"] == 4 and steps["turns_before_first_edit"] == 3
+    assert steps["gold"] == {"auth/sessions.py": {"surfaced": 1, "opened": 3, "edited": 4, "named_by_agent": 3}}
+    # The names of version 1 stay, as copies.
+    assert steps["gold_file_read"] is True and steps["first_gold_read_turn"] == 3
+    assert steps["commands"] == [{"turn": 1, "command": "cd /testbed && grep -rn revoke_session . | head -20",
+                                  "cut": False, "cwd": ".", "simple": [["other", "cd", []],
+                                                                       ["search_content", "grep", ["."]],
+                                                                       ["filter", "head", []]]}]
     none = e2e_run.count_steps(_events()[:4], ["auth/sessions.py"])
     assert none["turns_before_first_edit"] is None and not none["gold_file_read"]
 
@@ -376,6 +370,7 @@ def test_run_one_locally(make_task, tmp_path, monkeypatch):
     assert integrity["redacted_files"] == ["stderr.txt"]
     assert record["tokens"]["source"] == "proxy" and record["tokens"]["processed_tokens"] == 190930
     assert record["steps"]["turns"] == 5 and record["steps"]["num_turns_result"] == 5
+    assert record["identity"]["gold_files"] == ["auth/sessions.py"] and record["steps"]["gold_opened"]
     assert record["time"]["agent_s"] >= 0 and set(record["time"]["prep_steps_s"]) == {"remove_config", "chown", "ready"}
     # The patch has the agent's edit, and not the removal of the configuration files.
     assert len(graded) == 1 and e2e_run.patch_files(graded[0]) == {"auth/sessions.py"}

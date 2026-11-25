@@ -88,7 +88,7 @@ The files of one run go to `CMEVAL_HOME/e2e/runs/<run id>/<task id>/<setup>/<rep
 
 | File | What it holds |
 |---|---|
-| `run.json` | The record: identity, how the run ended, integrity checks, tokens (proxy and agent), clocks, steps, outcome. The fields are described in `src/cmeval/e2e_run.py` |
+| `run.json` | The record: identity, how the run ended, integrity checks, tokens (proxy and agent), clocks, steps, outcome. The fields are described in `src/cmeval/e2e_run.py`. `steps` is what the agent did: its searches, views, edits and tests, the turns at which it first saw, opened and edited each gold file, and each Bash command with the kinds of its simple commands. Claude Code searches and reads through its Bash tool, so these counts come from the shell commands; the rules are in `src/cmeval/e2e_steps.py` |
 | `stream.jsonl`, `stderr.txt` | Claude Code's events (`--output-format stream-json`) and its error output |
 | `proxy.jsonl` | One line for each model request (see "Record the model requests of an agent") |
 | `agent.patch` | The agent's changes against the task's commit, with new files |

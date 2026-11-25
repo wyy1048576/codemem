@@ -32,7 +32,7 @@ run.json has these fields:
   discard, discard_reason, flags
                       a discarded run is done again; a flag (for example "cross-check disagrees") asks a person to look
   identity            prompt level, frame and hash, harness and its version, binary, image tag and id, split, cmeval
-                      commit, machine, limits, start time (UTC)
+                      commit, machine, limits, start time (UTC), the task's gold files
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
                       network, the removed configuration files, the files where the token was found and replaced
   result_event        subtype, is_error, num_turns, duration_ms, duration_api_ms, total_cost_usd
@@ -45,7 +45,8 @@ run.json has these fields:
   proxy_errors        the errors of the proxy log
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
                       preparation step, container_start_s, collect_s, container_s, grade_s
-  steps               count_steps, and num_turns_result from the result event
+  steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
+                      command), and num_turns_result from the result event
   outcome             completed, the grader's record, the patch's files and changed lines, status_lines
 """
 
@@ -63,13 +64,13 @@ import subprocess
 import threading
 import time
 import uuid
-from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from .e2e import grade, patch_files
+from .e2e_steps import TurnCounter, count_steps, parse_stream
 from .files import write_json
 from .generate import GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
 from .paths import cmeval_home, e2e_dir
@@ -92,9 +93,6 @@ EXIT_USAGE_LIMIT = 4
 EXIT_ERRORS = 5
 
 ENDS = ("finished", "time limit", "turn limit", "usage limit", "error")
-EDIT_TOOLS = ("Edit", "Write", "NotebookEdit")
-# A Bash command segment whose first word is one of these counts as a search or a look at files.
-SEARCH_WORDS = ("grep", "egrep", "fgrep", "rg", "find", "ls", "cat", "head", "tail")
 # Paths in the checkout that would configure the agent, at the top level and in any folder.
 CONFIG_PATHSPECS = (":(glob)**/.claude/**", ":(glob)**/CLAUDE.md", ":(glob)**/AGENTS.md", ":(glob)**/.mcp.json")
 # Run as the agent user, this stops every process of that user. The tests replace it, so that it never runs
@@ -292,26 +290,6 @@ def agent_script(model: str, settings: RunSettings) -> str:
 
 # ---- reading what a run left
 
-def parse_stream(path: Path) -> dict:
-    """The events of Claude Code's stream-json output: the init event, the result event, all events, and the
-    count of lines that are not JSON (for example a line cut off by a kill)."""
-    events, bad = [], 0
-    text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except ValueError:
-            bad += 1
-            continue
-        if isinstance(event, dict):
-            events.append(event)
-    init = next((e for e in events if e.get("type") == "system" and e.get("subtype") == "init"), None)
-    result = next((e for e in reversed(events) if e.get("type") == "result"), None)
-    return {"events": events, "init": init, "result": result, "bad_lines": bad}
-
-
 def check_setup(init: dict | None, setup: Setup, model: str) -> list[str]:
     """The checks of the init event that fail. An empty list: the setup is what it should be."""
     if not init:
@@ -379,118 +357,6 @@ def classify_end(result: dict | None, exit_code: int | None, *, agent_s: float |
     if result and result.get("subtype") == "success" and not result.get("is_error") and exit_code == 0:
         return "finished"
     return "error"
-
-
-class TurnCounter:
-    """Counts the turns of the main agent and of its subagents in the stream.
-
-    One turn is one model answer: one `assistant` event with a new message.id. Claude Code writes one event
-    for each content block, so several events can share one id. Events of a subagent (Task tool) have a
-    parent_tool_use_id that is not null; they are counted apart and are not turns of the main agent.
-    The result event's num_turns is Claude Code's own count. We expect it to be close to ours. It is not
-    documented whether it counts the last answer or subagent answers, so the record keeps both.
-    """
-
-    def __init__(self) -> None:
-        self.main: set[str] = set()
-        self.sub: set[str] = set()
-        self._anonymous = 0
-
-    def feed(self, event: dict) -> bool:
-        """Count one event. True when it starts a new turn of the main agent."""
-        if event.get("type") != "assistant":
-            return False
-        message_id = (event.get("message") or {}).get("id")
-        if not message_id:
-            self._anonymous += 1
-            message_id = f"no-id-{self._anonymous}"
-        ids = self.sub if event.get("parent_tool_use_id") else self.main
-        if message_id in ids:
-            return False
-        ids.add(message_id)
-        return ids is self.main
-
-    @property
-    def turns(self) -> int:
-        return len(self.main)
-
-
-def _segments(command: str) -> list[list[str]]:
-    """The words of each part of a shell command, cut at ;, &&, ||, | and line ends."""
-    words: list[list[str]] = []
-    for part in re.split(r"\|\||&&|[;|\n]", command):
-        try:
-            tokens = shlex.split(part, comments=True)
-        except ValueError:
-            tokens = part.split()
-        while tokens and re.fullmatch(r"\w+=\S*", tokens[0]):  # VAR=value before the command
-            tokens = tokens[1:]
-        if tokens:
-            words.append(tokens)
-    return words
-
-
-def search_words(command: str) -> list[str]:
-    """The search commands in one Bash command. A heuristic: the first word of each segment is matched, and
-    `sed -n` counts as a look at a file. A search inside a script or a subshell is not seen."""
-    found = []
-    for tokens in _segments(command):
-        first = os.path.basename(tokens[0])
-        if first in SEARCH_WORDS:
-            found.append(first)
-        elif first == "sed" and len(tokens) > 1 and tokens[1].startswith("-n"):
-            found.append("sed -n")
-        elif first == "git" and len(tokens) > 1 and tokens[1] == "grep":
-            found.append("git grep")
-    return found
-
-
-def _relative(path: str) -> str:
-    return path.removeprefix("/testbed/")
-
-
-def count_steps(events: list[dict], gold_files: list[str]) -> dict:
-    """What the agent did: turns, tool calls, searches and reads. A subagent's event counts at the main turn
-    in which it happens (the turn of its Task call)."""
-    counter = TurnCounter()
-    tools, sub_tools, words = Counter(), Counter(), Counter()
-    search_calls, first_edit, first_gold = 0, None, None
-    files_read: list[str] = []
-    gold = set(gold_files)
-    for event in events:
-        counter.feed(event)
-        if event.get("type") != "assistant":
-            continue
-        is_sub = bool(event.get("parent_tool_use_id"))
-        for block in (event.get("message") or {}).get("content") or []:
-            if not isinstance(block, dict) or block.get("type") != "tool_use":
-                continue
-            name, args = block.get("name", "?"), block.get("input") or {}
-            (sub_tools if is_sub else tools)[name] += 1
-            if name in EDIT_TOOLS and not is_sub and first_edit is None:
-                first_edit = counter.turns
-            if name == "Bash":
-                found = search_words(str(args.get("command") or ""))
-                words.update(found)
-                search_calls += bool(found)
-            if name == "Read" and args.get("file_path"):
-                path = _relative(str(args["file_path"]))
-                if path not in files_read:
-                    files_read.append(path)
-                if path in gold and first_gold is None:
-                    first_gold = counter.turns
-    return {
-        "turns": counter.turns,
-        "subagent_turns": len(counter.sub),
-        "tool_calls": dict(tools),
-        "subagent_tool_calls": dict(sub_tools),
-        "turns_before_first_edit": first_edit - 1 if first_edit else None,
-        "search_bash_calls": search_calls,
-        "search_words": dict(words),
-        "files_read": files_read,
-        "gold_file_read": first_gold is not None,
-        "first_gold_read_turn": first_gold,
-    }
 
 
 def _lines(path: Path) -> list[list[str]]:
@@ -726,6 +592,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "limits": {"turns": settings.turn_limit, "time_s": settings.time_limit_s, "cpus": settings.cpus,
                        "memory": settings.memory, "effort": settings.effort},
             "started_utc": started,
+            "gold_files": list(task.gold.files),
         },
         "integrity": {
             "setup_ok": not failed,
