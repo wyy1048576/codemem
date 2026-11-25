@@ -3,7 +3,8 @@
 For each setup, two tables. Outcome: runs, discarded runs, the share of completed runs, processed tokens, the
 agent's seconds, turns, and how the runs ended. Behaviour (from `steps`): content searches, file searches,
 files viewed, the share of runs that opened a gold file, the turn of the first gold open, the turns before the
-first edit, and, when a run called codemem, its calls and the share of runs that called it.
+first edit, and, for a setup with codemem or when a run called codemem: the share of runs that called it, its
+mean calls, and the mean turn of the first call.
 
 Discarded runs count only in "runs", "discarded" and the ends. Flagged runs (for example a cross-check that
 disagrees) are counted, and are kept out of every number until someone has looked at them: their measurement
@@ -75,6 +76,7 @@ def behaviour(kept: list[dict]) -> dict:
         "turns_before_first_edit_mean": _mean([_steps(r, "turns_before_first_edit") for r in kept]),
         "codemem_calls_mean": _mean(codemem),
         "codemem_share": _mean([None if c is None else float(c > 0) for c in codemem]),
+        "first_codemem_turn_mean": _mean([_steps(r, "first_codemem_turn") for r in kept]),
     }
 
 
@@ -106,6 +108,7 @@ def score(run_id: str) -> dict:
             "turns_mean": _mean([r.get("steps", {}).get("turns") for r in kept]),
             "ends": dict(Counter(r["end"] for r in rows)),
             "behaviour": behaviour(kept),
+            "codemem": any((r.get("identity") or {}).get("codemem") for r in rows),
         }
     baseline = "grep" if "grep" in setups else next(iter(setups), None)
     paired = [paired_difference(records, name, baseline) for name in setups if name != baseline]
@@ -151,14 +154,16 @@ def format_score(summary: dict) -> str:
     for p in summary["paired"]:
         lines.append(f"  {p['setup']} - {p['baseline']} over {p['tasks']} tasks: completed {_fmt(p['completed'], 2)}, "
                      f"tokens {_fmt(p['tokens'], 0)}, seconds {_fmt(p['seconds'])}")
-    codemem = any((s["behaviour"]["codemem_calls_mean"] or 0) > 0 for s in summary["setups"].values())
+    codemem = any(s.get("codemem") or (s["behaviour"]["codemem_calls_mean"] or 0) > 0
+                  for s in summary["setups"].values())
     lines.append("  behaviour (means over kept runs):")
     lines.append(f"  {'setup':12} {'content s.':>10} {'file s.':>8} {'viewed':>7} {'gold open':>9} {'open turn':>9} "
-                 f"{'pre-edit':>8}" + (f" {'codemem':>8} {'used':>5}" if codemem else ""))
+                 f"{'pre-edit':>8}" + (f" {'used':>5} {'codemem':>8} {'1st call':>8}" if codemem else ""))
     for name, s in summary["setups"].items():
         b = s["behaviour"]
         lines.append(f"  {name:12} {_fmt(b['content_searches_mean']):>10} {_fmt(b['file_searches_mean']):>8} "
                      f"{_fmt(b['files_viewed_mean']):>7} {_fmt(b['gold_opened_share'], 2):>9} "
                      f"{_fmt(b['first_gold_open_mean']):>9} {_fmt(b['turns_before_first_edit_mean']):>8}"
-                     + (f" {_fmt(b['codemem_calls_mean']):>8} {_fmt(b['codemem_share'], 2):>5}" if codemem else ""))
+                     + (f" {_fmt(b['codemem_share'], 2):>5} {_fmt(b['codemem_calls_mean']):>8} "
+                        f"{_fmt(b.get('first_codemem_turn_mean')):>8}" if codemem else ""))
     return "\n".join(lines)
