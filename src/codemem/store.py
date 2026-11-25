@@ -28,6 +28,7 @@ import os
 import sqlite3
 import threading
 import time
+import uuid
 import zlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -812,6 +813,12 @@ class Store:
         conn.executescript(_SCHEMA)
         if self.get_meta("schema_version") is None:
             self.set_meta("schema_version", SCHEMA_VERSION)
+        if self.get_meta("database_id") is None:
+            # A new database, or one that came without an identity (an older index, or a copy made
+            # to start another index). Of two processes that open it together, the first one's stays.
+            conn.execute(
+                "INSERT OR IGNORE INTO meta(key, value) VALUES('database_id', ?)", (json.dumps(uuid.uuid4().hex),)
+            )
 
     # ---- connections
     @property
@@ -1315,6 +1322,13 @@ class Store:
         """The saved index a note describes (notes from before backends were pluggable: FAISS)."""
         return self.index_dir / note.get("file", f"vec_{vec_type}.faiss") if note else None
 
+    def database_id(self) -> str:
+        """This database's identity: a random token set when it is created. A saved search index
+        names it in its note and is read back only into that database. Vector ids start again at
+        1 in a new database, so the file of an index that was deleted would match other vectors
+        by id."""
+        return self.get_meta("database_id")
+
     def use_vector_backend(self, name: str, options: Mapping[str, Any] | None = None) -> None:
         """Search with another backend, or other options of the same one, from now on. Each vector
         type's index is rebuilt from the stored vectors when it is next used; nothing is re-embedded."""
@@ -1577,9 +1591,11 @@ class Store:
         row is gone are dropped, rows the file lacks are added. Rows never change in place, so
         this is exact whichever epoch the file was saved at (another process, a crash, a save
         that is behind), and it costs only the difference instead of a full rebuild. No file, or
-        one from another backend or other options: None, and the index is rebuilt from the rows."""
+        one from another database, another backend or other options: None, and the index is
+        rebuilt from the rows."""
         note = self._read_note(vec_type)
-        if (note is None or note.get("backend", "faiss") != self.vector_backend
+        if (note is None or note.get("database") != self.database_id()
+                or note.get("backend", "faiss") != self.vector_backend
                 or note.get("options", {}) != self.vector_options):
             return None
         path = self._noted_file(vec_type, note)
@@ -1703,7 +1719,7 @@ class Store:
                     if not ti.dirty:
                         continue
                     note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
-                            "embedder": self.get_meta(f"vec.{vec_type}.embedder"),
+                            "embedder": self.get_meta(f"vec.{vec_type}.embedder"), "database": self.database_id(),
                             "backend": self.vector_backend, "file": self._data_path(vec_type).name}
                     if self.vector_options:
                         note["options"] = self.vector_options

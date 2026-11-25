@@ -1,5 +1,11 @@
 """What every search index shares (docs/architecture.md §5): where each vector came from, how many
-vectors a search asks its index for, and the hook that lets an index read stored vectors back."""
+vectors a search asks its index for, the hook that lets an index read stored vectors back, and
+the database a saved index belongs to."""
+
+import json
+import shutil
+import sqlite3
+from contextlib import closing
 
 import numpy as np
 import pytest
@@ -182,3 +188,100 @@ def test_the_base_class_ignores_bind():
         upsert = remove = search = ids = __len__ = lambda self, *a: None
 
     assert Plain().bind(lambda ids: None) is None
+
+
+# ---------------------------------------------------------------- a saved index belongs to one database
+
+
+class SavedPlugin(FaissVectorStore):
+    """A plugin backend that is saved, under a suffix of its own."""
+
+    suffix = ".plug"
+
+
+def _count_rebuilds(monkeypatch):
+    rebuilds: list[tuple] = []
+    rebuild = Store._rebuild
+    monkeypatch.setattr(Store, "_rebuild", lambda self, *a: rebuilds.append(a) or rebuild(self, *a))
+    return rebuilds
+
+
+@pytest.mark.parametrize("backend, options", [
+    ("faiss", {}), ("compact", {"rescore": 2}), (f"{__name__}:SavedPlugin", {}),
+])
+def test_a_saved_index_is_never_read_into_another_database(tmp_path, monkeypatch, backend, options):
+    """`index.db` deleted by hand, its saved search index left beside it, then a rebuild: the new
+    database numbers its vectors from 1 again, so the old file would match them by id."""
+    idx = tmp_path / "idx"
+    old = Store(idx, vector_backend=backend, vector_options=options)
+    _seed(old, 40)
+    old.save_vectors()
+    first_id = old.database_id()
+    old.close()
+    for gone in idx.glob("index.db*"):
+        gone.unlink()
+    assert len(list(idx.glob("vec_code*"))) == 2  # the saved index and its note stay
+
+    new = Store(idx, vector_backend=backend, vector_options=options)
+    ids = _add_chunks(new, 40)
+    other = _vecs(40, seed=9)
+    new.put_vectors("code", EMBEDDER, [VectorRow(c, 0, 1, 0, 1, f"n{c}") for c in ids], other)
+    assert sorted(vid for vid, _ in new.vector_rows("code").values()) == list(range(1, 41))  # the same ids again
+    assert new.database_id() != first_id
+    for i in range(0, 40, 4):
+        hit = new.vector_search("code", other[i], 1)[0]
+        assert hit.chunk_id == ids[i] and hit.score == pytest.approx(1.0, abs=1e-3)
+    new.save_vectors()
+    new.close()
+
+    rebuilds = _count_rebuilds(monkeypatch)  # the file saved now is this database's: a start reads it
+    again = Store(idx, vector_backend=backend, vector_options=options)
+    assert again.vector_search("code", other[3], 1)[0].chunk_id == ids[3] and rebuilds == []
+    again.close()
+
+
+def test_a_saved_index_whose_note_names_no_database_is_rebuilt_once(tmp_path, monkeypatch):
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend="faiss")
+    ids = _seed(s, 5)
+    s.save_vectors()
+    s.close()
+    note = json.loads((idx / "vec_code.json").read_text())
+    assert len(note.pop("database")) == 32
+    (idx / "vec_code.json").write_text(json.dumps(note))  # as an index saved before notes named their database
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend="faiss")
+    assert s.vector_search("code", _vecs(5)[2], 1)[0].chunk_id == ids[2] and len(rebuilds) == 1
+    s.save_vectors()
+    s.close()
+    s = Store(idx, vector_backend="faiss")
+    assert s.vector_search("code", _vecs(5)[2], 1)[0].chunk_id == ids[2] and len(rebuilds) == 1
+    assert json.loads((idx / "vec_code.json").read_text())["database"] == s.database_id()
+    s.close()
+
+
+def test_a_database_copied_without_its_identity_gets_its_own(tmp_path, monkeypatch):
+    """Another index started from a backup of this one's database: the copy drops the
+    `database_id` row, and the store gives it a new one. The original's saved files are not read
+    into it, wherever they lie."""
+    a = Store(tmp_path / "a", vector_backend="faiss")
+    ids = _seed(a, 5)
+    a.save_vectors()
+    a.close()
+    (tmp_path / "b").mkdir()
+    source, copy = sqlite3.connect(tmp_path / "a" / "index.db"), sqlite3.connect(tmp_path / "b" / "index.db")
+    with closing(source) as src, closing(copy) as dst:
+        src.backup(dst)
+        dst.execute("DELETE FROM meta WHERE key = 'database_id'")
+        dst.commit()
+    for saved in (tmp_path / "a").glob("vec_code*"):
+        shutil.copy(saved, tmp_path / "b")
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    a, b = Store(tmp_path / "a", vector_backend="faiss"), Store(tmp_path / "b", vector_backend="faiss")
+    assert len(b.database_id()) == 32 and b.database_id() != a.database_id()
+    assert a.vector_search("code", _vecs(5)[1], 1)[0].chunk_id == ids[1] and rebuilds == []  # its own file
+    assert b.vector_search("code", _vecs(5)[1], 1)[0].chunk_id == ids[1] and len(rebuilds) == 1  # not the original's
+    assert Store(tmp_path / "b").database_id() == b.database_id()  # and it keeps the one it got
+    a.close(), b.close()
