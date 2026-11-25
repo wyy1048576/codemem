@@ -499,6 +499,11 @@ joins and keyword search; SQLite has them, needs no server, and makes each updat
 transaction. Vectors are stored in it as plain rows, so the search index is only a derived copy,
 which can always be rebuilt without the model (2 s on vLLM).
 
+**The times in this section** are from an M1 laptop (8 cores, 16 GB), with FAISS on one thread.
+On macOS codemem keeps FAISS to one thread, because it shares the process with PyTorch
+(`codemem/__init__.py`). On Linux and Windows FAISS uses every core, and none of these times was
+taken that way.
+
 **The search index** is a copy of one vector type's stored vectors, held in memory in a form
 that is fast to search. It is derived from the rows, so it can be rebuilt at any time, and it sits
 behind a small interface (`VectorStore`), so the config chooses it (`vector_backend`) and a change
@@ -625,8 +630,8 @@ vectors it has to compare exactly. A search has three steps:
   the best found so far: a tenth of the codes when 200 candidates are asked for, a fifth to a
   quarter for 500. A search took 2.1 and 3.6 times as long as with the exact index on the 31k
   real vectors, and 3.0 and 3.9 times at 200,000. Rounding the query to 2 or 8 bits instead of
-  4, or one thread instead of eight, changes that by about a tenth, and no FAISS setting turns
-  it off. Which codes get the full estimate also depends on the order they are scanned in.
+  4 changes that by about a tenth, and no FAISS setting turns it off. Which codes get the full
+  estimate also depends on the order they are scanned in.
 - **Why the rotation.** How well one bit per number works depends on how a model spreads its
   numbers. After a random rotation the error of the estimate has the same bound for any vectors.
   On our real questions the exact top 10 was among the 200 best 1-bit codes in 99.3% of searches
@@ -690,7 +695,8 @@ loses results that no count of candidates brings back. Share of searches with th
 A fine code does not make up for the missing numbers: 256 numbers with a 4-bit code kept the top
 10 in 91% of question searches at 200 candidates, and 512 numbers in 99.3%.
 
-**What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50):
+**What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50),
+with FAISS on one thread:
 
 | At 200,000 vectors of 896 numbers | Exact | Compact, as `auto` uses it (4 bits, 200 candidates) | Compact, `bits = 1`, `rescore = 500` |
 |---|---|---|---|
@@ -761,8 +767,8 @@ backend's (the rule picks the other index, or the config names another), or its 
 database. That last case is every index built before saved copies named their database: the
 first start on one rebuilds its search index, once. On an M1 that was running other jobs, an
 exact index took 0.5 to 1.5 s to rebuild at 50,000 vectors and 2.5 to 5 s at 200,000. A compact
-index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000 (on macOS, FAISS
-runs on one thread beside PyTorch; elsewhere it uses every core).
+index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000, with FAISS on
+one thread.
 
 Nobody waits for a rebuild:
 - **It runs in the background.** The MCP server loads the model and the search indexes side by
@@ -923,8 +929,9 @@ codemem is for short, vague feature questions. A vague-question eval is the next
 
 ## 10. Performance
 
-On an M1 laptop. vLLM: 6,235 files, 102k chunks, 145k vectors. Update times use a fake model, so
-they show codemem's own work; the real model adds about 0.1 s per changed text.
+On an M1 laptop, where FAISS runs on one thread (§5). vLLM: 6,235 files, 102k chunks, 145k
+vectors. Update times use a fake model, so they show codemem's own work; the real model adds about
+0.1 s per changed text.
 
 | | Measured |
 |---|---|

@@ -12,7 +12,9 @@ were checked with, because a mistake inside FAISS can end the process instead of
 It prints one line per bit count and ends with "all 2608 combinations ran" and exit status 0. If
 FAISS faults, the last thing on the screen is the combination it was on (bits, code length,
 vectors) and, outside macOS, the Python stack; the exit status is not 0. Send that back, with the
-FAISS version and the platform (the first line it prints).
+first line it prints: the FAISS version, how many threads FAISS runs on, and the platform. The
+script sets no thread count and does not load codemem, so FAISS takes what it takes by default
+(every core, unless `OMP_NUM_THREADS` says otherwise).
 
 On macOS it can run under Guard Malloc, which puts every allocation against an unmapped page and
 unmaps freed memory, so a read or write outside a buffer, or of freed memory, faults at once
@@ -31,8 +33,8 @@ is libc's own `_exit`.
 whose only owner is a temporary, deleted when the statement ends. Using the result reads and
 writes freed memory. The store keeps the object `deserialize_index` returns, which owns the index.
 
-FAISS 1.15.1 on an M1: every combination ran, also under Guard Malloc; `--dangling` exits with 11
-under Guard Malloc and with 6 without it.
+FAISS 1.15.1 on an M1, on 8 threads and on 2: every combination ran, on 8 also under Guard
+Malloc; `--dangling` exits with 11 under Guard Malloc and with 6 without it.
 """
 
 from __future__ import annotations
@@ -133,7 +135,8 @@ def dangling() -> None:
 
 def main() -> None:
     exit_quietly_on_native_faults()
-    print(f"FAISS {faiss.__version__}, {platform.machine()} {platform.platform()}, Python {platform.python_version()}", flush=True)
+    print(f"FAISS {faiss.__version__} on {faiss.omp_get_max_threads()} thread(s), {platform.machine()} {platform.platform()}, "
+          f"Python {platform.python_version()}", flush=True)
     if "--dangling" in sys.argv:
         dangling()
         return

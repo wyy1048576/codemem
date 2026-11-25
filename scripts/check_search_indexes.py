@@ -33,6 +33,11 @@ compares with the reference: is the top 10 the same set, and how much of the top
 Then the whole search (keywords and vectors merged, 10 results): are the 10 results the same, in
 the same order. All of it per split (dev, test) and together, with the median time of each call.
 
+The times depend on how many threads FAISS uses, and the table's first line says how many: every
+core on Linux and Windows, one on macOS (codemem keeps it to one there, beside PyTorch). The script
+sets no thread count, so FAISS runs as codemem runs it on that machine. The comparisons do not
+depend on it.
+
 A pass: the rows `auto` and `compact:bits=4,rescore=200` show 1.000 for "top 10 same" of every
 vector type and for "merged same", and 0.999 or more for the top-50 overlap. The 2-bit and 1-bit
 rows are there to compare, and may lose a little. The last line says PASS or names what differs.
@@ -259,7 +264,8 @@ def codemem_commit() -> str:
 def table(report: dict) -> str:
     vec_types = list(report["vectors"])
     lines = [
-        f"codemem {report['codemem']} | FAISS {report['faiss']} | {report['machine']}, {report['cpus']} CPUs, "
+        f"codemem {report['codemem']} | FAISS {report['faiss']} on {report['faiss_threads']} "
+        f"thread{'s' if report['faiss_threads'] != 1 else ''} | {report['machine']}, {report['cpus']} CPUs, "
         f"{report['memory_gb']} GB | {report['measured']}",
         f"{report['repo']}: {report['questions']} questions of {report['tasks']} ("
         + ", ".join(f"{n} {split}" for split, n in report["splits"].items()) + "); vectors: "
@@ -339,7 +345,7 @@ def main() -> int:
             splits[r["split"]] += 1
         memory = physical_memory()
         report: dict = {
-            "codemem": codemem_commit(), "faiss": faiss.__version__,
+            "codemem": codemem_commit(), "faiss": faiss.__version__, "faiss_threads": faiss.omp_get_max_threads(),
             "machine": f"{platform.machine()} {platform.platform()}", "cpus": os.cpu_count(),
             "memory_gb": round(memory / 1e9, 1) if memory else None, "measured": time.strftime("%Y-%m-%d %H:%M %z"),
             "index": str(args.index), "index_db_bytes": size, "repo": args.repo, "tasks": tasks.stem, "questions": len(rows),

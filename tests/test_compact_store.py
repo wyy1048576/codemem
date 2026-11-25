@@ -700,8 +700,17 @@ def test_a_file_whose_index_is_not_the_one_described_is_refused():
     ((8,), {"rescore": 0}), ((8,), {"rescore": "200"}),
 ])
 def test_options_faiss_cannot_take_are_refused_with_a_sentence(args, kwargs):
-    with pytest.raises(ValueError, match="whole numbers|need an index dim of 1 or more"):
-        CompactVectorStore(*args, **kwargs)
+    for hands_them_to_faiss in (CompactVectorStore, CompactVectorStore.bytes_per_vector):
+        with pytest.raises(ValueError, match="whole numbers|need an index dim of 1 or more"):
+            hands_them_to_faiss(*args, **kwargs)
+
+
+@pytest.mark.parametrize("options", [{}, {"bits": 1}, {"bits": 2, "dim": 33}, {"bits": 8, "rescore": 500}])
+def test_the_memory_counted_for_a_vector_is_its_codes_its_id_and_where_it_came_from(options):
+    vs = CompactVectorStore(65, **options)
+    assert CompactVectorStore.bytes_per_vector(65, **options) == vs.code_bytes + 8 + 32
+    # the numbers of docs/architecture.md §5, at the real model's 896 numbers: 4 bits, and 1 bit
+    assert (CompactVectorStore.bytes_per_vector(896), CompactVectorStore.bytes_per_vector(896, bits=1)) == (628, 160)
 
 
 @pytest.mark.parametrize("dim, code_dim, expect", [(8, 0, 8), (8, 4, 4), (8, 64, 8), (5, 0, 5), (65, 33, 33)])
@@ -793,8 +802,8 @@ def test_search_needs_the_stored_vectors():
 
 def test_a_faiss_the_codes_were_not_checked_against_is_refused_with_a_sentence(monkeypatch, tmp_path):
     monkeypatch.setattr(faiss, "__version__", "1.14.0")
-    for build in (lambda: CompactVectorStore(8), lambda: vector_backend_class("compact"),
-                  lambda: Store(tmp_path / "idx", vector_backend="compact")):
+    for build in (lambda: CompactVectorStore(8), lambda: CompactVectorStore.bytes_per_vector(8),
+                  lambda: vector_backend_class("compact"), lambda: Store(tmp_path / "idx", vector_backend="compact")):
         with pytest.raises(RuntimeError, match='vector_backend = "compact" needs FAISS 1.15.1 or newer'):
             build()
     assert vector_backend_class("faiss") is FaissVectorStore

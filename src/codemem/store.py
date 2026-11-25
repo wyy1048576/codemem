@@ -364,6 +364,20 @@ class CompactVectorStore(VectorStore):
     suffix = ".rabitq"
 
     def __init__(self, index_dim: int, /, *, bits: int = 4, dim: int = 0, rescore: int = 200):
+        self.code_dim = self._code_dim(index_dim, bits, dim, rescore)
+        self.dim = index_dim
+        self.bits = bits
+        self.rescore = rescore
+        self._rotation, self._rotation_id = _rotation(self.code_dim)
+        self._coarse = _rabitq(self.code_dim, 1)
+        self._fine = _rabitq(self.code_dim, bits) if bits > 1 else None
+        self._ids = np.empty(0, dtype=np.int64)
+        self._fetch: Fetch | None = None
+
+    @staticmethod
+    def _code_dim(index_dim: int, bits: int, dim: int, rescore: int) -> int:
+        """How many numbers of a vector are coded. It refuses, with a sentence, what FAISS was not
+        checked with, so it runs before FAISS is given any of these."""
         _require_rabitq()
         given = (index_dim, bits, dim, rescore)
         if not all(type(v) is int for v in given):
@@ -373,15 +387,7 @@ class CompactVectorStore(VectorStore):
                 f"need an index dim of 1 or more, bits 1 to 8, dim 0 to {COMPACT_MAX_DIM} and rescore of 1 or more, "
                 f"got {given}"
             )
-        self.dim = index_dim
-        self.bits = bits
-        self.code_dim = min(index_dim, dim or index_dim, COMPACT_MAX_DIM)
-        self.rescore = rescore
-        self._rotation, self._rotation_id = _rotation(self.code_dim)
-        self._coarse = _rabitq(self.code_dim, 1)
-        self._fine = _rabitq(self.code_dim, bits) if bits > 1 else None
-        self._ids = np.empty(0, dtype=np.int64)
-        self._fetch: Fetch | None = None
+        return min(index_dim, dim or index_dim, COMPACT_MAX_DIM)
 
     @property
     def _indexes(self) -> list[Any]:
@@ -397,7 +403,7 @@ class CompactVectorStore(VectorStore):
         # The codes, 8 bytes of id and 32 of where the vector came from. Measured at 896 numbers
         # and 4 bits: 657 bytes kept per vector for 628 counted this way; the rest is the rotation
         # (4 bytes for each number, squared, once in the process) and the allocator's slack.
-        code_dim = min(index_dim, dim or index_dim, COMPACT_MAX_DIM)
+        code_dim = cls._code_dim(index_dim, bits, dim, rescore)
         codes = sum(faiss.IndexRaBitQ(code_dim, faiss.METRIC_INNER_PRODUCT, b).code_size for b in {1, bits})
         return codes + 8 + _OWNER_BYTES
 
@@ -1552,8 +1558,9 @@ class Store:
         at the next start."""
         use = self._search_index()
         types: dict[str, Any] = {}
-        for vec_type, n in self.conn.execute("SELECT vec_type, COUNT(*) FROM vectors GROUP BY vec_type"):
-            per = use.cls.bytes_per_vector(self.vector_dim(vec_type) or 0, **use.options)
+        for vec_type, n in self.conn.execute("SELECT vec_type, COUNT(*) FROM vectors GROUP BY vec_type").fetchall():
+            dim = self.vector_dim(vec_type)
+            per = use.cls.bytes_per_vector(dim, **use.options) if dim else None
             types[vec_type] = {"index": use.name, "vectors": n,
                                "memory_mb": None if per is None else round(n * per / 1e6, 1)}
         info: dict[str, Any] = {"setting": self.vector_backend, "index": use.name, "why": use.why, "types": types}
@@ -1751,10 +1758,11 @@ class Store:
         """The in-memory index of a vector type, loaded or rebuilt if missing or out of date.
 
         Loading happens outside the vector lock. A rebuild reads and codes every vector (half a
-        minute for 200,000 in the compact form), and a write's commit, a status call or a search
-        that can answer without vectors must not wait for that. One thread loads a type; others
-        that ask for it meanwhile wait for that thread, on an event, not on the lock. So this is
-        never called while holding the vector lock: the loading thread needs the lock at its end."""
+        minute for 200,000 in the compact form, with FAISS on one thread), and a write's commit, a
+        status call or a search that can answer without vectors must not wait for that. One thread
+        loads a type; others that ask for it meanwhile wait for that thread, on an event, not on
+        the lock. So this is never called while holding the vector lock: the loading thread needs
+        the lock at its end."""
         while True:
             with self._vec_lock:
                 ti = self._loaded(vec_type)
