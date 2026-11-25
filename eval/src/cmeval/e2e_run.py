@@ -101,6 +101,11 @@ GPUS_ENV = "CMEVAL_E2E_GPUS"
 # How hard codemem's tool texts push the agent to codemem: none, light or strong. Not set = codemem's default.
 STEERING_ENV = "CMEVAL_CODEMEM_STEERING"
 STEERING_LEVELS = ("none", "light", "strong")
+# For diagnostic batches only. Runs made with either of them are not comparable with other runs.
+# Extra arguments for claude, for example "--thinking-display summarized" to get the thinking text in the stream.
+DIAG_ARGS_ENV = "CMEVAL_E2E_DIAG_ARGS"
+# 1 = the proxy also writes each request and answer body to bodies/ in the run folder.
+BODIES_ENV = "CMEVAL_E2E_BODIES"
 # Claude Code waits this long for an MCP server to start and for one tool call. codemem loads a model at start.
 MCP_TIMEOUT_MS = 120_000
 # Where the container of a codemem setup gets the index copy and the Hugging Face cache.
@@ -388,6 +393,15 @@ def unexpected_paths(patch: str) -> list[str]:
 
 # ---- the container script
 
+def diagnostic_args() -> list[str]:
+    """Extra arguments for claude, from the environment. Empty in a normal batch."""
+    return shlex.split(os.environ.get(DIAG_ARGS_ENV, ""))
+
+
+def keep_bodies() -> bool:
+    return os.environ.get(BODIES_ENV, "0") == "1"
+
+
 def agent_script(model: str, settings: RunSettings) -> str:
     """The shell script that runs in the task's container, as root. It reads and writes /out."""
     specs = " ".join(shlex.quote(p) for p in CONFIG_PATHSPECS)
@@ -400,6 +414,8 @@ def agent_script(model: str, settings: RunSettings) -> str:
               "--setting-sources user --strict-mcp-config --mcp-config /tmp/mcp.json --disable-slash-commands "
               "--no-session-persistence --exclude-dynamic-system-prompt-sections --permission-mode bypassPermissions "
               '--disallowedTools "WebSearch,WebFetch"')
+    for arg in diagnostic_args():
+        claude += " " + shlex.quote(arg)
     return (
         "# Written by cmeval. Runs in the task's container as root, and writes to /out.\n"
         # The files must be readable outside the container, also after a step fails.
@@ -652,7 +668,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
         if codemem:
             copy_index(codemem["index"], index_copy)
             index_bytes["before"] = tree_bytes(index_copy)
-        with RecordingProxy(out / "proxy.jsonl", host=gateway, port=0, upstream=settings.upstream) as proxy:
+        with RecordingProxy(out / "proxy.jsonl", host=gateway, port=0, upstream=settings.upstream,
+                            bodies_dir=out / "bodies" if keep_bodies() else None) as proxy:
             cmd = ["docker", "run", "--rm", "--name", name, "--network", settings.network,
                    f"--cpus={settings.cpus}", f"--memory={settings.memory}",
                    *(["--device", GPU_DEVICE] if settings.gpus else []),
@@ -751,6 +768,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "limits": {"turns": settings.turn_limit, "time_s": settings.time_limit_s, "cpus": settings.cpus,
                        "memory": settings.memory, "effort": settings.effort},
             "started_utc": started,
+            "diagnostic": {"claude_args": diagnostic_args(), "bodies": keep_bodies()},
             "gold_files": list(task.gold.files),
             "codemem": {
                 "commit": codemem["commit"],

@@ -111,6 +111,13 @@ codemem's tool texts have three steering levels (`none`, `light`, `strong`) that
 
 `run.json` of a `tool` run records the codemem commit, the program, the task's `index.json`, the steering level and the index size before and after the run (`identity.codemem`). `outcome.unexpected_paths` lists files of the agent's patch such as `.codemem*` or `.mcp.json`, which codemem should never write.
 
+### Diagnostic runs
+
+Two environment variables are for diagnostic batches. A run made with either is not comparable with other runs; `run.json` records them in `identity.diagnostic`. Use a run ID of its own.
+
+- `CMEVAL_E2E_DIAG_ARGS`: extra arguments for `claude`. `--thinking-display summarized` puts a summary of the model's thinking in `stream.jsonl`; without it a headless run gets thinking blocks with no text.
+- `CMEVAL_E2E_BODIES=1`: the proxy writes every request and answer body to `bodies/` in the run folder. This shows the system prompt and the tool texts as the model got them. The files are large, because each request repeats the conversation.
+
 ## Watch a long job
 
 `run`, `score`, `collect`, and `repo-stats` can take minutes to hours. To watch them, start the dashboard in a second terminal:
