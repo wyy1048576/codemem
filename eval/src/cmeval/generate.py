@@ -40,6 +40,7 @@ import random
 import re
 import shutil
 import subprocess
+import threading
 import time
 import tomllib
 import xml.etree.ElementTree as ET
@@ -61,6 +62,9 @@ ADMISSION_PASS = 6
 ADMISSION_MIX = (("easy", 3), ("medium", 4), ("hard", 3))
 
 FAIL, PASS, SKIP = "fail", "pass", "skip"
+
+# Tasks are built side by side, and git cannot change one clone from two threads at once.
+_CLONE_LOCK = threading.Lock()
 
 
 class GenerateError(RuntimeError):
@@ -289,7 +293,12 @@ def build_task_image(recipe: Recipe, task: Task) -> tuple[str, float]:
     base = build_base(recipe)
     folder = task_dir(recipe, task)
     context = folder / "context"
-    _export_source(task.repo, task.base_commit, context / "src")
+    with _CLONE_LOCK:
+        _export_source(task.repo, task.base_commit, context / "src")
+        commit_time = repos.commit_time(task.repo, task.base_commit)
+        # Build tools that read the version from git (versioneer, setuptools-scm) need a tag. The
+        # image has no history, so the nearest tag of the real history is put on its one commit.
+        tag_name = nearest_tag(task.repo, task.base_commit)
     deps = context / "deps"
     deps.mkdir(exist_ok=True)
     for name in recipe.deps_files:
@@ -298,10 +307,7 @@ def build_task_image(recipe: Recipe, task: Task) -> tuple[str, float]:
             raise GenerateError(f"{task.id}: {name} does not exist at {task.base_commit[:12]}")
         (deps / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(source, deps / name)
-    when = exclude_newer(repos.commit_time(task.repo, task.base_commit))
-    # Build tools that read the version from git (versioneer, setuptools-scm) need a tag. The image
-    # has no history, so the nearest tag of the real history is put on its one commit.
-    tag_name = nearest_tag(task.repo, task.base_commit)
+    when = exclude_newer(commit_time)
     tag_step = f" && git tag '{tag_name}'" if tag_name else ""
     dockerfile = (
         f"FROM {base}\n"

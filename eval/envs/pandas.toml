@@ -12,8 +12,11 @@ base_setup = [
 
 # Dependencies. The layer is shared by tasks with the same file content and the same week.
 deps_files = ["requirements-dev.txt"]
+# Packages for the documentation, for lint and type checks, and for Qt are left out: no test
+# needs them, and some of them do not install at an older date.
 deps = [
-    "uv pip install --system --exclude-newer {exclude_newer} -r requirements-dev.txt",
+    "grep -viE '^(sphinx|pydata-sphinx-theme|numpydoc|nbsphinx|nbconvert|nbformat|notebook|ipywidgets|ipykernel|jupyterlite|pandoc|markdown|feedparser|pygments|asv|py-rattler|mypy|pre-commit|tokenize-rt|gitpython|scipy-stubs|types-|pyqt5|pytest-qt)' requirements-dev.txt > requirements-tests.txt",
+    "uv pip install --system --exclude-newer {exclude_newer} -r requirements-tests.txt",
 ]
 
 # After the source of the task's commit is in /testbed. The editable install builds the
