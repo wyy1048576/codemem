@@ -71,7 +71,8 @@ def _check_layout(path):
             rows, last = conn.execute(f"SELECT COUNT(*), COALESCE(MAX(slot), 0) FROM vec_{eid}").fetchone()
             entries = conn.execute("SELECT COUNT(*) FROM entry WHERE embedder = ?", (eid,)).fetchone()[0]
             wrong = conn.execute(
-                f"SELECT COUNT(*) FROM entry e LEFT JOIN vec_{eid} v ON v.slot = e.slot WHERE e.embedder = ? AND v.hash IS NOT e.hash",
+                f"SELECT COUNT(*) FROM entry e LEFT JOIN vec_{eid} v ON v.slot = e.slot "
+                "WHERE e.embedder = ? AND v.hash IS NOT e.hash",
                 (eid,),
             ).fetchone()[0]
             assert rows == last == entries and wrong == 0, (eid, rows, last, entries, wrong)
@@ -649,8 +650,12 @@ def two_branches(sample_repo):
     _git(sample_repo, "commit", "-qm", "state A")
     _git(sample_repo, "checkout", "-qb", "feature")
     sessions = sample_repo / "auth" / "sessions.py"
-    sessions.write_text(sessions.read_text().replace("db.sessions.delete(session_id)", "db.sessions.delete(session_id)\n    db.audit(session_id)"))
-    (sample_repo / "auth" / "tokens.py").write_text("from auth.sessions import revoke_session\n\n\ndef rotate_token(session_id):\n    revoke_session(session_id)\n    return session_id[::-1]\n")
+    delete = "db.sessions.delete(session_id)"
+    sessions.write_text(sessions.read_text().replace(delete, f"{delete}\n    db.audit(session_id)"))
+    (sample_repo / "auth" / "tokens.py").write_text(
+        "from auth.sessions import revoke_session\n\n\n"
+        "def rotate_token(session_id):\n    revoke_session(session_id)\n    return session_id[::-1]\n"
+    )
     (sample_repo / "api" / "routes.py").unlink()
     _git(sample_repo, "add", "-A")
     _git(sample_repo, "commit", "-qm", "state B")
@@ -751,7 +756,8 @@ def test_status_shows_the_cache(sample_repo, tmp_path, fake_config):
         assert cache["entries"] == sum(info["vectors"].values()) > 0 and cache["max_bytes"] == 8_000_000_000
         assert cache["bytes"] == os.path.getsize(cache["path"]) and cache["embedders"]["fake:64|doc"]["dim"] == 64
         line = next(line for line in format_status(info).splitlines() if line.startswith("vector cache"))
-        assert line == f"vector cache: {cache['entries']} vectors, {cache['bytes'] / 1e3:.1f} KB of 8.0 GB, in {cache['path']}"
+        size = f"{cache['bytes'] / 1e3:.1f} KB"
+        assert line == f"vector cache: {cache['entries']} vectors, {size} of 8.0 GB, in {cache['path']}"
         fake_config.vector_cache_max_gb = 0
         assert "KB (no cap), in " in format_status(svc.status())
         fake_config.vector_cache = "off"

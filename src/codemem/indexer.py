@@ -975,7 +975,7 @@ class Indexer:
                 stats.add_time("write_vectors", time.perf_counter() - t)
             cache = self.vector_cache()
             if cache is not None:
-                cache.evict()  # a put trims only for a moment; nothing waits here, so this goes all the way under the cap
+                cache.evict()  # a put evicts only for a moment; nothing waits here, so a cache over its cap is trimmed fully
         finally:
             if self._cache is not None:
                 self._cache.close()

@@ -42,8 +42,9 @@ CACHE_FILE = "vector_cache.db"
 ROW_FORMAT_FILE = "vectors.db"  # a cache with one row per vector in a single table: imported, then deleted
 
 _LAYOUT = 1  # PRAGMA user_version of a file this code reads and writes
-# The smallest page that packs vectors of 768 to 1,024 numbers within 7% of their size and still
-# holds three of 4,096 (measured: docs/architecture.md §5).
+# At 32 KB a vector of 768 to 1,024 numbers takes 5 to 9% more than its own bytes on disk, keys
+# included, and three vectors of 4,096 numbers fit a page. At 16 KB an undisturbed read is a quarter
+# faster, but 1,024 numbers take 17% more and 4,096 twice as much (docs/architecture.md §5).
 _PAGE_SIZE = 32768
 _SCHEMA = (
     "CREATE TABLE embedder(id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, dim INTEGER NOT NULL)",
@@ -235,7 +236,10 @@ class VectorCache:
             found[to] = True
         return vecs, found
 
-    def _read(self, conn: sqlite3.Connection, embedder: str, keys: list[Key], touch: bool) -> tuple[int, list[tuple[Key, bytes]]]:
+    def _read(
+        self, conn: sqlite3.Connection, embedder: str, keys: list[Key], touch: bool
+    ) -> tuple[int, list[tuple[Key, bytes]]]:
+        """The embedder's vector length, and (key, vector bytes) for each of `keys` the cache holds."""
         known = conn.execute("SELECT id, dim FROM embedder WHERE key = ?", (embedder,)).fetchone()
         if known is None:
             return 0, []
@@ -285,8 +289,8 @@ class VectorCache:
 
     def _held(self, conn: sqlite3.Connection, eid: int, keys: list[Key]) -> dict[Key, int]:
         """Of `keys` (one batch), those the cache holds, with their time of last use."""
-        rows = conn.execute(f"SELECT hash, used FROM entry WHERE embedder = ? AND hash IN ({_marks(len(keys))})", (eid, *keys))
-        return dict(rows.fetchall())
+        sql = f"SELECT hash, used FROM entry WHERE embedder = ? AND hash IN ({_marks(len(keys))})"
+        return dict(conn.execute(sql, (eid, *keys)).fetchall())
 
     def _stamp(self, conn: sqlite3.Connection, eid: int, keys: list[Key]) -> None:
         """Set the time of last use of `keys` to now, in one transaction: a transaction writes each
@@ -313,15 +317,16 @@ class VectorCache:
         if not len(hashes):
             return
         rows = np.ascontiguousarray(vecs, dtype=np.float16)
-        written = self._try(
-            self._store, embedder, [_pack(h) for h in hashes], [row.tobytes() for row in rows], int(rows.shape[1]), _now(), True
-        )
+        keys, blobs = [_pack(h) for h in hashes], [row.tobytes() for row in rows]
+        written = self._try(self._store, embedder, keys, blobs, int(rows.shape[1]), _now(), True)
         if written and self.max_bytes:
             self._try(self._check_size, written)
 
-    def _store(self, conn: sqlite3.Connection, embedder: str, keys: list[Key], blobs: list[bytes], dim: int, used: int,
-               touch: bool) -> int:
-        """Add the entries the cache does not hold yet, in one transaction. Returns the bytes added."""
+    def _store(
+        self, conn: sqlite3.Connection, embedder: str, keys: list[Key], blobs: list[bytes], dim: int, used: int, touch: bool
+    ) -> int:
+        """Add the entries the cache does not hold yet, in one transaction, with `used` as their time
+        of last use; `touch` also marks the ones it holds. Returns the bytes added."""
         conn.execute("BEGIN IMMEDIATE")
         try:
             known = conn.execute("SELECT id, dim FROM embedder WHERE key = ?", (embedder,)).fetchone()
@@ -388,7 +393,8 @@ class VectorCache:
         if not self.max_bytes or (size(free=True) <= self.max_bytes and not self._evicting):
             return 0
         if not self._evicting:
-            log.info("the vector cache at %s is over its cap of %d bytes: deleting the least recently used", self.path, self.max_bytes)
+            log.info("the vector cache at %s is over its cap of %d bytes: deleting the least recently used",
+                     self.path, self.max_bytes)
         self._evicting = True
         until = None if max_seconds is None else time.monotonic() + max_seconds
         deleted = 0
@@ -479,8 +485,8 @@ class VectorCache:
         src = self._import_from
         if src is None or not src.is_file():
             return
-        try:
-            old = sqlite3.connect(f"{src.resolve().as_uri()}?mode=rw", uri=True, timeout=_BUSY_SECONDS)  # rw: never create it
+        try:  # mode=rw: open it, never create it
+            old = sqlite3.connect(f"{src.resolve().as_uri()}?mode=rw", uri=True, timeout=_BUSY_SECONDS)
         except sqlite3.OperationalError:
             return  # another process finished the copy and deleted it
         try:
@@ -494,7 +500,9 @@ class VectorCache:
                 last = rows[-1][:2]
                 for (embedder, dim), group in groupby(rows, key=lambda r: (r[0], r[2])):
                     good = [(_pack(h), data) for _, h, _, data in group if len(data) == 2 * dim]
-                    written = self._store(conn, embedder, [k for k, _ in good], [d for _, d in good], dim, used, False) if good else 0
+                    if not good:
+                        continue
+                    written = self._store(conn, embedder, [k for k, _ in good], [d for _, d in good], dim, used, False)
                     if written and self.max_bytes:
                         self._check_size(conn, written)
                 done += len(rows)
