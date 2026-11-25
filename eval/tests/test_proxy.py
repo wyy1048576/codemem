@@ -458,3 +458,14 @@ def test_cli_proxy_summary(tmp_path, capsys):
 
 def test_cli_default_port_matches():
     assert cli.PROXY_PORT == proxy.DEFAULT_PORT
+
+
+def test_a_closed_client_connection_prints_no_traceback(capsys):
+    from cmeval.proxy import _Server
+
+    server = _Server.__new__(_Server)
+    try:
+        raise ConnectionResetError(104, "Connection reset by peer")
+    except ConnectionResetError:
+        server.handle_error(None, ("127.0.0.1", 1))
+    assert capsys.readouterr().err == ""

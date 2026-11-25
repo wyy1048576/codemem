@@ -42,14 +42,14 @@ models, caches and indexes stay inside the project.
 
 ```bash
 cd path/to/repo
-codemem init --agents claude          # registers the MCP server (asks first), then builds the index
+codemem init --agents claude          # registers the MCP server and adds a note to CLAUDE.md (asks first), then builds the index
 codemem search "disabled users stay logged in" --debug
 codemem status
 ```
 
 | Command | What it does |
 |---|---|
-| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--write-agent-notes] [--dry-run] [-y]` | register with agents, download the model, then build the index (`--no-index` skips the build) |
+| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--no-agent-notes] [--write-hooks] [--dry-run] [-y]` | register with agents, add the agent note, download the model, then build the index (`--no-index` skips the build) |
 | `codemem index [PATH] [--full] [--no-cache] [--verify] [--json]` | build or update the index (`--no-cache`: cold timing; `--verify`: compare with a fresh build) |
 | `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--kinds function,method] [--language go] [--tests include\|exclude\|only] [--json] [--debug]` | search |
 | `codemem status [PATH] [--json] [--check-assist]` | what is indexed, pending or skipped, which model, the indexed commit (`--check-assist`: only compare an assist endpoint with the local model, "A second source for a build's embeddings", below) |
@@ -57,18 +57,57 @@ codemem status
 | `codemem mcp [PATH]` | the MCP server over stdio (what agents launch) |
 | `codemem serve-embeddings [PATH] [--host 127.0.0.1] [--port 8791]` | serve the local embedding model to other codemem processes, over HTTP ("One model for several codemem processes", below) |
 | `codemem languages` | supported languages and file extensions |
+| `codemem hook` | two Claude Code hooks that point the agent at `search_code` when it has no lead (see below) |
 
 The commands that use an index accept `--index-dir DIR`; the eval uses it for one index per commit.
 
 ## Using it from an agent
 
-- **Claude Code:** `init --agents claude` writes a project `.mcp.json`. Or run
-  `claude mcp add codemem -- codemem mcp`.
+- **Claude Code:** `init --agents claude` writes a project `.mcp.json`, with `"alwaysLoad": true`.
+  Claude Code otherwise keeps an MCP server's tools behind a tool-search step, where the agent
+  sees only their names; with it, codemem's tools and their descriptions are there from the first
+  turn. `claude mcp add codemem -- codemem mcp` registers the server without that setting.
 - **Cursor:** `init --agents cursor` writes `.cursor/mcp.json`.
 - **Codex:** `init --agents codex` prints a `~/.codex/config.toml` snippet; it never edits that
   file.
 - **No `codemem` command on PATH** (installed in a virtualenv): `init` registers
   `<that python> -m codemem mcp` instead, which works while that environment exists.
+- **The agent note.** `init` also appends a short "Code search" note to `CLAUDE.md` (Claude
+  Code) or `AGENTS.md` (Cursor, Codex), which tells the agent when to call `search_code`. It is
+  part of what `init` shows and asks about before writing, it leaves the rest of the file as it
+  is, and a second `init` does not add it again. `--no-agent-notes` skips it, and so does
+  `steering = "none"`.
+- **Claude Code, optional: two hooks that point the agent at codemem when it has no lead.**
+  `init --write-hooks` adds them to the repo's `.claude/settings.json`. It keeps every other
+  setting and hook in that file, and running it again does not add them twice. Or add them by
+  hand:
+
+  ```json
+  {"hooks": {
+    "PreToolUse": [{"matcher": "Grep|Glob|mcp__codemem__search_code",
+      "hooks": [{"type": "command", "command": "codemem hook", "timeout": 10}]},
+      {"matcher": "Bash", "hooks": [
+        {"type": "command", "if": "Bash(rg *)", "command": "codemem hook", "timeout": 10},
+        {"type": "command", "if": "Bash(grep *)", "command": "codemem hook", "timeout": 10},
+        {"type": "command", "if": "Bash(find *)", "command": "codemem hook", "timeout": 10}]}],
+    "PostToolUse": [{"matcher": "Grep|Glob|Read|mcp__codemem__(search_code|get_chunk)",
+      "hooks": [{"type": "command", "command": "codemem hook", "timeout": 10}]}]}}
+  ```
+
+  - **The first search.** The first Grep or Glob of a session is refused once, and the agent is
+    told to call `search_code` unless it already has an exact name, path or error string. The
+    repeated call goes through. Nothing happens if `search_code` was called first. A shell command
+    that runs `rg`, `grep` or `find` counts as a search here too. That is a check for the word,
+    not a reading of the command: `pytest | grep FAILED` can count, which costs one refusal in a
+    session, and a search written some other way does not. The `if` lines make Claude Code start
+    the command only for those shell commands, so tests, git and builds are not slowed down.
+  - **The lost trail.** Nothing is refused. After a Grep or Glob that found nothing, matched more
+    than 50 files, or was the third search in a row with no Read, `search_code` or `get_chunk` in
+    between, the agent gets a one-line reminder to try `search_code`. The two searches after a
+    reminder get none. Shell commands take no part in this one.
+
+  Either hook works without the other. The PowerShell tool is not covered. The command
+  takes about 0.2 s, and the second hook also runs after every Read.
 
 The agent gets four tools: `search_code` (plain-language or identifier search), `get_chunk` (one
 result in full, with its callers and callees), `index_status` and `refresh_index`. Every search
