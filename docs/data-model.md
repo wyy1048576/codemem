@@ -411,7 +411,8 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 - **`used`** is set when the entry is put, and again when it is found or marked, at most once per
   day (UTC).
 - A file `$CODEMEM_HOME/cache/vectors.db` with one table `cache(embedder, text_hash, dim, data)`
-  is imported when the cache is opened, and then deleted.
+  is imported when the cache is opened, and then deleted, unless rows were added to it during
+  the import.
 
 `meta` keys:
 - `schema_version` (3);

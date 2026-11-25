@@ -485,6 +485,35 @@ def test_a_failed_import_keeps_the_row_format_file_and_the_cache_usable(tmp_path
     second.close()
 
 
+def test_a_row_format_file_that_is_still_written_is_not_deleted(tmp_path, monkeypatch):
+    """Another process (an older codemem) adds a vector to the row-format file while it is imported,
+    at a key the copy has already passed. The file stays, and the next start picks the vector up."""
+    content = _row_format_file(tmp_path / ROW_FORMAT_FILE)
+    monkeypatch.setattr(vectorcache, "_IMPORT_ROWS", 100)
+    real, calls = VectorCache._store, []
+    late = np.ones(4, dtype=np.float16)
+
+    def with_a_writer(self, *args):
+        calls.append(1)
+        if len(calls) == 5:
+            writer = sqlite3.connect(tmp_path / ROW_FORMAT_FILE)
+            writer.execute("INSERT INTO cache VALUES ('a model|doc', 'ab', 4, ?)", (late.tobytes(),))
+            writer.commit()
+            writer.close()
+        return real(self, *args)
+
+    monkeypatch.setattr(VectorCache, "_store", with_a_writer)
+    first = VectorCache(tmp_path / CACHE_FILE, import_from=tmp_path / ROW_FORMAT_FILE)
+    assert first.count() == 1222 and (tmp_path / ROW_FORMAT_FILE).exists()
+    first.close()
+
+    monkeypatch.setattr(VectorCache, "_store", real)
+    second = VectorCache(tmp_path / CACHE_FILE, import_from=tmp_path / ROW_FORMAT_FILE)
+    _assert_holds(second, {**content, "a model|doc": (["ab"], late[None, :])})
+    second.close()
+    assert not (tmp_path / ROW_FORMAT_FILE).exists()
+
+
 _IMPORTER = """
 import pathlib, sys, time
 from codemem import vectorcache

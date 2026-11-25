@@ -9,8 +9,9 @@ things shape its layout (docs/architecture.md §5):
   size, so they fill 32 KB pages, and the last row can take the place of a deleted one. The file
   therefore shrinks by what is deleted;
 - the key table `entry` maps (embedder id, hash) to a slot and holds the time of last use. A read
-  is one lookup there and one in the vector table. Marking an entry as used rewrites only a small
-  page, and an index on the time gives the least recently used entries without a scan;
+  is one lookup there and one in the vector table. Marking an entry as used rewrites a page of
+  keys, never a page of vectors, and an index on the time gives the least recently used entries
+  without a scan;
 - a size cap: past it, the least recently used entries are deleted until the file is under 90%
   of it. An evicted vector is embedded again when its text comes back.
 
@@ -509,6 +510,10 @@ class VectorCache:
                 if time.monotonic() - said > 5:
                     log.info("importing the vector cache: %d of %d vectors", done, total)
                     said = time.monotonic()
+            if old.execute("SELECT COUNT(*) FROM cache").fetchone()[0] != done:
+                # A process that still writes that file added rows behind the copy: the next start gets them.
+                log.info("%s changed while it was imported; it stays until an import finds it unchanged", src)
+                return
         finally:
             old.close()
         # Durable before the source goes: a WAL commit alone is not synced to disk.

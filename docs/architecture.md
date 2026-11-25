@@ -593,8 +593,9 @@ minute. The index update goes on, with vectors from the model.
 **A cache file with one row per vector** (`cache/vectors.db`, a single table keyed by text) is
 read into the cache when the cache is first opened: 2,000 rows at a time, in key order,
 skipping what is already there. So an import that was interrupted, or that two processes run at
-once, still ends complete. The file is deleted once everything is committed and synced to disk.
-34,218 vectors (148 MB) take 1.6 s and become 60 MB.
+once, still ends complete. The file is deleted once everything is committed and synced to disk,
+and only if nothing was added to it meanwhile: while another process still writes it, it stays,
+and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and become 60 MB.
 
 ---
 
