@@ -12,7 +12,7 @@ Freshness (docs/architecture.md §4):
   The writer gives it the model meanwhile. `get_chunk()` waits for stage A only;
 - a reconcile (a scan of the whole repo) runs at startup, every few minutes, on `refresh()`, and
   when the ignore rules, the config or the git branch change;
-- the FAISS files are written once the index has been quiet for a while, and on close.
+- the search indexes' files are written once the index has been quiet for a while, and on close.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ _LONG_CLASS_LINES = 80
 # Rough share of total work per phase, for a single progress percentage.
 _PHASE_SPAN = {"chunk": (0.0, 0.15), "embed": (0.15, 1.0), "done": (1.0, 1.0)}
 CATCHUP_MAX_CHUNKS = 1000  # beyond this many queued chunks the index is being built: don't wait
-SAVE_AFTER_IDLE = 30.0  # write the FAISS files once nothing changed for this long
+SAVE_AFTER_IDLE = 30.0  # write the search indexes' files once nothing changed for this long
 RECONCILE_EVERY = 300.0  # a full scan, in case a file event was missed
 POLL_EVERY = 10.0  # the scan interval when file events don't work
 BURST_PATHS = 2000  # more changed paths than this at once: scan everything instead
@@ -133,7 +133,7 @@ class CodememService:
 
     def update(self, *, full: bool = False) -> IndexStats | None:
         """Bring the index up to date now: a full reconcile, then every queued vector, then the
-        FAISS files written. Waits for any update in progress. An error is kept in `last_error`
+        search indexes' files written. Waits for any update in progress. An error is kept in `last_error`
         (the eval adapter relies on that) and gives None."""
         self.state = "indexing" if not self.has_index() or full else "updating"
         self.progress = 0.0
@@ -151,7 +151,7 @@ class CodememService:
     # ---- indexing in the background (MCP server, `codemem watch`)
     def start(self, *, watch: bool = True, prewarm: bool = True) -> None:
         """Keep the index fresh in the background: a catch-up now, then the watcher's batches,
-        a reconcile every few minutes, and lazy saves of the FAISS files."""
+        a reconcile every few minutes, and lazy saves of the search indexes' files."""
         self.request_reconcile()
         self._ensure_worker()
         if watch:
@@ -354,7 +354,7 @@ class CodememService:
 
     def refresh(self, timeout: float = 60.0) -> dict[str, Any]:
         """Reconcile now (after `git checkout` or `git pull`, or when in doubt), embed within
-        `timeout`, and write the FAISS files. Returns what changed."""
+        `timeout`, and write the search indexes' files. Returns what changed."""
         t = time.monotonic()
         stats = IndexStats()
         self._hand_over()

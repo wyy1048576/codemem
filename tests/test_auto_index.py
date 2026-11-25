@@ -289,7 +289,7 @@ def test_status_says_which_search_index_is_in_use_why_and_its_memory(sample_repo
         per = 2 * 64 + 64  # the exact index at 64 numbers
         assert all(v["index"] == "faiss" and v["memory_mb"] == round(counts[t] * per / 1e6, 1) for t, v in index["types"].items())
         text = format_status(info)
-        assert "search index: exact (faiss) (auto: the exact index takes 0 MB, within the budget of " in text
+        assert "search index: exact (faiss)\n  auto: the exact index takes 0 MB, within the budget of " in text
         assert f"  code: {counts['code']} vectors, about 0 MB in memory" in text
 
         (sample_repo / ".codemem.toml").write_text('vector_backend = "auto"\nvector_memory_mb = 1\n')
@@ -300,7 +300,7 @@ def test_status_says_which_search_index_is_in_use_why_and_its_memory(sample_repo
         assert all(v["index"] == "compact" for v in index["types"].values())
         assert isinstance(svc.store._type_index("code").store, CompactVectorStore)
         assert "revoke_session" in [r.qualname for r in svc.search("revoke session", k=5, signals=["code"]).results]
-        assert "search index: compact (auto: the exact index would take " in format_status(svc.status(check_staleness=False))
+        assert "search index: compact\n  auto: the exact index would take " in format_status(svc.status(check_staleness=False))
     finally:
         svc.close()
 

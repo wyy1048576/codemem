@@ -470,6 +470,7 @@ and reports any difference.
 | two agent sessions on one repo | one writes at a time (a lock file); each picks up the other's vectors without re-embedding |
 | OS file events don't work (network drives, WSL) | a warning, a full check every 10 s, and a full check before each search (0.5 s on vLLM) |
 | a search while the model is still loading (about 7 s at startup) | it waits within its 4 s, then answers from keywords alone and says so |
+| a search while a search index is still loading, or is being rebuilt from the stored vectors (§5) | the same: it waits within its 4 s, and not for a rebuild that will take longer; then keywords alone, and the note |
 
 ---
 
@@ -487,7 +488,7 @@ and reports any difference.
  │     dirty_texts  the queue between stage A and stage B
  │     meta         the settings the index was built with, the git commit, version counters
  ├── vec_code.faiss ...... saved copies of the in-memory search indexes,  ┐ rebuilt from the
- ├── vec_usage.faiss         one per text type (.rabitq: the compact one) ┘ vectors table if lost
+ ├── vec_usage.faiss         one per text type (.rabitq: a compact one)   ┘ vectors table if lost
  └── write.lock .......... one writer at a time
 
  ~/.codemem/cache/vectors.db ... the vector cache, shared by every index on the machine
@@ -498,25 +499,85 @@ joins and keyword search; SQLite has them, needs no server, and makes each updat
 transaction. Vectors are stored in it as plain rows, so the search index is only a derived copy,
 which can always be rebuilt without the model (2 s on vLLM).
 
-**The search index** compares a query vector with every stored vector of a type, using FAISS (a
-vector search library) in its exact mode: about 10 ms over 109k vectors. It keeps each number in
-2 bytes, like the stored rows: 196 MB for vLLM's code vectors, against 393 MB at 4 bytes, at the
-same speed. Vectors are scaled back to length 1 as they enter the index and rounded to 2 bytes
-again, so every backend gets the same numbers. Keeping 4 bytes would change scores by at most
-0.0003: on 40 real-model queries, 38 top-10 lists came out in the same order, and the other two
-swapped results that were practically tied. It sits behind a small
-interface (`VectorStore`), so another index can replace it through the config; a switch re-embeds
-nothing. Two come with codemem: this exact one (`vector_backend = "faiss"`, the default), and the
-compact one below. An approximate index (HNSW or IVF, which trade a little accuracy for speed on
-very large repos) can be plugged in as a class.
+**The search index** is a copy of one vector type's stored vectors, held in memory in a form
+that is fast to search. It is derived from the rows, so it can be rebuilt at any time, and it sits
+behind a small interface (`VectorStore`), so the config chooses it (`vector_backend`) and a change
+re-embeds nothing. Two come with codemem, an exact one and a compact one. The default, `auto`,
+picks between them: **the exact index while it fits a memory budget, the compact one when it
+does not.**
 
-**The compact index** (`vector_backend = "compact"`) returns what the exact index returns, from a
-third of the memory. On 30,977 real code vectors it returned the exact index's top 10 and top 50
-in every one of 4,608 searches: 268 real questions (the eval's issue texts) and 500 code vectors,
-each with no filter and with filters that keep 10% and 1% of the chunks, each for 10 and for 50
-results. Every score it returns is the exact one. At 200,000 vectors it keeps 131 MB in
-memory against 371 MB, and a search takes 0.92 times as long as with the exact index; at 31k
-vectors, 1.4 to 1.8 times as long (8.5 ms against 6.2).
+- **Why exact first.** The exact index compares a query with every vector, so it returns exactly
+  the best ones, and it reads nothing from disk. On an index that fits the budget it is also the
+  faster of the two: 6.2 ms a search against 8.5 at 31k vectors.
+- **Why compact for the rest.** The exact index keeps every vector in memory: 1,856 bytes for a
+  vector of 896 numbers, 371 MB for 200,000 of them. The compact index keeps a third of that,
+  returned the same results in every measured search (below), and on a large index is the faster
+  one: 0.92 times the exact index's time at 200,000 vectors.
+- **The rule.** When an index's search indexes are loaded or built, codemem adds up what the
+  exact indexes of all its vector types would take: for each vector, 2 bytes a number and 64
+  bytes beside them (measured: 1,853 bytes a vector of 896 numbers). If the sum fits the budget,
+  every type gets the exact index. If not, every type gets the compact one.
+- **The budget** is `vector_memory_mb`. At 0, the default, it is 2% of the machine's memory, and
+  at least 128 MB:
+
+  | The machine | Its memory, as it reports it | The budget | Vectors of 896 numbers that stay exact |
+  |---|---|---|---|
+  | 6 GB or less | up to 6.4 GB | 128 MB | 69,000 |
+  | 16 GB | 17.2 GB | 344 MB | 185,000 |
+  | 24 GB | 25.8 GB | 515 MB | 278,000 |
+  | 48 GB | 51.5 GB | 1,031 MB | 555,000 |
+
+  So on a laptop of 16 GB an index of pandas (49,770 vectors, 92 MB) or of vLLM (145,000 vectors,
+  269 MB) is exact, and one of 200,000 vectors (371 MB) is compact; from 24 GB up that one is
+  exact too. Memory is read from the operating system; on Linux a lower limit set on the
+  process's container counts. Where it cannot be read, 16 GB is assumed.
+- **When the pick is made.** Once, when the first search index of a process is loaded or built,
+  and it holds while the index is open: an index that grows past the budget while the service
+  runs stays exact until the next start. An update that ends by saving the search indexes (the
+  CLI's, the eval's) applies the rule again first, so a large index is compact, in memory and on
+  disk, when the run that built it ends.
+- **No flapping at the boundary.** An index that is compact goes back to exact only when the
+  exact indexes would take less than 80% of the budget.
+- **When the pick differs from the saved copy,** the search index is rebuilt from the stored
+  vectors, as for any change of backend (see "Loading a search index" below).
+- **`codemem status` says which one is in use and why**, with the memory of each vector type:
+
+  ```
+  search index: exact (faiss)
+    auto: the exact index takes 92 MB, within the budget of 344 MB (2% of this machine's 17.2 GB)
+    code: 43,187 vectors, about 80 MB in memory
+    usage: 6,583 vectors, about 12 MB in memory
+  ```
+- **Naming one.** `vector_backend = "faiss"` is always the exact index, for whoever wants no disk
+  read at search time whatever the size. `"compact"` is always the compact one. `"module:Class"`
+  plugs in another: an approximate index (HNSW or IVF, which trade a little accuracy for speed
+  on very large repos) is a class away.
+- **An older FAISS.** The compact index needs FAISS 1.15.1, which codemem's dependencies ask
+  for. In an environment that still has an older one, `auto` always picks the exact index;
+  `vector_backend = "compact"` is refused with one sentence.
+
+**The exact index** (`faiss`) compares a query vector with every stored vector of a type, using
+FAISS (a vector search library) in its exact mode: about 10 ms over 109k vectors. It keeps each
+number in 2 bytes, like the stored rows: 196 MB for vLLM's code vectors, against 393 MB at 4
+bytes, at the same speed. Vectors are scaled back to length 1 as they enter the index and rounded
+to 2 bytes again, so every backend gets the same numbers. Keeping 4 bytes would change scores by
+at most 0.0003: on 40 real-model queries, 38 top-10 lists came out in the same order, and the
+other two swapped results that were practically tied.
+
+**The compact index** (`compact`) returns what the exact index returns, from a third of the
+memory. Two checks, each against the exact index:
+
+- On 30,977 real code vectors it returned the same top 10 and top 50 in every one of 4,608
+  searches: 268 real questions (the eval's issue texts) and 500 code vectors, each with no filter
+  and with filters that keep 10% and 1% of the chunks, each for 10 and for 50 results.
+- On a whole index of pandas (43,187 code vectors and 6,583 usage vectors, embedded by the real
+  model), with the eval's 352 pandas issue texts as questions: the same top 10 and top 50 for
+  both vector types, and the same 10 results of the whole search in the same order, in 352 of 352
+  searches.
+
+Every score it returns is the exact one. At 200,000 vectors it keeps 131 MB in memory against
+371 MB, and a search takes 0.92 times as long as with the exact index; at 31k vectors, 1.4 to 1.8
+times as long (8.5 ms against 6.2), which is why `auto` leaves a small index exact.
 
 It keeps two codes of each vector in memory instead of the vector, and reads from SQLite only the
 vectors it has to compare exactly. A search has three steps:
@@ -592,7 +653,7 @@ is the one that lost most of its top 50.
 
 | `bits`, `rescore` | Codes, bytes per vector | Questions: searches with the exact top 10 | Their top 50, on average | Their worst search | Code vectors: the worst search |
 |---|---|---|---|---|---|
-| **4, 200** (the default) | 588 | 100% | 100% | 50 of 50 | 50 of 50 |
+| **4, 200** (the defaults) | 588 | 100% | 100% | 50 of 50 | 50 of 50 |
 | 4, 500 | 588 | 100% | 100% | 50 of 50 | 50 of 50 |
 | 8, 200 | 1,036 | 100% | 100% | 50 of 50 | 50 of 50 |
 | 2, 500 | 364 | 100% | 100% | 50 of 50 | 50 of 50 |
@@ -631,7 +692,7 @@ A fine code does not make up for the missing numbers: 256 numbers with a 4-bit c
 
 **What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50):
 
-| At 200,000 vectors of 896 numbers | Exact (`faiss`) | Compact, the default (4 bits) | Compact, `bits = 1`, `rescore = 500` |
+| At 200,000 vectors of 896 numbers | Exact | Compact, as `auto` uses it (4 bits, 200 candidates) | Compact, `bits = 1`, `rescore = 500` |
 |---|---|---|---|
 | in memory, per vector: the index | 1,800 bytes | 588 + 8 (its id) | 120 + 8 |
 | in memory, per vector: where it came from | 32 | 32 | 32 |
@@ -692,6 +753,38 @@ and never returned). Its saved file carries a checksum, and is given to FAISS on
 checksum, the options and the rotation are the expected ones. What FAISS was not checked with is
 refused with a message: a code of more than 4,096 numbers when the config is read, a FAISS older
 than 1.15.1 when the index is opened.
+
+**Loading a search index.** A search index is saved beside `index.db` and read back at the next
+start: 0.9 s for the exact index of 200,000 vectors, 0.5 s for the compact one. It is rebuilt
+from the stored vectors instead when the saved copy cannot be used: there is none, it is another
+backend's (the rule picks the other index, or the config names another), or its note names no
+database. That last case is every index built before saved copies named their database: the
+first start on one rebuilds its search index, once. On an M1 that was running other jobs, an
+exact index took 0.5 to 1.5 s to rebuild at 50,000 vectors and 2.5 to 5 s at 200,000. A compact
+index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000 (on macOS, FAISS
+runs on one thread beside PyTorch; elsewhere it uses every core).
+
+Nobody waits for a rebuild:
+- **It runs in the background.** The MCP server loads the model and the search indexes side by
+  side when it starts. A rebuild holds no lock while it reads and codes, so writes, `get_chunk`
+  and `index_status` go on; what was written meanwhile is added at the end, by vector id.
+- **A search that comes first answers from keywords.** It waits for the model and the search
+  indexes only within its 4 s, and not at all for a rebuild that will not end in time (its pace
+  tells). It then returns keyword results and a note that says so, as it does while the model
+  loads. Measured at 200,000 vectors, on the same loaded machine: a search asked 0.2 s after
+  the start returned its keyword results in 0.9 s, while the compact index was being rebuilt;
+  searches used the vectors from the moment it was ready, 83 s after the start. Had the rebuild
+  held the lock, that first search would have waited for all of it (66 s in the same
+  measurement), and so would the commit of a vector written meanwhile. At 50,000 vectors an
+  exact index is rebuilt within the wait: the first search took 1.1 to 1.3 s and already had the
+  vectors.
+- **The CLI and the eval pay it in the update, not in a search.** An update that ends by saving
+  leaves every vector type with the file the next start reads: a type whose file is missing,
+  behind the rows or another backend's is loaded or rebuilt, and written. Their searches wait for
+  an index that is still loading: they return results by meaning, always.
+- **A write does not start one.** Vectors written to a type whose index is not in memory are left
+  for its first use, which reads the file and adds the rows it lacks. Only a type's very first
+  vectors start its index, so that a build's index grows batch by batch.
 
 **Where each vector came from** (its chunk, its part, its lines) is kept in memory as one 32-byte
 row per vector, in an array sorted by vector id: 6.4 MB at 200,000 vectors, for either index. A

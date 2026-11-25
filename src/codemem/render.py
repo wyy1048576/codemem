@@ -97,7 +97,8 @@ def format_status(info: dict[str, Any]) -> str:
     for vec_type, m in info["models"].items():
         lines.append(f"  {vec_type}: {m['model']} (dim {m['dim']})")
     if index := info.get("search_index"):
-        lines.append(f"search index: {_index_name(index['index'])} ({index['why']})")
+        lines.append(f"search index: {_index_name(index['index'])}")
+        lines.append(f"  {index['why']}")
         for vec_type, t in index["types"].items():
             memory = "" if t.get("memory_mb") is None else f", about {t['memory_mb']:,.0f} MB in memory"
             lines.append(f"  {vec_type}: {t['vectors']:,} vectors{memory}")

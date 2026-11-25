@@ -4,17 +4,19 @@ Consistency model
 -----------------
 SQLite is the source of truth for everything, vectors included: each row of `vectors` holds one
 float16 vector at the model's full dimension, with the chunk, part (window) and text hash it
-came from. The search index is derived from those rows: by default FAISS, an exact inner-product
-index over vector ids that holds the same 2-byte numbers (or another `VectorStore` backend,
-named in config: `compact` keeps small codes of each vector and scores its best candidates from
-the rows), truncated to `embedding_dim` if set, kept in memory and saved as
-`vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it reflects (and the database,
-backend and options it was saved from). Every transaction that changes a vector type's
-rows bumps its epoch in `meta`, and the index is patched right after the commit (never before, so
-it never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
-with a new id. So an index that is behind (a saved file from before a crash, or another process
-wrote) catches up by comparing vector ids and applying only the difference; a missing or corrupt
-file is rebuilt from the rows, which needs no model. docs/architecture.md §5 lists the tables.
+came from. The search index is derived from those rows. It is a `VectorStore` backend: `faiss`,
+an exact inner-product index over vector ids that holds the same 2-byte numbers; `compact`,
+which keeps small codes of each vector and scores its best candidates from the rows; or a class
+named in config. By default (`auto`) it is the exact one while that fits a memory budget, and
+the compact one when it does not (Store._pick). It is truncated to `embedding_dim` if set, kept
+in memory and saved as `vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it
+reflects (and the database, backend and options it was saved from). Every transaction that
+changes a vector type's rows bumps its epoch in `meta`, and the index is patched right after the
+commit (never before, so it never holds an uncommitted vector). Vector rows never change in
+place: a new vector is a new row with a new id. So an index that is behind (a saved file from
+before a crash, or another process wrote) catches up by comparing vector ids and applying only
+the difference; a missing or corrupt file is rebuilt from the rows, which needs no model, and
+outside the vector lock (Store._type_index). docs/architecture.md §5 lists the tables.
 """
 
 from __future__ import annotations
@@ -1523,7 +1525,7 @@ class Store:
     def _pick(self, compact_now: bool) -> _InUse:
         """`auto`: the exact index for every vector type while their exact indexes fit the budget
         together, the compact one for every type when they do not. Exact is the more faithful
-        and, on an index this size, the faster of the two; compact is what keeps a large index
+        and, on an index that fits, the faster of the two; compact is what keeps a large index
         within the memory a machine can spare. An index that is compact goes back to exact only
         well under the budget, so that one near it does not change at every start. Where the
         installed FAISS cannot make the compact index, the pick is always exact."""
