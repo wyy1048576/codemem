@@ -470,7 +470,7 @@ def validate_task(recipe: Recipe, task: Task, tag: str, repeats: int = DEFAULT_R
 
 
 def generate_task(recipe: Recipe, task: Task, repeats: int = DEFAULT_REPEATS, cpus: int = 8, force: bool = False) -> dict:
-    """Build and validate one task. The record is saved, and a saved record is reused."""
+    """Build and validate one task. The record of a validation is saved, and a saved record is reused."""
     folder = task_dir(recipe, task)
     saved = folder / "result.json"
     if saved.exists() and not force:
@@ -483,7 +483,9 @@ def generate_task(recipe: Recipe, task: Task, repeats: int = DEFAULT_REPEATS, cp
         record.update(image=tag, build_s=round(build_s, 1))
         record.update(validate_task(recipe, task, tag, repeats=repeats, cpus=cpus))
     except (GenerateError, repos.RepoError, subprocess.TimeoutExpired) as exc:
+        # Not saved: a build that failed is tried again by the next call.
         record["reason"] = f"error: {exc}"
+        return record
     saved.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return record
 
