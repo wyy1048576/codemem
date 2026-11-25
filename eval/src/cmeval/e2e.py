@@ -19,24 +19,24 @@ fix must complete the task, and the empty change must not.
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from .generate import (PASS, GenerateError, Recipe, _run, image_exists, read_results, refresh_lines, task_tag,
-                       test_run_line, tests_path)
+from .generate import (PASS, GenerateError, Recipe, image_exists, image_fingerprint, image_label, read_results,
+                       read_times, refresh_lines, run_in_container, task_tag, test_run_line, tests_path,
+                       validation_fingerprint)
+from .patches import diff_sections as _sections, file_paths
 from .paths import e2e_dir
 from .tasks import Task
 
 MAX_FAILED_SHOWN = 50
 
 REASONS = ("ok", "empty change", "changes do not apply", "hidden tests do not apply", "build failed",
-           "no test results", "tests failed")
+           "tests timed out", "no test results", "tests failed")
 
 # The lines that run.sh writes to times.txt when a step fails, and the reason of each.
 _STEP_REASONS = (("agent patch failed", "changes do not apply"), ("test patch failed", "hidden tests do not apply"),
@@ -44,82 +44,6 @@ _STEP_REASONS = (("agent patch failed", "changes do not apply"), ("test patch fa
 
 
 # ---- patches
-
-_DIFF_START = re.compile(r"^diff --git ", re.M)
-
-
-def _sections(patch: str) -> list[str]:
-    """The patch cut before each line that starts with "diff --git ". Text before the first one
-    (for example a commit message) is a part of its own."""
-    starts = [m.start() for m in _DIFF_START.finditer(patch)]
-    if not starts:
-        return [patch] if patch else []
-    bounds = ([0] if starts[0] > 0 else []) + starts + [len(patch)]
-    return [patch[a:b] for a, b in zip(bounds, bounds[1:])]
-
-
-_ESCAPES = {b"a": 7, b"b": 8, b"t": 9, b"n": 10, b"v": 11, b"f": 12, b"r": 13}
-
-
-def _unquote(name: str) -> str:
-    """A path as git writes it. Git puts a path with special characters in quotes, with C escapes
-    and octal bytes."""
-    if len(name) < 2 or not (name.startswith('"') and name.endswith('"')):
-        return name
-
-    def byte(m: re.Match) -> bytes:
-        code = m.group(1)
-        return bytes([int(code, 8) if len(code) == 3 else _ESCAPES.get(code, code[0])])
-
-    return re.sub(rb"\\([0-7]{3}|.)", byte, name[1:-1].encode("utf-8")).decode("utf-8", "replace")
-
-
-def _side(name: str, prefix: str) -> str | None:
-    """The path of a "---" or "+++" line, without its a/ or b/ prefix. None for /dev/null."""
-    name = _unquote(name.split("\t")[0])
-    if name == "/dev/null":
-        return None
-    return name[len(prefix):] if name.startswith(prefix) else name
-
-
-def _header_paths(line: str) -> tuple[str | None, str | None]:
-    """The two paths of a "diff --git a/X b/Y" line. A path with spaces makes the line unclear;
-    then the two halves are taken to be the same path, as they are for a change in place."""
-    rest = line[len("diff --git "):].rstrip("\n")
-    quoted = re.fullmatch(r'("(?:[^"\\]|\\.)*"|\S+) ("(?:[^"\\]|\\.)*"|\S+)', rest)
-    if quoted and (rest.startswith('"') or rest.endswith('"')):
-        return _side(quoted.group(1), "a/"), _side(quoted.group(2), "b/")
-    half = (len(rest) - 1) // 2
-    if len(rest) % 2 == 1 and rest[half] == " " and rest[2:half] == rest[half + 3:]:
-        return rest[2:half], rest[half + 3:]
-    m = re.fullmatch(r"a/(.+?) b/(.+)", rest)
-    return (m.group(1), m.group(2)) if m else (None, None)
-
-
-def file_paths(section: str) -> tuple[str | None, str | None]:
-    """The path before and the path after the change, for the diff of one file. None for a side
-    that does not exist (a new file has no path before, a deleted file has no path after)."""
-    lines = section.splitlines()
-    if not lines or not lines[0].startswith("diff --git "):
-        return None, None
-    old, new = _header_paths(lines[0])
-    for line in lines[1:]:
-        if line.startswith(("@@", "GIT binary patch", "Binary files ")):
-            break
-        if line.startswith("new file mode"):
-            old = None
-        elif line.startswith("deleted file mode"):
-            new = None
-        elif line.startswith(("rename from ", "copy from ")):
-            old = _unquote(line.split(" ", 2)[2])
-        elif line.startswith(("rename to ", "copy to ")):
-            new = _unquote(line.split(" ", 2)[2])
-        elif line.startswith("--- "):
-            old = _side(line[4:], "a/")
-        elif line.startswith("+++ "):
-            new = _side(line[4:], "b/")
-    return old, new
-
 
 def split_patch(patch: str) -> list[tuple[str, str]]:
     """A git unified diff, cut into one part for each file: (path after the change, text of the
@@ -175,7 +99,8 @@ def _failed_step(times_text: str) -> str | None:
 
 def verdict(results: dict[str, str], tests: dict, *, empty: bool = False, failed_step: str | None = None) -> dict:
     """Judge one graded run. `results` are the test results, `tests` the two lists of tests.json,
-    `failed_step` the reason of a step that failed before the tests (see _STEP_REASONS)."""
+    `failed_step` the reason of a step that failed before the tests (see _STEP_REASONS), or
+    "tests timed out"."""
     f2p, p2p = tests.get("fail_to_pass", []), tests.get("pass_to_pass", [])
     missed = [t for t in f2p + p2p if results.get(t) != PASS]
     if failed_step:
@@ -206,7 +131,12 @@ def load_tests(recipe: Recipe, task: Task) -> dict:
     path = tests_path(recipe, task)
     if not path.exists():
         raise GenerateError(f"{task.id}: no tests.json; validate the task with cmeval generate first ({path})")
-    return json.loads(path.read_text(encoding="utf-8"))
+    tests = json.loads(path.read_text(encoding="utf-8"))
+    # The lists are only good for the recipe and the task that they were made from.
+    if tests.get("fingerprint") != validation_fingerprint(recipe, task, tests.get("repeats")):
+        raise GenerateError(f"{task.id}: tests.json was made from another version of the recipe or the task; "
+                            f"run cmeval generate again ({path})")
+    return tests
 
 
 def grade(recipe: Recipe, task: Task, agent_patch: str, out: Path, cpus: int = 8) -> dict:
@@ -216,6 +146,9 @@ def grade(recipe: Recipe, task: Task, agent_patch: str, out: Path, cpus: int = 8
     tag = task_tag(recipe, task)
     if not image_exists(tag):
         raise GenerateError(f"{task.id}: image {tag} does not exist; build it with cmeval generate")
+    if image_label(tag) != image_fingerprint(recipe, task):
+        raise GenerateError(f"{task.id}: image {tag} was built from another version of the recipe or the task; "
+                            "run cmeval generate again")
     # The hidden test files win over the agent's version of them.
     patch = drop_files(agent_patch, patch_files(task.test_patch or ""))
     empty = is_empty(patch)
@@ -227,21 +160,19 @@ def grade(recipe: Recipe, task: Task, agent_patch: str, out: Path, cpus: int = 8
     (out / "run.sh").write_text(_grade_script(recipe, task, has_agent_patch=not empty), encoding="utf-8")
     # Each suite has its own limit inside the container. One more limit is for the patches and the refresh.
     limit = recipe.timeout_min * 60 * (len(recipe.suites) + 1)
-    name = f"cmeval-grade-{uuid.uuid4().hex[:12]}"
     start = time.monotonic()
-    try:
-        _run(["docker", "run", "--rm", "--name", name, "--network", "none", f"--cpus={cpus}", "-v", f"{out}:/work",
-              tag, "bash", "/work/run.sh"], log=out / "docker.log", timeout=limit)
-    except subprocess.TimeoutExpired:
-        # The container does not stop when its client is killed.
-        _run(["docker", "rm", "-f", name])
+    finished = run_in_container(tag, out, prefix="cmeval-grade", limit=limit, cpus=cpus)
     seconds = time.monotonic() - start
 
     times_text = (out / "times.txt").read_text(encoding="utf-8") if (out / "times.txt").exists() else ""
-    run_ms = [int(parts[2]) for parts in (line.split() for line in times_text.splitlines())
-              if len(parts) == 3 and parts[0] == "grade"]
-    record = verdict(read_results(out, "grade"), tests, empty=empty, failed_step=_failed_step(times_text))
-    record.update(grade_s=round(seconds, 1), test_run_s=round(run_ms[0] / 1000, 1) if run_ms else None)
+    runs = [run for run in read_times(out) if run.name == "grade"]
+    failed_step = _failed_step(times_text)
+    if failed_step is None and (not finished or any(run.timed_out for run in runs)):
+        failed_step = "tests timed out"
+    unreadable: list[Path] = []
+    record = verdict(read_results(out, "grade", unreadable), tests, empty=empty, failed_step=failed_step)
+    record.update(grade_s=round(seconds, 1), test_run_s=round(sum(run.ms for run in runs) / 1000, 1) if runs else None,
+                  junit_unreadable=len(unreadable))
     (out / "grade.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return record
 

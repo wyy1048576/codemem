@@ -178,7 +178,7 @@ def test_grade_script_with_an_agent_patch(make_task):
     assert "echo 'test patch failed' >> /work/times.txt" in lines[3]
     assert lines[4] == "python -c 'import pkg' >> /work/refresh.log 2>&1 || echo \"refresh failed\" >> /work/times.txt"
     assert "/work/grade.0.xml" in lines[5] and "'pkg/tests/test_core.py'" in lines[5]
-    assert 'echo "grade $rc' in lines[5]
+    assert 'echo "grade 0 $r ' in lines[5]
     assert len(lines) == 6
 
 
@@ -290,7 +290,7 @@ def _local_docker(monkeypatch, tmp_path):
     (shims / "timeout").write_text('#!/bin/sh\nshift 3\nexec "$@"\n')
     (shims / "timeout").chmod(0o755)
     monkeypatch.setenv("PATH", f"{shims}:{os.environ['PATH']}")
-    real_run = e2e._run
+    real_run = gen._run
 
     def fake_run(cmd, **kwargs):
         if cmd[:2] != ["docker", "run"]:
@@ -302,21 +302,30 @@ def _local_docker(monkeypatch, tmp_path):
         script.write_text(open(f"{work}/run.sh").read().replace("/testbed", str(testbed)).replace("/work", work))
         return real_run(["bash", str(script)], **kwargs)
 
-    monkeypatch.setattr(e2e, "_run", fake_run)
+    monkeypatch.setattr(gen, "_run", fake_run)
     monkeypatch.setattr(e2e, "image_exists", lambda tag: True)
 
 
-def _local_task(make_task):
+def _write_tests(recipe, task, fail_to_pass, pass_to_pass=(), repeats=3):
+    """A tests.json as a validation with this recipe writes it."""
+    gen.task_dir(recipe, task).mkdir(parents=True, exist_ok=True)
+    gen.tests_path(recipe, task).write_text(json.dumps({
+        "fingerprint": gen.validation_fingerprint(recipe, task, repeats), "repeats": repeats,
+        "fail_to_pass": list(fail_to_pass), "pass_to_pass": list(pass_to_pass)}))
+
+
+def _local_task(make_task, monkeypatch):
     recipe = _recipe(test=LOCAL_TEST, refresh=("true",))
     task = make_task(patch=MODIFY, test_patch=TEST_PATCH)
-    gen.task_dir(recipe, task).mkdir(parents=True)
-    gen.tests_path(recipe, task).write_text(json.dumps({"fail_to_pass": ["t::new"], "pass_to_pass": []}))
+    _write_tests(recipe, task, ["t::new"])
+    # The image has the label of this recipe and task.
+    monkeypatch.setattr(e2e, "image_label", lambda tag: gen.image_fingerprint(recipe, task))
     return recipe, task
 
 
 def test_grade_locally(make_task, tmp_path, monkeypatch):
     _local_docker(monkeypatch, tmp_path)
-    recipe, task = _local_task(make_task)
+    recipe, task = _local_task(make_task, monkeypatch)
     out = tmp_path / "out"
 
     record = e2e.grade(recipe, task, MODIFY, out)
@@ -339,12 +348,69 @@ def test_grade_locally(make_task, tmp_path, monkeypatch):
     assert record["reason"] == "changes do not apply"
 
     broken = _recipe(test=LOCAL_TEST, refresh=("false",))
+    _write_tests(broken, task, ["t::new"])
     assert e2e.grade(broken, task, MODIFY, out)["reason"] == "build failed"
+
+
+def test_grade_refuses_stale_tests_and_images(make_task, tmp_path, monkeypatch):
+    recipe = _recipe()
+    task = make_task(patch=MODIFY, test_patch=TEST_PATCH)
+    monkeypatch.setattr(e2e, "image_exists", lambda tag: True)
+    monkeypatch.setattr(e2e, "image_label", lambda tag: gen.image_fingerprint(recipe, task))
+    monkeypatch.setattr(gen, "_run", lambda cmd, **kwargs: pytest.fail(f"no container may start: {cmd}"))
+    # A tests.json from before fingerprints.
+    gen.task_dir(recipe, task).mkdir(parents=True)
+    gen.tests_path(recipe, task).write_text(json.dumps(TESTS))
+    with pytest.raises(gen.GenerateError, match="run cmeval generate again"):
+        e2e.grade(recipe, task, MODIFY, tmp_path / "out")
+    # A tests.json from another test command, or from another test patch.
+    _write_tests(_recipe(test="pytest -x {files} --junitxml={junit}"), task, ["t::new"])
+    with pytest.raises(gen.GenerateError, match="another version of the recipe or the task"):
+        e2e.load_tests(recipe, task)
+    _write_tests(recipe, make_task(patch=MODIFY, test_patch=TEST_PATCH + "\n"), ["t::new"])
+    with pytest.raises(gen.GenerateError, match="another version"):
+        e2e.load_tests(recipe, task)
+    _write_tests(recipe, task, ["t::new"])
+    assert e2e.load_tests(recipe, task)["fail_to_pass"] == ["t::new"]
+    # An image without the label, or with the label of another build.
+    for label in (None, gen.image_fingerprint(_recipe(build=("make",)), task)):
+        monkeypatch.setattr(e2e, "image_label", lambda tag, label=label: label)
+        with pytest.raises(gen.GenerateError, match=r"image .* was built from another version"):
+            e2e.grade(recipe, task, MODIFY, tmp_path / "out")
+
+
+def test_grade_locally_with_a_suite_that_times_out(make_task, tmp_path, monkeypatch):
+    _local_docker(monkeypatch, tmp_path)
+    recipe, task = _local_task(make_task, monkeypatch)
+    (tmp_path / "shims" / "timeout").write_text("#!/bin/sh\nexit 124\n")
+    record = e2e.grade(recipe, task, MODIFY, tmp_path / "out")
+    assert not record["completed"] and record["reason"] == "tests timed out"
+    assert "grade 0 124 " in (tmp_path / "out" / "times.txt").read_text()
+
+
+def test_validate_locally_then_grade(make_task, tmp_path, monkeypatch):
+    _local_docker(monkeypatch, tmp_path)
+    recipe, task = _local_task(make_task, monkeypatch)
+    gen.tests_path(recipe, task).unlink()
+    record = gen.validate_task(recipe, task, "cmeval-env/r:x")
+    assert record["valid"] and record["reason"] == "ok", record
+    assert record["fail_to_pass"] == ["t::new"] and record["fail_to_pass_failed_before"] == 1
+    assert record["slowest_test_run_s"] is not None and record["timed_out"] == []
+    times = gen.read_times(gen.task_dir(recipe, task) / "work")
+    # One line for each suite of each run. The local test command writes its failure to the XML and exits 0.
+    assert [(run.name, run.suite, run.exit_code) for run in times] == (
+        [(f"{phase}-{i}", 0, 0) for phase in ("before", "after") for i in (1, 2, 3)])
+    # The tests.json of the validation is good for the grader.
+    assert e2e.grade(recipe, task, MODIFY, tmp_path / "out")["completed"]
+    # A refresh that fails gives a fixed reason, and no tests.json.
+    record = gen.validate_task(_recipe(test=LOCAL_TEST, refresh=("false",)), task, "cmeval-env/r:x")
+    assert not record["valid"] and record["reason"] == "refresh failed"
+    assert not gen.tests_path(recipe, task).exists()
 
 
 def test_grader_check_locally(make_task, tmp_path, monkeypatch):
     _local_docker(monkeypatch, tmp_path)
-    recipe, task = _local_task(make_task)
+    recipe, task = _local_task(make_task, monkeypatch)
     seen = []
     records = e2e.grader_check(recipe, [task], progress=seen.append)
     assert records[0]["passed"] and records[0]["problem"] == "ok"
