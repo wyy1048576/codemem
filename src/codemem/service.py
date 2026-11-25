@@ -491,8 +491,8 @@ class CodememService:
         search waits for what is still loading at a start only within `catchup_budget_ms` too: the
         embedding model (about 7 s on an M1), and the search indexes (read from their files, or
         rebuilt from the stored vectors on the first start after the search index changed, which
-        takes half a minute for 200,000 vectors in the compact form). If they are not ready by
-        then, or will not be, the search uses keywords alone and says so."""
+        takes half a minute for 200,000 vectors in the compact form, with FAISS on one thread).
+        If they are not ready by then, or will not be, the search uses keywords alone and says so."""
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
         freshness = self.catch_up() if self._worker is not None or self._watcher is not None else Freshness()
         loading = not wait_for_models and "signals" not in kwargs and not (
