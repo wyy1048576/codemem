@@ -10,8 +10,8 @@ from cmeval import cli, proxy
 from cmeval.cli import main
 from cmeval.proxy import AnswerReader, RecordingProxy, SSEParser, cross_check, merge_usage, summarize
 
-SECRET = "sk-ant-oat01-NOT-A-REAL-TOKEN-7f3a9c"
-API_KEY = "sk-ant-api03-NOT-A-REAL-KEY-51bd"
+SECRET = "FAKE-LOGIN-VALUE-7f3a9c"
+API_KEY = "FAKE-KEY-VALUE-51bd"
 MODEL = "claude-opus-4-5-20251101"
 
 
