@@ -14,7 +14,9 @@ import pytest
 from codemem import vectorcache
 from codemem.config import Config, config_from_dict
 from codemem.indexer import Indexer
+from codemem.render import format_status
 from codemem.schema import text_hash
+from codemem.service import CodememService
 from codemem.store import Store
 from codemem.vectorcache import CACHE_FILE, ROW_FORMAT_FILE, VectorCache, machine_cache
 
@@ -676,3 +678,25 @@ def test_the_configured_cap_reaches_the_cache_and_an_update_enforces_it(sample_r
     fake_config.vector_cache = "off"
     assert indexer.vector_cache() is None
     store.close()
+
+
+def test_status_shows_the_cache(sample_repo, tmp_path, fake_config):
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=fake_config)
+    try:
+        svc.update()
+        info = svc.status()
+        cache = info["vector_cache"]
+        assert cache["entries"] == sum(info["vectors"].values()) > 0 and cache["max_bytes"] == 8_000_000_000
+        assert cache["bytes"] == os.path.getsize(cache["path"]) and cache["embedders"]["fake:64|doc"]["dim"] == 64
+        line = next(line for line in format_status(info).splitlines() if line.startswith("vector cache"))
+        assert line == f"vector cache: {cache['entries']} vectors, {cache['bytes'] / 1e3:.1f} KB of 8.0 GB, in {cache['path']}"
+        fake_config.vector_cache_max_gb = 0
+        assert "KB (no cap), in " in format_status(svc.status())
+        fake_config.vector_cache = "off"
+        assert svc.status()["vector_cache"] is None and "vector cache: off" in format_status(svc.status())
+        fake_config.vector_cache = "global"
+        with open(cache["path"], "wb") as f:
+            f.write(b"not a database" * 100)
+        assert f"vector cache: cannot be read ({cache['path']})" in format_status(svc.status())
+    finally:
+        svc.close()

@@ -99,6 +99,8 @@ def format_status(info: dict[str, Any]) -> str:
     emb = info.get("embedding") or {}
     if emb.get("provider", "local") != "local":
         lines.append(f"embeddings: remote, {emb.get('model')} at {emb.get('host')} (code is sent there to be embedded)")
+    if "vector_cache" in info:
+        lines.append(_cache_line(info["vector_cache"]))
     lines.append(f"indexed commit: {info['indexed_commit'] or '-'}")
     if "age_seconds" in info:
         lines.append(f"last indexed: {info['age_seconds']:.0f}s ago")
@@ -121,7 +123,19 @@ _REASONS = {"too_large": "too large", "parse_errors": "with parse errors"}  # th
 
 
 def _size(n: int) -> str:
+    if n >= 1e9:
+        return f"{n / 1e9:.1f} GB"
     return f"{n / 1e6:.1f} MB" if n >= 1e6 else f"{n / 1e3:.1f} KB"
+
+
+def _cache_line(cache: dict[str, Any] | None) -> str:
+    """The machine's vector cache (`VectorCache.stats()`): how many vectors, its size and its cap."""
+    if cache is None:
+        return "vector cache: off"
+    if cache["entries"] is None:
+        return f"vector cache: cannot be read ({cache['path']})"
+    cap = f"of {_size(cache['max_bytes'])}" if cache["max_bytes"] else "(no cap)"
+    return f"vector cache: {cache['entries']} vectors, {_size(cache['bytes'])} {cap}, in {cache['path']}"
 
 
 def _files(n: int) -> str:
