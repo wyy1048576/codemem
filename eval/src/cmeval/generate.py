@@ -38,6 +38,7 @@ import json
 import os
 import random
 import re
+import shlex
 import shutil
 import subprocess
 import threading
@@ -395,9 +396,10 @@ def _script(recipe: Recipe, task: Task, repeats: int) -> str:
     def runs(phase: str) -> str:
         lines = []
         for i in range(1, repeats + 1):
+            # The command goes through a shell, so it can start with variables and use pipes.
             parts = "; ".join(
-                f"timeout -k 30 {limit} {test.replace('{junit}', f'/work/{phase}-{i}.{k}.xml')}"
-                f" > /work/{phase}-{i}.{k}.log 2>&1; rc=$((rc > $? ? rc : $?))" for k, test in commands)
+                f"timeout -k 30 {limit} bash -c {shlex.quote(test.replace('{junit}', f'/work/{phase}-{i}.{k}.xml'))}"
+                f" > /work/{phase}-{i}.{k}.log 2>&1; r=$?; rc=$((rc > r ? rc : r))" for k, test in commands)
             lines.append(
                 f"s=$(date +%s%N); rc=0; {parts}; "
                 f"e=$(date +%s%N); echo \"{phase} {i} $rc $(( (e - s) / 1000000 ))\" >> /work/times.txt"
