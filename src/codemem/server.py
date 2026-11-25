@@ -70,7 +70,7 @@ def build_server(service: CodememService) -> MCPServer:
     def index_status() -> str:
         info = service.status(check_staleness=True)
         return format_status(info) + "\n\n" + json.dumps(
-            {k: info.get(k) for k in ("state", "progress", "chunks", "vectors", "stale")}, default=str
+            {k: info.get(k) for k in ("state", "progress", "chunks", "vectors", "search_index", "stale")}, default=str
         )
 
     return server

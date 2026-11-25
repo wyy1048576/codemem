@@ -96,6 +96,13 @@ def format_status(info: dict[str, Any]) -> str:
     lines.append(f"vectors: {json.dumps(info['vectors'])}")
     for vec_type, m in info["models"].items():
         lines.append(f"  {vec_type}: {m['model']} (dim {m['dim']})")
+    if index := info.get("search_index"):
+        lines.append(f"search index: {_index_name(index['index'])} ({index['why']})")
+        for vec_type, t in index["types"].items():
+            memory = "" if t.get("memory_mb") is None else f", about {t['memory_mb']:,.0f} MB in memory"
+            lines.append(f"  {vec_type}: {t['vectors']:,} vectors{memory}")
+        if later := index.get("next"):
+            lines.append(f"  from the next start: {_index_name(later['index'])} ({later['why']})")
     emb = info.get("embedding") or {}
     if emb.get("provider", "local") != "local":
         lines.append(f"embeddings: remote, {emb.get('model')} at {emb.get('host')} (code is sent there to be embedded)")
@@ -115,6 +122,10 @@ def format_status(info: dict[str, Any]) -> str:
     if info.get("error"):
         lines.append(f"error: {info['error']}")
     return "\n".join(lines)
+
+
+def _index_name(backend: str) -> str:
+    return {"faiss": "exact (faiss)", "compact": "compact"}.get(backend, backend)
 
 
 _REASONS = {"too_large": "too large", "parse_errors": "with parse errors"}  # the rest read as they are

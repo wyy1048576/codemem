@@ -158,12 +158,15 @@ def test_config_parses_embedder_version_and_backend():
     assert cfg.vectors["code"].embedder == "pkg.emb:Mine" and cfg.vectors["code"].version == "run-3"
     assert cfg.vectors["code"].model == DEFAULT_MODEL
     assert cfg.vectors["usage"].embedder is None and cfg.vectors["usage"].version is None
-    assert Config().vector_backend == "faiss"
+    assert Config().vector_backend == "auto" and Config().vector_memory_mb == 0
 
 
 @pytest.mark.parametrize("raw, message", [
     ({"vectors": {"code": {"embedder": "no_colon"}}}, "embedder must be 'module:Class'"),
-    ({"vector_backend": "lancedb"}, "vector_backend must be faiss"),
+    ({"vector_backend": "lancedb"}, "vector_backend must be auto, faiss, compact"),
+    ({"vector_memory_mb": -1}, "vector_memory_mb must be a whole number"),
+    ({"vector_memory_mb": 0.5}, "vector_memory_mb must be a whole number"),
+    ({"vector_memory_mb": True}, "vector_memory_mb must be a whole number"),
     ({"vectors": {"code": {"modle": "x"}}}, "unknown \\[vectors.code\\] settings"),
     ({"vectors": {"summary": {"enabled": True}}}, "have no text builder"),  # a type without a text builder
 ])
@@ -180,8 +183,54 @@ def test_defaults_keep_their_ids_so_existing_indexes_stay_valid():
     assert config_from_dict({"vectors": {"summary": {"enabled": False}}}).enabled_vec_types() == ["code", "usage"]
     assert cfg.model_id("code") == DEFAULT_MODEL
     assert Config(embedding_dim=256).model_id("code") == f"{DEFAULT_MODEL}@256"
-    assert "vector_backend" not in cfg.index_settings()
     assert SentenceTransformerEmbedder(DEFAULT_MODEL, device="cpu").key == f"{DEFAULT_MODEL}|doc|L1024|float32|cpu"
+    # The index settings of a configuration that sets nothing, written out: they are what they
+    # were before a search index could be chosen. The eval hashes them into its index keys.
+    assert cfg.index_settings() == config_from_dict({}).index_settings() == {
+        "text_format": 3,
+        "chunker": 2,
+        "vectors": {"code": {"model": "jinaai/jina-code-embeddings-0.5b"}, "usage": {"model": "jinaai/jina-code-embeddings-0.5b"}},
+        "embedding_dim": None,
+        "dtype": "auto",
+        "batch_size": 16,
+        "max_seq_length": 1024,
+        "bm25_stem": False,
+        "bm25_stopwords": False,
+        "max_defs_per_name": 5,
+        "max_usage_items": 20,
+        "include_commits": False,
+        "max_file_size": 10000000,
+        "ignore": [],
+        "use_default_ignore": True,
+        "skip_generated": True,
+        "languages": None,
+        "code_header": True,
+        "window_chars": 2976,
+        "window_overlap_lines": 3,
+        "max_block_lines": 200,
+    }
+
+
+def test_the_search_index_is_in_the_index_settings_only_where_it_is_named():
+    def settings(backend, **compact):
+        return config_from_dict({"vector_backend": backend, "compact": compact}).index_settings()
+
+    usual = Config(vector_backend="auto").index_settings()
+    assert "vector_backend" not in usual and "compact" not in usual
+    # `auto` named, and the compact options written out at their defaults: the same index
+    assert settings("auto") == settings("auto", bits=4, dim=0, rescore=200) == usual
+    # a backend that is named gets its own index
+    for backend in ("faiss", "compact", "pkg.mod:Store"):
+        assert settings(backend) == {**usual, "vector_backend": backend}
+    # and so do the compact index's options that differ from their defaults, those only, where
+    # the backend can use them
+    assert settings("auto", bits=2) == {**usual, "compact": {"bits": 2}}
+    assert settings("compact", bits=2, dim=0, rescore=500) == {
+        **usual, "vector_backend": "compact", "compact": {"bits": 2, "rescore": 500}}
+    assert settings("faiss", dim=256) == settings("faiss")
+    # the budget `auto` picks by is no index-time setting: the index stores nothing of it
+    assert config_from_dict({"vector_backend": "auto", "vector_memory_mb": 64}).index_settings() == usual
+    assert json.loads(json.dumps(usual)) == usual  # plain values: the indexer stores them as JSON
 
 
 def test_model_id_includes_version_and_plugin():
@@ -383,7 +432,7 @@ def test_saved_indexes_from_before_backends_load_as_faiss(sample_repo, tmp_path,
         raise AssertionError("the saved FAISS file should have been used")
 
     monkeypatch.setattr(Store, "_rebuild", no_rebuild)
-    store = Store(tmp_path / "index")
+    store = Store(tmp_path / "index", vector_backend="faiss")
     assert _scores(store, recorder) == want
     store.close()
 

@@ -842,6 +842,7 @@ def test_config_reads_the_compact_table():
     default = config_from_dict({"vector_backend": "compact"})
     assert default.vector_options() == {"bits": 4, "dim": 0, "rescore": 200}
     assert Config(vector_backend="faiss").vector_options() == {}
+    assert Config(vector_backend="auto").vector_options() == {"bits": 4, "dim": 0, "rescore": 200}  # for when it picks compact
     assert config_from_dict({"vector_backend": "faiss", "compact": {"dim": 64}}).vector_options() == {}
 
 
@@ -856,19 +857,6 @@ def test_config_reads_the_compact_table():
 def test_bad_compact_settings_are_refused_when_the_config_is_read(table, message):
     with pytest.raises(ValueError, match=message):
         config_from_dict({"vector_backend": "compact", "compact": table})
-
-
-def test_compact_settings_are_index_settings_only_for_the_compact_backend():
-    plain = Config(vector_backend="faiss").index_settings()
-    assert "compact" not in plain and "vector_backend" not in plain
-    unused = config_from_dict({"vector_backend": "faiss", "compact": {"dim": 256}})
-    assert unused.index_settings() == plain  # options of a backend that is not in use change nothing
-    a = config_from_dict({"vector_backend": "compact"}).index_settings()
-    b = config_from_dict({"vector_backend": "compact", "compact": {"dim": 256}}).index_settings()
-    assert a["vector_backend"] == "compact" and a["compact"] == {"bits": 4, "dim": 0, "rescore": 200}
-    assert b["compact"]["dim"] == 256
-    rest = lambda settings: {k: v for k, v in settings.items() if k not in ("compact", "vector_backend")}  # noqa: E731
-    assert rest(a) == rest(b) == plain and b["vector_backend"] == "compact"
 
 
 def test_switching_to_compact_and_changing_its_options_re_embeds_nothing(sample_repo, tmp_path, fake_config, recorder):

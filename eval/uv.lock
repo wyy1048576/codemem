@@ -250,7 +250,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "faiss-cpu", specifier = ">=1.9" },
+    { name = "faiss-cpu", specifier = ">=1.15.1" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pathspec", specifier = ">=0.12" },

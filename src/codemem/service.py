@@ -87,6 +87,7 @@ class CodememService:
         self.store = Store(
             self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords,
             vector_backend=self.config.vector_backend, vector_options=self.config.vector_options(),
+            vector_memory_mb=self.config.vector_memory_mb,
         )
         self.state = "ready" if self.has_index() else "empty"
         self.progress = 0.0
@@ -338,9 +339,10 @@ class CodememService:
             return
         if new != self.config:
             log.info("the config changed; the index follows it")
-            if (new.vector_backend, new.vector_options()) != (self.store.vector_backend, self.store.vector_options):
+            asked = (new.vector_backend, new.vector_options(), new.vector_memory_mb)
+            if asked != (self.store.vector_backend, self.store.vector_options, self.store.vector_memory_mb):
                 try:
-                    self.store.use_vector_backend(new.vector_backend, new.vector_options())
+                    self.store.use_vector_backend(*asked)
                 except Exception:
                     log.exception("could not load vector_backend %r; keeping the current config", new.vector_backend)
                     return
@@ -563,6 +565,7 @@ class CodememService:
                 }
                 for v in self.config.enabled_vec_types()
             },
+            "search_index": store.search_index_status(),
             "indexed_commit": store.get_meta("indexed_commit"),
             "indexed_at": store.get_meta("indexed_at"),
             "last_update": store.get_meta("last_update"),

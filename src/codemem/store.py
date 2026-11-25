@@ -41,7 +41,7 @@ from typing import Any, NamedTuple
 import faiss
 import numpy as np
 
-from .config import COMPACT_MAX_DIM
+from .config import COMPACT_MAX_DIM, DEFAULT_VECTOR_BACKEND, vector_memory_budget
 from .plugins import load_object
 from .schema import CALLABLE_KINDS, Chunk
 from .texts import Ref
@@ -204,6 +204,15 @@ class VectorStore(ABC):
     def from_bytes(cls, data: bytes) -> VectorStore:
         raise NotImplementedError(f"{cls.__name__} is not saved")
 
+    @classmethod
+    def bytes_per_vector(cls, dim: int, **options: Any) -> int | None:
+        """About how much memory one vector of `dim` numbers takes in this index, with the 32
+        bytes the store keeps of where it came from. None when a backend does not say."""
+        return None
+
+
+_OWNER_BYTES = 32  # what the store keeps in memory of where a vector came from (_TypeIndex)
+
 
 class FaissVectorStore(VectorStore):
     """Exact inner-product search; IndexIDMap2 so the vector id is the FAISS id. It keeps each
@@ -211,6 +220,13 @@ class FaissVectorStore(VectorStore):
     bytes would hold the same values at twice the memory."""
 
     suffix = ".faiss"
+
+    @classmethod
+    def bytes_per_vector(cls, dim: int, **options: Any) -> int:
+        # Measured: a process keeps 1,853 bytes per vector of 896 numbers (200,000 vectors). That is
+        # 1,792 for the numbers, 8 for the id, 32 for where the vector came from, and 21 that
+        # FAISS's id map takes: 32 beside the numbers, taken a little high.
+        return 2 * dim + 32 + _OWNER_BYTES
 
     def __init__(self, dim: int, index: Any = None):
         self.dim = dim
@@ -281,11 +297,15 @@ _NO_THRESHOLD = -1e30  # below every estimate: FAISS's range search then returns
 _RABITQ_SINCE = (1, 15, 1)  # the FAISS those calls were checked against (docs/decisions.md §2)
 
 
-def _require_rabitq() -> None:
-    """One sentence, not a native crash, when the installed FAISS is not one the compact index
-    was checked against."""
+def _has_rabitq() -> bool:
+    """Whether the installed FAISS is one the compact index was checked against."""
     version = tuple(int(part) for part in faiss.__version__.split(".")[:3] if part.isdigit())
-    if version < _RABITQ_SINCE or not hasattr(faiss, "IndexRaBitQ"):
+    return version >= _RABITQ_SINCE and hasattr(faiss, "IndexRaBitQ")
+
+
+def _require_rabitq() -> None:
+    """One sentence, not a native crash, when the installed FAISS cannot make the compact index."""
+    if not _has_rabitq():
         raise RuntimeError(
             f'vector_backend = "compact" needs FAISS {".".join(map(str, _RABITQ_SINCE))} or newer for its RaBitQ '
             f"codes; this is FAISS {faiss.__version__}"
@@ -369,6 +389,15 @@ class CompactVectorStore(VectorStore):
     def code_bytes(self) -> int:
         """Bytes of codes per vector."""
         return sum(index.code_size for index in self._indexes)
+
+    @classmethod
+    def bytes_per_vector(cls, index_dim: int, *, bits: int = 4, dim: int = 0, rescore: int = 200) -> int:
+        # The codes, 8 bytes of id and 32 of where the vector came from. Measured at 896 numbers
+        # and 4 bits: 657 bytes kept per vector for 628 counted this way; the rest is the rotation
+        # (4 bytes for each number, squared, once in the process) and the allocator's slack.
+        code_dim = min(index_dim, dim or index_dim, COMPACT_MAX_DIM)
+        codes = sum(faiss.IndexRaBitQ(code_dim, faiss.METRIC_INNER_PRODUCT, b).code_size for b in {1, bits})
+        return codes + 8 + _OWNER_BYTES
 
     def bind(self, fetch: Fetch) -> None:
         self._fetch = fetch
@@ -547,6 +576,18 @@ class CompactVectorStore(VectorStore):
             loaded.append(index)
         store._coarse, store._fine = loaded[0], (loaded[1] if len(loaded) > 1 else None)
         return store
+
+
+class _InUse(NamedTuple):
+    """The search index a store's vector types are searched with."""
+
+    name: str  # faiss | compact | "module:Class"
+    options: dict[str, Any]
+    cls: type[VectorStore]
+    why: str  # the reason, for `codemem status`
+
+
+_BACK_TO_EXACT = 0.8  # `auto`: an index that is compact goes back to exact only under this share of the budget
 
 
 def vector_backend_class(name: str) -> type[VectorStore]:
@@ -837,13 +878,17 @@ def _batches(items: Sequence[Any], size: int = 500) -> Iterator[Sequence[Any]]:
 class Store:
     def __init__(
         self, index_dir: Path | str, *, bm25_stem: bool = False, bm25_stopwords: bool = False,
-        vector_backend: str = "faiss", vector_options: Mapping[str, Any] | None = None,
+        vector_backend: str = DEFAULT_VECTOR_BACKEND, vector_options: Mapping[str, Any] | None = None,
+        vector_memory_mb: int = 0,
     ):
-        """`vector_options` are the backend's own settings, passed to it by keyword when it is
-        built and when its saved file is read (Config.vector_options())."""
+        """`vector_backend` is `auto`, `faiss`, `compact` or "module:Class". `vector_options` are
+        a backend's own settings, passed to it by keyword when it is built and when its saved
+        file is read (Config.vector_options()): for `auto`, the compact index's, used when that
+        is the index it picks. `vector_memory_mb` is the budget `auto` picks by (_pick)."""
         self.vector_backend = vector_backend
         self.vector_options = dict(vector_options or {})
-        self._backend = vector_backend_class(vector_backend)
+        self.vector_memory_mb = vector_memory_mb
+        self._in_use = self._named()  # None for `auto`, until the first index is loaded or built
         self.index_dir = Path(index_dir)
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.index_dir / "index.db"
@@ -1403,7 +1448,7 @@ class Store:
 
     # ---- vectors: bookkeeping
     def _data_path(self, vec_type: str) -> Path:
-        return self.index_dir / f"vec_{vec_type}{self._backend.suffix}"
+        return self.index_dir / f"vec_{vec_type}{self._search_index().cls.suffix}"
 
     def _note_path(self, vec_type: str) -> Path:
         return self.index_dir / f"vec_{vec_type}.json"
@@ -1425,13 +1470,90 @@ class Store:
         by id."""
         return self.get_meta("database_id")
 
-    def use_vector_backend(self, name: str, options: Mapping[str, Any] | None = None) -> None:
-        """Search with another backend, or other options of the same one, from now on. Each vector
-        type's index is rebuilt from the stored vectors when it is next used; nothing is re-embedded."""
-        backend = vector_backend_class(name)
+    def use_vector_backend(
+        self, name: str, options: Mapping[str, Any] | None = None, memory_mb: int | None = None
+    ) -> None:
+        """Search with another backend, other options of the same one, or another budget for
+        `auto`, from now on. Each vector type's index is loaded or rebuilt from the stored vectors
+        when it is next used; nothing is re-embedded."""
+        vector_backend_class("faiss" if name == "auto" else name)  # a backend that does not load is refused here
         with self._vec_lock:
-            self.vector_backend, self.vector_options, self._backend = name, dict(options or {}), backend
+            self.vector_backend, self.vector_options = name, dict(options or {})
+            if memory_mb is not None:
+                self.vector_memory_mb = memory_mb
+            self._in_use = self._named()
             self._types.clear()
+
+    def _named(self) -> _InUse | None:
+        """The backend the configuration names, or None for `auto`."""
+        if self.vector_backend == "auto":
+            return None
+        cls = vector_backend_class(self.vector_backend)
+        return _InUse(self.vector_backend, self.vector_options, cls, f'vector_backend = "{self.vector_backend}"')
+
+    def _search_index(self) -> _InUse:
+        """What this store's vector types are searched with: the backend the configuration names,
+        or what `auto` picked. `auto` picks once, when the first index is loaded or built, and
+        the pick holds while the store is open: an index that grows past the budget meanwhile
+        stays as it is until the next start (or the next update that saves)."""
+        with self._vec_lock:
+            if self._in_use is None:
+                self._in_use = self._pick(self._saved_as_compact())
+                log.info("search index of %s: %s (%s)", self.index_dir, self._in_use.name, self._in_use.why)
+            return self._in_use
+
+    def _exact_bytes(self) -> int:
+        """What the exact indexes of every vector type would take in memory, together."""
+        counts = self.conn.execute("SELECT vec_type, COUNT(*) FROM vectors GROUP BY vec_type").fetchall()
+        return sum(n * FaissVectorStore.bytes_per_vector(self.vector_dim(vec_type) or 0) for vec_type, n in counts)
+
+    def _saved_as_compact(self) -> bool:
+        """Whether this database's saved search indexes are compact ones."""
+        notes = (self._read_note(p.name[len("vec_"):-len(".json")]) for p in self.index_dir.glob("vec_*.json"))
+        return any(n.get("backend") == "compact" and n.get("database") == self.database_id() for n in notes if n)
+
+    def _pick(self, compact_now: bool) -> _InUse:
+        """`auto`: the exact index for every vector type while their exact indexes fit the budget
+        together, the compact one for every type when they do not. Exact is the more faithful
+        and, on an index this size, the faster of the two; compact is what keeps a large index
+        within the memory a machine can spare. An index that is compact goes back to exact only
+        well under the budget, so that one near it does not change at every start. Where the
+        installed FAISS cannot make the compact index, the pick is always exact."""
+        need = self._exact_bytes()
+        budget, of = vector_memory_budget(self.vector_memory_mb)
+        exact, limit = f"{need / 1e6:,.0f} MB", f"{budget / 1e6:,.0f} MB ({of})"
+        if not _has_rabitq():
+            fits, why = True, f"this FAISS, {faiss.__version__}, cannot make the compact index"
+        elif need <= budget * (_BACK_TO_EXACT if compact_now else 1):
+            fits, why = True, f"the exact index takes {exact}, within the budget of {limit}"
+        elif need <= budget:
+            fits = False
+            why = (f"the exact index would take {exact}: the index is compact, and goes back to exact under "
+                   f"{_BACK_TO_EXACT:.0%} of the budget of {limit}")
+        else:
+            fits, why = False, f"the exact index would take {exact}, over the budget of {limit}"
+        if fits:
+            return _InUse("faiss", {}, FaissVectorStore, f"auto: {why}")
+        return _InUse("compact", self.vector_options, CompactVectorStore, f"auto: {why}")
+
+    def search_index_status(self) -> dict[str, Any]:
+        """Which search index the vector types use, why, and about how much memory each takes
+        (for `codemem status`). `next` is set when `auto` would pick the other index now: it does
+        at the next start."""
+        use = self._search_index()
+        types: dict[str, Any] = {}
+        for vec_type, n in self.conn.execute("SELECT vec_type, COUNT(*) FROM vectors GROUP BY vec_type"):
+            per = use.cls.bytes_per_vector(self.vector_dim(vec_type) or 0, **use.options)
+            types[vec_type] = {"index": use.name, "vectors": n,
+                               "memory_mb": None if per is None else round(n * per / 1e6, 1)}
+        info: dict[str, Any] = {"setting": self.vector_backend, "index": use.name, "why": use.why, "types": types}
+        if self.vector_backend == "auto":
+            info["exact_mb"] = round(self._exact_bytes() / 1e6, 1)
+            info["budget_mb"] = round(vector_memory_budget(self.vector_memory_mb)[0] / 1e6, 1)
+            now = self._pick(use.name == "compact")
+            if now.name != use.name:
+                info["next"] = {"index": now.name, "why": now.why}
+        return info
 
     def vec_types(self) -> list[str]:
         """Vector types that have stored vectors (one index probe per known type: search calls this)."""
@@ -1697,16 +1819,16 @@ class Store:
         that is behind), and it costs only the difference instead of a full rebuild. No file, or
         one from another database, another backend or other options: None, and the index is
         rebuilt from the rows."""
+        use = self._search_index()
         note = self._read_note(vec_type)
         if (note is None or note.get("database") != self.database_id()
-                or note.get("backend", "faiss") != self.vector_backend
-                or note.get("options", {}) != self.vector_options):
+                or note.get("backend", "faiss") != use.name or note.get("options", {}) != use.options):
             return None
         path = self._noted_file(vec_type, note)
         if not path.is_file() or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder"):
             return None
         try:
-            store = self._backend.from_bytes(path.read_bytes(), **self.vector_options)
+            store = use.cls.from_bytes(path.read_bytes(), **use.options)
         except Exception:  # corrupt or partial file: rebuild from the rows
             log.exception("could not load %s; rebuilding it from the stored vectors", path)
             return None
@@ -1726,7 +1848,8 @@ class Store:
         return ti
 
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:
-        ti = _TypeIndex(dim, epoch, self._bound(self._backend(dim, **self.vector_options), dim))
+        use = self._search_index()
+        ti = _TypeIndex(dim, epoch, self._bound(use.cls(dim, **use.options), dim))
         # Straight down the table, which is in vector-id order. Through an index on the type,
         # SQLite would then sort the rows, vectors and all: 2.4 to 3.3 s to read 200,000 rows, not 0.9 s.
         rows = self.conn.execute(
@@ -1821,14 +1944,15 @@ class Store:
         with self._save_lock:
             copies = []
             with self._vec_lock:
+                use = self._search_index()
                 for vec_type, ti in sorted(self._types.items()):
                     if not ti.dirty:
                         continue
                     note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
                             "embedder": self.get_meta(f"vec.{vec_type}.embedder"), "database": self.database_id(),
-                            "backend": self.vector_backend, "file": self._data_path(vec_type).name}
-                    if self.vector_options:
-                        note["options"] = self.vector_options
+                            "backend": use.name, "file": self._data_path(vec_type).name}
+                    if use.options:
+                        note["options"] = use.options
                     copies.append((vec_type, ti.store.to_bytes(), note))
                     ti.dirty = False
             for vec_type, data, note in copies:

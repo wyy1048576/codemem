@@ -370,13 +370,14 @@ def test_a_saved_index_is_reconciled_with_the_rows(tmp_path):
     s = Store(tmp_path / "idx")
     _seed(s, ["one", "two"])
     s.save_vectors()
-    old_faiss = (tmp_path / "idx" / "vec_code.faiss").read_bytes()
+    saved = s._data_path("code")  # vec_code.faiss, or vec_code.rabitq when the index is compact
+    older = saved.read_bytes()
     vid = next(iter(s.vector_rows("code").values()))[0]
     s.delete_vectors("code", [vid])
     _seed(s, ["three"], seed=2)  # same count as before, different ids
     s.save_vectors()
     s.close()
-    (tmp_path / "idx" / "vec_code.faiss").write_bytes(old_faiss)  # older data under a newer note
+    saved.write_bytes(older)  # older data under a newer note
     s2 = Store(tmp_path / "idx")
     assert _in_sync(s2, "code")
     q = _vecs(1, seed=2)[0]
