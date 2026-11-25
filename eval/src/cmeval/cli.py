@@ -449,7 +449,8 @@ def cmd_e2e_run(args) -> int:
         for task, setup, rep in order:
             state = e2e_run.run_state(e2e_run.run_dir(args.run_id, task.id, setup, rep))
             states[state] += 1
-            print(f"{task.id} {setup} {rep} {state}")
+            index = f" index {e2e_run.index_state(recipe, task)}" if e2e_run.SETUPS[setup].codemem else ""
+            print(f"{task.id} {setup} {rep} {state}{index}")
         print(f"{len(order)} runs: {states['done']} done, {states['redo']} to do again, {states['todo']} to do")
         return 0
     with JobStatus("e2e-run", args.run_id) as status:
@@ -458,7 +459,8 @@ def cmd_e2e_run(args) -> int:
                  f"model {args.model}")
         try:
             batch = e2e_run.run_batch(recipe, ready, run_id=args.run_id, setups=setups, model=args.model,
-                                      reps=args.reps, progress=progress, status=status)
+                                      reps=args.reps, settings=e2e_run.RunSettings(), progress=progress,
+                                      status=status)
         except (gen.GenerateError, OSError) as exc:
             print(f"e2e run: {exc}", file=sys.stderr)
             status.fail(str(exc))
@@ -470,6 +472,33 @@ def cmd_e2e_run(args) -> int:
     print(f"run {args.run_id}: {batch.done} runs done, {batch.skipped} already done, {batch.discarded} discarded; "
           f"files in {e2e_run.e2e_dir() / 'runs' / args.run_id}")
     return batch.exit_code
+
+
+def cmd_e2e_index(args) -> int:
+    from . import e2e_index
+    from . import generate as gen
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        if args.id:
+            wanted = set(args.id)
+            tasks = [t for t in tasks if t.id in wanted]
+        ready = [t for t in tasks if gen.tests_path(recipe, t).exists()]
+        if len(ready) < len(tasks):
+            say(f"note: {len(tasks) - len(ready)} tasks have no tests.json (not valid or not generated); skipped")
+        if not ready:
+            print(f"e2e index: no task of {recipe.repo} in {args.tasks} has tests.json; run cmeval generate first",
+                  file=sys.stderr)
+            return 1
+        failed = e2e_index.index_tasks(recipe, ready, force=args.force, progress=say)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e index: {exc}", file=sys.stderr)
+        return 1
+    print(f"{recipe.name}: {len(ready) - failed} of {len(ready)} indexes ready in "
+          f"{e2e_index.e2e_dir() / 'indexes' / recipe.name}")
+    return 1 if failed else 0
 
 
 def cmd_e2e_score(args) -> int:
@@ -673,6 +702,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, help="at most this number of tasks")
     p.add_argument("--dry-run", action="store_true", help="print the runs and how many exist already; run nothing")
     p.set_defaults(func=cmd_e2e_run)
+    p = e2e_sub.add_parser("index", help="build the codemem index of each valid task, for runs of the setup tool")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--force", action="store_true", help="build again, also when index.json is up to date")
+    p.set_defaults(func=cmd_e2e_index)
     p = e2e_sub.add_parser("score", help="tables of an end-to-end run: completion, tokens, time, by setup")
     p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
     p.set_defaults(func=cmd_e2e_score)

@@ -8,23 +8,26 @@ from pathlib import Path
 
 import pytest
 
-from cmeval import e2e_run
+from cmeval import e2e_index, e2e_run
 from cmeval import generate as gen
 from cmeval.cli import main
 from cmeval.e2e_run import RunSettings
-from cmeval.e2e_score import score
+from cmeval.e2e_score import format_score, score
 from cmeval.tasks import save_tasks
 
 from conftest import FIXTURES
 
 STREAM = FIXTURES / "e2e_stream.jsonl"
+TOOL_STREAM = FIXTURES / "e2e_stream_tool.jsonl"
 FAKE_TOKEN = "FAKE-LOGIN-VALUE-1"
 INIT = json.loads(STREAM.read_text().splitlines()[0])
 GREP = e2e_run.SETUPS["grep"]
+TOOL = e2e_run.SETUPS["tool"]
+TOOL_INIT = json.loads(TOOL_STREAM.read_text().splitlines()[0])
 
 
-def _events():
-    return [json.loads(line) for line in STREAM.read_text().splitlines()]
+def _events(path=STREAM):
+    return [json.loads(line) for line in path.read_text().splitlines()]
 
 
 # ---- pure parts
@@ -39,8 +42,9 @@ def test_prompt_frame_v1(make_task):
 
 def test_setups_and_models():
     assert e2e_run.get_setup("grep").mcp_config == {"mcpServers": {}}
+    assert e2e_run.get_setup("tool").codemem and not e2e_run.get_setup("grep").codemem
     with pytest.raises(gen.GenerateError, match="not built yet"):
-        e2e_run.get_setup("tool")
+        e2e_run.get_setup("upfront")
     with pytest.raises(gen.GenerateError, match="no such setup"):
         e2e_run.get_setup("nope")
     e2e_run.check_model("claude-haiku-5-5")
@@ -171,7 +175,7 @@ def test_agent_script():
     assert "timeout -k 30 3000 runuser -u agent -- env -u ANTHROPIC_API_KEY HOME=/home/agent" in script
     for part in ("CLAUDE_CONFIG_DIR=/run/claude-empty", "CLAUDE_CODE_DISABLE_CLAUDE_MDS=1",
                  "CLAUDE_CODE_DISABLE_AUTO_MEMORY=1", "CLAUDE_CODE_EFFORT_LEVEL=medium", "ENABLE_TOOL_SEARCH=false",
-                 "DISABLE_AUTOUPDATER=1", 'claude -p "$(cat /out/prompt.txt)" --model claude-haiku-5-5',
+                 "DISABLE_AUTOUPDATER=1 MCP_TIMEOUT=120000 MCP_TOOL_TIMEOUT=120000", 'claude -p "$(cat /out/prompt.txt)" --model claude-haiku-5-5',
                  "--output-format stream-json --verbose --setting-sources user --strict-mcp-config "
                  "--mcp-config /tmp/mcp.json --disable-slash-commands --no-session-persistence "
                  "--exclude-dynamic-system-prompt-sections --permission-mode bypassPermissions "
@@ -261,6 +265,7 @@ def _shim(folder, name, text):
 def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PROXY_LINES, sleep=0):
     """Set up a run whose container script runs in local folders. The fake Claude Code prints the stream,
     writes the token to stderr (as an agent that runs `env` could), adds proxy lines, and edits a file."""
+    monkeypatch.delenv(e2e_run.GPUS_ENV, raising=False)
     testbed = tmp_path / "testbed"
     (testbed / "auth").mkdir(parents=True)
     (testbed / "sub" / ".claude").mkdir(parents=True)
@@ -381,6 +386,10 @@ def test_run_one_locally(make_task, tmp_path, monkeypatch):
     run = next(c for c in calls if c[:2] == ["docker", "run"])
     assert "CLAUDE_CODE_OAUTH_TOKEN" in run and not any(FAKE_TOKEN in part for part in run)
     assert ["docker", "rm", "-f", run[run.index("--name") + 1]] in calls
+    # The GPU in both setups, and no codemem mount for grep.
+    assert run[run.index("--device") + 1] == "nvidia.com/gpu=all" and run.count("-v") == 2
+    assert record["identity"]["codemem"] is None and record["integrity"]["gpus"] is True
+    assert record["outcome"]["unexpected_paths"] == []
 
 
 def test_no_file_of_a_run_holds_the_token(make_task, tmp_path, monkeypatch):
@@ -428,7 +437,7 @@ def test_run_one_preconditions(make_task, monkeypatch, tmp_path):
     with pytest.raises(gen.GenerateError, match="no tests.json"):
         e2e_run.run_one(recipe, task, setup="grep", model="claude-haiku-5-5", rep=1, out=out)
     with pytest.raises(gen.GenerateError, match="not built yet"):
-        e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out)
+        e2e_run.run_one(recipe, task, setup="upfront", model="claude-haiku-5-5", rep=1, out=out)
     assert not out.exists()
 
 
@@ -480,7 +489,7 @@ def test_cli_run_batch(make_task, tmp_path, monkeypatch, capsys):
     args = ["e2e", "run", "pandas", "--tasks", str(path), "--run-id", "b1"]
     assert main(args + ["--model", "sonnet"]) == 1
     assert "full model id" in capsys.readouterr().err
-    assert main(args + ["--setup", "tool"]) == 1
+    assert main(args + ["--setup", "upfront"]) == 1
     assert "not built yet" in capsys.readouterr().err
 
     assert main(args + ["--dry-run"]) == 0
@@ -558,3 +567,302 @@ def test_score_tables_and_paired_difference(capsys):
     out = capsys.readouterr().out
     assert "other - grep over 1 tasks: completed 0.50, tokens -400, seconds -20.0" in out
     assert main(["e2e", "score", "none"]) == 1
+
+
+# ---- the setup tool: codemem's MCP server in the container
+
+def _codemem_install(tmp_path, monkeypatch, recipe, task):
+    """Stand-ins for the codemem program in a virtual environment, its uv Python, the Hugging Face cache and the
+    task's index. Returns the checkout, the Python root, the cache and index.json."""
+    checkout = tmp_path / "codemem"
+    bin_dir = checkout / ".venv" / "bin"
+    bin_dir.mkdir(parents=True)
+    _shim(bin_dir, "codemem", "#!/bin/sh\nexit 0\n")
+    python = tmp_path / "uv" / "python" / "cpython-3.12-linux" / "bin" / "python3.12"
+    python.parent.mkdir(parents=True)
+    python.write_text("")
+    (bin_dir / "python").symlink_to(python)
+    monkeypatch.setenv("CMEVAL_CODEMEM_BIN", str(bin_dir / "codemem"))
+    hf = tmp_path / "hf"
+    hf.mkdir()
+    monkeypatch.setenv("HF_HOME", str(hf))
+    root = e2e_index.index_root(recipe, task)
+    (root / "index" / "vectors").mkdir(parents=True)
+    (root / "index" / "index.sqlite").write_bytes(b"x" * 1000)
+    (root / "index" / "vectors" / "code.faiss").write_bytes(b"y" * 500)
+    meta = {"task_id": task.id, "repo": task.repo, "base_commit": task.base_commit, "codemem_commit": "abc",
+            "seconds": 1.0, "summary": "indexed 3 files"}
+    (root / "index.json").write_text(json.dumps(meta))
+    return checkout, Path(os.path.realpath(python)).parents[1], hf, meta
+
+
+def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
+    recipe, task = gen.Recipe(name="r", repo="acme/auth", base_image="i", test="pytest"), make_task()
+    checkout, python_root, hf, meta = _codemem_install(tmp_path, monkeypatch, recipe, task)
+    codemem = e2e_run.codemem_preconditions(recipe, task, RunSettings(gpus=True))
+    assert codemem["checkout"] == checkout and codemem["python_root"] == python_root
+    assert codemem["hf_cache"] == hf and codemem["meta"] == meta and codemem["commit"] is None  # not a git checkout
+    program = str(checkout / ".venv" / "bin" / "codemem")
+    assert e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4)) == {"mcpServers": {"codemem": {
+        "command": program, "args": ["mcp", "/testbed", "--index-dir", "/cmindex"],
+        "env": {"HF_HOME": "/hf", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
+                "CODEMEM_HOME": "/home/agent/.codemem", "OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
+        "alwaysLoad": True}}}
+    assert e2e_run.codemem_mounts(codemem, Path("/runs/x/cmindex")) == [
+        "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",
+        "-v", "/runs/x/cmindex:/cmindex"]
+
+
+def test_codemem_preconditions(make_task, tmp_path, monkeypatch):
+    recipe, task = gen.Recipe(name="r", repo="acme/auth", base_image="i", test="pytest"), make_task()
+    checkout, _, hf, meta = _codemem_install(tmp_path, monkeypatch, recipe, task)
+    on = RunSettings(gpus=True)
+
+    def fails(match, settings=on):
+        with pytest.raises(gen.GenerateError, match=match):
+            e2e_run.codemem_preconditions(recipe, task, settings)
+
+    fails("needs the GPU in the container", RunSettings(gpus=False))
+    program = checkout / ".venv" / "bin" / "codemem"
+    program.chmod(0o644)
+    fails("is not executable.*run cmeval e2e index r")
+    program.chmod(0o755)
+    (program.parent / "python").unlink()
+    fails("no python beside")
+    (program.parent / "python").symlink_to("/usr/bin/python3")
+    fails("a folder of the system")
+    (program.parent / "python").unlink()
+    (program.parent / "python").symlink_to(tmp_path / "uv" / "python" / "cpython-3.12-linux" / "bin" / "python3.12")
+    monkeypatch.setenv("CMEVAL_CODEMEM_BIN", str(tmp_path / "none"))
+    fails("does not exist")
+    monkeypatch.setenv("CMEVAL_CODEMEM_BIN", str(program))
+    index_json = e2e_index.index_root(recipe, task) / "index.json"
+    index_json.write_text(json.dumps({**meta, "base_commit": "f" * 40}))
+    fails(r"no index for base commit 0123456789ab .*\(another commit\); run cmeval e2e index r first")
+    index_json.unlink()
+    fails(r"\(missing\); run cmeval e2e index r")
+    index_json.write_text(json.dumps(meta))
+    hf.rmdir()
+    fails("no Hugging Face cache")
+    hf.mkdir()
+    e2e_run.codemem_preconditions(recipe, task, on)
+
+
+def test_check_setup_of_tool_and_grep():
+    model = "claude-haiku-5-5"
+    assert e2e_run.check_setup(TOOL_INIT, TOOL, model) == []
+    failed = {**TOOL_INIT, "mcp_servers": [{"name": "codemem", "status": "failed"}]}
+    assert e2e_run.check_setup(failed, TOOL, model) == ["mcp server codemem is failed"]
+    no_tool = {**TOOL_INIT, "tools": [t for t in TOOL_INIT["tools"] if t != "mcp__codemem__search_code"]}
+    assert e2e_run.check_setup(no_tool, TOOL, model) == ["tool mcp__codemem__search_code is not loaded"]
+    assert e2e_run.check_setup({**TOOL_INIT, "mcp_servers": []}, TOOL, model) == [
+        "mcp_servers are [], expected ['codemem']"]
+    two = {**TOOL_INIT, "mcp_servers": TOOL_INIT["mcp_servers"] + [{"name": "other", "status": "connected"}]}
+    assert e2e_run.check_setup(two, TOOL, model) == ["mcp_servers are ['codemem', 'other'], expected ['codemem']"]
+    # Only the shape {"name", "status"} is accepted.
+    assert e2e_run.check_setup({**TOOL_INIT, "mcp_servers": ["codemem"]}, TOOL, model) == [
+        'mcp_servers is not a list of name and status objects: ["codemem"]']
+    # grep: no MCP server and no MCP tool.
+    assert e2e_run.check_setup(TOOL_INIT, GREP, model) == [
+        "mcp_servers are ['codemem'], expected []",
+        "mcp tools are loaded: mcp__codemem__get_chunk, mcp__codemem__index_status, mcp__codemem__refresh_index, "
+        "mcp__codemem__search_code"]
+
+
+def _spy_docker_run(monkeypatch, seen, *, fail=False):
+    """Look at the index copy while the container runs, and let codemem add a file to it."""
+    inner = e2e_run._run
+
+    def spy(cmd, **kwargs):
+        if cmd[:2] == ["docker", "run"]:
+            seen["cmd"] = cmd
+            copy = Path(next(part for part in cmd if part.endswith(":/cmindex")).rsplit(":", 1)[0])
+            seen["files"] = sorted(str(p.relative_to(copy)) for p in copy.rglob("*"))
+            seen["modes"] = {oct(p.stat().st_mode & 0o777) for p in [copy, *copy.rglob("*")]}
+            (copy / "index.sqlite-wal").write_bytes(b"z" * 100)
+            if fail:
+                raise RuntimeError("docker went away")
+        return inner(cmd, **kwargs)
+
+    monkeypatch.setattr(e2e_run, "_run", spy)
+
+
+def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
+    recipe, task, calls, graded = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events(TOOL_STREAM))
+    checkout, python_root, hf, meta = _codemem_install(tmp_path, monkeypatch, recipe, task)
+    seen = {}
+    _spy_docker_run(monkeypatch, seen)
+    out = e2e_run.run_dir("r1", task.id, "tool", 1)
+    record = e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
+                             settings=RunSettings(poll_s=0.05))
+
+    assert record["integrity"]["setup_ok"] and not record["discard"] and record["completed"] is True
+    run = seen["cmd"]
+    assert run[run.index("--device") + 1] == "nvidia.com/gpu=all"
+    assert run[run.index(f"{out}:/out") + 1:run.index(record["identity"]["image"])] == [
+        "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",
+        "-v", f"{out / 'cmindex'}:/cmindex"]
+    # The copy was there during the run, open to all users, and is gone after it.
+    assert seen["files"] == ["index.sqlite", "vectors", "vectors/code.faiss"] and seen["modes"] == {"0o666", "0o777"}
+    assert not (out / "cmindex").exists()
+    assert record["identity"]["codemem"] == {
+        "commit": None, "bin": str(checkout / ".venv" / "bin" / "codemem"), "index": meta, "steering": "default",
+        "index_bytes_before": 1500, "index_bytes_after": 1600, "index_copy_removed": True}
+    assert json.loads((out / "mcp.json").read_text())["mcpServers"]["codemem"]["alwaysLoad"] is True
+    assert record["integrity"]["gpus"] is True and record["outcome"]["unexpected_paths"] == []
+    steps = record["steps"]
+    assert steps["codemem_calls"] == 5 and steps["first_codemem_turn"] == 1
+    assert steps["mcp_tools"] == {"mcp__codemem__index_status": 1, "mcp__codemem__search_code": 2,
+                                  "mcp__codemem__get_chunk": 1, "mcp__codemem__refresh_index": 1}
+
+
+def test_run_one_removes_the_index_copy_when_it_fails(make_task, tmp_path, monkeypatch):
+    recipe, task, _, _ = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events(TOOL_STREAM))
+    _codemem_install(tmp_path, monkeypatch, recipe, task)
+    seen = {}
+    _spy_docker_run(monkeypatch, seen, fail=True)
+    out = e2e_run.run_dir("r1", task.id, "tool", 1)
+    with pytest.raises(RuntimeError, match="docker went away"):
+        e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
+                        settings=RunSettings(poll_s=0.05))
+    assert seen["files"] and not (out / "cmindex").exists()
+
+
+def test_run_one_without_gpus(make_task, tmp_path, monkeypatch):
+    recipe, task, calls, _ = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events())
+    monkeypatch.setenv(e2e_run.GPUS_ENV, "0")
+    assert RunSettings().gpus is False
+    out = e2e_run.run_dir("r1", task.id, "grep", 1)
+    record = e2e_run.run_one(recipe, task, setup="grep", model="claude-haiku-5-5", rep=1, out=out,
+                             settings=RunSettings(poll_s=0.05))
+    run = next(c for c in calls if c[:2] == ["docker", "run"])
+    assert "--device" not in run and record["integrity"]["gpus"] is False
+    _codemem_install(tmp_path, monkeypatch, recipe, task)
+    with pytest.raises(gen.GenerateError, match="needs the GPU"):
+        e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
+                        settings=RunSettings(poll_s=0.05))
+
+
+def test_unexpected_paths():
+    patch = "".join(f"diff --git a/{p} b/{p}\n--- /dev/null\n+++ b/{p}\n@@ -0,0 +1 @@\n+x\n"
+                    for p in ("auth/x.py", ".codemem/index.db", "sub/.codemem.toml", ".mcp.json"))
+    assert e2e_run.unexpected_paths(patch) == [".codemem/index.db", ".mcp.json", "sub/.codemem.toml"]
+
+
+def test_cli_dry_run_shows_the_index(make_task, tmp_path, monkeypatch, capsys):
+    path, tasks = _batch_task_file(make_task, tmp_path)
+    recipe = gen.load_recipe("pandas")
+    _codemem_install(tmp_path, monkeypatch, recipe, tasks[0])
+    args = ["e2e", "run", "pandas", "--tasks", str(path), "--run-id", "d1", "--setup", "grep", "--setup", "tool",
+            "--dry-run"]
+    assert main(args) == 0
+    assert capsys.readouterr().out.splitlines()[:4] == [
+        "pandas-dev__pandas-1 grep 1 todo", "pandas-dev__pandas-1 tool 1 todo index ok",
+        "pandas-dev__pandas-2 grep 1 todo", "pandas-dev__pandas-2 tool 1 todo index missing"]
+
+
+# ---- cmeval e2e index
+
+FAKE_CODEMEM = """#!/bin/sh
+echo "$@" >> "{calls}"
+test -f "$2/app.py" || exit 3
+mkdir -p "$4"
+echo data > "$4/index.sqlite"
+echo "indexing $2 -> $4" >&2
+echo "indexed 1 files (1 changed, 0 deleted); chunks +1 ~0 -0; edges 0; embedded {{'code': 1}} in 0.01s"
+"""
+
+
+def test_cli_index(remote, make_task, tmp_path, monkeypatch, capsys):
+    from dataclasses import replace
+    recipe_file = tmp_path / "demo.toml"
+    recipe_file.write_text('repo = "acme/demo"\nbase_image = "x"\ntest = "pytest"\n')
+    recipe = gen.load_recipe(recipe_file)
+    tasks = [make_task(id="acme__demo-42", repo="acme/demo", base_commit=remote.shas[0]),
+             make_task(id="acme__demo-43", repo="acme/demo", base_commit=remote.shas[1],
+                       fix=replace(make_task().fix, pr_number=43))]
+    task_file = tmp_path / "tasks.jsonl"
+    save_tasks(task_file, tasks)
+    gen.task_dir(recipe, tasks[0]).mkdir(parents=True)
+    gen.tests_path(recipe, tasks[0]).write_text("{}")  # the second task has no tests.json
+    args = ["e2e", "index", str(recipe_file), "--tasks", str(task_file)]
+
+    monkeypatch.setenv("CMEVAL_CODEMEM_BIN", str(tmp_path / "none"))
+    assert main(args) == 1
+    assert "does not exist or is not executable" in capsys.readouterr().err
+
+    checkout = tmp_path / "codemem"
+    (checkout / "src").mkdir(parents=True)
+    (checkout / "src" / "a.py").write_text("A = 1\n")
+    _git(checkout, "init", "-q")
+    _git(checkout, "add", "-A")
+    _git(checkout, "commit", "-qm", "codemem")
+    commit = _git(checkout, "rev-parse", "HEAD").strip()
+    (checkout / ".venv" / "bin").mkdir(parents=True)
+    calls = tmp_path / "calls.txt"
+    _shim(checkout / ".venv" / "bin", "codemem", FAKE_CODEMEM.format(calls=calls))
+    monkeypatch.setenv("CMEVAL_CODEMEM_BIN", str(checkout / ".venv" / "bin" / "codemem"))
+
+    assert main(args) == 0
+    err = capsys.readouterr().err
+    root = e2e_index.index_root(recipe, tasks[0])
+    meta = json.loads((root / "index.json").read_text())
+    assert meta["task_id"] == "acme__demo-42" and meta["repo"] == "acme/demo"
+    assert meta["base_commit"] == remote.shas[0] and meta["codemem_commit"] == commit
+    assert meta["summary"].startswith("indexed 1 files (1 changed, 0 deleted)") and meta["seconds"] >= 0
+    assert (root / "src" / "app.py").read_text() == "VERSION = 1\n" and (root / "index" / "index.sqlite").exists()
+    assert "1 tasks have no tests.json" in err and f"acme__demo-42: {meta['seconds']} s, indexed 1 files" in err
+    assert calls.read_text().split() == ["index", str(root / "src"), "--index-dir", str(root / "index")]
+    assert e2e_index.index_state(recipe, tasks[0]) == "ok"
+
+    # The same commits: skipped. --force builds again. A change in codemem's src/ builds again.
+    assert main(args) == 0
+    assert "acme__demo-42: skipped" in capsys.readouterr().err and len(calls.read_text().splitlines()) == 1
+    assert main(args + ["--force"]) == 0
+    assert len(calls.read_text().splitlines()) == 2
+    (checkout / "src" / "a.py").write_text("A = 2\n")
+    assert main(args) == 0
+    assert len(calls.read_text().splitlines()) == 3
+    assert json.loads((root / "index.json").read_text())["codemem_commit"] == commit + "-dirty"
+
+    # A failed build leaves no index.json.
+    (root / "src" / "app.py").unlink()
+    assert main(args + ["--force"]) == 1
+    assert "exit code 3" in capsys.readouterr().err and not (root / "index.json").exists()
+
+
+def test_score_tool_against_grep(capsys):
+    steps = e2e_run.count_steps(_events(TOOL_STREAM), ["auth/sessions.py"])
+    for task_id in ("t1", "t2"):
+        _write("s2", {**_record(task_id, "grep", 1, tokens=1000, seconds=100.0),
+                      "steps": e2e_run.count_steps(_events(), ["auth/sessions.py"]), "identity": {"codemem": None}})
+    _write("s2", {**_record("t1", "tool", 1, tokens=800, seconds=90.0), "steps": steps,
+                  "identity": {"codemem": {"commit": "abc"}}})
+    _write("s2", {**_record("t2", "tool", 1, tokens=900, seconds=95.0),
+                  "steps": {**steps, "codemem_calls": 0, "first_codemem_turn": None},
+                  "identity": {"codemem": {"commit": "abc"}}})
+    summary = score("s2")
+    behaviour = summary["setups"]["tool"]["behaviour"]
+    assert (behaviour["codemem_share"], behaviour["codemem_calls_mean"], behaviour["first_codemem_turn_mean"]) == \
+        (0.5, 2.5, 1.0)
+    assert summary["paired"] == [{"setup": "tool", "baseline": "grep", "tasks": 2, "completed": 0.0,
+                                  "tokens": -150.0, "seconds": -7.5}]
+    text = format_score(summary)
+    assert "tool - grep over 2 tasks: completed 0.00, tokens -150, seconds -7.5" in text
+    assert "used  codemem 1st call" in text
+    assert text.splitlines()[-1].endswith("0.50      2.5      1.0")
+
+
+def test_python_root_holds_the_alias_and_the_real_install(tmp_path):
+    from cmeval.e2e_index import codemem_python_root
+
+    pythons = tmp_path / "uv" / "python"
+    real = pythons / "cpython-3.11.18-linux" / "bin"
+    real.mkdir(parents=True)
+    (real / "python3.11").write_text("")
+    (pythons / "cpython-3.11-linux").symlink_to(pythons / "cpython-3.11.18-linux")
+    bin_dir = tmp_path / "checkout" / ".venv" / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "python").symlink_to(pythons / "cpython-3.11-linux" / "bin" / "python3.11")
+    (bin_dir / "codemem").write_text("")
+    assert codemem_python_root(bin_dir / "codemem") == pythons

@@ -3,8 +3,11 @@
 One run (run_one) has these steps:
 
   1. check the preconditions: the task's image and tests.json, the login token file, the Claude Code binary,
-     and an internal Docker network
-  2. write the prompt, the MCP config and the container script (agent.sh) to the run's folder
+     and an internal Docker network. For a codemem setup also the codemem program, the task's index (from
+     `cmeval e2e index`), the Hugging Face cache, and the GPU setting
+  2. write the prompt, the MCP config and the container script (agent.sh) to the run's folder. For a codemem
+     setup, copy the task's index to cmindex/ in the run's folder. The container gets it at /cmindex, and the
+     copy is deleted after the run
   3. start a recording proxy on the network's gateway, then the container. On the network the container
      reaches the proxy and nothing else. A thread follows the stream of events and stops the agent after
      the turn limit
@@ -32,9 +35,12 @@ run.json has these fields:
   discard, discard_reason, flags
                       a discarded run is done again; a flag (for example "cross-check disagrees") asks a person to look
   identity            prompt level, frame and hash, harness and its version, binary, image tag and id, split, cmeval
-                      commit, machine, limits, start time (UTC), the task's gold files
+                      commit, machine, limits, start time (UTC), the task's gold files. codemem: null for a setup
+                      without codemem; else the codemem commit, the program, the task's index.json, the steering
+                      level, and the bytes of the index copy before and after the run
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
-                      network, the removed configuration files, the files where the token was found and replaced
+                      network, the removed configuration files, the files where the token was found and replaced,
+                      gpus (the container had the GPU)
   result_event        subtype, is_error, num_turns, duration_ms, duration_api_ms, total_cost_usd
   usage_limit         the evidence of a usage limit (429 answers and their reset headers, the result text), or null
   turn_limit          the turn at which the runner stopped the agent, and how, or null
@@ -47,11 +53,13 @@ run.json has these fields:
                       preparation step, container_start_s, collect_s, container_s, grade_s
   steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
                       command), and num_turns_result from the result event. `cmeval e2e recount` computes it again
-  outcome             completed, the grader's record, the patch's files and changed lines, status_lines
+  outcome             completed, the grader's record, the patch's files and changed lines, status_lines, and
+                      unexpected_paths (files of the patch that codemem could have written, such as .codemem*)
 """
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -66,10 +74,12 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Callable
 
 from .e2e import grade, patch_files
+from .e2e_index import codemem_bin, codemem_checkout, codemem_commit, codemem_python_root, hf_cache, index_root, \
+    index_state, read_index_meta
 from .e2e_steps import TurnCounter, count_steps, parse_stream
 from .files import write_json
 from .generate import GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
@@ -87,6 +97,17 @@ BIN_ENV = "CMEVAL_CLAUDE_BIN"
 DEFAULT_MODEL = "claude-haiku-5-5"
 REDACTED = b"[REDACTED]"
 MAX_ERRORS_IN_A_ROW = 3
+GPUS_ENV = "CMEVAL_E2E_GPUS"
+# Claude Code waits this long for an MCP server to start and for one tool call. codemem loads a model at start.
+MCP_TIMEOUT_MS = 120_000
+# Where the container of a codemem setup gets the index copy and the Hugging Face cache.
+INDEX_MOUNT = "/cmindex"
+# The GPU as a CDI device (nvidia-ctk cdi generate). Docker reads CDI specs without a restart of its daemon.
+GPU_DEVICE = "nvidia.com/gpu=all"
+HF_MOUNT = "/hf"
+CODEMEM_SEARCH_TOOL = "mcp__codemem__search_code"
+# Files of the agent's patch that codemem could have written. `codemem mcp` should write none.
+UNEXPECTED_PATTERNS = (".codemem*", ".mcp.json")
 
 # Exit codes of a batch.
 EXIT_USAGE_LIMIT = 4
@@ -111,6 +132,10 @@ issue is resolved. Work on your own until you are done: nobody can answer questi
 """
 
 
+def _gpus_default() -> bool:
+    return os.environ.get(GPUS_ENV, "1") != "0"
+
+
 @dataclass(frozen=True)
 class RunSettings:
     time_limit_s: int = 50 * 60
@@ -125,6 +150,8 @@ class RunSettings:
     host_extra_s: int = 15 * 60
     poll_s: float = 0.5
     upstream: str = DEFAULT_UPSTREAM
+    # The GPU for every setup, so that the containers of two setups are the same (plan 4.5, rule 1).
+    gpus: bool = field(default_factory=_gpus_default)
 
 
 # ---- setups
@@ -132,18 +159,38 @@ class RunSettings:
 @dataclass(frozen=True)
 class Setup:
     name: str
-    mcp_config: dict | None  # None: not built yet
+    mcp_config: dict | None  # None: not built yet, or made at run time (codemem)
     mcp_servers: tuple[str, ...] = ()  # the servers that the init event must list, each "connected"
     checks: tuple[Callable[[dict], list[str]], ...] = ()  # more checks of the init event: failed checks
+    # codemem's MCP server. Its config holds paths of the host, so codemem_mcp_config makes it for each run.
+    codemem: bool = False
 
     @property
     def built(self) -> bool:
-        return self.mcp_config is not None
+        return self.mcp_config is not None or self.codemem
+
+
+def _no_mcp_tools(init: dict) -> list[str]:
+    tools = sorted(str(t) for t in init.get("tools") or [] if str(t).startswith("mcp__"))
+    return [f"mcp tools are loaded: {', '.join(tools)}"] if tools else []
+
+
+def _codemem_loaded(init: dict) -> list[str]:
+    """mcp_servers must be a list of {name, status} objects (check_setup reads the names and the status), and
+    the search tool of codemem must be loaded."""
+    failed = []
+    servers = init.get("mcp_servers")
+    if not isinstance(servers, list) or not all(isinstance(s, dict) and isinstance(s.get("name"), str)
+                                                and isinstance(s.get("status"), str) for s in servers):
+        failed.append(f"mcp_servers is not a list of name and status objects: {json.dumps(servers)[:200]}")
+    if CODEMEM_SEARCH_TOOL not in (init.get("tools") or []):
+        failed.append(f"tool {CODEMEM_SEARCH_TOOL} is not loaded")
+    return failed
 
 
 SETUPS = {s.name: s for s in (
-    Setup("grep", {"mcpServers": {}}),
-    Setup("tool", None, ("codemem",)),
+    Setup("grep", {"mcpServers": {}}, checks=(_no_mcp_tools,)),
+    Setup("tool", None, ("codemem",), checks=(_codemem_loaded,), codemem=True),
     Setup("upfront", None),
     Setup("placebo", None, ("codemem",)),
     Setup("tool-strong", None, ("codemem",)),
@@ -229,16 +276,107 @@ def ensure_network(name: str = NETWORK) -> str:
     return parts[1]
 
 
-def preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> dict:
-    """Check what a run needs. Returns the image tag, the token file, the binary and the gateway."""
+def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> dict:
+    """Check what codemem needs in the container. Returns the program, its checkout and Python install, the
+    Hugging Face cache, the task's index folder and index.json, and the codemem commit."""
+    hint = f"run cmeval e2e index {recipe.name} first"
+    if not settings.gpus:
+        raise GenerateError(f"a codemem setup needs the GPU in the container ({GPUS_ENV}=1): the index is tied to "
+                            "the device that built it, and on the CPU codemem embeds the whole repo again")
+    try:
+        program = codemem_bin()
+        python_root = codemem_python_root(program)
+    except GenerateError as exc:
+        raise GenerateError(f"{exc}; then {hint}") from None
+    state = index_state(recipe, task)
+    if state != "ok":
+        where = index_root(recipe, task)
+        raise GenerateError(f"{task.id}: no index for base commit {task.base_commit[:12]} in {where} "
+                            f"({state}); {hint}")
+    hf = hf_cache()
+    if not hf.is_dir():
+        raise GenerateError(f"no Hugging Face cache at {hf} (codemem's embedding model is there); {hint}, "
+                            "which loads the model")
+    checkout = codemem_checkout(program)
+    return {"bin": program, "checkout": checkout, "python_root": python_root, "hf_cache": hf,
+            "index": index_root(recipe, task) / "index", "meta": read_index_meta(recipe, task),
+            "commit": codemem_commit(checkout)}
+
+
+def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setup | None = None) -> dict:
+    """Check what a run needs. Returns the image tag, the token file, the binary, the gateway, and for a codemem
+    setup what codemem_preconditions returns (else None)."""
     tag = task_tag(recipe, task)
     if not image_exists(tag):
         raise GenerateError(f"{task.id}: image {tag} does not exist; build it with cmeval generate")
     if not tests_path(recipe, task).exists():
         raise GenerateError(f"{task.id}: no tests.json; validate the task with cmeval generate first")
+    codemem = codemem_preconditions(recipe, task, settings) if setup and setup.codemem else None
     path = token_file()
     check_token_file(path)
-    return {"tag": tag, "token_file": path, "claude_bin": claude_bin(), "gateway": ensure_network(settings.network)}
+    return {"tag": tag, "token_file": path, "claude_bin": claude_bin(), "gateway": ensure_network(settings.network),
+            "codemem": codemem}
+
+
+# ---- codemem in the container
+
+def codemem_mcp_config(codemem: dict, settings: RunSettings) -> dict:
+    """The MCP config of a codemem setup. The server runs the host's codemem program on /testbed, with the index
+    copy at /cmindex, the model from the Hugging Face cache, and no network."""
+    # Python in a container sees all processors of the host, also with --cpus.
+    threads = str(max(1, int(settings.cpus)))
+    env = {"HF_HOME": HF_MOUNT, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
+           "CODEMEM_HOME": "/home/agent/.codemem", "OMP_NUM_THREADS": threads, "MKL_NUM_THREADS": threads}
+    return {"mcpServers": {"codemem": {"command": str(codemem["bin"]),
+                                       "args": ["mcp", "/testbed", "--index-dir", INDEX_MOUNT],
+                                       "env": env, "alwaysLoad": True}}}
+
+
+def codemem_mounts(codemem: dict, index_copy: Path) -> list[str]:
+    """The docker run arguments of a codemem setup. The checkout and the Python install keep their paths, so
+    that the program's links and its editable install work."""
+    mounts = [f"{codemem['checkout']}:{codemem['checkout']}:ro"]
+    if codemem["python_root"]:
+        mounts.append(f"{codemem['python_root']}:{codemem['python_root']}:ro")
+    mounts += [f"{codemem['hf_cache']}:{HF_MOUNT}:ro", f"{index_copy}:{INDEX_MOUNT}"]
+    return [part for mount in mounts for part in ("-v", mount)]
+
+
+def copy_index(index: Path, target: Path) -> None:
+    """A private copy of the task's index. Any user can write it: codemem runs as the agent's user and updates
+    the index when the agent edits files."""
+    shutil.copytree(index, target)
+    for folder, dirs, files in os.walk(target):
+        os.chmod(folder, 0o777)
+        for name in files:
+            path = os.path.join(folder, name)
+            os.chmod(path, os.stat(path).st_mode | 0o666)
+
+
+def tree_bytes(path: Path) -> int | None:
+    """The bytes of the files in a folder. None when the folder does not exist."""
+    if not path.is_dir():
+        return None
+    return sum(os.lstat(os.path.join(folder, name)).st_size for folder, _, files in os.walk(path) for name in files)
+
+
+def remove_index_copy(path: Path, tag: str) -> bool:
+    """Delete the index copy. True when it is gone."""
+    shutil.rmtree(path, ignore_errors=True)
+    if path.exists():
+        # When the container was killed, agent.sh did not open the files to all users. Folders that codemem made
+        # as the agent's user can then only be removed as root.
+        _run(["docker", "run", "--rm", "--network", "none", "-v", f"{path.parent}:/x", tag, "rm", "-rf",
+              f"/x/{path.name}"])
+        shutil.rmtree(path, ignore_errors=True)
+    return not path.exists()
+
+
+def unexpected_paths(patch: str) -> list[str]:
+    """Files of the patch that match UNEXPECTED_PATTERNS in any part of their path."""
+    return sorted(p for p in patch_files(patch)
+                  if any(fnmatch.fnmatch(part, pattern) for part in PurePosixPath(p).parts
+                         for pattern in UNEXPECTED_PATTERNS))
 
 
 # ---- the container script
@@ -246,9 +384,11 @@ def preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> dict:
 def agent_script(model: str, settings: RunSettings) -> str:
     """The shell script that runs in the task's container, as root. It reads and writes /out."""
     specs = " ".join(shlex.quote(p) for p in CONFIG_PATHSPECS)
+    # MCP_TIMEOUT and MCP_TOOL_TIMEOUT are the same in every setup, so that the setups differ only in the server.
     env = ("env -u ANTHROPIC_API_KEY HOME=/home/agent CLAUDE_CONFIG_DIR=/run/claude-empty "
            "CLAUDE_CODE_DISABLE_CLAUDE_MDS=1 CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 "
-           f"CLAUDE_CODE_EFFORT_LEVEL={shlex.quote(settings.effort)} ENABLE_TOOL_SEARCH=false DISABLE_AUTOUPDATER=1")
+           f"CLAUDE_CODE_EFFORT_LEVEL={shlex.quote(settings.effort)} ENABLE_TOOL_SEARCH=false DISABLE_AUTOUPDATER=1 "
+           f"MCP_TIMEOUT={MCP_TIMEOUT_MS} MCP_TOOL_TIMEOUT={MCP_TIMEOUT_MS}")
     claude = (f'claude -p "$(cat /out/prompt.txt)" --model {shlex.quote(model)} --output-format stream-json --verbose '
               "--setting-sources user --strict-mcp-config --mcp-config /tmp/mcp.json --disable-slash-commands "
               "--no-session-persistence --exclude-dynamic-system-prompt-sections --permission-mode bypassPermissions "
@@ -472,7 +612,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     """One run of Claude Code on one task. `out` is made again. Returns the record, also saved as run.json."""
     spec = get_setup(setup)
     check_model(model)
-    ready = preconditions(recipe, task, settings)
+    ready = preconditions(recipe, task, settings, spec)
+    codemem = ready["codemem"]
     token = read_token(ready["token_file"])
     if out.exists():
         shutil.rmtree(out)
@@ -480,7 +621,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     out = out.resolve()
     prompt = make_prompt(task)
     (out / "prompt.txt").write_text(prompt, encoding="utf-8")
-    (out / "mcp.json").write_text(json.dumps(spec.mcp_config) + "\n", encoding="utf-8")
+    mcp_config = codemem_mcp_config(codemem, settings) if codemem else spec.mcp_config
+    (out / "mcp.json").write_text(json.dumps(mcp_config) + "\n", encoding="utf-8")
     (out / "agent.sh").write_text(agent_script(model, settings), encoding="utf-8")
     image_id = _run(["docker", "image", "inspect", "-f", "{{.Id}}", ready["tag"]]).stdout.strip() or None
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -497,13 +639,19 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             turn_limit["how"] = "docker kill"
 
     host_start_ns, host_timeout, docker_exit = time.time_ns(), False, None
+    index_copy, index_bytes, index_removed = out / "cmindex", {}, None
     t0 = time.monotonic()
     try:
+        if codemem:
+            copy_index(codemem["index"], index_copy)
+            index_bytes["before"] = tree_bytes(index_copy)
         with RecordingProxy(out / "proxy.jsonl", host=gateway, port=0, upstream=settings.upstream) as proxy:
             cmd = ["docker", "run", "--rm", "--name", name, "--network", settings.network,
                    f"--cpus={settings.cpus}", f"--memory={settings.memory}",
+                   *(["--device", GPU_DEVICE] if settings.gpus else []),
                    "-e", TOKEN_ENV, "-e", f"ANTHROPIC_BASE_URL=http://{gateway}:{proxy.port}",
                    "-v", f"{ready['claude_bin']}:/usr/local/bin/claude:ro", "-v", f"{out}:/out",
+                   *(codemem_mounts(codemem, index_copy) if codemem else []),
                    ready["tag"], "bash", "/out/agent.sh"]
             stop = threading.Event()
             watcher = threading.Thread(target=_follow_stream, name="cmeval-turns", daemon=True,
@@ -523,6 +671,10 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 watcher.join()
     finally:
         _run(["docker", "rm", "-f", name])
+        if codemem:
+            # Keep only the numbers: a copy is about 300 MB.
+            index_bytes["after"] = tree_bytes(index_copy)
+            index_removed = remove_index_copy(index_copy, ready["tag"])
     container_s = time.monotonic() - t0
     redacted = redact_secret(out, token)
     del token
@@ -593,6 +745,15 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                        "memory": settings.memory, "effort": settings.effort},
             "started_utc": started,
             "gold_files": list(task.gold.files),
+            "codemem": {
+                "commit": codemem["commit"],
+                "bin": str(codemem["bin"]),
+                "index": codemem["meta"],
+                "steering": mcp_config["mcpServers"]["codemem"]["env"].get("CODEMEM_STEERING", "default"),
+                "index_bytes_before": index_bytes.get("before"),
+                "index_bytes_after": index_bytes.get("after"),
+                "index_copy_removed": index_removed,
+            } if codemem else None,
         },
         "integrity": {
             "setup_ok": not failed,
@@ -609,6 +770,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "stream_bad_lines": stream["bad_lines"],
             "host_timeout": host_timeout,
             "docker_exit_code": docker_exit,
+            "gpus": settings.gpus,
         },
         "result_event": {k: (result or {}).get(k) for k in ("subtype", "is_error", "num_turns", "duration_ms",
                                                              "duration_api_ms", "total_cost_usd")},
@@ -638,6 +800,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "patch_files": len(patch_files(patch)),
             "patch_lines": changed_lines(patch),
             "status_lines": after.get("status_lines"),
+            "unexpected_paths": unexpected_paths(patch),
         },
     }
     record["steps"]["num_turns_result"] = (result or {}).get("num_turns")
