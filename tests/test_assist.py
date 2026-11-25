@@ -73,7 +73,7 @@ class Stub:
                 outer.requests.append({"auth": self.headers.get("Authorization"), **body})
                 time.sleep(outer.delay)
                 if outer.fail:
-                    status, out = outer.fail.pop(0), b'{"error": {"message": "not now"}}'
+                    status, out = outer.fail.pop(0), b'{"error": {\n  "message": "not now"}}'
                 else:
                     texts = [outer.prompt + t + outer.salt for t in body["input"]]
                     if outer.limit is not None:
@@ -311,6 +311,7 @@ def test_an_endpoint_that_fails_gives_its_texts_back_and_rests(stub, caplog):
     np.testing.assert_array_equal(got, FakeEmbedder(64).embed_documents(texts))  # within the same call
     status = emb.status()
     assert status["state"] == "resting" and "HTTP 503" in status["reason"] and "tried again in 1 s" in status["reason"]
+    assert "\n" not in status["reason"] and "not now" in status["reason"]  # one line, with the provider's words
     said = [r for r in caplog.records if "not used for now" in r.getMessage()]
     assert len(said) == 1  # once, however many requests failed
     failed = len(stub.requests) - asked
@@ -381,6 +382,7 @@ def test_a_slow_endpoint_gets_little_and_a_hung_one_does_not_hold_the_call(stub)
     stub.delay = 5.0  # an endpoint that hangs
     fresh = assisted(stub.url, Slow(0.001), timeout_s=30)
     fresh.endpoint.speed.add(10**9, 1.0)  # believed fast, as after a good check
+    fresh.endpoint.checking()
     fresh.endpoint.accept(1.0, 64, "")
     t = time.perf_counter()
     got = fresh.embed_documents(texts)

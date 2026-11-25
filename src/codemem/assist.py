@@ -177,13 +177,23 @@ class Endpoint:
             self.state = CHECKING
 
     def accept(self, agreement: float, dim: int, prefix: str) -> None:
+        """A check found its vectors equal to the local model's."""
         with self._lock:
+            if self.state != CHECKING:  # refused meanwhile, by a reply to an earlier request
+                return
             self.state, self.reason, self.agreement, self.dim, self.prefix = SHARING, None, agreement, dim, prefix
         log.info("the assist endpoint %s gives the local model's vectors for %s (cosine %.6f at worst): it shares "
                  "the work of large embedding calls", self.host, self.cfg.model, agreement)
 
+    def unchecked(self, state: str) -> None:
+        """A check ended without a verdict: back to `state`, unless the endpoint was refused meanwhile."""
+        with self._lock:
+            if self.state == CHECKING:
+                self.state = state
+
     def refuse(self, reason: str, agreement: float | None = None) -> None:
         """Not used again by this process: it answered, and not as the local model does."""
+        reason = " ".join(reason.split())  # one line, whatever a provider's message holds
         with self._lock:
             already = self.state == REFUSED
             self.state, self.reason, self.agreement = REFUSED, reason, agreement
@@ -205,7 +215,8 @@ class Endpoint:
             self._rest_until = now + rest
             if not error.rate_limited:
                 self.state = RESTING
-            self.reason = f"{error}; the local model embeds alone, and the endpoint is tried again in {rest:.0f} s"
+            why = " ".join(str(error).split())
+            self.reason = f"{why}; the local model embeds alone, and the endpoint is tried again in {rest:.0f} s"
         log.warning("the assist endpoint is not used for now: %s", self.reason)
 
     def late(self, chars: int, seconds: float) -> None:
@@ -534,9 +545,7 @@ class AssistedEmbedder(Embedder):
             took = time.perf_counter() - t
             local_done.wait()
             if self._probe is None:  # the local model failed; its error went to the caller
-                with endpoint._lock:
-                    endpoint.state = UNCHECKED
-                return
+                return endpoint.unchecked(UNCHECKED)
             agreement, reason = difference(
                 self._probe, raw, [label for label, _ in probes], endpoint.host, self.cfg.model, self.max_seq_length
             )
@@ -547,8 +556,7 @@ class AssistedEmbedder(Embedder):
                 endpoint.refuse(reason, agreement)
         except TryLater as e:
             endpoint.failed(e)
-            with endpoint._lock:
-                endpoint.state = RESTING  # also after a rate limit: it has not been compared yet
+            endpoint.unchecked(RESTING)  # also after a rate limit: it has not been compared yet
         except Exception as e:
             endpoint.refuse(str(e))
         self._remember_verdict()
