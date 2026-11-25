@@ -159,7 +159,10 @@ class VectorStore(ABC):
     """The in-memory search index of one vector type, keyed by vector id: FAISS by default, or a
     subclass named in config (`vector_backend = "module:Class"`, docs/architecture.md §5). It is
     built as Class(dim) and filled from the vectors stored in SQLite, already truncated and
-    L2-normalized; the store calls it under its lock, one call at a time.
+    L2-normalized. The store calls one index from one thread at a time: the thread that builds or
+    loads it, and after that whoever holds the store's vector lock. The indexes of two vector
+    types can be called at the same time (one loads while the other is searched), so an index
+    keeps its state in itself.
 
     `search(query, k, allowed_ids)` returns at most k (id, score) pairs, best first, with the real
     similarity as the score (equal scores are ties); fewer than k only when no other vector

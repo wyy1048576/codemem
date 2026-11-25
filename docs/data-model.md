@@ -703,7 +703,10 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   array of shape `(len(found), dim)` with their vectors, row for row, exactly as `upsert` got
   them. An id whose row is gone is left out. `fetch` reads on the thread that calls it, through
   a connection of that thread: call it from inside `search`. The default `bind` does nothing;
-- the store calls it under its lock, one call at a time.
+- the store calls one index from one thread at a time: from the thread that builds or loads it,
+  and under the store's lock once it is in use. The indexes of two vector types can be called at
+  the same time (one loads while the other is searched), so an index keeps its state in itself,
+  not in its class or its module.
 
 **Embedder factories.** `Indexer`, `search()` and `CodememService` take an `embedder_factory`
 called as `factory(spec: VectorConfig, config: Config) -> Embedder`, once per vector type (and
