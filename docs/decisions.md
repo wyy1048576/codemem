@@ -65,6 +65,7 @@ The values codemem runs with, and why each was picked. All of these are settings
 | **safety full check** | every 5 min (every 10 s without file events) | catches a missed event; one check costs 0.3–0.5 s on vLLM | constants |
 | **writing the search index to disk** | after 30 s idle, at shutdown, on `refresh_index` | writing it on every save blocked searches for 2.2 s on vLLM (520 MB of files, with 4 bytes per number); the CLI and the eval write at once, because the eval measures the index size | constant |
 | **the vector cache** | on, shared by every index on the machine | rebuilds, branch switches and other commits cost no model calls | `vector_cache = "off"` |
+| **the vector cache's size cap** | 8 GB (8 × 10⁹ bytes) | Past the cap the least recently used vectors are deleted. A cap that is too low costs model time again and again (0.02 to 0.5 s per text on the M1); a high one only costs disk. A vector of the default model takes 1.9 KB in the cache, so 8 GB holds about 4.2 million of them, 29 times vLLM's 145,000: the file stays a size a laptop disk can spare, and nothing is deleted before many repos have filled it | `vector_cache_max_gb` (0 = no cap) |
 | **file size cap** | 10 MB | hand-written files can reach megabytes (TypeScript's `checker.ts`); larger ones are generated data | `max_file_size` |
 | **vendored and generated code** | skipped | copies crowd results and cost embedding time; `third_party/` is kept, as it is often the project's own code | `use_default_ignore`, `skip_generated` |
 | **text length per vector** | 1,024 tokens (about 3,000 characters) | keeps CPU indexing tractable; longer code is split into windows, so nothing is lost | `max_seq_length` |
@@ -95,6 +96,13 @@ Values in the code, not in the config.
 | barrier wait | 0.25 s | `service.py` | how long a search waits for its marker file's event |
 | git wait | 10 s | `service.py` | how long an update waits for a running git command |
 | write lock wait | 30 s | `store.py` | how long a second writer process waits before giving up |
+| `_PAGE_SIZE` | 32 KB | `vectorcache.py` | the vector cache's page size (architecture.md §5) |
+| `_TARGET` | 90% of the cap | `vectorcache.py` | where an eviction stops |
+| `_CHECK` | 1% of the cap | `vectorcache.py` | how much a process puts into the cache between two looks at its size; the first put of a process always looks |
+| `_EVICT_SECONDS`, `_EVICT_ROWS` | 0.25 s, 256 entries | `vectorcache.py` | the eviction one put may do, and the entries deleted per transaction |
+| last use | one write a day per entry | `vectorcache.py` | an entry used again on the same day (UTC) keeps its time |
+| `_BUSY_SECONDS`, `_RETRY_SECONDS` | 60 s, 60 s | `vectorcache.py` | how long a cache call waits for another process's lock; how long the cache is left alone after a call failed |
+| `_IMPORT_ROWS` | 2,000 rows | `vectorcache.py` | rows read at a time when a cache file with one row per vector is imported |
 | `k` cap | 50 | `server.py` | results per MCP search |
 
 ---
@@ -151,7 +159,9 @@ only what each file costs to recreate.
 |---|---|---|---|
 | `~/.codemem/indexes/<repo>-<hash>/index.db` | the index | ~640 MB | rebuilt by the next update: the structure in about 70 s, vectors from the cache |
 | `~/.codemem/indexes/<repo>-<hash>/vec_*.faiss` | saved copies of the search indexes | ~260 MB | rebuilt from `index.db` in about 2 s |
-| `~/.codemem/cache/vectors.db` | every vector ever computed on this machine | grows about 4.5 KB per vector, never shrinks | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping |
+| `~/.codemem/cache/vector_cache.db` | the vector cache: the vectors computed on this machine, the least recently used ones only while the cap has room | 1.9 KB per vector (272 MB for vLLM's 145,000), at most the cap: 8 GB | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping. To make it smaller, lower `vector_cache_max_gb` and run `codemem index`: the least recently used vectors go first. To delete it, stop every codemem process first: a running one keeps writing to the deleted file, and those vectors are lost |
+| `~/.codemem/cache/vector_cache.db-wal`, `-shm` | SQLite's write-ahead log of the cache, and the log's index | the log is cut back to 64 MB after it has been copied into the cache file | they are part of the cache while a process runs: delete them only together with it, and only when no codemem process runs |
+| `~/.codemem/cache/vectors.db` | a vector cache with one row per vector | 4.7 KB per vector | codemem imports it into `vector_cache.db` when the cache is next opened, then deletes it (34,218 vectors: 1.6 s). Deleted by hand before that, its vectors are embedded again when needed |
 | `~/.codemem/model_hashes.json` | hashes of local model folders' files | tiny | each local model folder is read once more (about 1 s per GB) |
 | the Hugging Face model cache (`HF_HOME`) | the downloaded model | ~1 GB | downloaded again at the next start (needs the network) |
 | `~/.codemem/config.toml`, `<repo>/.codemem.toml` | your settings | | yours to keep |
@@ -179,5 +189,5 @@ Searches, updates and everything else stay on your machine.
 |---|---|---|
 | an API outage | each search waits about 31 s, then fails; `index_status` shows no error | fall back to keywords at once, with a note, and show the error in `index_status` |
 | the model fails to load | each search waits about 4 s (the first took 7.5 s in a test), and the note says the model is "still loading" | say it failed, and stop waiting for it |
-| the vector cache only grows | about 4.5 KB per vector, forever | a "last used" date per entry, and a size cap |
+| a running server applies a lowered cache cap slowly | it evicts for 0.25 s per put, so a cache far over the lowered cap shrinks over many puts | `codemem index` brings it under the cap in one go; let the server do the same when it is idle |
 | PyTorch is always installed | about 1 GB, even when only an API is used | make the local model an optional install; needs a one-line change in the eval's dependencies |

@@ -252,13 +252,13 @@ Turning a text into a vector costs model time, so codemem first looks for one it
                               │ no
                               ▼
                     in the vector cache on this machine? ── yes ──► reuse it
-                              │ no                            (~/.codemem/cache/vectors.db)
+                              │ no                            (~/.codemem/cache/vector_cache.db)
                               ▼
                     the embedding model ──► store it in the index and in the cache
 ```
 
-The cache holds every text ever embedded on the machine, so rebuilds, branch switches and undos
-cost no model calls. The model is local by default (`jinaai/jina-code-embeddings-0.5b`, on the GPU
+The cache holds the vectors of the texts embedded on this machine, up to a size cap (§5), so
+rebuilds, branch switches and undos cost no model calls. The model is local by default (`jinaai/jina-code-embeddings-0.5b`, on the GPU
 when there is one); it can also be any OpenAI-compatible API, or a Python class of your own for
 research models (README).
 
@@ -490,7 +490,10 @@ and reports any difference.
  ├── vec_usage.faiss         one per text type                            ┘ vectors table if lost
  └── write.lock .......... one writer at a time
 
- ~/.codemem/cache/vectors.db ... the vector cache, shared by every index on the machine
+ ~/.codemem/cache/vector_cache.db ... the vector cache, shared by every index on the machine
+       embedder     one row per embedder key: its id and its vector length
+       entry        (embedder id, text hash) ──► slot, time of last use       the key table
+       vec_<id>     slot ──► text hash, vector       one table per embedder, slots 1..n, no gaps
 ```
 
 **Why SQLite, and not a vector database.** Most of what is stored isn't vectors and needs lookups,
@@ -514,6 +517,84 @@ bumps that type's version number in `meta`, and an index that is behind catches 
 vector ids: vectors are never changed in place, only added and deleted, so the ids that differ are
 the whole difference. That covers a saved copy from before a crash, and another process's writes.
 Searches never wait for writes (SQLite's WAL mode lets readers continue while one process writes).
+
+**The vector cache** maps (embedder key, text hash) to a vector: 2 bytes per number, at the
+model's full length. It is one SQLite file for the whole machine, and every codemem process
+reads and writes it. Each part of its layout has a reason. The numbers are from 200,000 synthetic
+vectors of 896 numbers unless a line says otherwise. The times are medians of one run on an M1
+that other jobs kept busy (load average 12 to 16 on its 8 cores); from run to run they moved by
+about a fifth.
+
+- **One vector table per embedder.** All vectors of an embedder have one length, so the rows of
+  its table have one size and fill their pages: 18 vectors of 896 numbers on a page. On disk a
+  vector of 1,792 bytes takes 1,877 bytes, its key included (31,477 vectors of the default
+  model). A single table with the key as text in every row takes 4,690 bytes for the same vector,
+  because every row spills onto a 4 KB page of its own.
+- **Slots without gaps.** When entries are deleted, the last rows of the table are written into
+  the freed slots, and the pages at the table's end become free. So the file shrinks by what was
+  deleted, wherever the deleted entries were: a tenth of the entries, spread over the whole file,
+  takes it from 377 MB to 339 MB. Without the move a page is free only once every row on it is
+  gone: the same deletion in a plain table of the same rows, 369 MB, gives back nothing.
+- **The time of last use sits in the key table,** not next to the vector. Marking entries as used
+  then rewrites key pages, which hold about a thousand entries each, and never a page of vectors.
+  An index on that time lists the least recently used entries, so eviction does not scan the
+  cache.
+- **A read is one statement:** a lookup in the key table, then one in the vector table, both in
+  one snapshot. A reader therefore never follows a slot that an eviction is moving. A read writes
+  nothing. Marking entries as used is a call of its own (`touch`), and it writes an entry once a
+  day at most.
+- **Pages are read through SQLite's page cache, not a memory map.** A map reads 200 vectors in
+  0.9 ms where the page cache takes 2.2 ms. But an I/O error on a mapped file ends the process,
+  and an error in an ordinary read only costs a cache miss.
+- **Pages of 32 KB.** A page holds a whole number of rows, so the space lost depends on the
+  vector's length. The table shows the bytes on disk above the vector's own bytes, keys included,
+  and the time to read 200 vectors by key (100,000 vectors of 896 numbers; the fastest of 450
+  reads, then the median):
+
+  | Numbers per vector | 16 KB pages | 32 KB pages | 64 KB pages |
+  |---|---|---|---|
+  | 768 | +10.2% | +5.1% | +5.5% |
+  | 896 | +4.6% | +4.8% | +5.0% |
+  | 1,024 | +16.9% | +9.4% | +6.3% |
+  | 2,048 | +34.8% | +15.8% | +8.5% |
+  | 4,096 | +100.9% | +34.3% | +15.6% |
+  | 200 keyed reads | 1.5 ms, 2.7 ms | 1.9 ms, 2.5 ms | 2.9 ms, 3.4 ms |
+
+  At 32 KB the default model's vectors cost what they cost at 16 KB, every other length costs
+  less, and three vectors of 4,096 numbers fit a page where 16 KB holds one. An undisturbed read
+  takes a quarter longer than at 16 KB; on the busy machine the medians did not differ. At 64 KB
+  a read takes half as long again as at 32 KB, and every change writes more, because a page is
+  rewritten whole.
+
+**What the cache costs in time.** Reading 200 random vectors by key takes 2.3 ms (4.3 ms for 19
+reads in 20). A process's first read, which also opens the file, takes 3.1 ms, and 35 ms when
+the file's pages are not in memory yet. A put of 256 vectors takes 5.8 ms. Marking 200 entries as
+used takes 4.6 ms, and 0.4 ms when they were already marked today.
+
+**The size cap** (`vector_cache_max_gb`, 8 GB by default: [decisions.md](decisions.md) §3). When
+the file passes it, the least recently used entries are deleted until the file is under 90% of
+the cap. An entry is used when stage B puts it, finds it, or a caller marks it. Three rules keep
+this out of the way:
+- a put looks at the file's size once per 1% of the cap it has written, not every time;
+- a put that finds the file over the cap evicts for a quarter of a second at most, because a
+  search may be waiting for that put. The next puts go on, and a blocking update (`codemem
+  index`) finishes the job before it returns;
+- an eviction works in transactions of 256 entries, so other processes read and write in between.
+
+Deleting the oldest tenth of 200,000 vectors takes 1.1 s. A tenth spread over the whole file
+takes 2.8 s, because almost every deleted row sits on a page of its own, and that page is
+rewritten. Eviction loses nothing for good: an evicted vector is embedded again when its text
+comes back.
+
+**When the cache file cannot be used** (another program holds it, it is read-only, it is damaged),
+every call answers as an empty cache would. It logs one warning and leaves the file alone for a
+minute. The index update goes on, with vectors from the model.
+
+**A cache file with one row per vector** (`cache/vectors.db`, a single table keyed by text) is
+read into the cache when the cache is first opened: 2,000 rows at a time, in key order,
+skipping what is already there. So an import that was interrupted, or that two processes run at
+once, still ends complete. The file is deleted once everything is committed and synced to disk.
+34,218 vectors (148 MB) take 1.6 s and become 60 MB.
 
 ---
 
@@ -643,6 +724,7 @@ they show codemem's own work; the real model adds about 0.1 s per changed text.
 | a search of 10 words / 250 words (vLLM) | 0.12 s / 0.63 s |
 | a save then a search, through MCP, real model (sample repo) | 0.13–0.4 s, the edit included |
 | a full build of vLLM, fake model | 72 s |
+| 200 vectors read by key from the vector cache (200,000 vectors) | 2.3 ms |
 
 **Building is almost all embedding.** The local model embeds about 8.5 texts a second on the M1,
 so the first build of a large repo (vLLM: 145k texts, about 5 hours) wants a CUDA GPU or an
