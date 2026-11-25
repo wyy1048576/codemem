@@ -14,10 +14,12 @@ import anyio
 import numpy as np
 import pytest
 
+from codemem import embedserver
 from codemem.config import Config, config_from_dict
 from codemem.embedder import (
     TRIM_AFTER_IDLE, Embedder, FakeEmbedder, OpenAIEmbedder, PluginEmbedder, SentenceTransformerEmbedder,
 )
+from codemem.embedserver import ModelQueue
 from codemem.render import format_status
 from codemem.service import CodememService
 
@@ -646,6 +648,42 @@ def test_a_search_that_found_the_model_keeps_it_for_the_idle_time(service, model
     clock.pass_minutes(IDLE_MINUTES + 1)
     service._step()
     assert not model.ready
+
+
+# ---------------------------------------------------------------- the embedding server
+
+
+def test_the_embedding_server_gives_working_memory_back_and_keeps_its_model(model, clock, monkeypatch):
+    monkeypatch.setattr(embedserver, "QUIET_CHECK_S", 0.01)
+    queue = ModelQueue(model, batch_size=4)
+    try:
+        assert len(queue.embed(["revoke session", "parse csv"])) == 2
+        clock.pass_minutes(1000)
+        assert _wait_for(lambda: model.trims == 1)  # the queue's quiet moments run
+        assert model.ready and not model.unloaded.is_set()
+    finally:
+        queue.close()
+
+
+def test_the_embedding_server_frees_its_model_when_idle_minutes_are_set(model, clock, monkeypatch, fake_config):
+    monkeypatch.setattr(embedserver, "QUIET_CHECK_S", 0.01)
+    queue = ModelQueue(model, batch_size=4, idle_minutes=IDLE_MINUTES)
+    try:
+        queue.embed(["revoke session"])  # a request is a use of the model
+        clock.pass_minutes(IDLE_MINUTES - 1)
+        assert _wait_for(lambda: model.trims == 1) and model.ready  # quiet moments ran: not yet idle for long enough
+        clock.pass_minutes(2)
+        assert model.unloaded.wait(10) and not model.ready
+        assert len(queue.embed(["revoke session"])) == 1  # the next request loads it again
+        assert model.ready and model.loads == 1
+    finally:
+        queue.close()
+    fake_config.model_idle_minutes = 7  # `codemem serve-embeddings` takes the time from the config
+    server = embedserver.serve(fake_config, port=0)
+    try:
+        assert server.queue._idle_minutes == 7
+    finally:
+        server.close()
 
 
 # ---------------------------------------------------------------- status
