@@ -176,16 +176,21 @@ def test_the_local_model_loads_at_its_first_use_and_again_after_an_unload(local_
     assert emb.ready and stub.instances == 2
 
 
-def test_another_precision_is_converted_on_the_cpu_before_the_model_moves_to_its_device(transformer):
-    """Converting on a GPU leaves the first format's blocks in its allocator while the model lives."""
+def test_for_the_apple_gpu_another_precision_is_converted_on_the_cpu_first(transformer, monkeypatch):
+    """Converting on that GPU leaves the first format's blocks in its allocator while the model lives."""
     import torch
 
-    half = SentenceTransformerEmbedder("stub-model", device="auto", dtype="float16")
-    half.embed_documents(["a"])
-    assert transformer.built_on == ["cpu"] and transformer.moves == [torch.float16, half.device]
-    full = SentenceTransformerEmbedder("stub-model", device="auto", dtype="float32")
-    full.embed_documents(["a"])
-    assert transformer.built_on == ["cpu", full.device] and len(transformer.moves) == 2  # as the file has it
+    from codemem import embedder
+
+    def load(device, dtype):
+        monkeypatch.setattr(embedder, "resolve_device", lambda preference: device)
+        del transformer.built_on[:], transformer.moves[:]
+        SentenceTransformerEmbedder("stub-model", device=device, dtype=dtype).embed_documents(["a"])
+        return transformer.built_on, transformer.moves
+
+    assert load("mps", "float16") == (["cpu"], [torch.float16, "mps"])
+    assert load("cuda", "float16") == (["cuda"], [torch.float16, "cuda"])  # on the device, then a move that changes nothing
+    assert load("mps", "float32") == (["mps"], [])  # as the file has it
 
 
 def test_the_local_model_is_loaded_once_by_calls_that_arrive_together(local_model):
