@@ -545,8 +545,8 @@ def test_the_command_says_so_when_the_port_is_taken(tmp_path, isolated_home):
 NO_PYTORCH = """
 import sys
 
-# What an install without the `local` extra looks like: importing either package fails, and
-# importlib finds neither.
+# What an environment built without PyTorch and sentence-transformers looks like: importing either
+# fails, and importlib finds neither.
 sys.modules["torch"] = None
 sys.modules["sentence_transformers"] = None
 
@@ -579,8 +579,8 @@ print("built and searched without PyTorch")
 
 
 def test_without_pytorch_a_codemem_builds_and_searches_through_the_server(sample_repo, tmp_path, isolated_home):
-    """The install for API users: the CLI, the service behind the MCP server and its model warm-up
-    all work with neither PyTorch nor sentence-transformers importable."""
+    """A client of a served model needs neither package: the CLI, the service behind the MCP server
+    and its model warm-up all work with PyTorch and sentence-transformers unimportable."""
     proc = subprocess.run(
         [sys.executable, "-c", NO_PYTORCH, str(sample_repo), str(tmp_path / "idx")], cwd=tmp_path,
         env={**os.environ, "CODEMEM_HOME": str(isolated_home)}, capture_output=True, text=True, timeout=120,

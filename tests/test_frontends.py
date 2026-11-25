@@ -413,27 +413,27 @@ def test_cli_index_search_status(sample_repo, tmp_path, fake_env, capsys):
 
 
 def test_cli_without_pytorch_names_the_remedy_and_status_still_works(sample_repo, tmp_path, monkeypatch, capsys):
-    """The local model in an install without the `local` extra: one line on stderr, no traceback."""
+    """The local model in an environment built without its packages: one line on stderr, no traceback."""
     monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
     monkeypatch.setattr("codemem.embedder._CACHE", {})
     idx = str(tmp_path / "idx")
     assert main(["index", str(sample_repo), "--index-dir", idx]) == 1
     err = capsys.readouterr().err
     assert "error: The local embedding model cannot run because PyTorch and sentence-transformers are not" in err
-    assert 'pip install "codemem[local]"' in err and "Traceback" not in err
+    assert "pip install torch sentence-transformers" in err and "Traceback" not in err
     assert main(["status", str(sample_repo), "--index-dir", idx]) == 0  # needs no model
     assert "state: empty" in capsys.readouterr().out
 
     svc = CodememService(sample_repo, index_dir=idx)
     try:
         assert svc.update() is None  # what the MCP server's writer does: the error is kept for index_status
-        assert 'pip install "codemem[local]"' in format_status(svc.status())
+        assert "pip install torch sentence-transformers" in format_status(svc.status())
     finally:
         svc.close()
 
 
 def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sample_repo, tmp_path, monkeypatch):
-    """The MCP server's service in an install without the `local` extra, with a config that asks
+    """The MCP server's service in an environment built without PyTorch, with a config that asks
     for the local model: no update is applied, nothing is dropped, and a search answers from
     keywords once its wait for the model is over."""
     monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
@@ -448,7 +448,7 @@ def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sa
     svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=Config(catchup_budget_ms=300))
     try:
         svc.start(watch=False, prewarm=False)
-        assert _wait_for(lambda: "codemem[local]" in (svc.last_error or ""))
+        assert _wait_for(lambda: "pip install torch" in (svc.last_error or ""))
         resp = svc.search("revoke session", k=3, wait_for_models=False)
         assert resp.signals == ["bm25"] and resp.models_loading
         assert resp.results[0].qualname == "revoke_session"

@@ -15,8 +15,10 @@ the vector cache reuse them by (key, text hash).
 HTTP endpoint (embedserver.py): the endpoint embeds each text as given, and its clients put the
 query or document prefix in front themselves.
 
-The local model's packages (PyTorch, sentence-transformers) are an optional install. Nothing here
-imports them until a local model is used, and then a missing package is named with its remedy.
+The local model's packages (PyTorch, sentence-transformers) are imported only when a local model
+is used. A codemem that embeds through an API or a served model therefore runs in an environment
+built without them, and one that is asked for the local model there names what is missing and the
+two ways out.
 """
 
 from __future__ import annotations
@@ -51,7 +53,8 @@ FALLBACK_PROMPTS = {
 }
 _AS_GIVEN = ""  # no prompt: the text exactly as given
 _QUERY_CACHE_SIZE = 512
-_LOCAL_PACKAGES = {"torch": "PyTorch", "sentence_transformers": "sentence-transformers"}
+# The local model's packages, by the name pip installs them under, with the name to print.
+_LOCAL_PACKAGES = {"torch": "PyTorch", "sentence-transformers": "sentence-transformers"}
 
 
 class LocalModelUnavailable(RuntimeError):
@@ -59,13 +62,15 @@ class LocalModelUnavailable(RuntimeError):
 
 
 def require_local_model() -> None:
-    """Raise, naming both remedies, when the local model's packages are missing."""
-    missing = [label for module, label in _LOCAL_PACKAGES.items() if find_spec(module) is None]
+    """Raise, naming what to install and what to set instead, when the local model's packages are
+    missing (an environment built without them, for a client of an API or of a served model)."""
+    missing = [package for package in _LOCAL_PACKAGES if find_spec(package.replace("-", "_")) is None]
     if missing:
+        names = " and ".join(_LOCAL_PACKAGES[package] for package in missing)
         raise LocalModelUnavailable(
-            f"The local embedding model cannot run because {' and '.join(missing)} "
-            f"{'is' if len(missing) == 1 else 'are'} not installed: run `pip install \"codemem[local]\"`, or set "
-            '`[embedding] provider = "openai"` to embed through an API or a `codemem serve-embeddings` server.'
+            f"The local embedding model cannot run because {names} {'is' if len(missing) == 1 else 'are'} not "
+            f"installed: run `pip install {' '.join(missing)}`, or set `[embedding] provider = \"openai\"` to embed "
+            "through an API or a `codemem serve-embeddings` server."
         )
 
 

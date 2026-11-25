@@ -183,6 +183,8 @@ dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pathspec" },
+    { name = "sentence-transformers" },
+    { name = "torch" },
     { name = "tree-sitter" },
     { name = "tree-sitter-c" },
     { name = "tree-sitter-cpp" },
@@ -193,12 +195,6 @@ dependencies = [
     { name = "tree-sitter-rust" },
     { name = "tree-sitter-typescript" },
     { name = "watchdog" },
-]
-
-[package.optional-dependencies]
-local = [
-    { name = "sentence-transformers" },
-    { name = "torch" },
 ]
 
 [package.dev-dependencies]
@@ -213,8 +209,8 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pathspec", specifier = ">=0.12" },
-    { name = "sentence-transformers", marker = "extra == 'local'", specifier = ">=5.0" },
-    { name = "torch", marker = "extra == 'local'", specifier = ">=2.4" },
+    { name = "sentence-transformers", specifier = ">=5.0" },
+    { name = "torch", specifier = ">=2.4" },
     { name = "tree-sitter", specifier = ">=0.25,<0.27" },
     { name = "tree-sitter-c", specifier = ">=0.24,<0.25" },
     { name = "tree-sitter-cpp", specifier = ">=0.23,<0.24" },
@@ -226,7 +222,6 @@ requires-dist = [
     { name = "tree-sitter-typescript", specifier = ">=0.23,<0.24" },
     { name = "watchdog", specifier = ">=5.0" },
 ]
-provides-extras = ["local"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8" }]

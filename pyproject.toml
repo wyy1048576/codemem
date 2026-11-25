@@ -21,13 +21,8 @@ dependencies = [
     "watchdog>=5.0",
     "mcp>=2.3,<3",
     "httpx>=0.27",  # the client for embedding APIs and for `codemem serve-embeddings`
-]
-
-[project.optional-dependencies]
-# The local embedding model. PyTorch is about 1 GB on disk, and an install that embeds through an
-# API or a `codemem serve-embeddings` server does not need it. Imported lazily: tests and
-# FakeEmbedder never load them.
-local = [
+    # Heavy, but imported lazily: tests and FakeEmbedder never load them, and a codemem that embeds
+    # through an API or a `serve-embeddings` server runs in an environment built without them.
     "sentence-transformers>=5.0",
     "torch>=2.4",
 ]
@@ -48,7 +43,7 @@ packages = ["src/codemem"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "model: needs the local extra and the real jina embedding model (downloads ~1 GB); deselected by default",
+    "model: needs the real jina embedding model (downloads ~1 GB); deselected by default",
     "api: calls a real embedding API (needs its key in the environment); deselected by default",
 ]
 addopts = "-m 'not model and not api'"

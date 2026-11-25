@@ -175,7 +175,7 @@ def test_load_config_layers(tmp_path, monkeypatch):
 
 
 def test_resolve_device_mps(monkeypatch):
-    torch = pytest.importorskip("torch")  # the `local` extra
+    torch = pytest.importorskip("torch")  # absent from an environment built without the local model
 
     from codemem.embedder import resolve_device
 
@@ -191,7 +191,7 @@ def test_resolve_device_mps(monkeypatch):
 
 
 def test_resolve_device_cuda_before_mps(monkeypatch):
-    torch = pytest.importorskip("torch")  # the `local` extra
+    torch = pytest.importorskip("torch")  # absent from an environment built without the local model
 
     from codemem.embedder import resolve_device
 
@@ -201,9 +201,10 @@ def test_resolve_device_cuda_before_mps(monkeypatch):
 
 
 def test_without_pytorch_the_local_model_says_how_to_get_it(monkeypatch):
-    """An install without the `local` extra. The model says in one sentence what is missing and both
-    ways out. A key that would need PyTorch is refused too: answering "cpu" would re-key an index
-    built on a GPU, and its vectors would be dropped before the model failed."""
+    """An environment built without PyTorch and sentence-transformers. The model says in one sentence
+    what is missing, what to install and what to set instead. A key that would need PyTorch is
+    refused too: answering "cpu" would re-key an index built on a GPU, and its vectors would be
+    dropped before the model failed."""
     from codemem.embedder import resolve_device
 
     monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
@@ -213,8 +214,8 @@ def test_without_pytorch_the_local_model_says_how_to_get_it(monkeypatch):
             use()
         assert str(err.value) == (
             "The local embedding model cannot run because PyTorch and sentence-transformers are not installed: "
-            'run `pip install "codemem[local]"`, or set `[embedding] provider = "openai"` to embed through an API '
-            "or a `codemem serve-embeddings` server."
+            'run `pip install torch sentence-transformers`, or set `[embedding] provider = "openai"` to embed '
+            "through an API or a `codemem serve-embeddings` server."
         )
     on_cpu = SentenceTransformerEmbedder(DEFAULT_MODEL, device="cpu")
     assert on_cpu.key == f"{DEFAULT_MODEL}|doc|L1024|float32|cpu"  # needs no PyTorch, so it stays the same
@@ -223,7 +224,8 @@ def test_without_pytorch_the_local_model_says_how_to_get_it(monkeypatch):
     assert resolve_device("auto") == "cpu" and resolve_device("cuda") == "cpu"  # what the eval's adapter asks
 
     monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None if name == "sentence_transformers" else name)
-    with pytest.raises(LocalModelUnavailable, match="because sentence-transformers is not installed"):
+    one_missing = "because sentence-transformers is not installed: run `pip install sentence-transformers`"
+    with pytest.raises(LocalModelUnavailable, match=one_missing):
         on_cpu.embed_documents(["x"])
 
 
