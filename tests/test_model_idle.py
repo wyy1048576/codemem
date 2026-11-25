@@ -577,6 +577,8 @@ def test_status_says_whether_the_model_is_in_memory(service, model, clock, sampl
     fresh = CodememService(sample_repo, index_dir=tmp_path / "idx", config=service.config)
     try:  # a process that has not embedded anything holds no model, and status builds none
         assert fresh.status(check_staleness=False)["models_loaded"] is False and fresh._embedders == {}
+        fresh.embedder_factory("fake:64", fresh.config)  # by name, as make_embedder allows
+        assert fresh.status(check_staleness=False)["models_loaded"] is True
     finally:
         fresh.close()
 

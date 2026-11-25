@@ -118,11 +118,13 @@ class CodememService:
         self._last_write = 0.0  # monotonic time of the last index change
         self._last_reconcile = 0.0
 
-    def embedder_factory(self, spec: VectorConfig, config: Config) -> Embedder:
-        """The embedder of a vector type. Each one handed out is remembered, so `status` and the
-        idle unload reach the models in use without building any."""
+    def embedder_factory(self, spec: VectorConfig | str, config: Config) -> Embedder:
+        """The embedder of a vector type (or of a bare model name, as `make_embedder` takes). Each
+        one handed out is remembered, so `status` and the idle unload reach the models in use
+        without building any."""
         embedder = self._make_embedder(spec, config)
-        self._embedders[(spec.model, spec.embedder, spec.version)] = embedder
+        named = VectorConfig(model=spec) if isinstance(spec, str) else spec
+        self._embedders[(named.model, named.embedder, named.version)] = embedder
         return embedder
 
     @property
