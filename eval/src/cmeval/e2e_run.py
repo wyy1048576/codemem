@@ -102,6 +102,8 @@ GPUS_ENV = "CMEVAL_E2E_GPUS"
 MCP_TIMEOUT_MS = 120_000
 # Where the container of a codemem setup gets the index copy and the Hugging Face cache.
 INDEX_MOUNT = "/cmindex"
+# The GPU as a CDI device (nvidia-ctk cdi generate). Docker reads CDI specs without a restart of its daemon.
+GPU_DEVICE = "nvidia.com/gpu=all"
 HF_MOUNT = "/hf"
 CODEMEM_SEARCH_TOOL = "mcp__codemem__search_code"
 # Files of the agent's patch that codemem could have written. `codemem mcp` should write none.
@@ -148,7 +150,7 @@ class RunSettings:
     host_extra_s: int = 15 * 60
     poll_s: float = 0.5
     upstream: str = DEFAULT_UPSTREAM
-    # --gpus all for every setup, so that the containers of two setups are the same (plan 4.5, rule 1).
+    # The GPU for every setup, so that the containers of two setups are the same (plan 4.5, rule 1).
     gpus: bool = field(default_factory=_gpus_default)
 
 
@@ -646,7 +648,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
         with RecordingProxy(out / "proxy.jsonl", host=gateway, port=0, upstream=settings.upstream) as proxy:
             cmd = ["docker", "run", "--rm", "--name", name, "--network", settings.network,
                    f"--cpus={settings.cpus}", f"--memory={settings.memory}",
-                   *(["--gpus", "all"] if settings.gpus else []),
+                   *(["--device", GPU_DEVICE] if settings.gpus else []),
                    "-e", TOKEN_ENV, "-e", f"ANTHROPIC_BASE_URL=http://{gateway}:{proxy.port}",
                    "-v", f"{ready['claude_bin']}:/usr/local/bin/claude:ro", "-v", f"{out}:/out",
                    *(codemem_mounts(codemem, index_copy) if codemem else []),

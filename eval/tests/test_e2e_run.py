@@ -387,7 +387,7 @@ def test_run_one_locally(make_task, tmp_path, monkeypatch):
     assert "CLAUDE_CODE_OAUTH_TOKEN" in run and not any(FAKE_TOKEN in part for part in run)
     assert ["docker", "rm", "-f", run[run.index("--name") + 1]] in calls
     # The GPU in both setups, and no codemem mount for grep.
-    assert run[run.index("--gpus") + 1] == "all" and run.count("-v") == 2
+    assert run[run.index("--device") + 1] == "nvidia.com/gpu=all" and run.count("-v") == 2
     assert record["identity"]["codemem"] is None and record["integrity"]["gpus"] is True
     assert record["outcome"]["unexpected_paths"] == []
 
@@ -698,7 +698,7 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
 
     assert record["integrity"]["setup_ok"] and not record["discard"] and record["completed"] is True
     run = seen["cmd"]
-    assert run[run.index("--gpus") + 1] == "all"
+    assert run[run.index("--device") + 1] == "nvidia.com/gpu=all"
     assert run[run.index(f"{out}:/out") + 1:run.index(record["identity"]["image"])] == [
         "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",
         "-v", f"{out / 'cmindex'}:/cmindex"]
@@ -736,7 +736,7 @@ def test_run_one_without_gpus(make_task, tmp_path, monkeypatch):
     record = e2e_run.run_one(recipe, task, setup="grep", model="claude-haiku-5-5", rep=1, out=out,
                              settings=RunSettings(poll_s=0.05))
     run = next(c for c in calls if c[:2] == ["docker", "run"])
-    assert "--gpus" not in run and record["integrity"]["gpus"] is False
+    assert "--device" not in run and record["integrity"]["gpus"] is False
     _codemem_install(tmp_path, monkeypatch, recipe, task)
     with pytest.raises(gen.GenerateError, match="needs the GPU"):
         e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
@@ -851,3 +851,18 @@ def test_score_tool_against_grep(capsys):
     assert "tool - grep over 2 tasks: completed 0.00, tokens -150, seconds -7.5" in text
     assert "used  codemem 1st call" in text
     assert text.splitlines()[-1].endswith("0.50      2.5      1.0")
+
+
+def test_python_root_holds_the_alias_and_the_real_install(tmp_path):
+    from cmeval.e2e_index import codemem_python_root
+
+    pythons = tmp_path / "uv" / "python"
+    real = pythons / "cpython-3.11.18-linux" / "bin"
+    real.mkdir(parents=True)
+    (real / "python3.11").write_text("")
+    (pythons / "cpython-3.11-linux").symlink_to(pythons / "cpython-3.11.18-linux")
+    bin_dir = tmp_path / "checkout" / ".venv" / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "python").symlink_to(pythons / "cpython-3.11-linux" / "bin" / "python3.11")
+    (bin_dir / "codemem").write_text("")
+    assert codemem_python_root(bin_dir / "codemem") == pythons

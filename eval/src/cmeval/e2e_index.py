@@ -61,6 +61,13 @@ def codemem_python_root(program: Path) -> Path | None:
     if not python.exists():
         raise GenerateError(f"no python beside {program}; codemem must be installed in a virtual environment")
     root = Path(os.path.realpath(python)).parent.parent
+    # uv links the environment to an alias folder (cpython-3.11-...), which links to the real one
+    # (cpython-3.11.18-...). Both must be in the container, so mount the folder that holds both.
+    link = Path(os.readlink(python)) if python.is_symlink() else python
+    link = link if link.is_absolute() else python.parent / link
+    alias = Path(os.path.abspath(link)).parent.parent
+    if alias != root and alias.parent == root.parent:
+        root = root.parent
     if root in SYSTEM_ROOTS:
         raise GenerateError(f"the Python of {program} is in {root}, a folder of the system; make the environment "
                             "with a Python that uv installed")
