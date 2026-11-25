@@ -94,8 +94,8 @@ skip_generated = true        # skip files marked "Code generated ... DO NOT EDIT
 languages = ["python", "go"] # default: every supported language
 code_header = true           # put the path and enclosing class above the embedded code
 vector_cache = "global"      # global = reuse vectors across indexes on this machine | off
-vector_backend = "faiss"     # the in-memory search index: faiss (every vector, exact) | compact (a
-                             # small code per vector, [compact] below) | a plugin class (below)
+vector_backend = "faiss"     # the in-memory search index: faiss (every vector, exact) | compact (small
+                             # codes of each vector, [compact] below) | a plugin class (below)
 kinds = ["function", "method"]  # search-time filter; default: every kind
 test_weight = 1.0            # search-time: lower it to rank tests lower
 kind_weights = { class = 1.0, block = 1.0 }  # search-time: lower them to rank classes or blocks lower
@@ -110,8 +110,8 @@ model = "jinaai/jina-code-embeddings-0.5b"   # a Hugging Face name, or a local m
 model = "jinaai/jina-code-embeddings-0.5b"
 
 [compact]                    # read when vector_backend = "compact"
-bits = 1                     # bits per number of the in-memory code, 1 to 8
-dim = 0                      # numbers of each vector the code covers (the first N); 0 = as many as the index uses
+bits = 4                     # bits per number of the code that ranks the candidates, 1 to 8 (1 = the smallest index)
+dim = 0                      # numbers of each vector the codes cover (the first N); 0 = as many as the index uses
 rescore = 200                # candidates scored exactly from the stored vectors: at least this many,
                              # and at least 4 per result asked for
 

@@ -6,10 +6,10 @@ SQLite is the source of truth for everything, vectors included: each row of `vec
 float16 vector at the model's full dimension, with the chunk, part (window) and text hash it
 came from. The search index is derived from those rows: by default FAISS, an exact inner-product
 index over vector ids that holds the same 2-byte numbers (or another `VectorStore` backend,
-named in config: `compact` keeps a small code per vector and scores its best candidates from
+named in config: `compact` keeps small codes of each vector and scores its best candidates from
 the rows), truncated to `embedding_dim` if set, kept in memory and saved as
-`vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it reflects (and the backend and
-options that wrote it). Every transaction that changes a vector type's
+`vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it reflects (and the database,
+backend and options it was saved from). Every transaction that changes a vector type's
 rows bumps its epoch in `meta`, and the index is patched right after the commit (never before, so
 it never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
 with a new id. So an index that is behind (a saved file from before a crash, or another process
@@ -328,10 +328,11 @@ class CompactVectorStore(VectorStore):
     skips the codes.
 
     FAISS can also scan fine codes by itself. It then takes a code's fine estimate whenever its
-    first bit leaves it a chance against the best found so far, which was 10 to 20% of the codes
-    at 30 times the cost of a 1-bit estimate: 2.5 to 4 times the exact index's whole scan. And
-    which codes that is depends on the order they are held in. Here a search takes a fine
-    estimate of a fixed number of codes, and its candidates depend only on the vectors held.
+    first bit leaves it a chance against the best found so far: a tenth to a quarter of the
+    codes, each at 25 times the cost of a 1-bit estimate, so that a search took 2 to 4 times as
+    long as with the exact index. And which codes that is depends on the order they are held in.
+    Here a search takes the fine estimate of the scan's best only, and its candidates depend
+    only on the vectors held.
 
     FAISS holds the codes by position; `_ids` maps a position to its vector id, and the codes are
     kept in the order of those ids, so two indexes that hold the same vectors are the same bytes.

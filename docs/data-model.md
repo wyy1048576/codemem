@@ -383,17 +383,20 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
   index.db                           SQLite (WAL): meta, files, chunks, fts (word lists only, + fts_vocab), calls, edges, vectors,
                                      dirty_texts (the queue)
   vec_code.faiss, vec_code.json      a saved copy of the search index + a note {epoch, dim, count, embedder,
-  vec_usage.faiss, vec_usage.json    backend, file}; another backend saves vec_<type><suffix>, or nothing.
+  vec_usage.faiss, vec_usage.json    database, backend, file}; another backend saves vec_<type><suffix>, or nothing.
+                                     `database` is the `database_id` of the index.db the copy was saved from.
                                      FAISS files hold an IndexIDMap2 over an fp16 IndexScalarQuantizer
                                      (inner product, 2 bytes per number); a file of 4-byte numbers
                                      (IndexFlatIP) is converted when loaded
   vec_code.rabitq, vec_usage.rabitq  the compact backend's copy, and in its note `options`: the [compact]
                                      table it was made with. The file is one line of JSON {dim, code_dim,
-                                     bits, count, rotation, crc32}, then `count` vector ids (8 bytes each,
-                                     little-endian), then a FAISS IndexRaBitQ (inner product, centre zero)
-                                     with one code per id, in the same order. `rotation` names the rotation
-                                     the codes were made after, and `crc32` is the checksum of everything
-                                     after the first line
+                                     bits, count, rotation, index_bytes, crc32}, then `count` vector ids
+                                     (8 bytes each, little-endian), then one FAISS IndexRaBitQ (inner
+                                     product, centre zero) of the 1-bit codes and, when `bits` is above 1,
+                                     a second one of the `bits`-bit codes. Each holds one code per id, in
+                                     the order of the ids, and `index_bytes` lists their sizes. `rotation`
+                                     names the rotation the codes were made after, and `crc32` is the
+                                     checksum of everything after the first line
   write.lock                         one writer at a time (OS file lock)
 $CODEMEM_HOME/cache/vectors.db       shared vector cache: (embedder key, text_hash) -> float16 vector
 $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sha256], so it is read once
@@ -401,6 +404,8 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 
 `meta` keys:
 - `schema_version` (3);
+- `database_id`: a random token that names this database file. The store sets it when it opens a
+  database that has none; a copy made to start another index drops the row and so gets its own;
 - `repo_path`, `indexed_commit`, `indexed_at`;
 - `codemem_version`, `index_settings`, `last_update` (the last `IndexStats`);
 - `coverage`: ignored and non-code counts;
@@ -424,9 +429,13 @@ it doesn't own.
   2. the in-memory index is patched only after the commit, and its epoch is set last;
   3. an index that is behind catches up by vector id: vector rows never change in place (a new
      vector is a new row, and ids are never reused), so the ids missing on either side are the
-     whole difference. This applies to a saved copy (used if its dim, embedder, backend and
-     backend options match, whatever epoch it was saved at; a note without `backend` counts as
-     FAISS) and to another process's writes.
+     whole difference. This applies to a saved copy (used if its database, dim, embedder, backend
+     and backend options match, whatever epoch it was saved at; a note without `backend` counts
+     as FAISS) and to another process's writes.
+  4. a saved copy is read only into the database it was saved from. Its note names that
+     database's `database_id`; a note that names another, or none, means a rebuild from the rows.
+     Vector ids start again at 1 in a new `index.db`, so the copy of a deleted one would match
+     other vectors by id.
 - **Saving the search index:**
   - the data file is written first and its note second, each by atomic rename;
   - the MCP server saves lazily (after 30 s idle, on shutdown, on refresh), while the CLI and the
@@ -435,8 +444,8 @@ it doesn't own.
     wait;
   - a backend that returns no bytes is not saved; it is rebuilt from the rows at each start;
   - the compact backend's file is read only if its checksum, its options and its rotation are the
-    ones expected, and the FAISS index inside is the one its first line describes. Anything else
-    is rebuilt from the rows.
+    ones expected, its ids are in order, and the FAISS indexes inside are the ones its first line
+    describes. Anything else is rebuilt from the rows.
 - **The queue (`dirty_texts`: chunk id, sequence number).** Stage A writes a row for every chunk
   whose texts may have changed, in the same transaction as the change. Stage B rebuilds those
   texts, embeds the changed ones, and deletes a row only if its number is unchanged (a chunk edited
@@ -606,7 +615,7 @@ A change to any of these must be made together with the eval:
   is refused, and an enabled type needs a text builder (`code` or `usage`). The model id is
   `model[@embedding_dim][#version][+embedder]`: index-time, and unchanged when neither option is
   set.
-- **`vector_backend`:** `faiss` (every vector in memory, exact), `compact` (a small code per
+- **`vector_backend`:** `faiss` (every vector in memory, exact), `compact` (small codes of each
   vector in memory, exact scores from the stored vectors) or `"module:Class"` (a
   `store.VectorStore` subclass). Index-time only so that eval systems with different backends
   don't share an index.
@@ -615,8 +624,8 @@ A change to any of these must be made together with the eval:
 
   | Key | Default | Range | Meaning |
   |---|---|---|---|
-  | `bits` | 1 | 1 to 8 | bits per number of the in-memory code |
-  | `dim` | 0 | 0 to 4,096 | how many numbers of each vector the code covers (the first N); 0 = as many as the index uses, which is `embedding_dim` or the model's length. A code never covers more than 4,096 |
+  | `bits` | 4 | 1 to 8 | bits per number of the fine code, which ranks the candidates. Every vector also has a 1-bit code, which a search scans; at `bits = 1` that is the only code, and the index is at its smallest |
+  | `dim` | 0 | 0 to 4,096 | how many numbers of each vector the codes cover (the first N); 0 = as many as the index uses, which is `embedding_dim` or the model's length. A code never covers more than 4,096 |
   | `rescore` | 200 | 1 or more | candidates scored exactly from the stored vectors: at least this many, and at least 4 for each result asked for |
 
   The three are in `index_settings()` as `compact`, for the same reason as `vector_backend`.
@@ -655,8 +664,8 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   calls it once, right after it builds or loads the index. `fetch(ids)` reads vectors from SQLite
   and returns `(found, vectors)`: an int64 array of the ids that still have a row, and a float32
   array of shape `(len(found), dim)` with their vectors, row for row, exactly as `upsert` got
-  them. An id whose row is gone is left out. `fetch` reads with the SQLite connection of the
-  thread that calls it: call it from inside `search`. The default `bind` does nothing;
+  them. An id whose row is gone is left out. `fetch` reads on the thread that calls it, through
+  a connection of that thread: call it from inside `search`. The default `bind` does nothing;
 - the store calls it under its lock, one call at a time.
 
 **Embedder factories.** `Indexer`, `search()` and `CodememService` take an `embedder_factory`

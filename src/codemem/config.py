@@ -96,11 +96,13 @@ class EmbeddingConfig:
 
 @dataclass
 class CompactConfig:
-    """The compact search index, `vector_backend = "compact"` (docs/architecture.md §5): a small
-    code per vector in memory, and the best candidates scored exactly from the stored vectors."""
+    """The compact search index, `vector_backend = "compact"` (docs/architecture.md §5): small
+    codes of each vector in memory, and the best candidates scored exactly from the stored vectors."""
 
-    bits: int = 4  # bits per number of the in-memory code, 1 to 8
-    # numbers of each vector the code covers (the first N); 0 = as many as the index uses. At most
+    # bits per number of the fine code, which ranks the candidates, 1 to 8. Every vector also has a
+    # 1-bit code, which a search scans; at 1 that is the only code
+    bits: int = 4
+    # numbers of each vector the codes cover (the first N); 0 = as many as the index uses. At most
     # COMPACT_MAX_DIM either way
     dim: int = 0
     rescore: int = 200  # candidates scored exactly: at least this many, and at least 4 per result asked for
