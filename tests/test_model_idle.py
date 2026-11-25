@@ -378,6 +378,24 @@ def test_two_vector_types_on_one_model_are_one_model_to_unload(service, model, c
     assert asked == [IDLE_MINUTES * 60]  # once, although code and usage vectors both use it
 
 
+def test_a_model_that_cannot_be_freed_does_not_stop_the_writer(service, model, clock):
+    tries = []
+
+    def broken():
+        tries.append(clock())
+        raise RuntimeError("the allocator said no")
+
+    model._drop = broken
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    service._step()  # logged, not raised
+    service._step()
+    assert len(tries) == 1 and model.ready  # it counted as a use: the next try is an idle time away
+    del model._drop
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    service._step()
+    assert not model.ready
+
+
 # ---------------------------------------------------------------- the next use loads it again
 
 

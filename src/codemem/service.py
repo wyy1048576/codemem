@@ -310,13 +310,13 @@ class CodememService:
             if self.indexer.searches_waiting:
                 self._stop.wait(0.05)  # a search is embedding what it needs: leave it the model
                 return True
-            if not self._models_ready(0.0):
-                # The model is loading in its own thread (start-up, or the first use after an
-                # idle unload): saves are still applied meanwhile.
-                self._stop.wait(0.05)
-                return True
             stats = IndexStats()
             try:
+                if not self._models_ready(0.0):
+                    # The model is loading in its own thread (start-up, or the first use after an
+                    # idle unload): saves are still applied meanwhile.
+                    self._stop.wait(0.05)
+                    return True
                 # Stops at its next model call when a search wants the model or new saves arrive.
                 self.indexer.embed_pending(
                     stats, deadline=time.monotonic() + 5.0, batch_chunks=_BATCH, group=self.config.batch_size,
@@ -548,8 +548,12 @@ class CodememService:
         if minutes <= 0:
             return
         for embedder in list(self._embedders.values()):
-            if embedder.unload(minutes * 60):
-                log.info("unloaded %s after %g idle minutes", embedder.model_name, minutes)
+            try:
+                if embedder.unload(minutes * 60):
+                    log.info("unloaded %s after %g idle minutes", embedder.model_name, minutes)
+            except Exception:  # the writer must go on; touching it puts the next try an idle time away
+                log.exception("could not unload %s", embedder.model_name)
+                embedder.touch()
 
     def _models_loaded(self) -> bool | None:
         """Whether the model of every enabled vector type is in this process's memory. None when

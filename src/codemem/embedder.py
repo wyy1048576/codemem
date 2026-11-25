@@ -133,8 +133,8 @@ def _counted(embed: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
 
 def _release_memory(device: str) -> None:
     """Hand a dropped model's memory back to the system. Collecting frees what reference cycles
-    kept of it. On a GPU (cuda, mps, xpu) PyTorch keeps freed blocks for reuse, and they stay in
-    the process's footprint until its cache is emptied."""
+    kept of it. On a GPU (cuda, mps, xpu) PyTorch keeps freed blocks for reuse, and they stay
+    with the process until its cache is emptied."""
     import torch
 
     gc.collect()
