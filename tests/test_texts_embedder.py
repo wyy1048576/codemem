@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from codemem.callgraph import is_test_caller, is_test_path, resolve_edges
-from codemem.config import Config, config_from_dict
-from codemem.embedder import FakeEmbedder, make_embedder
+from codemem.config import DEFAULT_MODEL, Config, config_from_dict
+from codemem.embedder import FakeEmbedder, LocalModelUnavailable, SentenceTransformerEmbedder, make_embedder
 from codemem.schema import Chunk
 from codemem.texts import TEXT_BUILDERS, BuildContext, Ref, build_parts, build_texts
 
@@ -175,7 +175,7 @@ def test_load_config_layers(tmp_path, monkeypatch):
 
 
 def test_resolve_device_mps(monkeypatch):
-    import torch
+    torch = pytest.importorskip("torch")  # the `local` extra
 
     from codemem.embedder import resolve_device
 
@@ -191,13 +191,40 @@ def test_resolve_device_mps(monkeypatch):
 
 
 def test_resolve_device_cuda_before_mps(monkeypatch):
-    import torch
+    torch = pytest.importorskip("torch")  # the `local` extra
 
     from codemem.embedder import resolve_device
 
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
     assert resolve_device("auto") == "cuda"
+
+
+def test_without_pytorch_the_local_model_says_how_to_get_it(monkeypatch):
+    """An install without the `local` extra. The model says in one sentence what is missing and both
+    ways out. A key that would need PyTorch is refused too: answering "cpu" would re-key an index
+    built on a GPU, and its vectors would be dropped before the model failed."""
+    from codemem.embedder import resolve_device
+
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+    emb = SentenceTransformerEmbedder(DEFAULT_MODEL)
+    for use in (lambda: emb.key, lambda: emb.embed_queries(["x"]), lambda: emb.embed_documents(["x"]), lambda: emb.dim):
+        with pytest.raises(LocalModelUnavailable) as err:
+            use()
+        assert str(err.value) == (
+            "The local embedding model cannot run because PyTorch and sentence-transformers are not installed: "
+            'run `pip install "codemem[local]"`, or set `[embedding] provider = "openai"` to embed through an API '
+            "or a `codemem serve-embeddings` server."
+        )
+    on_cpu = SentenceTransformerEmbedder(DEFAULT_MODEL, device="cpu")
+    assert on_cpu.key == f"{DEFAULT_MODEL}|doc|L1024|float32|cpu"  # needs no PyTorch, so it stays the same
+    with pytest.raises(LocalModelUnavailable):
+        on_cpu.embed_documents(["x"])
+    assert resolve_device("auto") == "cpu" and resolve_device("cuda") == "cpu"  # what the eval's adapter asks
+
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None if name == "sentence_transformers" else name)
+    with pytest.raises(LocalModelUnavailable, match="because sentence-transformers is not installed"):
+        on_cpu.embed_documents(["x"])
 
 
 def test_config_accepts_mps():

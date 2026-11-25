@@ -11,6 +11,7 @@ from pathlib import Path
 
 from . import __version__, agents
 from .config import find_repo_root, load_config
+from .embedder import LocalModelUnavailable
 from .render import format_results, format_status
 
 
@@ -269,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         args.index_dir = str(Path(args.index_dir).resolve())
     try:
         return args.func(args)
-    except TimeoutError as e:
+    except (TimeoutError, LocalModelUnavailable) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 

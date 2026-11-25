@@ -10,6 +10,9 @@ search index, so changing it never re-embeds.
 `Embedder.key` names the embedding space of document vectors (model and its weights version,
 prompt, max length, dtype, device): vectors with equal keys are interchangeable, so the store and
 the vector cache reuse them by (key, text hash).
+
+The local model's packages (PyTorch, sentence-transformers) are an optional install. Nothing here
+imports them until a local model is used, and then a missing package is named with its remedy.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from importlib.util import find_spec
 from typing import Any
 from urllib.parse import urlparse
 
@@ -42,6 +46,22 @@ FALLBACK_PROMPTS = {
     DOCUMENT_PROMPT: "Candidate code snippet:\n",
 }
 _QUERY_CACHE_SIZE = 512
+_LOCAL_PACKAGES = {"torch": "PyTorch", "sentence_transformers": "sentence-transformers"}
+
+
+class LocalModelUnavailable(RuntimeError):
+    """The packages the local embedding model runs on are not installed."""
+
+
+def require_local_model() -> None:
+    """Raise, naming both remedies, when the local model's packages are missing."""
+    missing = [label for module, label in _LOCAL_PACKAGES.items() if find_spec(module) is None]
+    if missing:
+        raise LocalModelUnavailable(
+            f"The local embedding model cannot run because {' and '.join(missing)} "
+            f"{'is' if len(missing) == 1 else 'are'} not installed: run `pip install \"codemem[local]\"`, or set "
+            '`[embedding] provider = "openai"` to embed through an API or a `codemem serve-embeddings` server.'
+        )
 
 
 def l2_normalize(vecs: np.ndarray) -> np.ndarray:
@@ -113,10 +133,11 @@ class FakeEmbedder(Embedder):
 
 
 def resolve_device(preference: str) -> str:
+    """The device a local model runs on. An install without PyTorch has nothing to run on a GPU: cpu."""
+    if preference == "cpu" or find_spec("torch") is None:
+        return "cpu"
     import torch
 
-    if preference == "cpu":
-        return "cpu"
     if preference in ("auto", "cuda") and torch.cuda.is_available():
         return "cuda"
     if preference in ("auto", "mps") and torch.backends.mps.is_available():
@@ -174,6 +195,10 @@ class SentenceTransformerEmbedder(Embedder):
     @property
     def device(self) -> str:
         if self._device is None:
+            if self.device_preference != "cpu":
+                # Without PyTorch the answer would be "cpu", and the key would name another set of
+                # vectors: an index built on a GPU would drop its vectors before the model failed.
+                require_local_model()
             self._device = resolve_device(self.device_preference)
         return self._device
 
@@ -190,6 +215,7 @@ class SentenceTransformerEmbedder(Embedder):
     def model(self):
         with self._lock:
             if self._model is None:
+                require_local_model()
                 import torch
                 from sentence_transformers import SentenceTransformer
 
@@ -292,10 +318,8 @@ class OpenAIEmbedder(Embedder):
     def _http(self) -> Any:
         with self._lock:
             if self._client is None:
-                try:
-                    import httpx
-                except ImportError as e:  # codemem's own dependencies bring it; a bare environment may not
-                    raise RuntimeError("API embeddings need the httpx package: pip install httpx") from e
+                import httpx
+
                 self._client = httpx.Client(timeout=self.cfg.timeout_s)
             return self._client
 

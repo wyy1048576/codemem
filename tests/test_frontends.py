@@ -10,6 +10,7 @@ import pytest
 from codemem import agents, prompts
 from codemem.cli import main
 from codemem.embedder import make_embedder
+from codemem.render import format_status
 from codemem.service import CodememService
 
 
@@ -408,6 +409,26 @@ def test_cli_index_search_status(sample_repo, tmp_path, fake_env, capsys):
     assert main(["status", str(sample_repo), "--index-dir", idx, "--json"]) == 0
     status = json.loads(capsys.readouterr().out)
     assert status["state"] == "ready" and status["files"] == 6 and status["stale"]["changed_files"] == 0
+
+
+def test_cli_without_pytorch_names_the_remedy_and_status_still_works(sample_repo, tmp_path, monkeypatch, capsys):
+    """The local model in an install without the `local` extra: one line on stderr, no traceback."""
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+    monkeypatch.setattr("codemem.embedder._CACHE", {})
+    idx = str(tmp_path / "idx")
+    assert main(["index", str(sample_repo), "--index-dir", idx]) == 1
+    err = capsys.readouterr().err
+    assert "error: The local embedding model cannot run because PyTorch and sentence-transformers are not" in err
+    assert 'pip install "codemem[local]"' in err and "Traceback" not in err
+    assert main(["status", str(sample_repo), "--index-dir", idx]) == 0  # needs no model
+    assert "state: empty" in capsys.readouterr().out
+
+    svc = CodememService(sample_repo, index_dir=idx)
+    try:
+        assert svc.update() is None  # what the MCP server's writer does: the error is kept for index_status
+        assert 'pip install "codemem[local]"' in format_status(svc.status())
+    finally:
+        svc.close()
 
 
 def test_cli_search_without_index(sample_repo, tmp_path, fake_env, capsys):
