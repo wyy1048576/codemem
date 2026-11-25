@@ -227,9 +227,12 @@ class VectorCache:
         dim, rows = self._try(self._read, embedder, list(places), touch) or (0, [])
         vecs = np.zeros((len(hashes), dim), dtype=np.float16)
         found = np.zeros(len(hashes), dtype=bool)
-        for key, data in rows:
-            vecs[places[key]] = from_blob(data, dim)
-            found[places[key]] = True
+        if rows:
+            # One copy for all rows: row by row costs as much again as reading them.
+            read = np.frombuffer(b"".join(data for _, data in rows), dtype=np.float16).reshape(len(rows), dim)
+            to = [i for key, _ in rows for i in places[key]]
+            vecs[to] = read[[r for r, (key, _) in enumerate(rows) for _ in places[key]]]
+            found[to] = True
         return vecs, found
 
     def _read(self, conn: sqlite3.Connection, embedder: str, keys: list[Key], touch: bool) -> tuple[int, list[tuple[Key, bytes]]]:

@@ -298,6 +298,68 @@ def test_eviction_with_two_vector_lengths_and_other_writers(tmp_path, clock):
     _check_layout(cache.path)
 
 
+_WORKER = """
+import hashlib, sys, time
+import numpy as np
+from codemem import vectorcache
+
+path, seed, seconds, cap = sys.argv[1], int(sys.argv[2]), float(sys.argv[3]), int(sys.argv[4])
+vectorcache._EVICT_ROWS = 64
+rng = np.random.default_rng(seed)
+cache = vectorcache.VectorCache(path, max_bytes=cap)
+
+
+def name(i):
+    return hashlib.sha256(f"text {i}".encode()).hexdigest()[:20]
+
+
+def vector(h):  # 32 numbers that follow from the hash alone, so every process can check what it reads
+    return np.frombuffer(hashlib.sha256(h.encode()).digest() * 2, dtype=np.float16)
+
+
+end, read, wrong, put = time.monotonic() + seconds, 0, 0, 0
+while time.monotonic() < end:
+    hashes = list(dict.fromkeys(name(i) for i in rng.integers(0, 30000, 64)))
+    rows, found = cache.fetch("m|doc", hashes)
+    for h, row, ok in zip(hashes, rows, found):
+        read += int(ok)
+        wrong += int(ok and row.tobytes() != vector(h).tobytes())
+    missing = [h for h, ok in zip(hashes, found) if not ok]
+    if missing:
+        cache.put_many("m|doc", missing, np.stack([vector(h) for h in missing]))
+        put += len(missing)
+    cache.touch("m|doc", hashes[:8])
+print(read, wrong, put)
+cache.close()
+"""
+
+
+def test_processes_reading_writing_and_evicting_at_once_never_read_a_wrong_vector(tmp_path):
+    """Four processes share a cache whose cap holds a third of what they ask for, so entries are
+    evicted, and rows move between slots, all the time. Whatever a read finds must be the vector
+    of the hash it asked for."""
+    path, cap = tmp_path / CACHE_FILE, 1_600_000
+    procs = [
+        subprocess.Popen([sys.executable, "-c", _WORKER, str(path), str(seed), "3", str(cap)],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        for seed in range(4)
+    ]
+    try:
+        outs = [p.communicate(timeout=120) for p in procs]
+    finally:
+        for p in procs:
+            p.kill()
+    assert [p.returncode for p in procs] == [0, 0, 0, 0], outs
+    read, wrong, put = (sum(column) for column in zip(*(map(int, out.split()) for out, _ in outs)))
+    assert wrong == 0 and read > 0 and put > 0
+    assert not any("going on without it" in err for _, err in outs), outs  # and no call gave up on the file
+    cache = VectorCache(path, max_bytes=cap)
+    cache.evict()
+    assert 0 < cache.count() < put and cache.stats()["bytes"] <= cap  # entries were evicted along the way
+    _check_layout(path)
+    cache.close()
+
+
 def test_no_cap_means_no_eviction(tmp_path):
     cache = VectorCache(tmp_path / "cache.db")
     _put(cache, KEY, _hashes("a", 2000), _vecs(2000, 64))
