@@ -286,6 +286,11 @@ def task_dir(recipe: Recipe, task: Task) -> Path:
     return generate_dir() / recipe.name / task.id
 
 
+def tests_path(recipe: Recipe, task: Task) -> Path:
+    """The tests that a valid task is graded on: fail_to_pass and pass_to_pass."""
+    return task_dir(recipe, task) / "tests.json"
+
+
 def build_task_image(recipe: Recipe, task: Task) -> tuple[str, float]:
     """Build the image of one task. Returns the tag and the build time in seconds (0 if it existed)."""
     tag = task_tag(recipe, task)
@@ -382,37 +387,52 @@ def judge(before: list[dict[str, str]], after: list[dict[str, str]]) -> Verdict:
     return verdict
 
 
-def _script(recipe: Recipe, task: Task, repeats: int) -> str:
-    """The shell script that runs inside the container. It writes to /work. A line of times.txt
-    is: phase, run number, exit code, milliseconds. A run is all suites that have files of the
-    task, one after the other; suite k writes <phase>-<run>.<k>.xml."""
+def test_run_line(recipe: Recipe, task: Task, name: str) -> str:
+    """One shell line that runs every suite that has files of the task, one after the other.
+    Suite k writes /work/<name>.<k>.xml and /work/<name>.<k>.log. Then one line goes to
+    /work/times.txt: the name, the highest exit code, and the milliseconds."""
     limit = recipe.timeout_min * 60
-    commands = []
+    parts = []
     for k, suite in enumerate(recipe.suites):
         files = suite_files(suite, task)
-        if files:
-            commands.append((k, suite.test.replace("{files}", " ".join(f"'{f}'" for f in files))))
+        if not files:
+            continue
+        test = suite.test.replace("{files}", " ".join(f"'{f}'" for f in files))
+        test = test.replace("{junit}", f"/work/{name}.{k}.xml")
+        # The command goes through a shell, so it can start with variables and use pipes.
+        parts.append(f"timeout -k 30 {limit} bash -c {shlex.quote(test)} > /work/{name}.{k}.log 2>&1; "
+                     "r=$?; rc=$((rc > r ? rc : r))")
+    return (f"s=$(date +%s%N); rc=0; {'; '.join(parts)}; e=$(date +%s%N); "
+            f"echo \"{name} $rc $(( (e - s) / 1000000 ))\" >> /work/times.txt")
 
+
+def refresh_lines(recipe: Recipe) -> str:
+    return "\n".join(f"{c} >> /work/refresh.log 2>&1 || echo \"refresh failed\" >> /work/times.txt"
+                     for c in recipe.refresh)
+
+
+def read_results(work: Path, name: str) -> dict[str, str]:
+    """The merged results of one test run (all suites)."""
+    merged: dict[str, str] = {}
+    for path in sorted(work.glob(f"{name}.*.xml")):
+        try:
+            merged.update(parse_junit(path))
+        except ET.ParseError:
+            pass
+    return merged
+
+
+def _script(recipe: Recipe, task: Task, repeats: int) -> str:
+    """The shell script that validates a task inside its container. It writes to /work."""
     def runs(phase: str) -> str:
-        lines = []
-        for i in range(1, repeats + 1):
-            # The command goes through a shell, so it can start with variables and use pipes.
-            parts = "; ".join(
-                f"timeout -k 30 {limit} bash -c {shlex.quote(test.replace('{junit}', f'/work/{phase}-{i}.{k}.xml'))}"
-                f" > /work/{phase}-{i}.{k}.log 2>&1; r=$?; rc=$((rc > r ? rc : r))" for k, test in commands)
-            lines.append(
-                f"s=$(date +%s%N); rc=0; {parts}; "
-                f"e=$(date +%s%N); echo \"{phase} {i} $rc $(( (e - s) / 1000000 ))\" >> /work/times.txt"
-            )
-        return "\n".join(lines)
+        return "\n".join(test_run_line(recipe, task, f"{phase}-{i}") for i in range(1, repeats + 1))
 
-    refresh = "\n".join(f"{c} >> /work/refresh.log 2>&1 || echo \"refresh failed\" >> /work/times.txt" for c in recipe.refresh)
     return (
         "cd /testbed\n"
         "git apply --whitespace=nowarn /work/test.patch || { echo 'test patch failed' >> /work/times.txt; exit 3; }\n"
         f"{runs('before')}\n"
         "git apply --whitespace=nowarn /work/fix.patch || { echo 'fix patch failed' >> /work/times.txt; exit 4; }\n"
-        f"{refresh}\n"
+        f"{refresh_lines(recipe)}\n"
         f"{runs('after')}\n"
         "chmod -R a+rwX /work\n"
     )
@@ -438,23 +458,18 @@ def validate_task(recipe: Recipe, task: Task, tag: str, repeats: int = DEFAULT_R
     seconds = time.monotonic() - start
 
     def results(phase: str) -> list[dict[str, str]]:
-        out = []
-        for i in range(1, repeats + 1):
-            merged: dict[str, str] = {}
-            for path in sorted(work.glob(f"{phase}-{i}.*.xml")):
-                try:
-                    merged.update(parse_junit(path))
-                except ET.ParseError:
-                    pass
-            out.append(merged)
-        return out
+        return [read_results(work, f"{phase}-{i}") for i in range(1, repeats + 1)]
 
     times_text = (work / "times.txt").read_text(encoding="utf-8") if (work / "times.txt").exists() else ""
-    run_times = [int(parts[3]) / 1000 for parts in (line.split() for line in times_text.splitlines())
-                 if len(parts) == 4 and parts[0] in ("before", "after")]
+    run_times = [int(parts[2]) / 1000 for parts in (line.split() for line in times_text.splitlines())
+                 if len(parts) == 3 and parts[0].startswith(("before-", "after-"))]
     verdict = judge(results("before"), results("after"))
     if "patch failed" in times_text or "refresh failed" in times_text:
         verdict = Verdict(False, times_text.strip().splitlines()[-1])
+    if verdict.valid:
+        # The two lists that a later run is graded on.
+        lists = {"fail_to_pass": verdict.fail_to_pass, "pass_to_pass": verdict.pass_to_pass}
+        tests_path(recipe, task).write_text(json.dumps(lists) + "\n", encoding="utf-8")
     return {
         "valid": verdict.valid,
         "reason": verdict.reason,

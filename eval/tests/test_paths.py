@@ -12,6 +12,7 @@ def test_cmeval_home_override(tmp_path, monkeypatch):
     assert paths.runs_dir() == tmp_path / "x" / "runs"
     assert paths.token_cache_dir() == tmp_path / "x" / "token-cache"
     assert paths.status_dir() == tmp_path / "x" / "status"
+    assert paths.e2e_dir() == tmp_path / "x" / "e2e"
 
 
 def test_cmeval_home_default(monkeypatch):

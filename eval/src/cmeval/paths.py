@@ -56,6 +56,11 @@ def status_dir() -> Path:
     return cmeval_home() / "status"
 
 
+def e2e_dir() -> Path:
+    """End-to-end runs and the grader check: grader-check/<recipe>/<task id>/."""
+    return cmeval_home() / "e2e"
+
+
 def tmp_dir() -> Path:
     """Short-lived data, for example shallow clones for repo-stats."""
     return cmeval_home() / "tmp"
