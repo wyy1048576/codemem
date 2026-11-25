@@ -16,8 +16,11 @@ A recipe is one TOML file for each repo, in eval/envs/. Its fields:
                 of the week of the task's commit, so a task does not get packages from its future
   build         shell commands, run in /testbed after the source of the commit is there
   refresh       shell commands, run after a patch is applied and before the tests
+  env           variables that are set in the image, for the build and for the tests
   test_files    globs: which changed files of the test patch are given to the test command
   test          the test command. "{files}" and "{junit}" are replaced
+  suite         for a repo with more than one test command: a list of tables, each with its own
+                test_files and test. It replaces the two fields above
   parser        how results are read. Only "junit" exists
   timeout_min   the limit for one test run
 
@@ -65,11 +68,17 @@ class GenerateError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class Suite:
+    test_files: tuple[str, ...]
+    test: str
+
+
+@dataclass(frozen=True)
 class Recipe:
     name: str
     repo: str
     base_image: str
-    test: str
+    test: str = ""
     base_setup: tuple[str, ...] = ()
     deps_files: tuple[str, ...] = ()
     deps: tuple[str, ...] = ()
@@ -78,6 +87,12 @@ class Recipe:
     test_files: tuple[str, ...] = ("**",)
     parser: str = "junit"
     timeout_min: int = 10
+    env: tuple[tuple[str, str], ...] = ()
+    suite: tuple[Suite, ...] = ()
+
+    @property
+    def suites(self) -> tuple[Suite, ...]:
+        return self.suite or (Suite(self.test_files, self.test),)
 
 
 def default_envs_dir() -> Path:
@@ -101,9 +116,17 @@ def load_recipe(name_or_path: str | Path) -> Recipe:
     unknown = sorted(set(data) - known)
     if unknown:
         raise GenerateError(f"{path}: unknown fields: {', '.join(unknown)}")
-    for key in ("repo", "base_image", "test"):
+    for key in ("repo", "base_image"):
         if not isinstance(data.get(key), str) or not data[key]:
             raise GenerateError(f"{path}: '{key}' is missing")
+    suites = data.pop("suite", [])
+    if bool(suites) == bool(data.get("test")):
+        raise GenerateError(f"{path}: give 'test', or a list of 'suite' tables, and not both")
+    for entry in suites:
+        if set(entry) != {"test_files", "test"}:
+            raise GenerateError(f"{path}: a suite has the fields test_files and test")
+    data["suite"] = [Suite(tuple(entry["test_files"]), entry["test"]) for entry in suites]
+    data["env"] = sorted((str(k), str(v)) for k, v in data.get("env", {}).items())
     if data.get("parser", "junit") != "junit":
         raise GenerateError(f"{path}: parser '{data['parser']}' does not exist")
     values = {k: tuple(v) if isinstance(v, list) else v for k, v in data.items()}
@@ -141,10 +164,14 @@ def _glob_match(path: str, pattern: str) -> bool:
     return fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, pattern.replace("/**/", "/"))
 
 
-def task_test_files(recipe: Recipe, task: Task) -> list[str]:
-    """The files of the task's test patch that the test command gets."""
+def suite_files(suite: Suite, task: Task) -> list[str]:
     files = changed_files(task.test_patch or "")
-    return [f for f in files if any(_glob_match(f, pattern) for pattern in recipe.test_files)]
+    return [f for f in files if any(_glob_match(f, pattern) for pattern in suite.test_files)]
+
+
+def task_test_files(recipe: Recipe, task: Task) -> list[str]:
+    """The files of the task's test patch that a test command gets."""
+    return sorted({f for suite in recipe.suites for f in suite_files(suite, task)})
 
 
 def admission_sample(recipe: Recipe, tasks: list[Task], n: int = ADMISSION_N, seed: str | None = None) -> list[Task]:
@@ -189,7 +216,7 @@ def _run_lines(commands: tuple[str, ...]) -> str:
 
 
 def base_tag(recipe: Recipe) -> str:
-    digest = hashlib.sha256(json.dumps([recipe.base_image, recipe.base_setup]).encode()).hexdigest()[:12]
+    digest = hashlib.sha256(json.dumps([recipe.base_image, recipe.base_setup, recipe.env]).encode()).hexdigest()[:12]
     return f"{IMAGE_PREFIX}/{recipe.name}:base-{digest}"
 
 
@@ -202,6 +229,7 @@ def build_base(recipe: Recipe) -> str:
     context.mkdir(parents=True, exist_ok=True)
     dockerfile = (
         f"FROM {recipe.base_image}\n"
+        + "".join(f"ENV {key}={json.dumps(value)}\n" for key, value in recipe.env)
         + _run_lines(recipe.base_setup)
         + "RUN git config --system user.email cmeval@localhost && git config --system user.name cmeval"
         + " && git config --system --add safe.directory '*'\n"
@@ -347,19 +375,25 @@ def judge(before: list[dict[str, str]], after: list[dict[str, str]]) -> Verdict:
     return verdict
 
 
-def _script(recipe: Recipe, files: list[str], repeats: int) -> str:
+def _script(recipe: Recipe, task: Task, repeats: int) -> str:
     """The shell script that runs inside the container. It writes to /work. A line of times.txt
-    is: phase, run number, exit code, milliseconds."""
-    quoted = " ".join(f"'{f}'" for f in files)
+    is: phase, run number, exit code, milliseconds. A run is all suites that have files of the
+    task, one after the other; suite k writes <phase>-<run>.<k>.xml."""
     limit = recipe.timeout_min * 60
+    commands = []
+    for k, suite in enumerate(recipe.suites):
+        files = suite_files(suite, task)
+        if files:
+            commands.append((k, suite.test.replace("{files}", " ".join(f"'{f}'" for f in files))))
 
     def runs(phase: str) -> str:
-        test = recipe.test.replace("{files}", quoted)
         lines = []
         for i in range(1, repeats + 1):
-            command = test.replace("{junit}", f"/work/{phase}-{i}.xml")
+            parts = "; ".join(
+                f"timeout -k 30 {limit} {test.replace('{junit}', f'/work/{phase}-{i}.{k}.xml')}"
+                f" > /work/{phase}-{i}.{k}.log 2>&1; rc=$((rc > $? ? rc : $?))" for k, test in commands)
             lines.append(
-                f"s=$(date +%s%N); timeout -k 30 {limit} {command} > /work/{phase}-{i}.log 2>&1; rc=$?; "
+                f"s=$(date +%s%N); rc=0; {parts}; "
                 f"e=$(date +%s%N); echo \"{phase} {i} $rc $(( (e - s) / 1000000 ))\" >> /work/times.txt"
             )
         return "\n".join(lines)
@@ -385,7 +419,7 @@ def validate_task(recipe: Recipe, task: Task, tag: str, repeats: int = DEFAULT_R
     work.mkdir(parents=True)
     (work / "test.patch").write_text(task.test_patch or "", encoding="utf-8")
     (work / "fix.patch").write_text(task.patch, encoding="utf-8")
-    (work / "run.sh").write_text(_script(recipe, files, repeats), encoding="utf-8")
+    (work / "run.sh").write_text(_script(recipe, task, repeats), encoding="utf-8")
     limit = recipe.timeout_min * 60 * (2 * repeats + 1)
     start = time.monotonic()
     try:
@@ -398,11 +432,13 @@ def validate_task(recipe: Recipe, task: Task, tag: str, repeats: int = DEFAULT_R
     def results(phase: str) -> list[dict[str, str]]:
         out = []
         for i in range(1, repeats + 1):
-            path = work / f"{phase}-{i}.xml"
-            try:
-                out.append(parse_junit(path))
-            except (FileNotFoundError, ET.ParseError):
-                out.append({})
+            merged: dict[str, str] = {}
+            for path in sorted(work.glob(f"{phase}-{i}.*.xml")):
+                try:
+                    merged.update(parse_junit(path))
+                except ET.ParseError:
+                    pass
+            out.append(merged)
         return out
 
     times_text = (work / "times.txt").read_text(encoding="utf-8") if (work / "times.txt").exists() else ""

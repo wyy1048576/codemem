@@ -1,0 +1,38 @@
+# Recipe for microsoft/playwright. Tests run on Chromium only.
+# The fields are described in src/cmeval/generate.py.
+
+repo = "microsoft/playwright"
+base_image = "node:22-bookworm"
+
+base_setup = [
+    "apt-get update && apt-get install -y --no-install-recommends xvfb xauth && rm -rf /var/lib/apt/lists/*",
+]
+
+# The lock file fixes every package version, and the commit fixes the browser build.
+build = [
+    "npm ci",
+    "npm run build",
+    "npx playwright install --with-deps chromium",
+    "cd tests/playwright-test/stable-test-runner && npm ci",
+]
+
+# The tests run the built files, so a change to the source needs a new build.
+refresh = ["npm run build"]
+
+timeout_min = 10
+
+# The browser must not be in /root/.cache: that folder is a build cache and is not in the image.
+[env]
+PLAYWRIGHT_BROWSERS_PATH = "/opt/browsers"
+
+[[suite]]
+test_files = ["tests/library/**/*.spec.ts", "tests/page/**/*.spec.ts"]
+test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} xvfb-run -a npx playwright test --config=tests/library/playwright.config.ts --project=chromium-library --project=chromium-page --reporter=junit {files}"
+
+[[suite]]
+test_files = ["tests/mcp/**/*.spec.ts"]
+test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} xvfb-run -a npx playwright test --config=tests/mcp/playwright.config.ts --project=chromium --reporter=junit {files}"
+
+[[suite]]
+test_files = ["tests/playwright-test/**/*.spec.ts", "tests/playwright-test/**/*.test.ts"]
+test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} node tests/playwright-test/stable-test-runner/node_modules/@playwright/test/cli test --config=tests/playwright-test/playwright.config.ts --project=playwright-test --reporter=junit {files}"

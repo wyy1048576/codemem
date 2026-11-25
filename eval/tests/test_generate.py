@@ -40,6 +40,32 @@ def test_load_recipe_rejects_unknown_fields(tmp_path):
         gen.load_recipe(path)
 
 
+def test_recipe_with_suites_and_env(tmp_path):
+    path = tmp_path / "x.toml"
+    path.write_text(
+        'repo = "a/b"\nbase_image = "i"\n[env]\nB = "2"\nA = "1"\n'
+        '[[suite]]\ntest_files = ["t/one/**"]\ntest = "one {files} {junit}"\n'
+        '[[suite]]\ntest_files = ["t/two/**"]\ntest = "two {files} {junit}"\n'
+    )
+    recipe = gen.load_recipe(path)
+    assert recipe.env == (("A", "1"), ("B", "2"))
+
+    class T:
+        test_patch = _patch("t/one/a.ts", "t/two/b.ts", "t/three/c.ts")
+
+    assert gen.task_test_files(recipe, T) == ["t/one/a.ts", "t/two/b.ts"]
+    script = gen._script(recipe, T, repeats=1)
+    assert "one 't/one/a.ts' /work/before-1.0.xml" in script
+    assert "two 't/two/b.ts' /work/after-1.1.xml" in script
+
+
+def test_recipe_needs_test_or_suites(tmp_path):
+    path = tmp_path / "x.toml"
+    path.write_text('repo = "a/b"\nbase_image = "i"\n')
+    with pytest.raises(gen.GenerateError, match="give 'test'"):
+        gen.load_recipe(path)
+
+
 def test_test_files_follow_the_recipe_globs():
     recipe = gen.Recipe(name="r", repo="a/b", base_image="i", test="t", test_files=("pkg/tests/**/test_*.py",))
 
