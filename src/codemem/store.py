@@ -1660,8 +1660,10 @@ class Store:
 
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:
         ti = _TypeIndex(dim, epoch, self._bound(self._backend(dim, **self.vector_options), dim))
+        # Straight down the table, which is in vector-id order. Through an index on the type,
+        # SQLite would then sort the rows, vectors and all: 2.4 to 3.3 s to read 200,000 rows, not 0.9 s.
         rows = self.conn.execute(
-            "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors "
+            "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors NOT INDEXED "
             "WHERE vec_type = ? ORDER BY vector_id",
             (vec_type,),
         )

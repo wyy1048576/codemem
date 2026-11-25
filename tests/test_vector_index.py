@@ -107,6 +107,23 @@ def test_an_index_that_has_the_two_column_index_loses_it_when_it_is_opened(tmp_p
     s.close()
 
 
+def test_a_rebuild_takes_one_type_s_vectors_from_the_table_in_id_order(tmp_path):
+    s = Store(tmp_path / "idx", vector_backend="faiss")
+    ids = _add_chunks(s, 6)
+    with s.transaction():
+        s.ensure_vec_type("usage", EMBEDDER)
+    for i, chunk_id in enumerate(ids):  # the two types' rows alternate in the table
+        s.put_vectors("code", EMBEDDER, [VectorRow(chunk_id, 0, 1, 0, 1, f"c{i}")], _vecs(1, seed=i))
+        s.put_vectors("usage", EMBEDDER, [VectorRow(chunk_id, 0, 1, 0, 1, f"u{i}")], _vecs(1, seed=100 + i))
+    s.close()  # nothing was saved: the next start builds both indexes from the rows
+    s = Store(tmp_path / "idx", vector_backend="faiss")
+    for vec_type, first in (("code", 1), ("usage", 2)):
+        ti = s._type_index(vec_type)
+        assert ti.table["vector"].tolist() == list(range(first, 13, 2)) and ti.store.ids() == set(range(first, 13, 2))
+    assert s.vector_search("usage", _vecs(1, seed=103)[0], 1)[0].chunk_id == ids[3]
+    s.close()
+
+
 def test_a_search_asks_the_backend_for_plain_lists(tmp_path):
     """Plugins get what they always got: lists of ints, and no filter when a filter keeps everything."""
     seen = []
