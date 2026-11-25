@@ -270,7 +270,6 @@ only, keywords and code, everything, and weight variants). The grep baselines ar
 
 ```bash
 cd eval && uv sync --extra codemem
-uv pip install -e "..[local]"         # the local embedding model: the eval's codemem extra leaves it out
 uv run cmeval run --tasks tasks/swebv-dev50.jsonl --config configs/codemem-v3.toml --run-id my-run
 uv run cmeval score my-run            # add --tokens estimate without an ANTHROPIC_API_KEY
 uv run cmeval report my-run --baseline cm3-bm25 --primary cm3-bm25-code --primary cm3-full
