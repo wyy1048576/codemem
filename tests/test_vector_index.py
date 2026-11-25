@@ -87,6 +87,26 @@ def test_type_index_keeps_its_table_sorted_when_older_ids_arrive_later():
     assert ti.vectors_of([1]).tolist() == [] and ti.vectors_of([9]).tolist() == [50]
 
 
+def test_an_index_that_has_the_two_column_index_loses_it_when_it_is_opened(tmp_path):
+    """`vectors_owner` starts with the columns of the older `vectors_type` and answers its lookups."""
+    s = Store(tmp_path / "idx", vector_backend="faiss")
+    _seed(s, 5)
+    s.close()
+    with closing(sqlite3.connect(tmp_path / "idx" / "index.db")) as conn:
+        conn.execute("CREATE INDEX vectors_type ON vectors(vec_type, chunk_id)")
+        conn.commit()
+    s = Store(tmp_path / "idx", vector_backend="faiss")
+    indexes = {r[1] for r in s.conn.execute("PRAGMA index_list(vectors)")}
+    assert "vectors_type" not in indexes and "vectors_owner" in indexes
+    for lookup in ("SELECT vector_id FROM vectors WHERE vec_type = 'code'",
+                   "SELECT vector_id, chunk_id, part FROM vectors WHERE vec_type = 'code' AND chunk_id IN (1, 2)",
+                   "SELECT vec_type, COUNT(*) FROM vectors GROUP BY vec_type"):
+        plan = " ".join(r[3] for r in s.conn.execute("EXPLAIN QUERY PLAN " + lookup))
+        assert "COVERING INDEX vectors_owner" in plan
+    assert s.vec_types() == ["code"] and len(s.vector_rows("code")) == 5 and s.counts()["vectors"] == {"code": 5}
+    s.close()
+
+
 def test_a_search_asks_the_backend_for_plain_lists(tmp_path):
     """Plugins get what they always got: lists of ints, and no filter when a filter keeps everything."""
     seen = []

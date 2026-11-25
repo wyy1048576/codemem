@@ -113,11 +113,12 @@ CREATE TABLE IF NOT EXISTS vectors (
     data BLOB NOT NULL,
     UNIQUE (chunk_id, vec_type, part)
 );
-CREATE INDEX IF NOT EXISTS vectors_type ON vectors(vec_type, chunk_id);
 CREATE INDEX IF NOT EXISTS vectors_hash ON vectors(embedder, text_hash);
 -- Covers the read of where every vector came from (a search index's start), so it never reads
--- the pages that hold the vectors themselves.
+-- the pages that hold the vectors themselves. It also answers every lookup by vector type, or by
+-- type and chunk: an index of only those two columns, which older indexes have, is dropped.
 CREATE INDEX IF NOT EXISTS vectors_owner ON vectors(vec_type, chunk_id, part, n_parts, start_off, end_off);
+DROP INDEX IF EXISTS vectors_type;
 """
 # Every table any schema version has created, dropped when an older index is rebuilt.
 _OLD_TABLES = ("meta", "files", "chunks", "calls", "edges", "fts_vocab", "fts", "embeddings", "vectors", "dirty_texts")
