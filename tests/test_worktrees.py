@@ -5,7 +5,9 @@ import json
 import os
 import shutil
 import sqlite3
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import anyio
 import pytest
@@ -188,6 +190,25 @@ def test_a_copy_never_replaces_an_index(main_index, tmp_path):
     (interrupted / f"{DB}.copy-123").write_bytes(b"half")
     assert copy_index(main_index, interrupted)
     assert sorted(p.name for p in interrupted.iterdir()) == [DB, "write.lock"]
+
+
+def test_two_starts_at_once_make_one_copy(main_index, tmp_path):
+    """Two codemem processes started in the same new worktree: one copies, the other waits for it
+    and then finds the index there."""
+    start = threading.Barrier(4)
+
+    def one_start(_):
+        start.wait(10)
+        return copy_index(main_index, tmp_path / "copy")
+
+    with ThreadPoolExecutor(4) as pool:
+        made = list(pool.map(one_start, range(4)))
+    assert sorted(made) == [False, False, False, True]
+    copy, source = Store(tmp_path / "copy"), Store(main_index)
+    assert copy.counts() == source.counts() and copy.conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    assert sorted(p.name for p in (tmp_path / "copy").iterdir() if not p.name.startswith(DB + "-")) == [DB, "write.lock"]
+    copy.close()
+    source.close()
 
 
 def test_a_copy_does_not_count_as_an_index_until_it_is_checked(repo, main_index, tmp_path, capsys):
