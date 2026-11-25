@@ -346,6 +346,44 @@ def cmd_subset(args) -> int:
     return 0
 
 
+def cmd_generate(args) -> int:
+    from . import generate as gen
+    from .repos import RepoError
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        if args.id:
+            wanted = set(args.id)
+            tasks = [t for t in tasks if t.id in wanted]
+        elif args.admission:
+            tasks = gen.admission_sample(recipe, tasks, seed=args.seed)
+        else:
+            tasks = [t for t in tasks if t.test_patch and gen.task_test_files(recipe, t)]
+            if args.split:
+                tasks = [t for t in tasks if t.split == args.split]
+            if args.limit:
+                tasks = tasks[: args.limit]
+        if not tasks:
+            print(f"generate: no task of {recipe.repo} with tests in {args.tasks}", file=sys.stderr)
+            return 1
+        say(f"{recipe.repo}: {len(tasks)} tasks, {args.jobs} at a time")
+        records = gen.generate(recipe, tasks, jobs=args.jobs, repeats=args.repeats, cpus=args.cpus,
+                               force=args.force, progress=say)
+    except (gen.GenerateError, RepoError, FileNotFoundError, TaskError) as exc:
+        print(f"generate: {exc}", file=sys.stderr)
+        return 1
+    valid = sum(1 for r in records if r["valid"])
+    print(f"{recipe.repo}: {valid} of {len(records)} tasks valid; records in {gen.generate_dir() / recipe.name}")
+    if args.admission and not args.id:
+        result = gen.admission(recipe, records)
+        print(f"admission check: {result['valid_in_time']} valid in time, {result['needed']} needed: "
+              + ("admitted" if result["admitted"] else "not admitted"))
+        return 0 if result["admitted"] else 3
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
@@ -462,6 +500,20 @@ def build_parser() -> argparse.ArgumentParser:
                    help="only tasks with this tag value, for example gold_all_python=true; repeatable (all must match)")
     p.add_argument("--repo", action="append", default=None, help="only this repo (owner/name); repeatable (default: every repo)")
     p.set_defaults(func=cmd_subset)
+
+    p = sub.add_parser("generate", help="build a test environment for each task of a repo and validate its tests")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--admission", action="store_true", help="the admission check: a fixed sample of 10 tasks")
+    p.add_argument("--seed", help="seed of the admission sample (default: admission-<recipe>-1)")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--split", choices=("dev", "test"))
+    p.add_argument("--limit", type=int, help="at most this number of tasks")
+    p.add_argument("--jobs", type=int, default=2, help="tasks built and validated at the same time (default 2)")
+    p.add_argument("--cpus", type=int, default=8, help="processors for one validation container (default 8)")
+    p.add_argument("--repeats", type=int, default=3, help="test runs before and after the fix (default 3)")
+    p.add_argument("--force", action="store_true", help="do a task again that has a saved record")
+    p.set_defaults(func=cmd_generate)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")

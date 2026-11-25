@@ -1,0 +1,38 @@
+# Recipe for pandas-dev/pandas: how to build it at a task's commit and run a task's tests.
+# The fields are described in src/cmeval/generate.py.
+
+repo = "pandas-dev/pandas"
+base_image = "python:3.12-bookworm"
+
+# Once per repo.
+base_setup = [
+    "apt-get update && apt-get install -y --no-install-recommends ccache && rm -rf /var/lib/apt/lists/*",
+    "pip install --no-cache-dir uv",
+]
+
+# Dependencies. The layer is shared by tasks with the same file content and the same week.
+deps_files = ["requirements-dev.txt"]
+# Packages for the documentation, for lint and type checks, and for Qt are left out: no test
+# needs them, and some of them do not install at an older date.
+deps = [
+    "grep -viE '^(sphinx|pydata-sphinx-theme|numpydoc|nbsphinx|nbconvert|nbformat|notebook|ipywidgets|ipykernel|jupyterlite|pandoc|markdown|feedparser|pygments|asv|py-rattler|mypy|pre-commit|tokenize-rt|gitpython|scipy-stubs|types-|pyqt5|pytest-qt)|sphinx' requirements-dev.txt > requirements-tests.txt",
+    "uv pip install --system --exclude-newer {exclude_newer} -r requirements-tests.txt",
+]
+
+# After the source of the task's commit is in /testbed. The editable install builds the
+# C and Cython code now, and builds it again by itself when a later patch changes it.
+# "--no-cache" is necessary: uv keeps a built package by its path, and every task is built in
+# /testbed. With the cache, a task can get the build of another task.
+build = [
+    "CC='ccache gcc' CXX='ccache g++' uv pip install --system --no-cache --no-deps --no-build-isolation -e . -Cbuilddir=build",
+    "python -c 'import pandas; print(pandas.__version__)'",
+]
+
+# After the real fix (or an agent's change) is applied, before the tests run.
+refresh = ["python -c 'import pandas'"]
+
+test_files = ["pandas/tests/**/test_*.py"]
+# pytest-qt is off: it needs display libraries that the image does not have.
+test = "python -m pytest {files} -p no:cacheprovider -p no:pytest-qt -n 8 --junitxml={junit}"
+parser = "junit"
+timeout_min = 10
