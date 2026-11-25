@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import threading
 import tomllib
 from dataclasses import dataclass, field, fields
@@ -42,6 +43,7 @@ DEFAULT_IGNORE = (
     "*.pb.h",
 )
 BM25_FIELDS = ("name", "path", "signature", "doc", "body")
+_SPACE = re.compile(r"[^\s|]{1,64}")  # `|` separates the parts of an embedder key
 DEVICES = ("auto", "cpu", "xpu", "cuda", "mps")
 DTYPES = ("auto", "float32", "float16", "bfloat16")
 # Search-time score multipliers, neutral by default (docs/architecture.md §6). Halving tests,
@@ -73,6 +75,9 @@ class EmbeddingConfig:
     provider: str = "local"  # local | openai
     model: str = ""  # the API's model name (required for openai)
     base_url: str = ""  # e.g. https://api.studio.nebius.com/v1 (required for openai)
+    # A name for the vectors the endpoint serves. It stands for the address in the embedder key and
+    # in index_settings(), so an index is reused through any address that carries the same name.
+    space: str = ""
     api_key_env: str = ""  # environment variable holding the key; empty = no key (a local server)
     dimensions: int | None = None  # shorter vectors, for models trained for it (Qwen3-Embedding)
     query_prefix: str = ""  # an instruction before each query (instruction-tuned models want one)
@@ -86,9 +91,11 @@ class EmbeddingConfig:
         return self.provider != "local"
 
     def index_settings(self) -> dict[str, Any]:
-        """What changes the stored vectors: not the key's variable, the query prefix or request sizes."""
+        """What changes the stored vectors: not the key's variable, the query prefix or request sizes.
+        Who serves them is the `space` when one is set, else the address."""
+        served_by = {"space": self.space} if self.space else {"base_url": self.base_url}
         return {
-            "provider": self.provider, "model": self.model, "base_url": self.base_url,
+            "provider": self.provider, "model": self.model, **served_by,
             "dimensions": self.dimensions, "document_prefix": self.document_prefix,
         }
 
@@ -390,6 +397,10 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"[embedding] provider must be local|openai, got {cfg.embedding.provider!r}")
     if cfg.embedding.remote and not (cfg.embedding.model and cfg.embedding.base_url):
         raise ValueError("[embedding] provider = openai needs model and base_url")
+    if cfg.embedding.space and not _SPACE.fullmatch(cfg.embedding.space):
+        raise ValueError(
+            f"[embedding] space must be 1 to 64 characters with no spaces and no '|', got {cfg.embedding.space!r}"
+        )
     if cfg.languages is not None:
         from .languages import supported_languages
 

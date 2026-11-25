@@ -279,7 +279,9 @@ class OpenAIEmbedder(Embedder):
     def key(self) -> str:
         prefix = self.cfg.document_prefix
         doc = hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:8] if prefix else "0"
-        return f"api:{self.host}|{self.model_name}|dims={self.cfg.dimensions or 'full'}|doc={doc}"
+        # A `space` names the vectors whatever address serves them: the host is then no part of the key.
+        served_by = self.cfg.space or self.host
+        return f"api:{served_by}|{self.model_name}|dims={self.cfg.dimensions or 'full'}|doc={doc}"
 
     @property
     def dim(self) -> int:
