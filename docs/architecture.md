@@ -642,11 +642,12 @@ codemem's own work:
 | B → A, a commit seen before | 1,635, 16 | 7,025, 3,714, 1,347 | 18,556 | 0 | 27 s | 22 s |
 | A → B again | 1,291, 360 | 1,347, 3,714, 7,025 | 10,228 | 0 | 18 s | 10 s |
 
-The M1 was shared with other jobs, so each time is the fastest of the runs of that leg; the
-slowest took several times as long (stage A up to 100 s). Another 22,335 chunks only moved
-inside their files and kept everything else. The real model adds its time to the first visit
-only: 9,054 texts are about 18 minutes at the M1's 8.5 texts a second, in the background, while
-keyword search already answers for B. On every later visit the vectors come from the cache.
+The M1 was shared with other jobs, so each time is the fastest of the runs of that leg. On the
+busy machine half of the 18 runs of stage A took more than 45 s, and the slowest 100 s. Another
+22,335 chunks only moved inside their files and kept everything else. The real model adds its
+time to the first visit only: 9,054 texts are about 18 minutes at the M1's 8.5 texts a second, in
+the background, while keyword search already answers for B. On every later visit the vectors come
+from the cache.
 
 **Switching back before the vectors are done** leaves no work for the branch that was left:
 - a chunk that exists only on that branch is deleted by stage A of the switch back, and its place
@@ -894,7 +895,7 @@ they show codemem's own work; the real model adds about 0.1 s per changed text.
 | a search of 10 words / 250 words (vLLM) | 0.12 s / 0.63 s |
 | a save then a search, through MCP, real model (sample repo) | 0.13–0.4 s, the edit included |
 | a full build of vLLM, fake model | 72 s |
-| a switch between two commits a week apart, 1,651 files differ (vLLM): stage A, then stage B with every vector in the cache | 18–27 s, then 10–22 s (§4.6) |
+| a switch between two commits a week apart, 1,651 files differ (vLLM): stage A, then stage B with every vector in the cache | 18–27 s, then 10–22 s, in the fastest runs on a busy machine (§4.6) |
 | the first current search in a new worktree (vLLM): its index copied / built from nothing | 4–8 s / 76 s (§4.6) |
 | loading the real model on the GPU, PyTorch already imported | about 2 s at a load average of 3 to 5 (8 cores), 3 to 5 s at 6 to 7, 5.5 s at 8 to 11 |
 | the first search after the model was freed, real model (sample repo) | 3.5 s with every signal at a load average of 5; 4.1 s from keywords at 8 to 11 (the model was back 7.0 s after the search began). A search that waits for the model: 2.2 s and 3.8 s |
