@@ -240,6 +240,15 @@ def _export_source(repo: str, commit: str, dest: Path) -> None:
         index.unlink(missing_ok=True)
 
 
+def nearest_tag(repo: str, commit: str) -> str | None:
+    """The newest tag that is an ancestor of the commit, or None."""
+    repos.ensure_commit(repo, commit)
+    proc = subprocess.run(["git", "describe", "--tags", "--abbrev=0", commit], cwd=repos.clone_path(repo),
+                          capture_output=True, text=True)
+    name = proc.stdout.strip()
+    return name if proc.returncode == 0 and re.fullmatch(r"[\w.+/-]+", name) else None
+
+
 def task_dir(recipe: Recipe, task: Task) -> Path:
     return generate_dir() / recipe.name / task.id
 
@@ -262,6 +271,10 @@ def build_task_image(recipe: Recipe, task: Task) -> tuple[str, float]:
         (deps / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(source, deps / name)
     when = exclude_newer(repos.commit_time(task.repo, task.base_commit))
+    # Build tools that read the version from git (versioneer, setuptools-scm) need a tag. The image
+    # has no history, so the nearest tag of the real history is put on its one commit.
+    tag_name = nearest_tag(task.repo, task.base_commit)
+    tag_step = f" && git tag '{tag_name}'" if tag_name else ""
     dockerfile = (
         f"FROM {base}\n"
         "COPY deps/ /deps/\n"
@@ -269,7 +282,7 @@ def build_task_image(recipe: Recipe, task: Task) -> tuple[str, float]:
         + _run_lines(tuple(c.replace("{exclude_newer}", when) for c in recipe.deps))
         + "COPY src/ /testbed/\n"
         "WORKDIR /testbed\n"
-        "RUN git init -q && git add -A && git commit -qm base\n"
+        f"RUN git init -q && git add -A && git commit -qm base{tag_step}\n"
         + _run_lines(recipe.build)
     )
     (context / "Dockerfile").write_text(dockerfile, encoding="utf-8")
