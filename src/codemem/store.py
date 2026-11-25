@@ -316,7 +316,7 @@ class CompactVectorStore(VectorStore):
 
     suffix = ".rabitq"
 
-    def __init__(self, index_dim: int, /, *, bits: int = 1, dim: int = 0, rescore: int = 200):
+    def __init__(self, index_dim: int, /, *, bits: int = 4, dim: int = 0, rescore: int = 500):
         _require_rabitq()
         given = (index_dim, bits, dim, rescore)
         if not all(type(v) is int for v in given):

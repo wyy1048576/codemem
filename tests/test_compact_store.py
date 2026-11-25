@@ -29,7 +29,7 @@ from codemem.store import (
 )
 
 EMBEDDER = "fake|doc"
-COMPACT = {"bits": 1, "dim": 0, "rescore": 200}
+COMPACT = {"bits": 4, "dim": 0, "rescore": 500}
 BACKENDS = {"faiss": {}, "compact": COMPACT}
 
 
@@ -504,7 +504,7 @@ def test_ties_at_the_candidate_cut_are_all_kept():
     v = for_index(_vecs(300, dim=32), 32)
     v[100:160] = v[100]
     other_ids = np.random.default_rng(1).permutation(300) + 1  # vector j has id other_ids[j]: another order
-    a, b = CompactVectorStore(32, rescore=8), CompactVectorStore(32, rescore=8)
+    a, b = CompactVectorStore(32, bits=1, rescore=8), CompactVectorStore(32, bits=1, rescore=8)
     _bound(a, range(1, 301), v)
     _bound(b, other_ids.tolist(), v)
     vector_of = {int(i): j + 1 for j, i in enumerate(other_ids)}
@@ -594,7 +594,7 @@ def test_a_file_whose_index_is_not_the_one_described_is_refused():
     right = faiss.IndexRaBitQ(16, faiss.METRIC_INNER_PRODUCT, 1)
     right.train(np.zeros((1, 16), dtype=np.float32))
     right.add(v)
-    assert len(CompactVectorStore.from_bytes(saved(right, 6, range(6)))) == 6
+    assert len(CompactVectorStore.from_bytes(saved(right, 6, range(6)), bits=1)) == 6
     centred = faiss.IndexRaBitQ(16, faiss.METRIC_INNER_PRODUCT, 1)
     centred.train(v)  # a learned centre: its codes are not the ones this store makes
     centred.add(v)
@@ -606,7 +606,7 @@ def test_a_file_whose_index_is_not_the_one_described_is_refused():
     for index, count, ids in ((right, 5, range(5)), (right, 7, range(7)), (centred, 6, range(6)), (flat, 6, range(6)),
                               (l2, 6, range(6)), (right, 6, [0, 1, 2, 4, 3, 5]), (right, 6, [0, 1, 2, 2, 3, 4])):
         with pytest.raises(ValueError, match="not the one its first line describes|as many vector ids|not in order"):
-            CompactVectorStore.from_bytes(saved(index, count, ids))
+            CompactVectorStore.from_bytes(saved(index, count, ids), bits=1)
 
 
 # ---------------------------------------------------------------- the checks in front of FAISS
@@ -625,7 +625,7 @@ def test_options_faiss_cannot_take_are_refused_with_a_sentence(args, kwargs):
 
 @pytest.mark.parametrize("dim, code_dim, expect", [(8, 0, 8), (8, 4, 4), (8, 64, 8), (5, 0, 5), (65, 33, 33)])
 def test_the_code_covers_the_first_numbers_of_any_length(dim, code_dim, expect):
-    vs = CompactVectorStore(dim, dim=code_dim, rescore=4)
+    vs = CompactVectorStore(dim, bits=1, dim=code_dim, rescore=4)
     v = for_index(_vecs(60, dim=dim), dim)
     _bound(vs, range(1, 61), v)
     assert vs.code_dim == vs._index.d == expect and vs._index.code_size == -(-expect // 8) + 8
@@ -726,7 +726,8 @@ def test_twenty_thousand_clustered_vectors_keep_the_exact_top_ten(tmp_path):
     assert np.mean(overlap[:40]) >= 0.99 and np.mean(overlap[40:]) >= 0.99
     ti = store._type_index("code")
     assert ti.table.nbytes == 32 * len(docs)  # the bookkeeping: 32 bytes per vector
-    assert len(ti.store.to_bytes()) < len(docs) * 34  # 16 bytes of bits, 8 of RaBitQ's numbers, 8 of id
+    # saved: 8 bytes of id and one code per vector (128 numbers at 4 bits: 84 bytes, against 256 at 2 bytes each)
+    assert ti.store._index.code_size == 84 and len(ti.store.to_bytes()) < len(docs) * 93
     store.close()
 
 
@@ -738,7 +739,7 @@ def test_config_reads_the_compact_table():
     assert (cfg.compact.bits, cfg.compact.dim, cfg.compact.rescore) == (2, 256, 500)
     assert cfg.vector_options() == {"bits": 2, "dim": 256, "rescore": 500}
     default = config_from_dict({"vector_backend": "compact"})
-    assert default.vector_options() == {"bits": 1, "dim": 0, "rescore": 200}
+    assert default.vector_options() == {"bits": 4, "dim": 0, "rescore": 500}
     assert Config(vector_backend="faiss").vector_options() == {}
     assert config_from_dict({"vector_backend": "faiss", "compact": {"dim": 64}}).vector_options() == {}
 
@@ -763,7 +764,7 @@ def test_compact_settings_are_index_settings_only_for_the_compact_backend():
     assert unused.index_settings() == plain  # options of a backend that is not in use change nothing
     a = config_from_dict({"vector_backend": "compact"}).index_settings()
     b = config_from_dict({"vector_backend": "compact", "compact": {"dim": 256}}).index_settings()
-    assert a["vector_backend"] == "compact" and a["compact"] == {"bits": 1, "dim": 0, "rescore": 200}
+    assert a["vector_backend"] == "compact" and a["compact"] == {"bits": 4, "dim": 0, "rescore": 500}
     assert b["compact"]["dim"] == 256
     rest = lambda settings: {k: v for k, v in settings.items() if k not in ("compact", "vector_backend")}  # noqa: E731
     assert rest(a) == rest(b) == plain and b["vector_backend"] == "compact"
@@ -792,7 +793,7 @@ def test_switching_to_compact_and_changing_its_options_re_embeds_nothing(sample_
         backend = store._type_index("code").store
         assert isinstance(backend, CompactVectorStore)
         made_with = {"bits": backend.bits, "dim": options.get("dim", 0), "rescore": backend.rescore}
-        assert made_with == {"bits": 1, "dim": 0, "rescore": 200, **options}
+        assert made_with == {"bits": 4, "dim": 0, "rescore": 500, **options}
         assert backend.code_dim == options.get("dim", 64)
         store.load_vectors()  # what a server does at start: every type's index is built with the new options
         store.save_vectors()
@@ -816,7 +817,7 @@ def test_a_saved_file_made_with_other_options_is_rebuilt_and_one_with_the_same_i
         s = _open(tmp_path / "idx", "compact", **options)
         backend = s._type_index("code").store
         assert len(rebuilds) == rebuilt and _same_as_brute_force(s)
-        made_with = (options.get("bits", 1), options.get("dim", 16), options.get("rescore", 200))
+        made_with = (options.get("bits", 4), options.get("dim", 16), options.get("rescore", 500))
         assert (backend.bits, backend.code_dim, backend.rescore) == made_with
         s.close()  # not saved: the file on disk is still the first one
     s = Store(tmp_path / "idx", vector_backend="faiss")  # and the exact backend does not read a compact file
@@ -833,7 +834,7 @@ def test_the_service_follows_the_compact_settings_in_the_config_file(sample_repo
         (sample_repo / ".codemem.toml").write_text('vector_backend = "compact"\n[compact]\ndim = 32\n')
         svc._reload_config()
         assert svc.store.vector_backend == "compact"
-        assert svc.store.vector_options == {"bits": 1, "dim": 32, "rescore": 200}
+        assert svc.store.vector_options == {"bits": 4, "dim": 32, "rescore": 500}
         assert [r.qualname for r in svc.search("revoke session", k=5, signals=["code"]).results] == found
         first = svc.store._type_index("code").store
         assert isinstance(first, CompactVectorStore) and first.code_dim == 32

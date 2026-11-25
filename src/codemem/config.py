@@ -99,11 +99,11 @@ class CompactConfig:
     """The compact search index, `vector_backend = "compact"` (docs/architecture.md §5): a small
     code per vector in memory, and the best candidates scored exactly from the stored vectors."""
 
-    bits: int = 1  # bits per number of the in-memory code, 1 to 8
+    bits: int = 4  # bits per number of the in-memory code, 1 to 8
     # numbers of each vector the code covers (the first N); 0 = as many as the index uses. At most
     # COMPACT_MAX_DIM either way
     dim: int = 0
-    rescore: int = 200  # candidates scored exactly: at least this many, and at least 4 per result asked for
+    rescore: int = 500  # candidates scored exactly: at least this many, and at least 4 per result asked for
 
 
 def _default_vectors() -> dict[str, VectorConfig]:
