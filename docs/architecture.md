@@ -294,8 +294,7 @@ needed for the next one (measurements: [decisions.md](decisions.md) §3).
   stores bfloat16, and on a GPU codemem runs it in float16. Converted on the Apple GPU, the blocks
   of the file's format stay in the GPU's allocator for as long as the model lives: it holds 2.16 GB
   for 1.01 GB of weights, against 1.09 GB this way. The vectors are the same bit for bit (checked
-  on 4 queries and 32 code texts). The conversion is CPU work, so a load takes longer while the CPU
-  is busy.
+  on 4 queries and 32 code texts). Measured side by side, a load took about 2 s either way.
 - **It can leave when idle.** With `model_idle_minutes` set, the writer frees the model once
   nothing has been embedded for that long: it drops the model, collects what reference cycles kept
   of it, and empties the GPU allocator's cache, which holds freed blocks for reuse otherwise. The
@@ -734,8 +733,8 @@ they show codemem's own work; the real model adds about 0.1 s per changed text.
 | a search of 10 words / 250 words (vLLM) | 0.12 s / 0.63 s |
 | a save then a search, through MCP, real model (sample repo) | 0.13–0.4 s, the edit included |
 | a full build of vLLM, fake model | 72 s |
-| loading the real model on the GPU, PyTorch already imported | 2.1 s on a quiet machine, 5.5 s on a busy one (load average 8 to 11) |
-| the first search after the model was freed, real model, on that busy machine (sample repo) | 4.1 s, from keywords (the model was back 7.0 s after the search began); 3.8 s when the search waits for the model |
+| loading the real model on the GPU, PyTorch already imported | about 2 s at a load average of 3 to 5 (8 cores), 3 to 5 s at 6 to 7, 5.5 s at 8 to 11 |
+| the first search after the model was freed, real model, at a load average of 8 to 11 (sample repo) | 4.1 s, from keywords (the model was back 7.0 s after the search began); 3.8 s when the search waits for the model |
 
 **Building is almost all embedding.** The local model embeds about 8.5 texts a second on the M1,
 so the first build of a large repo (vLLM: 145k texts, about 5 hours) wants a CUDA GPU or an

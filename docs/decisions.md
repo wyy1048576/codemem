@@ -65,7 +65,7 @@ The values codemem runs with, and why each was picked. All of these are settings
 |---|---|---|---|
 | **where embeddings come from** | the local model | private, free, works offline; an API is opt-in, for speed or bigger models | `[embedding] provider`, `vectors.*.model` |
 | **device and precision** | CUDA, else the Apple GPU, else CPU; float16 on a GPU | float16 halves memory and time and keeps the same top 10 (cosine ≥ 0.9997); a row that overflows is redone in float32 | `device`, `dtype` |
-| **the model in memory** | kept for as long as codemem runs | On an M1 the model is 1.3 GB of the process, and up to 2.4 GB after a batch of code texts (table below). Freeing it after some idle minutes gives that back, and the next search or save then starts a load: 2.1 s on a quiet machine, 5.5 s on a busy one. Meanwhile a search waits at most its 4 s and then answers from keywords, and an edit is found by keywords only. It stays by default so that no search pays that. A machine short of memory, or one with several agent sessions open, sets a number of minutes | `model_idle_minutes` (0 = keep) |
+| **the model in memory** | kept for as long as codemem runs | On an M1 the model is 1.3 GB of the process, and up to 2.4 GB after a batch of code texts (table below). Freeing it after some idle minutes gives that back, and the next search or save then starts a load: 2 to 6 s, longer the busier the machine. Meanwhile a search waits at most its 4 s and then answers from keywords, and an edit is found by keywords only. It stays by default so that no search pays that. A machine short of memory, or one with several agent sessions open, sets a number of minutes | `model_idle_minutes` (0 = keep) |
 | **how long a search may catch up** | 4 s | Chosen on Oct 25 (Andre). A one-function edit takes 0.1–0.5 s, and 4 s covers about 30 average texts at the M1's 8.5 texts a second. A `git pull` or a formatter run is what hits the cap; then the search returns what the index has and its note names the files still pending, so the agent can search again or grep them. A wasted grep turn costs an agent more than the wait | `catchup_budget_ms` |
 | **when a search doesn't wait at all** | more than 1,000 queued chunks, or a first build | that is minutes of embedding; answering at once with a note beats a 4 s wait that changes little | constant |
 | **grouping saves** | 0.5 s after the last save, at most 2 s after the first | one editor action writes several files; the maximum stops a long burst from postponing indexing | `debounce_ms`, `debounce_max_wait_ms` |
@@ -103,10 +103,11 @@ footprint is what Activity Monitor shows for the process. The machine was busy w
   went from 1.76 GB to 0.62 GB within a second of the writer freeing the model. The system gives
   GPU memory back 0.2 to 0.8 s after PyTorch releases it (30 trials with 1 GB of tensors), not at
   the moment of the call.
-- **Times.** Importing PyTorch 19 s, the first load 5.4 s, freeing 1.3 s, loading again 5.5 s. On
-  the same machine at a quieter moment (load average 3) a load took 2.1 s. The first search after
-  the model was freed took 4.1 s and answered from keywords, and the model was back 7.0 s after
-  that search began; a search that waits for the model (the CLI) took 3.8 s.
+- **Times.** Importing PyTorch 19 s, the first load 5.4 s, freeing 1.3 s, loading again 5.5 s.
+  The first search after the model was freed took 4.1 s and answered from keywords, and the model
+  was back 7.0 s after that search began; a search that waits for the model (the CLI) took 3.8 s.
+  A load follows the machine's load: the same day it took about 2 s at a load average of 3 to 5
+  (8 cores) and 3 to 5 s at 6 to 7.
 - **On the CPU** the same process takes 0.45 GB with the model loaded: the weights stay mapped
   from the model file, in the file's bfloat16 (§8), and a short query takes 1 s.
 
