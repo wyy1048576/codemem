@@ -538,7 +538,7 @@ def test_score_tables_and_paired_difference(capsys):
         _write("s1", _record("t1", "other", rep, completed=True, tokens=600, seconds=80.0))
     _write("s1", _record("t2", "grep", 1, completed=False, tokens=2000, seconds=200.0, end="time limit"))
     _write("s1", _record("t2", "other", 1, discard=True, end="usage limit"))
-    _write("s1", _record("t3", "other", 1, completed=True, tokens=500, seconds=50.0, flags=["cross-check disagrees"]))
+    _write("s1", _record("t3", "other", 1, completed=False, tokens=10**8, seconds=50.0, flags=["cross-check disagrees"]))
     # A folder set aside is not read.
     aside = e2e_run.run_dir("s1", "t1", "grep", 1).with_name("1.discarded-1")
     aside.mkdir()
@@ -549,7 +549,9 @@ def test_score_tables_and_paired_difference(capsys):
     assert (grep["runs"], grep["discarded"], grep["completed_share"]) == (3, 0, pytest.approx(1 / 3))
     assert grep["tokens_mean"] == pytest.approx(4000 / 3) and grep["tokens_median"] == 1000
     assert grep["ends"] == {"finished": 2, "time limit": 1}
+    # The flagged run is in no number.
     assert (other["runs"], other["discarded"], other["flagged"], other["completed_share"]) == (4, 1, 1, 1.0)
+    assert other["tokens_mean"] == 600
     assert summary["baseline"] == "grep"
     paired = summary["paired"][0]
     # Only t1 has kept runs in both setups: completed 1.0 - 0.5, tokens 600 - 1000, seconds 80 - 100.

@@ -2,7 +2,8 @@
 
 For each setup: runs, discarded runs, the share of completed runs, processed tokens, the agent's seconds,
 turns, and how the runs ended. Discarded runs count only in "runs", "discarded" and the ends. Flagged runs
-(for example a cross-check that disagrees) are counted and kept in the numbers.
+(for example a cross-check that disagrees) are counted, and are kept out of every number until someone has
+looked at them: their measurement is in doubt.
 
 With two or more setups, each setup is compared with the baseline (grep when it exists) on the tasks that both
 have: the mean over repetitions for each task and setup, then the mean of the differences (setup - baseline).
@@ -59,13 +60,14 @@ def score(run_id: str) -> dict:
     setups: dict[str, dict] = {}
     for name in sorted({r["setup"] for r in records}):
         rows = [r for r in records if r["setup"] == name]
-        kept = [r for r in rows if not r.get("discard")]
+        usable = [r for r in rows if not r.get("discard")]
+        kept = [r for r in usable if not r.get("flags")]
         tokens = [_value(r, "processed_tokens") for r in kept]
         seconds = [_value(r, "agent_s") for r in kept]
         setups[name] = {
             "runs": len(rows),
-            "discarded": len(rows) - len(kept),
-            "flagged": sum(1 for r in kept if r.get("flags")),
+            "discarded": len(rows) - len(usable),
+            "flagged": len(usable) - len(kept),
             "completed_share": _mean([_value(r, "completed") for r in kept]),
             "tokens_mean": _mean(tokens), "tokens_median": _median(tokens),
             "seconds_mean": _mean(seconds), "seconds_median": _median(seconds),
@@ -83,7 +85,7 @@ def paired_difference(records: list[dict], setup: str, baseline: str) -> dict:
     """Mean over tasks of (task mean in `setup` - task mean in `baseline`), for each measure."""
     by_task: dict[str, dict[str, list[dict]]] = {}
     for r in records:
-        if not r.get("discard") and r["setup"] in (setup, baseline):
+        if not r.get("discard") and not r.get("flags") and r["setup"] in (setup, baseline):
             by_task.setdefault(r["task_id"], {}).setdefault(r["setup"], []).append(r)
     result: dict = {"setup": setup, "baseline": baseline}
     both = [runs for runs in by_task.values() if setup in runs and baseline in runs]
