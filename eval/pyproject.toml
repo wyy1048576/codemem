@@ -17,8 +17,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The codemem adapter. Install with: uv sync --extra codemem
-codemem = ["codemem"]
+# The codemem adapter, with the local embedding model. Install with: uv sync --extra codemem
+codemem = ["codemem[local]"]
 
 [project.scripts]
 cmeval = "cmeval.cli:main"
