@@ -34,7 +34,7 @@ from urllib.parse import urlsplit
 import numpy as np
 
 from . import __version__
-from .config import Config
+from .config import AssistConfig, Config
 from .embedder import Embedder, FakeEmbedder, SentenceTransformerEmbedder, l2_normalize, make_embedder, release_idle
 
 log = logging.getLogger(__name__)
@@ -83,15 +83,16 @@ def served_space(embedder: Embedder) -> str:
 
 def local_embedder(config: Config) -> Embedder:
     """The embedder this process serves: the config's local model, whatever `[embedding] provider`
-    says, because the same config file may be the one that sends clients here."""
+    says, because the same config file may be the one that sends clients here. An assist of that
+    config is the clients' too: a server is the model, and shares its work with nobody."""
     specs = {(s.model, s.embedder, s.version): s for s in (config.vectors[v] for v in config.enabled_vec_types())}
     if len(specs) != 1:
         raise ValueError(
             f"serve-embeddings serves one model, and the vector types name {len(specs)}: "
             f"{', '.join(sorted(s.model for s in specs.values())) or 'none is enabled'}"
         )
-    local = dataclasses.replace(config, embedding=dataclasses.replace(config.embedding, provider="local"))
-    return make_embedder(next(iter(specs.values())), local)
+    alone = dataclasses.replace(config.embedding, provider="local", assist=AssistConfig())
+    return make_embedder(next(iter(specs.values())), dataclasses.replace(config, embedding=alone))
 
 
 def describe(embedder: Embedder) -> Served:

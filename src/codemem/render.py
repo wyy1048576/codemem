@@ -6,6 +6,7 @@ A card is what an agent reads for one result; the eval harness counts its tokens
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from .search import ResultCard, SearchResponse
@@ -102,6 +103,12 @@ def format_status(info: dict[str, Any]) -> str:
         lines.append(
             f"embeddings: remote, {emb.get('model')} at {emb.get('host')}{space} (code is sent there to be embedded)"
         )
+    if helper := info.get("assist"):
+        lines.append(
+            f"embeddings: local, with {helper.get('model')} at {helper.get('host')} for a share of a build's texts "
+            "(code is sent there to be embedded)"
+        )
+        lines.append(f"  {assist_line(helper)}")
     if info.get("models_loaded") is not None:
         lines.append(
             "embedding model: in memory" if info["models_loaded"]
@@ -123,6 +130,27 @@ def format_status(info: dict[str, Any]) -> str:
     if info.get("error"):
         lines.append(f"error: {info['error']}")
     return "\n".join(lines)
+
+
+def assist_line(helper: dict[str, Any]) -> str:
+    """What the assist endpoint is doing, or why it is not used, in one line. A verdict that
+    another codemem process left (`checked_at`) says when it was reached."""
+    state, reason = helper.get("state"), helper.get("reason")
+    when = helper.get("checked_at")
+    as_of = f" (as of {time.strftime('%Y-%m-%d %H:%M', time.localtime(when))})" if when else ""
+    if state == "sharing":
+        texts = helper.get("texts") or {}
+        agreed = f"assist: its vectors agree with the local model's (cosine {helper.get('agreement'):.6f} at worst)"
+        if not texts.get("endpoint"):
+            return agreed + as_of
+        return f"{agreed}; it embedded {texts['endpoint']} texts, the local model {texts['local']}"
+    if state == "refused":
+        return f"assist: not used: {reason}{as_of}"
+    if state == "resting":
+        return f"assist: not used for now: {reason}{as_of}"
+    if state == "checking":
+        return "assist: its vectors are being compared with the local model's"
+    return "assist: not checked yet (its vectors are compared with the local model's when a build has work to share)"
 
 
 _REASONS = {"too_large": "too large", "parse_errors": "with parse errors"}  # the rest read as they are

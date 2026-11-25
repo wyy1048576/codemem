@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from . import assist
 from .config import Config, VectorConfig, default_index_dir, find_repo_root, load_config
 from .embedder import Embedder, make_embedder, release_idle
 from .indexer import IndexStats, Indexer, git_head
@@ -727,6 +728,11 @@ class CodememService:
                  "host": urlparse(self.config.embedding.base_url).netloc or self.config.embedding.base_url,
                  "space": self.config.embedding.space or None}
                 if self.config.embedding.remote else {"provider": "local"}
+            ),
+            # Where code texts also go, and whether that endpoint shares the work (None: no assist).
+            "assist": None if self.config.embedding.remote else assist.describe(
+                self.config.embedding.assist, list(self._embedders.values()),
+                [store.get_meta(f"vec.{v}.embedder") for v in self.config.enabled_vec_types()],
             ),
             "models": {
                 v: {
