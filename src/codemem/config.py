@@ -103,7 +103,7 @@ class CompactConfig:
     # numbers of each vector the code covers (the first N); 0 = as many as the index uses. At most
     # COMPACT_MAX_DIM either way
     dim: int = 0
-    rescore: int = 500  # candidates scored exactly: at least this many, and at least 4 per result asked for
+    rescore: int = 200  # candidates scored exactly: at least this many, and at least 4 per result asked for
 
 
 def _default_vectors() -> dict[str, VectorConfig]:

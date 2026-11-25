@@ -29,7 +29,7 @@ from codemem.store import (
 )
 
 EMBEDDER = "fake|doc"
-COMPACT = {"bits": 4, "dim": 0, "rescore": 500}
+COMPACT = {"bits": 4, "dim": 0, "rescore": 200}
 BACKENDS = {"faiss": {}, "compact": COMPACT}
 
 
@@ -452,8 +452,8 @@ def test_at_least_four_candidates_per_result_asked_for():
     vs = CompactVectorStore(32, rescore=10)
     _bound(vs, range(1, 501), v)
     asked: list[int] = []
-    scan = vs._scan
-    vs._scan = lambda q, size, allowed: asked.append(size) or scan(q, size, allowed)
+    candidates = vs._candidates
+    vs._candidates = lambda q, size, allowed: asked.append(size) or candidates(q, size, allowed)
     assert len(vs.search(v[0], 1)) == 1 and len(vs.search(v[0], 50)) == 50
     assert asked == [10, 200]
 
@@ -489,7 +489,7 @@ def test_rows_deleted_behind_the_index_are_dropped_and_replaced():
     rows = _bound(vs, range(1, 401), v)
     q = for_index(_vecs(1, dim=32, seed=9), 32)[0]
     first = [i for i, _ in vs.search(q, 2)]
-    for i in vs._scan(q, 8, None).tolist():  # every candidate of that search loses its row
+    for i in vs._ids[vs._candidates(q, 8, None)].tolist():  # every candidate of that search loses its row
         del rows[i]
     hits = vs.search(q, 2)
     assert len(hits) == 2 and not {i for i, _ in hits} & set(first) and all(i in rows for i, _ in hits)
@@ -497,34 +497,102 @@ def test_rows_deleted_behind_the_index_are_dropped_and_replaced():
     assert vs.search(q, 2) == []
 
 
-def test_ties_at_the_candidate_cut_are_all_kept():
-    """Copies of one vector have one code. A cut through them takes every copy, so at 1 bit the
+def _candidate_ids(vs, q, size, allowed=None):
+    return set(vs._ids[vs._candidates(q, size, allowed)].tolist())
+
+
+@pytest.mark.parametrize("bits", [1, 4])
+def test_ties_at_the_candidate_cut_are_all_kept(bits):
+    """Copies of one vector have the same codes. A cut through them takes every copy, so the
     candidates do not depend on the order the codes are held in: the same vectors under other ids
     (as in another database) give the same candidates."""
     v = for_index(_vecs(300, dim=32), 32)
     v[100:160] = v[100]
     other_ids = np.random.default_rng(1).permutation(300) + 1  # vector j has id other_ids[j]: another order
-    a, b = CompactVectorStore(32, bits=1, rescore=8), CompactVectorStore(32, bits=1, rescore=8)
+    a, b = CompactVectorStore(32, bits=bits, rescore=8), CompactVectorStore(32, bits=bits, rescore=8)
     _bound(a, range(1, 301), v)
     _bound(b, other_ids.tolist(), v)
     vector_of = {int(i): j + 1 for j, i in enumerate(other_ids)}
-    in_a = set(a._scan(v[100], 8, None).tolist())
-    in_b = {vector_of[i] for i in b._scan(v[100], 8, None).tolist()}
+    in_a = _candidate_ids(a, v[100], 8)
+    in_b = {vector_of[i] for i in _candidate_ids(b, v[100], 8)}
     assert set(range(101, 161)) <= in_a and len(in_a) < 80 and in_a == in_b
     for q in for_index(_vecs(20, dim=32, seed=6), 32):
-        assert set(a._scan(q, 8, None).tolist()) == {vector_of[i] for i in b._scan(q, 8, None).tolist()}
+        assert _candidate_ids(a, q, 8) == {vector_of[i] for i in _candidate_ids(b, q, 8)}
     assert [i for i, _ in a.search(v[100], 2)] == [101, 102]
 
 
+@pytest.mark.parametrize("bits", [2, 4, 8])
+def test_the_same_vectors_in_another_order_give_the_same_candidates(bits, monkeypatch):
+    """Vectors with near neighbours, far more of them than candidates, with and without a filter:
+    which candidates a search takes depends on the vectors held, never on where their codes sit."""
+    monkeypatch.setattr("codemem.store._RANKED", 0)  # 4 per candidate: 100 of the 3,000, so both cuts are met
+    docs, queries = _clustered(30, 100, 64, 0.8, queries=30)
+    v = for_index(docs, 64)
+    other_ids = np.random.default_rng(2).permutation(len(v)) + 1
+    a, b = CompactVectorStore(64, bits=bits, rescore=25), CompactVectorStore(64, bits=bits, rescore=25)
+    a.upsert(list(range(1, len(v) + 1)), v)
+    b.upsert(other_ids.tolist(), v)
+    vector_of = {int(i): j + 1 for j, i in enumerate(other_ids)}
+    some = np.random.default_rng(3).choice(len(v), 1200, replace=False)
+    for q in for_index(queries, 64):
+        in_a = _candidate_ids(a, q, 25)
+        assert 25 <= len(in_a) < 30 and in_a == {vector_of[i] for i in _candidate_ids(b, q, 25)}
+        allowed_a, allowed_b = np.isin(a._ids, some + 1), np.isin(b._ids, other_ids[some])
+        in_a = _candidate_ids(a, q, 25, allowed_a)
+        assert in_a <= set((some + 1).tolist()) and in_a == {vector_of[i] for i in _candidate_ids(b, q, 25, allowed_b)}
+
+
+def test_finer_codes_rank_the_scan_s_best_again(monkeypatch):
+    """At more than 1 bit a search scans the coarse codes for more than it wants (here 4 times as
+    many), takes the fine estimate of those and keeps the best: what FAISS says of each code by itself."""
+    monkeypatch.setattr("codemem.store._RANKED", 0)
+    docs, queries = _clustered(30, 100, 64, 0.8, queries=20)
+    v = for_index(docs, 64)
+    vs = CompactVectorStore(64, bits=4, rescore=25)
+    vs.upsert(list(range(len(v))), v)
+    params = faiss.RaBitQSearchParameters(qb=4, centered=False)
+    kept_more = 0
+    for q in for_index(queries, 64):
+        x = vs._coded(q)
+        scanned = set(vs._coarse.search(x, 100, params=params)[1][0].tolist())
+        _, estimates, positions = vs._fine.range_search(x, -1e30, params=params)  # every code's fine estimate
+        fine = dict(zip(positions.tolist(), estimates.tolist()))
+        want = set(sorted(scanned, key=lambda i: -fine[i])[:25])
+        got = set(vs._candidates(q, 25, None).tolist())
+        assert got == want and got <= scanned
+        exact = set(np.argsort(-(v @ q))[:10].tolist())
+        coarse_only = set(vs._coarse.search(x, 25, params=params)[1][0].tolist())
+        kept_more += len(exact & got) - len(exact & coarse_only)
+    assert kept_more > 0  # the fine estimates keep more of the exact top 10 than the scan's own best 25
+
+
+def test_how_many_of_the_scan_s_best_the_fine_codes_rank(monkeypatch):
+    """At least 2,000, at least 4 for each candidate, and at least one in 50 of the vectors the
+    search may return."""
+    v = for_index(_vecs(6000, dim=16), 16)
+    vs = CompactVectorStore(16, bits=2, rescore=10)
+    vs.upsert(list(range(len(v))), v)
+    asked: list[int] = []
+    scan = vs._scan
+    monkeypatch.setattr(vs, "_scan", lambda x, size, allowed: asked.append(size) or scan(x, size, allowed))
+    half = np.arange(len(v)) < 3000
+    for size, allowed in ((10, None), (600, None), (10, half)):
+        assert 10 <= len(vs._candidates(v[0], size, allowed)) <= size + 5
+    monkeypatch.setattr("codemem.store._RANKED", 50)
+    for size, allowed in ((10, None), (10, half), (40, half)):
+        vs._candidates(v[0], size, allowed)
+    assert asked == [2000, 2400, 2000, 120, 60, 160]
+
+
 def _codes(vs):
-    table = faiss.vector_to_array(vs._index.codes).reshape(len(vs), -1)
-    return {int(i): bytes(code) for i, code in zip(vs._ids, table)}
+    tables = [faiss.vector_to_array(index.codes).reshape(len(vs), index.code_size) for index in vs._indexes]
+    return {int(i): b"".join(bytes(table[at]) for table in tables) for at, i in enumerate(vs._ids)}
 
 
 @pytest.mark.parametrize("bits", [1, 4])
 def test_an_index_patched_step_by_step_is_the_index_rebuilt_from_the_rows(bits):
-    """The same codes in the same order, whatever edits it went through: the same bytes when saved,
-    and so the same candidates, also at more than 1 bit, where FAISS's scan depends on the order."""
+    """The same codes in the same order, whatever edits it went through: the same bytes when
+    saved, and the same candidates."""
     v = for_index(_vecs(400, dim=48), 48)
     patched = CompactVectorStore(48, bits=bits, rescore=16)
     patched.upsert(list(range(201, 401)), v[200:])  # the newer half first, as a catch-up can bring it
@@ -538,7 +606,7 @@ def test_an_index_patched_step_by_step_is_the_index_rebuilt_from_the_rows(bits):
     assert patched._ids.tolist() == rebuilt._ids.tolist() == kept
     assert _codes(patched) == _codes(rebuilt) and patched.to_bytes() == rebuilt.to_bytes()
     for q in for_index(_vecs(10, dim=48, seed=4), 48):
-        assert patched._scan(q, 16, None).tolist() == rebuilt._scan(q, 16, None).tolist()
+        assert patched._candidates(q, 16, None).tolist() == rebuilt._candidates(q, 16, None).tolist()
 
 
 @pytest.mark.parametrize("options", [{}, {"bits": 2}, {"bits": 4, "dim": 16}, {"dim": 24}])
@@ -548,12 +616,12 @@ def test_the_saved_file_holds_ids_and_codes_and_reads_back(options):
     rows = _bound(vs, range(1, 301), v)
     vs.remove(range(1, 20))
     data = vs.to_bytes()
-    code_bytes = vs._index.code_size
-    assert len(data) < len(vs) * (code_bytes + 8) + 600  # 8 bytes of id and one code per vector, and a small head
+    assert vs.code_bytes == sum(index.code_size for index in vs._indexes) and len(vs._indexes) == 1 + (vs.bits > 1)
+    assert len(data) < len(vs) * (vs.code_bytes + 8) + 900  # 8 bytes of id and its codes per vector, and a small head
     back = CompactVectorStore.from_bytes(data, rescore=16, **options)
     back.bind(lambda wanted: (np.asarray(wanted, dtype=np.int64), np.stack([rows[int(i)] for i in wanted])))
     assert back.ids() == vs.ids() and (back.dim, back.code_dim, back.bits) == (vs.dim, vs.code_dim, vs.bits)
-    assert back._index.thisown  # the object FAISS gave owns the index: nothing else points into it
+    assert all(index.thisown for index in back._indexes)  # the objects FAISS gave own the indexes
     q = for_index(_vecs(1, dim=40, seed=8), 40)[0]
     assert back.search(q, 5) == vs.search(q, 5)
     back.upsert([1000], v[:1])  # a loaded index takes edits, and codes them as the first one does
@@ -584,29 +652,42 @@ def test_a_file_that_is_not_what_was_saved_is_refused_before_faiss_reads_it(monk
 def test_a_file_whose_index_is_not_the_one_described_is_refused():
     import zlib
 
-    def saved(index, count, ids):
-        body = np.asarray(ids, dtype="<i8").tobytes() + faiss.serialize_index(index).tobytes()
-        head = {"dim": 16, "code_dim": 16, "bits": 1, "count": count, "rotation": CompactVectorStore(16)._rotation_id,
-                "crc32": zlib.crc32(body)}
+    def saved(indexes, count, ids, bits=1, **other):
+        blobs = [faiss.serialize_index(index).tobytes() for index in indexes]
+        body = np.asarray(ids, dtype="<i8").tobytes() + b"".join(blobs)
+        head = {"dim": 16, "code_dim": 16, "bits": bits, "count": count, "rotation": CompactVectorStore(16)._rotation_id,
+                "index_bytes": [len(blob) for blob in blobs], "crc32": zlib.crc32(body)} | other
         return json.dumps(head).encode() + b"\n" + body
 
+    def rabitq(vectors, bits=1, metric=faiss.METRIC_INNER_PRODUCT, centre=None):
+        index = faiss.IndexRaBitQ(16, metric, bits)
+        index.train(np.zeros((1, 16), dtype=np.float32) if centre is None else centre)
+        index.add(vectors)
+        return index
+
     v = np.ascontiguousarray(for_index(_vecs(6, dim=16), 16))
-    right = faiss.IndexRaBitQ(16, faiss.METRIC_INNER_PRODUCT, 1)
-    right.train(np.zeros((1, 16), dtype=np.float32))
-    right.add(v)
-    assert len(CompactVectorStore.from_bytes(saved(right, 6, range(6)), bits=1)) == 6
-    centred = faiss.IndexRaBitQ(16, faiss.METRIC_INNER_PRODUCT, 1)
-    centred.train(v)  # a learned centre: its codes are not the ones this store makes
-    centred.add(v)
+    right, fine = rabitq(v), rabitq(v, bits=4)
+    size = len(faiss.serialize_index(right).tobytes())
+    assert len(CompactVectorStore.from_bytes(saved([right], 6, range(6)), bits=1)) == 6
+    assert len(CompactVectorStore.from_bytes(saved([right, fine], 6, range(6), bits=4), bits=4)) == 6
+    centred = rabitq(v, centre=v)  # a learned centre: its codes are not the ones this store makes
     flat = faiss.IndexFlatIP(16)
     flat.add(v)
-    l2 = faiss.IndexRaBitQ(16, faiss.METRIC_L2, 1)
-    l2.train(np.zeros((1, 16), dtype=np.float32))
-    l2.add(v)
-    for index, count, ids in ((right, 5, range(5)), (right, 7, range(7)), (centred, 6, range(6)), (flat, 6, range(6)),
-                              (l2, 6, range(6)), (right, 6, [0, 1, 2, 4, 3, 5]), (right, 6, [0, 1, 2, 2, 3, 4])):
-        with pytest.raises(ValueError, match="not the one its first line describes|as many vector ids|not in order"):
-            CompactVectorStore.from_bytes(saved(index, count, ids), bits=1)
+    refused = "not the one its first line describes|does not hold the vector ids and indexes|not in order"
+    for indexes, count, ids in (([right], 5, range(5)), ([right], 7, range(7)), ([centred], 6, range(6)),
+                                ([flat], 6, range(6)), ([rabitq(v, metric=faiss.METRIC_L2)], 6, range(6)),
+                                ([right], 6, [0, 1, 2, 4, 3, 5]), ([right], 6, [0, 1, 2, 2, 3, 4]),
+                                ([fine], 6, range(6)), ([right, fine], 6, range(6)), ([], 6, range(6))):
+        with pytest.raises(ValueError, match=refused):
+            CompactVectorStore.from_bytes(saved(indexes, count, ids), bits=1)
+    for sizes in ([size - 1], [size + 1], [size, 0], [0, size], [-1], [float(size)], [], size, None, "x"):
+        with pytest.raises(ValueError, match=refused):
+            CompactVectorStore.from_bytes(saved([right], 6, range(6), index_bytes=sizes), bits=1)
+    # at more than 1 bit: a coarse and a fine index, in that order, of the same vectors
+    for indexes in ([right], [fine, right], [right, right], [right, rabitq(v, bits=2)], [right, rabitq(v[:5], bits=4)],
+                    [rabitq(v[:5]), fine], [right, fine, fine]):
+        with pytest.raises(ValueError, match=refused):
+            CompactVectorStore.from_bytes(saved(indexes, 6, range(6), bits=4), bits=4)
 
 
 # ---------------------------------------------------------------- the checks in front of FAISS
@@ -628,7 +709,8 @@ def test_the_code_covers_the_first_numbers_of_any_length(dim, code_dim, expect):
     vs = CompactVectorStore(dim, bits=1, dim=code_dim, rescore=4)
     v = for_index(_vecs(60, dim=dim), dim)
     _bound(vs, range(1, 61), v)
-    assert vs.code_dim == vs._index.d == expect and vs._index.code_size == -(-expect // 8) + 8
+    assert vs.code_dim == vs._coarse.d == expect and vs.code_bytes == -(-expect // 8) + 8 and vs._fine is None
+    assert CompactVectorStore(dim, bits=4, dim=code_dim)._fine.d == expect
     hits = vs.search(v[7], 3)
     assert len(hits) == 3 and hits[0][1] == pytest.approx(max(float(s) for s in v @ v[7]), abs=1e-6)
 
@@ -636,7 +718,7 @@ def test_the_code_covers_the_first_numbers_of_any_length(dim, code_dim, expect):
 def test_an_index_wider_than_the_longest_code_is_coded_on_its_first_numbers(monkeypatch):
     monkeypatch.setattr("codemem.store.COMPACT_MAX_DIM", 16)
     vs = CompactVectorStore(40)
-    assert (vs.dim, vs.code_dim, vs._index.d) == (40, 16, 16)
+    assert (vs.dim, vs.code_dim, vs._coarse.d, vs._fine.d) == (40, 16, 16, 16)
     with pytest.raises(ValueError, match="dim 0 to 16"):
         CompactVectorStore(40, dim=17)
 
@@ -651,7 +733,7 @@ def test_vectors_and_queries_of_the_wrong_shape_raise_before_faiss():
     for bad_query in (np.zeros(7, np.float32), np.zeros(9, np.float32), np.zeros((2, 8), np.float32)):
         with pytest.raises(ValueError, match="a query of 8 numbers"):
             vs.search(bad_query, 1)
-    assert len(vs) == 40 and vs._index.ntotal == 40
+    assert len(vs) == 40 and [index.ntotal for index in vs._indexes] == [40, 40]
     assert len(vs.search(v[3].astype(np.float64), 5)) == 5  # other number types are converted
     assert len(vs.search(np.asfortranarray(v[3]), np.int64(5))) == 5
 
@@ -683,13 +765,23 @@ def test_a_selector_always_covers_every_position():
             vs._selector(wrong)
 
 
-def test_ids_and_codes_that_are_out_of_step_raise_before_faiss_reorders():
-    vs = CompactVectorStore(8)
-    v = for_index(_vecs(12, dim=8), 8)
-    vs.upsert(list(range(10, 20)), v[:10])
-    vs._ids = vs._ids[:-1]  # as a bug would leave them: one id too few
-    with pytest.raises(RuntimeError, match="10 vector ids for an index of 11 codes"):
-        vs.upsert([5], v[10:11])  # an older id: the codes would be moved by a list of the wrong length
+@pytest.mark.parametrize("bits, spoil, message", [
+    (1, lambda vs, v: setattr(vs, "_ids", vs._ids[:-1]), "39 vector ids for an index of 40 codes"),
+    (4, lambda vs, v: setattr(vs, "_ids", vs._ids[:-1]), "39 vector ids for an index of 40 codes"),
+    (4, lambda vs, v: vs._fine.add(vs._coded(v[40:49])), "40 vector ids for an index of 49 codes"),
+    (4, lambda vs, v: vs._coarse.add(vs._coded(v[40:49])), "40 vector ids for an index of 49 codes"),
+])
+def test_ids_and_codes_that_are_out_of_step_raise_before_faiss_is_asked(bits, spoil, message):
+    """As a bug would leave them: an id too few, or codes in one index that no id stands for. The
+    next call raises: FAISS is not handed a selector, or an order to move codes by, of another length."""
+    v = for_index(_vecs(50, dim=8), 8)
+    vs = CompactVectorStore(8, bits=bits, rescore=2)
+    _bound(vs, range(10, 50), v[:40])
+    spoil(vs, v)
+    for call in (lambda: vs.search(v[0], 1), lambda: vs.search(v[0], 1, allowed_ids=list(range(10, 40))),
+                 lambda: vs.remove([13]), lambda: vs.upsert([50], v[:1]), lambda: vs.upsert([5], v[:1])):
+        with pytest.raises(RuntimeError, match=message):
+            call()
 
 
 def test_search_needs_the_stored_vectors():
@@ -735,8 +827,8 @@ def test_twenty_thousand_clustered_vectors_keep_the_exact_top_ten(tmp_path):
     assert np.mean(overlap[:40]) >= 0.99 and np.mean(overlap[40:]) >= 0.99
     ti = store._type_index("code")
     assert ti.table.nbytes == 32 * len(docs)  # the bookkeeping: 32 bytes per vector
-    # saved: 8 bytes of id and one code per vector (128 numbers at 4 bits: 84 bytes, against 256 at 2 bytes each)
-    assert ti.store._index.code_size == 84 and len(ti.store.to_bytes()) < len(docs) * 93
+    # saved: 8 bytes of id and two codes per vector (128 numbers: 24 bytes at 1 bit and 84 at 4, against 256 at 2 bytes each)
+    assert ti.store.code_bytes == 24 + 84 and len(ti.store.to_bytes()) < len(docs) * 117
     store.close()
 
 
@@ -748,7 +840,7 @@ def test_config_reads_the_compact_table():
     assert (cfg.compact.bits, cfg.compact.dim, cfg.compact.rescore) == (2, 256, 500)
     assert cfg.vector_options() == {"bits": 2, "dim": 256, "rescore": 500}
     default = config_from_dict({"vector_backend": "compact"})
-    assert default.vector_options() == {"bits": 4, "dim": 0, "rescore": 500}
+    assert default.vector_options() == {"bits": 4, "dim": 0, "rescore": 200}
     assert Config(vector_backend="faiss").vector_options() == {}
     assert config_from_dict({"vector_backend": "faiss", "compact": {"dim": 64}}).vector_options() == {}
 
@@ -773,7 +865,7 @@ def test_compact_settings_are_index_settings_only_for_the_compact_backend():
     assert unused.index_settings() == plain  # options of a backend that is not in use change nothing
     a = config_from_dict({"vector_backend": "compact"}).index_settings()
     b = config_from_dict({"vector_backend": "compact", "compact": {"dim": 256}}).index_settings()
-    assert a["vector_backend"] == "compact" and a["compact"] == {"bits": 4, "dim": 0, "rescore": 500}
+    assert a["vector_backend"] == "compact" and a["compact"] == {"bits": 4, "dim": 0, "rescore": 200}
     assert b["compact"]["dim"] == 256
     rest = lambda settings: {k: v for k, v in settings.items() if k not in ("compact", "vector_backend")}  # noqa: E731
     assert rest(a) == rest(b) == plain and b["vector_backend"] == "compact"
@@ -802,7 +894,7 @@ def test_switching_to_compact_and_changing_its_options_re_embeds_nothing(sample_
         backend = store._type_index("code").store
         assert isinstance(backend, CompactVectorStore)
         made_with = {"bits": backend.bits, "dim": options.get("dim", 0), "rescore": backend.rescore}
-        assert made_with == {"bits": 4, "dim": 0, "rescore": 500, **options}
+        assert made_with == {"bits": 4, "dim": 0, "rescore": 200, **options}
         assert backend.code_dim == options.get("dim", 64)
         store.load_vectors()  # what a server does at start: every type's index is built with the new options
         store.save_vectors()
@@ -826,7 +918,7 @@ def test_a_saved_file_made_with_other_options_is_rebuilt_and_one_with_the_same_i
         s = _open(tmp_path / "idx", "compact", **options)
         backend = s._type_index("code").store
         assert len(rebuilds) == rebuilt and _same_as_brute_force(s)
-        made_with = (options.get("bits", 4), options.get("dim", 16), options.get("rescore", 500))
+        made_with = (options.get("bits", 4), options.get("dim", 16), options.get("rescore", 200))
         assert (backend.bits, backend.code_dim, backend.rescore) == made_with
         s.close()  # not saved: the file on disk is still the first one
     s = Store(tmp_path / "idx", vector_backend="faiss")  # and the exact backend does not read a compact file
@@ -843,7 +935,7 @@ def test_the_service_follows_the_compact_settings_in_the_config_file(sample_repo
         (sample_repo / ".codemem.toml").write_text('vector_backend = "compact"\n[compact]\ndim = 32\n')
         svc._reload_config()
         assert svc.store.vector_backend == "compact"
-        assert svc.store.vector_options == {"bits": 4, "dim": 32, "rescore": 500}
+        assert svc.store.vector_options == {"bits": 4, "dim": 32, "rescore": 200}
         assert [r.qualname for r in svc.search("revoke session", k=5, signals=["code"]).results] == found
         first = svc.store._type_index("code").store
         assert isinstance(first, CompactVectorStore) and first.code_dim == 32
