@@ -39,13 +39,13 @@ import pathspec
 from . import __version__
 from .callgraph import resolve_edges
 from .chunker import chunk_source
-from .config import ALWAYS_SKIP_DIRS, DEFAULT_IGNORE, Config, VectorConfig, codemem_home
+from .config import ALWAYS_SKIP_DIRS, DEFAULT_IGNORE, Config, VectorConfig
 from .embedder import Embedder, make_embedder
 from .languages import EXTENSIONS, LANGUAGES, language_for_path
 from .schema import CALLABLE_KINDS, Chunk, text_hash
 from .store import FileRow, IndexLock, Store, VectorRow, diff_snapshots
 from .texts import BuildContext, build_parts
-from .vectorcache import VectorCache
+from .vectorcache import VectorCache, cap_bytes, machine_cache
 
 log = logging.getLogger(__name__)
 
@@ -579,11 +579,13 @@ class Indexer:
         head = git_head(self.root)
         return bool(head) and head != self.store.get_meta("indexed_commit")
 
-    def _vector_cache(self) -> VectorCache | None:
+    def vector_cache(self) -> VectorCache | None:
+        """The machine's vector cache, under the cap the config has now; None when it is off."""
         if self.config.vector_cache == "off":
             return None
         if self._cache is None:
-            self._cache = VectorCache(codemem_home() / "cache" / "vectors.db")
+            self._cache = machine_cache(self.config)
+        self._cache.max_bytes = cap_bytes(self.config)
         return self._cache
 
     # ---- stage A: structure
@@ -846,7 +848,7 @@ class Indexer:
                 self._claimed |= set(seqs)
             chunks = store.get_chunks(seqs)
             ctx = self._build_context(list(chunks), {c.path for c in chunks.values()})
-            cache = self._vector_cache()
+            cache = self.vector_cache()
             work: dict[str, _TypeWork] = {}
             for vec_type, embedder in self._embedders().items():
                 key = embedder.key
@@ -886,7 +888,11 @@ class Indexer:
         structure updates go on meanwhile. False if it stopped early (`stop()`, or the next call
         would end past the deadline); what it computed stays in `batch`."""
         stats.add_time("build_texts", batch.build_time)
-        cache = self._vector_cache()
+        cache = self.vector_cache()
+        if cache is not None:
+            for tw in batch.work.values():
+                if tw.from_cache:
+                    cache.touch(tw.key, tw.from_cache)  # a hit counts as use; written here, outside the write lock
         # The model calls: newest edits first (a search cut short by its deadline has embedded the
         # agent's latest edit), code texts before usage texts, longest texts first (less padding).
         calls: list[tuple[int, int, int, _TypeWork, list[str]]] = []
@@ -967,6 +973,9 @@ class Indexer:
                 t = time.perf_counter()
                 self.store.save_vectors()
                 stats.add_time("write_vectors", time.perf_counter() - t)
+            cache = self.vector_cache()
+            if cache is not None:
+                cache.evict()  # a put trims only for a moment; nothing waits here, so this goes all the way under the cap
         finally:
             if self._cache is not None:
                 self._cache.close()
