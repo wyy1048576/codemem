@@ -1,9 +1,13 @@
 """`cmeval e2e score`: tables of an end-to-end run, from its run.json files.
 
-For each setup: runs, discarded runs, the share of completed runs, processed tokens, the agent's seconds,
-turns, and how the runs ended. Discarded runs count only in "runs", "discarded" and the ends. Flagged runs
-(for example a cross-check that disagrees) are counted, and are kept out of every number until someone has
-looked at them: their measurement is in doubt.
+For each setup, two tables. Outcome: runs, discarded runs, the share of completed runs, processed tokens, the
+agent's seconds, turns, and how the runs ended. Behaviour (from `steps`): content searches, file searches,
+files viewed, the share of runs that opened a gold file, the turn of the first gold open, the turns before the
+first edit, and, when a run called codemem, its calls and the share of runs that called it.
+
+Discarded runs count only in "runs", "discarded" and the ends. Flagged runs (for example a cross-check that
+disagrees) are counted, and are kept out of every number until someone has looked at them: their measurement
+is in doubt.
 
 With two or more setups, each setup is compared with the baseline (grep when it exists) on the tasks that both
 have: the mean over repetitions for each task and setup, then the mean of the differences (setup - baseline).
@@ -46,6 +50,34 @@ def _mean(values: list) -> float | None:
     return statistics.fmean(values) if values else None
 
 
+def _steps(record: dict, *keys):
+    """A value in the record's steps, or None. Older records do not have every field."""
+    value = record.get("steps") or {}
+    for key in keys:
+        if not isinstance(value, dict):
+            return None
+        value = value.get(key)
+    return value
+
+
+def behaviour(kept: list[dict]) -> dict:
+    """The means of the search behaviour of some runs. A run without a field is left out of its mean."""
+    viewed = [_steps(r, "views", "files_viewed") for r in kept]
+    opened = [_steps(r, "gold_opened") if _steps(r, "gold_opened") is not None else _steps(r, "gold_file_read")
+              for r in kept]
+    codemem = [_steps(r, "codemem_calls") for r in kept]
+    return {
+        "content_searches_mean": _mean([_steps(r, "searches", "content") for r in kept]),
+        "file_searches_mean": _mean([_steps(r, "searches", "files") for r in kept]),
+        "files_viewed_mean": _mean([len(v) if isinstance(v, list) else None for v in viewed]),
+        "gold_opened_share": _mean([None if v is None else float(v) for v in opened]),
+        "first_gold_open_mean": _mean([_steps(r, "first_gold_opened_turn") for r in kept]),
+        "turns_before_first_edit_mean": _mean([_steps(r, "turns_before_first_edit") for r in kept]),
+        "codemem_calls_mean": _mean(codemem),
+        "codemem_share": _mean([None if c is None else float(c > 0) for c in codemem]),
+    }
+
+
 def _median(values: list) -> float | None:
     values = [v for v in values if v is not None]
     return statistics.median(values) if values else None
@@ -73,6 +105,7 @@ def score(run_id: str) -> dict:
             "seconds_mean": _mean(seconds), "seconds_median": _median(seconds),
             "turns_mean": _mean([r.get("steps", {}).get("turns") for r in kept]),
             "ends": dict(Counter(r["end"] for r in rows)),
+            "behaviour": behaviour(kept),
         }
     baseline = "grep" if "grep" in setups else next(iter(setups), None)
     paired = [paired_difference(records, name, baseline) for name in setups if name != baseline]
@@ -118,4 +151,14 @@ def format_score(summary: dict) -> str:
     for p in summary["paired"]:
         lines.append(f"  {p['setup']} - {p['baseline']} over {p['tasks']} tasks: completed {_fmt(p['completed'], 2)}, "
                      f"tokens {_fmt(p['tokens'], 0)}, seconds {_fmt(p['seconds'])}")
+    codemem = any((s["behaviour"]["codemem_calls_mean"] or 0) > 0 for s in summary["setups"].values())
+    lines.append("  behaviour (means over kept runs):")
+    lines.append(f"  {'setup':12} {'content s.':>10} {'file s.':>8} {'viewed':>7} {'gold open':>9} {'open turn':>9} "
+                 f"{'pre-edit':>8}" + (f" {'codemem':>8} {'used':>5}" if codemem else ""))
+    for name, s in summary["setups"].items():
+        b = s["behaviour"]
+        lines.append(f"  {name:12} {_fmt(b['content_searches_mean']):>10} {_fmt(b['file_searches_mean']):>8} "
+                     f"{_fmt(b['files_viewed_mean']):>7} {_fmt(b['gold_opened_share'], 2):>9} "
+                     f"{_fmt(b['first_gold_open_mean']):>9} {_fmt(b['turns_before_first_edit_mean']):>8}"
+                     + (f" {_fmt(b['codemem_calls_mean']):>8} {_fmt(b['codemem_share'], 2):>5}" if codemem else ""))
     return "\n".join(lines)

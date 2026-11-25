@@ -46,7 +46,7 @@ run.json has these fields:
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
                       preparation step, container_start_s, collect_s, container_s, grade_s
   steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
-                      command), and num_turns_result from the result event
+                      command), and num_turns_result from the result event. `cmeval e2e recount` computes it again
   outcome             completed, the grader's record, the patch's files and changed lines, status_lines
 """
 
@@ -76,7 +76,7 @@ from .generate import GenerateError, Recipe, _run, changed_lines, image_exists, 
 from .paths import cmeval_home, e2e_dir
 from .proxy import AGENT_CLASSES, DEFAULT_UPSTREAM, TOKEN_CLASSES, RecordingProxy, cross_check, read_log, summarize
 from .status import NullStatus
-from .tasks import Task
+from .tasks import Task, load_tasks
 
 SCHEMA = 1
 HARNESS = "claude-code"
@@ -643,6 +643,51 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     record["steps"]["num_turns_result"] = (result or {}).get("num_turns")
     write_json(out / "run.json", record)
     return record
+
+
+# ---- counting the steps again
+
+def _recount_values(steps: dict) -> tuple:
+    """Content searches, files viewed, gold opened and first edit turn, from steps of any version."""
+    if "searches" in steps:
+        return (steps["searches"]["content"], len(steps["views"]["files_viewed"]), steps["gold_opened"],
+                steps["first_edit_turn"])
+    before = steps.get("turns_before_first_edit")  # version 1
+    return (None, len(steps.get("files_read") or []), steps.get("gold_file_read"),
+            before + 1 if before is not None else None)
+
+
+def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str], None] = print) -> int:
+    """Compute `steps` of each run of a run id again from its stream.jsonl, with the rules of today, and write
+    it into run.json. Nothing else in the record changes. The gold files come from the record (identity), or
+    from the task file for records that do not have them. Returns the number of runs counted again."""
+    root = e2e_dir() / "runs" / run_id
+    if not root.is_dir():
+        raise FileNotFoundError(f"no run folder {root}")
+    gold_of = {t.id: t.gold.files for t in load_tasks(tasks_file)} if tasks_file else {}
+    done = 0
+    for path in sorted(p for p in root.glob("*/*/*/run.json") if p.parent.name.isdigit()):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        where = f"{record.get('task_id')} {record.get('setup')} rep {record.get('rep')}"
+        gold = record.get("identity", {}).get("gold_files")
+        gold = gold if gold is not None else gold_of.get(record.get("task_id"))
+        if gold is None:
+            progress(f"{where}: no gold files in the record; give the task file with --tasks")
+            continue
+        if not (path.parent / "stream.jsonl").exists():
+            progress(f"{where}: no stream.jsonl; not counted again")
+            continue
+        old = record.get("steps") or {}
+        steps = count_steps(parse_stream(path.parent / "stream.jsonl")["events"], gold)
+        steps["num_turns_result"] = old.get("num_turns_result", (record.get("result_event") or {}).get("num_turns"))
+        record["steps"] = steps
+        write_json(path, record)
+        done += 1
+        names = ("content searches", "files viewed", "gold opened", "first edit turn")
+        pairs = zip(names, _recount_values(old), _recount_values(steps))
+        progress(f"{where}: " + ", ".join(f"{name} {'-' if a is None else a} -> {'-' if b is None else b}"
+                                          for name, a, b in pairs))
+    return done
 
 
 # ---- a batch

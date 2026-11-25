@@ -13,8 +13,11 @@ import random
 
 import pytest
 
-from cmeval import e2e_steps
+from cmeval import e2e_run, e2e_steps
+from cmeval.cli import main
+from cmeval.e2e_score import format_score, score
 from cmeval.e2e_steps import Action, Redirect, classify, classify_call, count_steps, split_commands
+from cmeval.files import write_json
 
 from conftest import FIXTURES
 
@@ -760,3 +763,71 @@ def test_counts_of_the_66227_run():
     assert steps["gold"]["pandas/core/arrays/timedeltas.py"] == {"surfaced": 5, "opened": 2, "edited": 10,
                                                                  "named_by_agent": 1}
     assert (steps["first_edit_turn"], steps["first_test_turn"]) == (10, 13)
+
+
+# ---- recount and score
+
+def _old_record(run_id: str, task_id: str, *, gold: bool = True) -> tuple:
+    out = e2e_run.run_dir(run_id, task_id, "grep", 1)
+    out.mkdir(parents=True)
+    (out / "stream.jsonl").write_text(FIXTURE_70742.read_text())
+    identity = {"prompt_level": "L0", "machine": {"hostname": "höst"}}
+    if gold:
+        identity["gold_files"] = GOLD_70742
+    record = {"schema": 1, "task_id": task_id, "setup": "grep", "rep": 1, "identity": identity,
+              "time": {"agent_s": 61.25}, "result_event": {"num_turns": 18},
+              "steps": {"turns": 17, "turns_before_first_edit": 6, "files_read": ["pandas/core/indexing.py"],
+                        "gold_file_read": True, "first_gold_read_turn": 8, "num_turns_result": 18},
+              "outcome": {"completed": True}}
+    write_json(out / "run.json", record)
+    return out / "run.json", record
+
+
+def test_recount_changes_only_steps(tmp_path, capsys):
+    path, record = _old_record("rc1", "pandas-dev__pandas-70742")
+    before = path.read_text()
+    assert main(["e2e", "recount", "rc1"]) == 0
+    out = capsys.readouterr().out
+    assert ("pandas-dev__pandas-70742 grep rep 1: content searches - -> 8, files viewed 1 -> 3, gold opened True "
+            "-> True, first edit turn 7 -> 7") in out
+    new = json.loads(path.read_text())
+    assert new["steps"]["steps_version"] == e2e_steps.STEPS_VERSION and new["steps"]["first_gold_read_turn"] == 2
+    assert new["steps"]["num_turns_result"] == 18
+    # Everything but steps is the same, byte for byte.
+    assert json.dumps({**new, "steps": record["steps"]}, indent=2, ensure_ascii=False) + "\n" == before
+
+
+def test_recount_takes_gold_files_from_the_task_file(make_task, tmp_path, capsys):
+    from cmeval.tasks import Gold, save_tasks
+    path, _ = _old_record("rc2", "acme__auth-42", gold=False)
+    assert main(["e2e", "recount", "rc2"]) == 0
+    assert "no gold files in the record" in capsys.readouterr().out
+    assert "steps_version" not in json.loads(path.read_text())["steps"]
+    tasks = tmp_path / "tasks.jsonl"
+    save_tasks(tasks, [make_task(gold=Gold(files=GOLD_70742))])
+    assert main(["e2e", "recount", "rc2", "--tasks", str(tasks)]) == 0
+    assert json.loads(path.read_text())["steps"]["gold_opened"]
+    assert main(["e2e", "recount", "none"]) == 1
+
+
+def _scored(run_id, task_id, setup, steps):
+    out = e2e_run.run_dir(run_id, task_id, setup, 1)
+    out.mkdir(parents=True)
+    write_json(out / "run.json", {"task_id": task_id, "setup": setup, "rep": 1, "end": "finished", "completed": True,
+                                  "discard": False, "flags": [], "tokens": {"processed_tokens": 10},
+                                  "time": {"agent_s": 1.0}, "steps": steps})
+
+
+def test_score_behaviour_table():
+    steps = count_steps(e2e_steps.parse_stream(FIXTURE_70742)["events"], GOLD_70742)
+    _scored("sb1", "t1", "grep", steps)
+    _scored("sb1", "t2", "grep", {"turns": 9, "turns_before_first_edit": 2, "gold_file_read": False})  # version 1
+    behaviour = score("sb1")["setups"]["grep"]["behaviour"]
+    assert behaviour["content_searches_mean"] == 8 and behaviour["files_viewed_mean"] == 3
+    assert behaviour["gold_opened_share"] == 0.5 and behaviour["first_gold_open_mean"] == 2
+    assert behaviour["turns_before_first_edit_mean"] == 4 and behaviour["codemem_share"] == 0.0
+    text = format_score(score("sb1"))
+    assert "behaviour (means over kept runs)" in text and "codemem" not in text
+    _scored("sb1", "t1", "tool", {**steps, "codemem_calls": 3})
+    text = format_score(score("sb1"))
+    assert "codemem" in text and score("sb1")["setups"]["tool"]["behaviour"]["codemem_share"] == 1.0

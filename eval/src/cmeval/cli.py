@@ -484,6 +484,18 @@ def cmd_e2e_score(args) -> int:
     return 0
 
 
+def cmd_e2e_recount(args) -> int:
+    from .e2e_run import recount
+
+    try:
+        done = recount(args.run_id, args.tasks)
+    except (FileNotFoundError, TaskError) as exc:
+        print(f"e2e recount: {exc}", file=sys.stderr)
+        return 1
+    print(f"run {args.run_id}: {done} runs counted again")
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
@@ -664,6 +676,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = e2e_sub.add_parser("score", help="tables of an end-to-end run: completion, tokens, time, by setup")
     p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
     p.set_defaults(func=cmd_e2e_score)
+    p = e2e_sub.add_parser("recount", help="count the steps of each run again from its stream, with today's rules")
+    p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
+    p.add_argument("--tasks", type=Path, help="the task file, for records that do not hold their gold files")
+    p.set_defaults(func=cmd_e2e_recount)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
