@@ -256,7 +256,8 @@ def test_the_watcher_follows_a_switch_and_coming_back_makes_no_model_call(served
     git(checkout, "checkout", "-q", "--detach", b)
     assert _wait_for(lambda: _follows(service, b, ONLY_ON_B, ONLY_ON_A)), service.status(check_staleness=False)
     if service.status(check_staleness=False)["watching"]:
-        assert any(service.reconciles)  # the change of HEAD asked for a full check
+        assert _wait_for(lambda: any(service.reconciles))  # the change of HEAD asked for a full check
+        assert _wait_for(lambda: _follows(service, b, ONLY_ON_B, ONLY_ON_A))
     assert service.indexer.verify() == []
     embedded_for_b = len(model.documents)
     assert embedded_for_b > 33
