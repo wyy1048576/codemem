@@ -98,6 +98,9 @@ DEFAULT_MODEL = "claude-haiku-5-5"
 REDACTED = b"[REDACTED]"
 MAX_ERRORS_IN_A_ROW = 3
 GPUS_ENV = "CMEVAL_E2E_GPUS"
+# How hard codemem's tool texts push the agent to codemem: none, light or strong. Not set = codemem's default.
+STEERING_ENV = "CMEVAL_CODEMEM_STEERING"
+STEERING_LEVELS = ("none", "light", "strong")
 # Claude Code waits this long for an MCP server to start and for one tool call. codemem loads a model at start.
 MCP_TIMEOUT_MS = 120_000
 # Where the container of a codemem setup gets the index copy and the Hugging Face cache.
@@ -327,6 +330,10 @@ def codemem_mcp_config(codemem: dict, settings: RunSettings) -> dict:
     threads = str(max(1, int(settings.cpus)))
     env = {"HF_HOME": HF_MOUNT, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
            "CODEMEM_HOME": "/home/agent/.codemem", "OMP_NUM_THREADS": threads, "MKL_NUM_THREADS": threads}
+    if steering := os.environ.get(STEERING_ENV):
+        if steering not in STEERING_LEVELS:
+            raise GenerateError(f"{STEERING_ENV} must be one of {', '.join(STEERING_LEVELS)}, not {steering!r}")
+        env["CODEMEM_STEERING"] = steering
     return {"mcpServers": {"codemem": {"command": str(codemem["bin"]),
                                        "args": ["mcp", "/testbed", "--index-dir", INDEX_MOUNT],
                                        "env": env, "alwaysLoad": True}}}
