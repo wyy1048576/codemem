@@ -522,8 +522,8 @@ Searches never wait for writes (SQLite's WAL mode lets readers continue while on
 model's full length. It is one SQLite file for the whole machine, and every codemem process
 reads and writes it. Each part of its layout has a reason. The numbers are from 200,000 synthetic
 vectors of 896 numbers unless a line says otherwise. The times are medians of one run on an M1
-that other jobs kept busy (load average 12 to 16 on its 8 cores); from run to run they moved by
-about a fifth.
+that other jobs kept busy (load average 12 to 16 on its 8 cores). Three more runs gave times up
+to twice as long, and up to three times for the eviction of the oldest tenth.
 
 - **One vector table per embedder.** All vectors of an embedder have one length, so the rows of
   its table have one size and fill their pages: 18 vectors of 896 numbers on a page. On disk a
