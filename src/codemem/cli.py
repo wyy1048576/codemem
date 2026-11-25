@@ -11,7 +11,9 @@ from pathlib import Path
 
 from . import __version__, agents
 from .config import find_repo_root, load_config
-from .render import format_results, format_status
+
+# .render (and through it the search stack: numpy, faiss) is imported inside the commands that
+# print results, so that `codemem hook`, which runs on every Grep and Glob, starts fast.
 
 
 def _progress_printer(enabled: bool):
@@ -80,7 +82,9 @@ def cmd_init(args) -> int:
     repo = find_repo_root(args.path)
     config = load_config(repo)
     names = [a.strip() for a in args.agents.split(",") if a.strip()] if args.agents else []
-    actions = agents.plan(repo, names, write_agent_notes=args.write_agent_notes, steering=config.steering)
+    actions = agents.plan(
+        repo, names, write_agent_notes=not args.no_agent_notes, write_hooks=args.write_hooks, steering=config.steering
+    )
     print(f"repo: {repo}")
     for a in actions:
         print(f"- {a.agent}: {a.description}")
@@ -143,6 +147,8 @@ def cmd_search(args) -> int:
         if args.json:
             print(json.dumps(resp.to_dict(), indent=2))
         else:
+            from .render import format_results
+
             print(format_results(resp, debug=args.debug, preview=not args.no_preview))
             if args.debug:
                 print(f"\n{json.dumps({k: round(v * 1000, 1) for k, v in resp.timings.items()})} (ms)", file=sys.stderr)
@@ -155,6 +161,8 @@ def cmd_status(args) -> int:
     svc = _service(args)
     try:
         info = svc.status(check_staleness=True)
+        from .render import format_status
+
         print(json.dumps(info, indent=2, default=str) if args.json else format_status(info))
     finally:
         svc.close()
@@ -199,6 +207,12 @@ def cmd_mcp(args) -> int:
     return 0
 
 
+def cmd_hook(args) -> int:
+    from .hook import run
+
+    return run(sys.stdin, sys.stdout)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="codemem", description="Local hybrid code search for coding agents.")
     p.add_argument("--version", action="version", version=f"codemem {__version__}")
@@ -214,7 +228,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp = common(sub.add_parser("init", help="register with agents and build the index"))
     sp.add_argument("--agents", default="claude", help="comma list of claude,cursor,codex (default: claude)")
     sp.add_argument("--no-index", action="store_true", help="don't build the index now")
-    sp.add_argument("--write-agent-notes", action="store_true", help="append a short note to CLAUDE.md / AGENTS.md")
+    sp.add_argument(
+        "--no-agent-notes", action="store_true",
+        help="don't append the short codemem note to CLAUDE.md / AGENTS.md (it is appended by default)",
+    )
+    # The note used to be opt-in. The old flag is still accepted, so that existing commands run.
+    sp.add_argument("--write-agent-notes", action="store_true", help=argparse.SUPPRESS)
+    sp.add_argument(
+        "--write-hooks", action="store_true",
+        help="Claude Code: add two hooks to .claude/settings.json that point the agent at search_code when it has no lead",
+    )
     sp.add_argument("--dry-run", action="store_true", help="show what would be written")
     sp.add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
     sp.set_defaults(func=cmd_init)
@@ -248,6 +271,9 @@ def build_parser() -> argparse.ArgumentParser:
     common(sub.add_parser("watch", help="foreground watcher (re-index on save)")).set_defaults(func=cmd_watch)
     common(sub.add_parser("mcp", help="MCP server over stdio (what agents launch)")).set_defaults(func=cmd_mcp)
     sub.add_parser("languages", help="list supported languages and file extensions").set_defaults(func=cmd_languages)
+    sub.add_parser(
+        "hook", help="Claude Code hooks: point the agent at search_code when it has no lead (see the README)"
+    ).set_defaults(func=cmd_hook)
     return p
 
 
