@@ -2,15 +2,15 @@
 
 **Owner:** Andre, who also leads the project: ask him, in the log, when a decision or a priority is unclear.
 **Plan:** `docs/plan/track-c-memory.md` on `main`.
-**Updated:** 2026-11-25 12:55 UTC, by Andre (with Claude Code).
+**Updated:** 2026-11-25 23:44 UTC, by Andre (with Claude Code).
 
 | | |
 |---|---|
-| Now | follow-ups on `andre/compact-store` and `andre/model-idle-unload`; `andre/worktree-start` in progress; then the check of the compact store on a real pandas index, and index rows that point into one shared copy of the vectors |
-| Done | on local branches, not pushed: the compact store (31 to 42 MB against 441 to 511 MB at 200,000 vectors; top 10 equal to the exact store's in 99.3% of 268 real-question searches at 200 candidates, 100% at 500), the capped vector cache (1,877 bytes per vector against 4,690), `codemem serve-embeddings` with the `space` setting and PyTorch as an optional install, the idle unload of the model. See the entries of 2026-11-25 |
-| Next | 1. The pull requests, when Andre says so. 2. The gate on a real pandas index. 3. Index rows keep only a text hash. 4. The memory, disk and time report from 50,000 to 1,000,000 vectors. 5. By Nov 30: the embedding presets |
+| Now | seven branches are pushed and wait for their pull requests (Andre opens them). The check on the eval's PC is asked for in the entry of 2026-11-25, "seven branches pass together" |
+| Done | pushed: `andre/embedding-endpoints`, `andre/model-idle-unload`, `andre/worktree-start`, `andre/embedding-assist` (stacked in that order), `andre/vector-cache-cap`, `andre/compact-store`, `andre/compact-default`, and `andre/track-c-all`, which merges all seven for testing (619 tests). The compact index returned the same results as the exact one in every real search measured (768 on 31,000 vectors, 352 on a pandas index of 49,770). The default will be the exact index while it fits 2% of the machine's memory, the compact one beyond |
+| Next | 1. The pull requests. 2. The check on the PC (Linux, x86, larger real indexes). 3. The vLLM check here, stopped at 77,900 of about 145,000 vectors. 4. The memory, disk and time report on a quiet machine, with FAISS on one thread and on several. 5. By Nov 30: the embedding presets |
 | Blocked on | nothing |
-| Needs from other tracks | B: which vector types stay (code only, or code and usage); whether B's code reads `_TypeIndex.owner` or `by_chunk` directly. A: vague rewrites of the dev tasks, when they exist |
-| Gives to other tracks | for A: `codemem serve-embeddings` and the `space` setting for the `tool` setup in containers, an install without PyTorch, and the `codemem-compact` configuration with its memory and disk numbers. For B: a vector store that returns exact scores. None of it is merged yet |
-| Open | the embedding model and the vector length: decided later (Andre, Nov 25). Everything stays on `jina-code-embeddings-0.5b` at 896 numbers until then, and the storage work does not depend on either |
+| Needs from other tracks | A: the two commands of the entry "seven branches pass together", on the PC. B: whether the graph work touches `store.py`'s vector part, the indexer's stages or the watcher |
+| Gives to other tracks | for A: nothing to set; indexes keep their keys; on the PC every repo stays on the exact index. `codemem serve-embeddings` if containers should share one model. For B: `Store.vector_search` unchanged; `ti.find()` and `ti.vectors_of()` replace the two bookkeeping dicts |
+| Open | the embedding model and the vector length: decided later (Andre, Nov 25). Whether a hosted API passes the assist's check: needs a key and one trial |
 | Dates | Nov 25, evening: `codemem-final` frozen. Nov 26: track A's full runs start. Nov 30, 23:59: everything frozen. Dec 1, 14:00: the presentation. Dec 7: the paper |
