@@ -12,7 +12,7 @@ from pathlib import Path
 from . import __version__, agents
 from .config import find_repo_root, load_config
 from .embedder import LocalModelUnavailable
-from .embedserver import DEFAULT_HOST, DEFAULT_PORT, KEY_ENV
+from .embedserver import DEFAULT_HOST, DEFAULT_PORT, KEY_ENV, serve
 from .render import format_results, format_status
 
 
@@ -202,8 +202,6 @@ def cmd_mcp(args) -> int:
 
 
 def cmd_serve_embeddings(args) -> int:
-    from .embedserver import serve
-
     config = load_config(find_repo_root(args.path))
     try:
         server = serve(config, host=args.host, port=args.port)

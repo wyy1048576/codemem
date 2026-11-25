@@ -304,7 +304,7 @@ class SentenceTransformerEmbedder(Embedder):
 
     @property
     def prefixes(self) -> tuple[str, str]:
-        self.model  # the prompts come with the model
+        _ = self.model  # loads it: the prompts come with the model
         return self._prefixes
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
