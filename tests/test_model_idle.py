@@ -117,8 +117,8 @@ def test_calls_that_arrive_together_wait_for_one_load(model):
 
 
 class _StubTransformer:
-    """Stands in for sentence_transformers.SentenceTransformer: no weights, and gates that hold a
-    load or a call open."""
+    """Stands in for sentence_transformers.SentenceTransformer: no weights, gates that hold a
+    load or a call open, and a record of where it was built and moved."""
 
     prompts = {"nl2code_query": "", "nl2code_document": ""}
     max_seq_length = 512
@@ -128,6 +128,11 @@ class _StubTransformer:
         cls.loading.set()
         assert cls.load_gate.wait(10)
         cls.instances += 1
+        cls.built_on.append(device)
+
+    def to(self, target):
+        type(self).moves.append(target)
+        return self
 
     def encode(self, texts, **kwargs):
         cls = type(self)
@@ -137,19 +142,26 @@ class _StubTransformer:
 
 
 @pytest.fixture
-def local_model(monkeypatch):
-    """The real local embedder over a stub of sentence-transformers, and the stub's class."""
+def transformer(monkeypatch):
+    """A stub class in place of sentence-transformers, for the real local embedder to load."""
     pytest.importorskip("torch")  # the embedder resolves its device and empties allocator caches through it
 
     class Stub(_StubTransformer):
         instances = 0
+        built_on, moves = [], []
         loading, load_gate, encoding, encode_gate = (threading.Event() for _ in range(4))
 
     Stub.load_gate.set()
     Stub.encode_gate.set()
     module = types.SimpleNamespace(SentenceTransformer=Stub, __spec__=ModuleSpec("sentence_transformers", None))
     monkeypatch.setitem(sys.modules, "sentence_transformers", module)
-    return SentenceTransformerEmbedder("stub-model", device="cpu"), Stub
+    return Stub
+
+
+@pytest.fixture
+def local_model(transformer):
+    """The real local embedder over the stub, and the stub's class."""
+    return SentenceTransformerEmbedder("stub-model", device="cpu"), transformer
 
 
 def test_the_local_model_loads_at_its_first_use_and_again_after_an_unload(local_model):
@@ -162,6 +174,18 @@ def test_the_local_model_loads_at_its_first_use_and_again_after_an_unload(local_
     assert emb.unload() and not emb.ready
     emb.embed_queries(["a"])
     assert emb.ready and stub.instances == 2
+
+
+def test_another_precision_is_converted_on_the_cpu_before_the_model_moves_to_its_device(transformer):
+    """Converting on a GPU leaves the first format's blocks in its allocator while the model lives."""
+    import torch
+
+    half = SentenceTransformerEmbedder("stub-model", device="auto", dtype="float16")
+    half.embed_documents(["a"])
+    assert transformer.built_on == ["cpu"] and transformer.moves == [torch.float16, half.device]
+    full = SentenceTransformerEmbedder("stub-model", device="auto", dtype="float32")
+    full.embed_documents(["a"])
+    assert transformer.built_on == ["cpu", full.device] and len(transformer.moves) == 2  # as the file has it
 
 
 def test_the_local_model_is_loaded_once_by_calls_that_arrive_together(local_model):
