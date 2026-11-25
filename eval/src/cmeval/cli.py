@@ -570,7 +570,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jobs", type=int, default=2, help="tasks built and validated at the same time (default 2)")
     p.add_argument("--cpus", type=int, default=8, help="processors for one validation container (default 8)")
     p.add_argument("--repeats", type=int, default=3, help="test runs before and after the fix (default 3)")
-    p.add_argument("--force", action="store_true", help="do a task again that has a saved record")
+    p.add_argument("--force", action="store_true", help="build the image and validate again, also when a record is saved")
     p.set_defaults(func=cmd_generate)
 
     p = sub.add_parser("e2e", help="end-to-end runs of a coding agent on tasks with a test environment")

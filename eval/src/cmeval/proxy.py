@@ -43,6 +43,8 @@ One log line has these fields. A field is left out when it has no value.
   proxy_error            what went wrong in the proxy or on the way to the API
   client_closed          the client closed the connection before the answer ended
   parse_note             why the answer was passed on but not read
+  unfinished             the request was still open when the proxy stopped. The line has the fields
+                         known at that time, and the request gets no other line
 """
 
 from __future__ import annotations
@@ -88,7 +90,7 @@ FIELDS = ("seq", "start", "method", "path", "query", "status", "ms_headers", "ms
           "request_bytes", "response_bytes", "model", "stream", "max_tokens", "messages", "tools", "has_system",
           "has_metadata", "has_authorization", "has_x_api_key", "request_headers", "response_model", "message_id",
           "stop_reason", "usage", "usage_start", "usage_delta", "stream_complete", "counted_input_tokens",
-          "request_id", "rate_limit_headers", "error", "proxy_error", "client_closed", "parse_note")
+          "request_id", "rate_limit_headers", "error", "proxy_error", "client_closed", "parse_note", "unfinished")
 
 _LINE_END = re.compile(rb"\r\n|\r|\n")
 
@@ -326,12 +328,11 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _forward(self) -> None:
         proxy = self.server.proxy
-        seq = proxy._begin()
-        if seq is None:
+        record = proxy._begin()
+        if record is None:
             self.close_connection = True
             self._send_error(503, "the recording proxy is stopping")
             return
-        record: dict = {"seq": seq, "start": datetime.now(timezone.utc).isoformat(timespec="milliseconds")}
         try:
             self._exchange(proxy, record, time.perf_counter())
         finally:
@@ -484,6 +485,7 @@ class RecordingProxy:
         self._lock = threading.Lock()  # guards the log, the sequence, and the count of requests in progress
         self._idle = threading.Condition(self._lock)
         self._active = 0
+        self._open: dict[int, dict] = {}  # seq -> record of each request in progress
         self._stopping = False
         self._seq = itertools.count(1)
         self._log = None
@@ -520,7 +522,8 @@ class RecordingProxy:
         return self
 
     def stop(self, wait: float = STOP_WAIT) -> None:
-        """Stop taking requests, wait up to `wait` seconds for the ones in progress, then close the log."""
+        """Stop taking requests, wait up to `wait` seconds for the ones in progress, then close the log.
+        A request that is still open then gets a line with "unfinished": true."""
         if self._server is None:
             return
         with self._lock:
@@ -530,6 +533,10 @@ class RecordingProxy:
         self._thread.join()
         with self._lock:
             self._idle.wait_for(lambda: self._active == 0, timeout=wait)
+            for seq in sorted(self._open):
+                # dict() copies in one step of the interpreter: the handler thread cannot change the record during it.
+                line = _log_line(dict(self._open[seq], unfinished=True))
+                self._log.write(json.dumps(line, ensure_ascii=False) + "\n")
             self._log.close()
             self._log = None
         self._transport.close()
@@ -542,25 +549,36 @@ class RecordingProxy:
     def __exit__(self, *exc) -> None:
         self.stop()
 
-    def _begin(self) -> int | None:
+    def _begin(self) -> dict | None:
+        """The record of a new request, or None when the proxy is stopping."""
         with self._lock:
             if self._stopping:
                 return None
             self._active += 1
-            return next(self._seq)
+            record = {"seq": next(self._seq), "start": datetime.now(timezone.utc).isoformat(timespec="milliseconds")}
+            self._open[record["seq"]] = record
+            return record
 
     def _end(self, record: dict) -> None:
-        line = {k: record[k] for k in FIELDS if record.get(k) is not None}
-        line.update({k: v for k, v in record.items() if k not in line and v is not None})
+        line = _log_line(record)
         text = json.dumps(line, ensure_ascii=False) + "\n"
         with self._lock:
-            if self._log is not None:  # a request that outlived stop() is not written
+            self._open.pop(record["seq"], None)
+            if self._log is not None:  # a request that outlived stop() has its unfinished line already
                 self._log.write(text)
                 self._log.flush()
             self._active -= 1
             self._idle.notify_all()
         if self._progress:
             self._progress(progress_line(line))
+
+
+def _log_line(record: dict) -> dict:
+    """The fields of a log line: the known ones in the order of FIELDS, then any others. A field without a value is
+    left out."""
+    line = {k: record[k] for k in FIELDS if record.get(k) is not None}
+    line.update({k: v for k, v in record.items() if k not in line and v is not None})
+    return line
 
 
 def progress_line(record: dict) -> str:
@@ -626,7 +644,8 @@ def summarize(log_path: str | Path) -> dict:
     count_tokens are counted apart and never added to the token sums. processed_tokens is the sum of the four
     classes (section 5.4); peak_context_tokens is the largest input of one request (fresh input, cache writes and
     cache reads). proxy_complete is true when every such request has a usage block, every stream ended with
-    message_stop, and every line of the log is JSON.
+    message_stop, every line of the log is JSON, no request is unfinished, and the sequence numbers run from 1 to
+    the highest one with no gap and no number twice.
     """
     records, bad = read_log(log_path)
     records.sort(key=lambda r: r.get("seq", 0))
@@ -661,6 +680,10 @@ def summarize(log_path: str | Path) -> dict:
                 totals[cls] += usage.get(cls) or 0
         peak = max(peak, sum(usage.get(cls) or 0 for cls in TOKEN_CLASSES if cls != "output_tokens"))
     starts = [r["start"] for r in records if r.get("start")]
+    seqs = Counter(r["seq"] for r in records if isinstance(r.get("seq"), int))
+    gaps = sorted(set(range(1, max(seqs, default=0) + 1)) - set(seqs))
+    twice = sorted(seq for seq, n in seqs.items() if n > 1)
+    unfinished = [r.get("seq") for r in records if r.get("unfinished")]
     return {
         "log": str(log_path),
         "requests": len(records),
@@ -673,7 +696,11 @@ def summarize(log_path: str | Path) -> dict:
         "missing_usage_seqs": missing,
         "incomplete_streams": len(incomplete),
         "incomplete_stream_seqs": incomplete,
-        "proxy_complete": not missing and not incomplete and not bad,
+        "seq_gaps": gaps,
+        "duplicate_seqs": twice,
+        "unfinished": len(unfinished),
+        "unfinished_seqs": unfinished,
+        "proxy_complete": not missing and not incomplete and not bad and not gaps and not twice and not unfinished,
         "count_tokens": count_tokens,
         "errors": {"count": len(errors), "by_status": dict(Counter(str(e["status"]) for e in errors)), "list": errors},
         "first_request": min(starts) if starts else None,
@@ -694,6 +721,9 @@ def cross_check(summary: dict, agent_model_usage: dict, tolerance: float = 0.01)
     forms (for example with or without a date), so the verdict compares totals over all models, class by class. A
     class agrees when its relative difference is at most tolerance; when both sides are 0; and never when only one
     side is 0. The per-model sums of both sides are in "models", for information.
+
+    The verdict is never "agree" on nothing: not when the proxy log is not complete, not when it has no
+    /v1/messages request with usage, and not when the agent's side has no token. "reason" says why.
     """
     agent = {model: {cls: int(usage.get(key) or 0) for cls, key in AGENT_CLASSES.items()}
              for model, usage in (agent_model_usage or {}).items() if isinstance(usage, dict)}
@@ -705,5 +735,16 @@ def cross_check(summary: dict, agent_model_usage: dict, tolerance: float = 0.01)
         diff = relative_difference(p, a)
         agree = p == a == 0 or (p > 0 and a > 0 and diff <= tolerance)
         classes[cls] = {"proxy": p, "agent": a, "relative_difference": round(diff, 6), "agree": agree}
-    return {"agree": all(c["agree"] for c in classes.values()), "tolerance": tolerance, "classes": classes,
+    differ = [cls for cls, c in classes.items() if not c["agree"]]
+    if not summary.get("proxy_complete"):
+        reason = "the proxy log is not complete"
+    elif not summary["messages"]["requests"]:
+        reason = "the proxy log has no /v1/messages request with usage"
+    elif not any(c["agent"] for c in classes.values()):
+        reason = "the agent's modelUsage has no tokens"
+    elif differ:
+        reason = f"token counts differ: {', '.join(differ)}"
+    else:
+        reason = "ok"
+    return {"agree": reason == "ok", "reason": reason, "tolerance": tolerance, "classes": classes,
             "models": {"proxy": proxy, "agent": agent}}

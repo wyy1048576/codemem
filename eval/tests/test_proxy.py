@@ -339,6 +339,38 @@ def test_summarize(tmp_path):
     assert [e["type"] for e in s["errors"]["list"]] == ["rate_limit_error", "overloaded_error"]
     assert s["first_request"] == "2026-11-24T10:00:00.000+00:00"
     assert s["last_request"] == "2026-11-24T10:00:09.000+00:00"
+    assert s["seq_gaps"] == [] and s["duplicate_seqs"] == [] and s["unfinished"] == 0
+
+
+def test_summarize_finds_a_gap_in_the_sequence(tmp_path):
+    log = tmp_path / "proxy.jsonl"
+    rows = [LOG_ROWS[0], {**LOG_ROWS[1], "seq": 4}, {**LOG_ROWS[1], "seq": 5}]
+    write_log(log, rows)
+    s = summarize(log)
+    assert s["seq_gaps"] == [2, 3] and s["proxy_complete"] is False
+    # Every line is JSON and every request has its usage: only the gap shows that lines are lost.
+    assert s["bad_lines"] == 0 and s["missing_usage"] == 0 and s["incomplete_streams"] == 0
+    write_log(log, [LOG_ROWS[0], LOG_ROWS[0], LOG_ROWS[1]])
+    s = summarize(log)
+    assert s["seq_gaps"] == [] and s["duplicate_seqs"] == [1] and s["proxy_complete"] is False
+    write_log(log, LOG_ROWS[:2] + [{"seq": 3, "start": "2026-11-24T10:00:06.000+00:00", "path": "/v1/messages",
+                                    "status": 200, "unfinished": True}])
+    s = summarize(log)
+    assert s["unfinished_seqs"] == [3] and s["proxy_complete"] is False
+
+
+def test_stop_writes_a_line_for_a_request_that_is_still_open(tmp_path, fake_api):
+    log = tmp_path / "proxy.jsonl"
+    p = RecordingProxy(log, upstream=fake_api.url).start()
+    conn, response = post(p.port, REQUEST, {"x-fake-answer": "sse"})
+    assert response.status == 200  # the API holds back the rest of the stream until release
+    p.stop(wait=0.2)
+    fake_api.release.set()
+    conn.close()
+    [r] = records(log)
+    assert r["seq"] == 1 and r["unfinished"] is True and r["status"] == 200 and "usage" not in r
+    s = summarize(log)
+    assert s["unfinished_seqs"] == [1] and s["proxy_complete"] is False
 
 
 def test_summarize_empty_log(tmp_path):
@@ -358,7 +390,7 @@ def test_cross_check_agrees_over_models_with_other_names(tmp_path):
     write_log(log, LOG_ROWS[:2])
     agent = {"claude-opus-4-5": agent_usage(3, 1200, 40100, 57), "claude-haiku-4-5": agent_usage(100, 0, 0, 20)}
     result = cross_check(summarize(log), agent)
-    assert result["agree"] is True
+    assert result["agree"] is True and result["reason"] == "ok"
     assert result["classes"]["cache_read_input_tokens"] == {"proxy": 40000, "agent": 40100,
                                                            "relative_difference": round(100 / 40100, 6), "agree": True}
     assert result["classes"]["cache_creation_input_tokens"]["agree"] is True
@@ -371,7 +403,7 @@ def test_cross_check_disagrees(tmp_path):
     write_log(log, LOG_ROWS[:2])
     agent = {MODEL: agent_usage(3, 1200, 40000, 57)}  # the haiku request is missing on the agent's side
     result = cross_check(summarize(log), agent)
-    assert result["agree"] is False
+    assert result["agree"] is False and result["reason"] == "token counts differ: input_tokens, output_tokens"
     assert result["classes"]["input_tokens"]["agree"] is False and result["classes"]["output_tokens"]["agree"] is False
     assert result["classes"]["cache_read_input_tokens"]["agree"] is True
 
@@ -385,6 +417,35 @@ def test_cross_check_zero_cases(tmp_path):
     one_zero = cross_check(s, {MODEL: agent_usage(3, 5, 40000, 57)})
     assert one_zero["agree"] is False and one_zero["classes"]["cache_creation_input_tokens"]["agree"] is False
     assert cross_check(s, {}, tolerance=2.0)["agree"] is False  # never agrees with an empty side, whatever the tolerance
+
+
+def test_cross_check_never_agrees_on_nothing(tmp_path):
+    log = tmp_path / "proxy.jsonl"
+    log.write_text("")
+    empty = summarize(log)
+    for agent in ({}, {MODEL: agent_usage(0, 0, 0, 0)}):
+        result = cross_check(empty, agent)
+        assert result["agree"] is False and result["reason"] == "the proxy log has no /v1/messages request with usage"
+    # A log with only errors and counts has no usage either.
+    write_log(log, [{**LOG_ROWS[2], "seq": 1}, {**LOG_ROWS[3], "seq": 2}])
+    assert cross_check(summarize(log), {})["reason"] == "the proxy log has no /v1/messages request with usage"
+    # The proxy has usage, the agent's side is empty or has only zeros.
+    write_log(log, LOG_ROWS[:1])
+    s = summarize(log)
+    for agent in ({}, {"x": {"costUSD": 1.0}}, {MODEL: agent_usage(0, 0, 0, 0)}):
+        result = cross_check(s, agent)
+        assert result["agree"] is False and result["reason"] == "the agent's modelUsage has no tokens"
+
+
+def test_cross_check_does_not_agree_with_an_incomplete_proxy(tmp_path):
+    log = tmp_path / "proxy.jsonl"
+    # The numbers agree, but a request after the first one is lost (a gap in the sequence).
+    write_log(log, [LOG_ROWS[0], {**LOG_ROWS[1], "seq": 3}])
+    agent = {MODEL: agent_usage(3, 1200, 40000, 57), "claude-haiku-4-5": agent_usage(100, 0, 0, 20)}
+    result = cross_check(summarize(log), agent)
+    assert result["agree"] is False and result["reason"] == "the proxy log is not complete"
+    assert all(c["agree"] for c in result["classes"].values())  # the numbers per class stay
+    assert cross_check({**summarize(log), "seq_gaps": [], "proxy_complete": True}, agent)["agree"] is True
 
 
 def test_cli_proxy_summary(tmp_path, capsys):
