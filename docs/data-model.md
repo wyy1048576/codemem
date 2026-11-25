@@ -660,6 +660,22 @@ A change to any of these must be made together with the eval:
     `input` cannot be among them.
   - `batch_size` (32), `max_concurrency` (4), `timeout_s` (30): texts per request, requests in
     flight, seconds per request.
+  - A reply's vectors are scaled to length 1 before they are compared or stored. A reply with a
+    vector that cannot be scaled, or with another number of numbers than the local model's,
+    ends the endpoint's part.
+  - The endpoint is sent only texts the local model reads whole (`Embedder.cut`, §12.4).
+  - `codemem status [PATH] --check-assist [--json]` compares the endpoint with each local model
+    now, without a build, and prints one report per model. It loads a local model unless that
+    model's vectors for the probe texts are remembered (decisions.md §6), and sends the probe
+    texts only. Exit status 0: the endpoint can share a build's work; 1: it cannot; 2: no assist
+    is set. With `--json` the output is a list of objects:
+    - `host`, `model`: the endpoint; `local_model`: the model it was compared with;
+    - `state`: `sharing`, `refused`, or `resting` when the endpoint could not be reached;
+    - `reason`: one sentence, null when it can share;
+    - `agreement`: the smallest cosine, null when nothing could be compared; `needed`: 0.99995;
+    - `local_vectors`: `"embedded now"` or `"remembered"`;
+    - `probes`: for each probe text `probe` (what it is), `characters`, `cosine`, `local_length`
+      and `endpoint_length`, the length of the endpoint's vector as it came.
   - None of it is index-time: it is not in `index_settings()`, and the vectors carry the local
     embedder's key (§5.4).
   - An unknown key is refused.
@@ -688,8 +704,10 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   before a query and before a document. They must agree: `embed_texts([prefix + text])` equals
   `embed_queries([text])` and `embed_documents([text])`. The server checks this at start.
 - with an assist endpoint (§12.3) its `prefixes` say what goes before the endpoint's texts, unless
-  `document_prefix` is set. A plugin that gives neither gets no help from the endpoint, and
-  `status` says so.
+  `document_prefix` is set, and `cut(texts)` says, with one true or false per document text,
+  which texts it reads only in part: those are never sent to the endpoint. A class that reads
+  every text whole returns false for each. A plugin that does not define `cut`, or gives no
+  prefix by either way, gets no help from the endpoint, and `status` says so.
 
 **A search index** (`vector_backend`):
 - subclasses `codemem.store.VectorStore`, is built as `Class(dim: int)`, and keeps `dim`;
@@ -718,8 +736,12 @@ repository whose `.codemem.toml` is read, by default the one of the current dire
 
 **At start** it prints to stdout, as TOML under comment lines, the `[embedding]` section of a
 client: `provider = "openai"`, `base_url`, `model`, `space`, `query_prefix`, `document_prefix`,
-and `api_key_env = "CODEMEM_SERVE_KEY"` when a key is set. Everything else goes to stderr. Exit
-code 2 means the port is taken or the model cannot be served.
+and `api_key_env = "CODEMEM_SERVE_KEY"` when a key is set. After an empty line come comment lines
+only: when to use which section, and the `[embedding.assist]` section of a codemem that runs the
+same model itself (§12.3), with `base_url`, `model` and, when a key is set, `api_key_env`, each
+line behind `# `. So all of stdout parses as TOML and holds the `[embedding]` section alone.
+Everything else goes to stderr. Exit code 2 means the port is taken or the model cannot be
+served.
 
 **Routes.** Bodies are JSON in OpenAI's shapes.
 

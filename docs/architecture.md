@@ -379,11 +379,12 @@ hosted API, and embeds part of a build's texts while the local model embeds the 
    ──────────────────►                                    ◄──────────────────────
    the local model, 16 at a time,                 the endpoint, 32 a request,
    in the caller's thread                         4 requests at once
+   (first the texts it would cut)
 
    the two meet where their measured speeds put them; every vector is stored as the local model's
 ```
 
-Four choices shape it:
+Five choices shape it:
 
 - **One index, under the local model's name.** The vectors of both sources are stored under the
   local embedder's key, so an index built with an assist is the index the local model alone would
@@ -391,12 +392,30 @@ Four choices shape it:
   to give the same vectors, and nothing in an OpenAI-style reply says whether it does. So there is
   a check before the endpoint gets any text: seven fixed texts are embedded both ways and each
   pair must agree to a cosine of 0.99995 (the reason for the number is in decisions.md §3). The
-  texts are chosen to make the ways a provider can differ show up: code in two languages, a usage
-  text, plain words, other alphabets, and one text longer than the local model reads, whose end
-  is about something else than its start. An endpoint that cuts texts at another length gives
-  another vector for that one. A prompt added on the provider's side, another model behind the
-  name and another precision move every pair, and vectors that are not normalized are refused as
-  they come. An endpoint that fails the check gets no text, and `status` says why in one sentence.
+  endpoint's vectors are scaled to length 1 first: a provider need not normalize, and the same
+  model's vector at another length is the same vector. One that cannot be scaled, all zeros or
+  with a number that is not finite, refuses the endpoint. The texts are chosen to make the ways a
+  provider can differ show up: code in two languages, a usage text, plain words, other alphabets,
+  and one text filled to the local model's limit to the token, whose end is about something else
+  than its start. An endpoint that cuts a text earlier than the local model reads less of that
+  one. Another model behind the name, another precision and a prompt added on the provider's side
+  move every pair. An endpoint that fails the check gets no text, and `status` says why in one
+  sentence. `codemem status --check-assist` runs the check alone and prints each text's cosine
+  and the two vectors' lengths, so a provider can be tried without a build.
+- **A text the local model cuts stays local.** The local model reads `max_seq_length` (1,024)
+  tokens of a text and drops the rest. A hosted model usually reads many times that, and nothing
+  in its reply says where it stopped, so for a longer text the two sources would give different
+  vectors. Each call's texts are therefore counted once with the local model's own tokenizer, as
+  the model counts them: its prompt and the text as one string, with the tokens the tokenizer
+  adds. A text over the limit stays at the local model's end of the row, where the endpoint does
+  not reach. A text of exactly the limit is read whole and may go; one token more stays. This is
+  why the check needs no text over the limit: the endpoint is compared on the longest text it is
+  ever handed. The count runs on a copy of the tokenizer. A tokenizer holds whether it cuts as a
+  setting that each call sets, and a count on the model's own could switch the cutting off under
+  a call that is embedding in another thread. A plain ASCII text with fewer characters than the
+  limit is not tokenized for this, since a token is one character at least. The tokenizer comes
+  with the model, so a large call that arrives while the model is loading waits for the load, as
+  its first local batch would, and the endpoint gets its first texts after it.
 - **The split is inside the embedder.** The indexer makes one call per group of texts and gets
   all vectors back in order, as without an assist (§4.1); neither of its stages knows about the
   endpoint. Inside
@@ -418,7 +437,8 @@ Four choices shape it:
   endpoint: an edit, a search's catch-up and a model warm-up run as they do without an assist,
   and so does the 4 s limit of §4.2. Queries are always embedded locally, so a search depends on
   no network. What is shared is a build's large calls, which `codemem index` and `codemem init`
-  make.
+  make. A first build that the MCP server makes in the background runs in the writer's small
+  calls (§4.2) and is not shared.
 
 Measured with stand-in models that take a set time per character, so the numbers are the
 mechanism's and not a model's (1,024 code texts in calls of 256, vectors of 896 numbers, the
