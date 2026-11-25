@@ -683,6 +683,15 @@ def test_a_selector_always_covers_every_position():
             vs._selector(wrong)
 
 
+def test_ids_and_codes_that_are_out_of_step_raise_before_faiss_reorders():
+    vs = CompactVectorStore(8)
+    v = for_index(_vecs(12, dim=8), 8)
+    vs.upsert(list(range(10, 20)), v[:10])
+    vs._ids = vs._ids[:-1]  # as a bug would leave them: one id too few
+    with pytest.raises(RuntimeError, match="10 vector ids for an index of 11 codes"):
+        vs.upsert([5], v[10:11])  # an older id: the codes would be moved by a list of the wrong length
+
+
 def test_search_needs_the_stored_vectors():
     vs = CompactVectorStore(8)
     vs.upsert([1], for_index(_vecs(1, dim=8), 8))

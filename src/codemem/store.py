@@ -370,6 +370,8 @@ class CompactVectorStore(VectorStore):
         self.remove(id_arr)
         self._index.add(self._coded(vecs))
         self._ids = np.concatenate([self._ids, id_arr])
+        if len(self._ids) != self._index.ntotal:
+            raise RuntimeError(f"{len(self._ids)} vector ids for an index of {self._index.ntotal} codes")
         if not (self._ids[1:] > self._ids[:-1]).all():
             # Ids are handed out in increasing order, so this is rare: a saved index or a catch-up
             # brings vectors older than the newest held. Move them to their place.
