@@ -244,6 +244,11 @@ def cmd_serve_embeddings(args) -> int:
     if server.has_key:
         print(f"# This server asks for a key: a client needs {KEY_ENV} in its environment too.")
     print(server.client_config(), flush=True)
+    print("# The section above is for a codemem that runs no model of its own: every vector comes from this server.")
+    print("# A codemem on another machine that runs this model itself can let this server embed a share of each")
+    print("# build instead, and keep its own model for the rest, for searches and for edits. For that, leave the")
+    print("# section above out and use these lines, with this machine's address in base_url:")
+    print("".join(f"# {line}\n" for line in server.assist_config().splitlines()), flush=True)
     if not server.has_key and args.host not in ("127.0.0.1", "localhost", "::1"):
         print(
             f"warning: {args.host} is not the loopback address and no key is set: whoever can reach it can use "

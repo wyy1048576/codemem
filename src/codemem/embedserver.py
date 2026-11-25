@@ -300,6 +300,14 @@ class EmbeddingServer:
             lines.append(f"api_key_env = {_toml(KEY_ENV)}")
         return "\n".join(lines) + "\n"
 
+    def assist_config(self) -> str:
+        """The `[embedding.assist]` section of a codemem that runs the same model itself and lets
+        this server embed a share of each build. The prefix is that codemem's own model's."""
+        lines = ["[embedding.assist]", f"base_url = {_toml(self.url)}", f"model = {_toml(self.served.model)}"]
+        if self.has_key:
+            lines.append(f"api_key_env = {_toml(KEY_ENV)}")
+        return "\n".join(lines) + "\n"
+
     def serve_forever(self) -> None:
         self.httpd.serve_forever()
 

@@ -943,6 +943,28 @@ def test_the_check_alone_prints_each_probe_texts_numbers_and_the_verdict(stub, s
     assert "characters" not in out  # nothing came back to compare
 
 
+def test_a_server_prints_the_settings_of_a_codemem_it_assists_too(monkeypatch):
+    server = EmbeddingServer(FakeEmbedder(64), port=0, key="s3cret").start()
+    try:
+        printed = server.assist_config()
+        assert printed == (
+            f'[embedding.assist]\nbase_url = "{server.url}"\nmodel = "fake:64"\napi_key_env = "CODEMEM_SERVE_KEY"\n'
+        )
+        monkeypatch.setenv("CODEMEM_SERVE_KEY", "s3cret")
+        cfg = config_from_dict({"vectors": {"code": {"model": "fake:64"}}, **tomllib.loads(printed)})
+        emb = AssistedEmbedder(Slow(), cfg.embedding.assist)
+        texts = code_texts(60)
+        np.testing.assert_array_equal(emb.embed_documents(texts), FakeEmbedder(64).embed_documents(texts))
+        assert emb.status()["state"] == "sharing" and emb.shared["endpoint"] > 0
+    finally:
+        server.close()
+    bare = EmbeddingServer(FakeEmbedder(64), port=0)
+    try:
+        assert "api_key_env" not in bare.assist_config()
+    finally:
+        bare.close()
+
+
 def test_a_build_through_the_config_with_a_server_in_another_process(sample_repo, tmp_path, isolated_home):
     """`codemem serve-embeddings` in its own process as the endpoint, named in the repo's config:
     the index equals one built without it."""
@@ -959,12 +981,20 @@ def test_a_build_through_the_config_with_a_server_in_another_process(sample_repo
             if not line.strip() and printed:
                 break
             printed.append(line)
+        offered: list[str] = []  # after the client's section: the server as an assist, in comment lines
+        for line in proc.stdout:
+            if not line.strip():
+                break
+            offered.append(line)
         assert proc.poll() is None, proc.stderr.read()
         server = tomllib.loads("".join(printed))["embedding"]
+        assert tomllib.loads("".join(offered)) == {}  # so all of stdout stays the first section's TOML
+        said = "".join(offered[: offered.index("# [embedding.assist]\n")])
+        assert "a codemem that runs no model of its own" in said and "that runs this model itself" in said
+        section = tomllib.loads("".join(line.removeprefix("# ") for line in offered[len(said.splitlines()):]))
+        assert section == {"embedding": {"assist": {"base_url": server["base_url"], "model": server["model"]}}}
         fake = {"code": {"model": "fake:64"}, "usage": {"model": "fake:64"}}
-        on = config_from_dict({"batch_size": 4, "vectors": fake, "vector_cache": "off", "embedding": {
-            "assist": {"base_url": server["base_url"], "model": server["model"]},
-        }})
+        on = config_from_dict({"batch_size": 4, "vectors": fake, "vector_cache": "off", **section})
         off = config_from_dict({"batch_size": 4, "vectors": fake, "vector_cache": "off"})
         with_assist, alone = Store(tmp_path / "with"), Store(tmp_path / "alone")
         try:
