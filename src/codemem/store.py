@@ -268,6 +268,7 @@ class FaissVectorStore(VectorStore):
         return store
 
 
+_VECTOR_READ_CACHE_KB = 2000  # the page cache of a thread's connection for re-scoring reads
 _ROTATION_SEED = 20261125
 _QUERY_BITS = 4  # FAISS scans codes against a query rounded to this many bits per number
 _PER_RESULT = 4  # candidates scored exactly for each result asked for
@@ -821,18 +822,33 @@ class Store:
             )
 
     # ---- connections
+    def _connect(self, cache_kb: int) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute(f"PRAGMA cache_size=-{cache_kb}")  # at most this much of pages, as used
+        with self._conns_lock:
+            self._all_conns[id(conn)] = (threading.current_thread(), conn)
+        return conn
+
     @property
     def conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
         if conn is None:
-            conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None, check_same_thread=False)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
-            conn.execute("PRAGMA cache_size=-65536")  # up to 64 MB of pages per connection, as used
-            self._local.conn = conn
-            with self._conns_lock:
-                self._all_conns[id(conn)] = (threading.current_thread(), conn)
+            conn = self._local.conn = self._connect(65536)  # up to 64 MB of pages per thread
+        return conn
+
+    @property
+    def _vector_reader(self) -> sqlite3.Connection:
+        """The calling thread's second connection, read-only, for the vectors a re-scoring search
+        index reads back. Each search reads a few hundred rows, other ones every time: through
+        `conn` they would fill its page cache (64 MB after 100 searches at 200,000 vectors) and
+        push out the pages that keyword search and cards use. This one keeps 2 MB."""
+        conn = getattr(self._local, "vector_reader", None)
+        if conn is None:
+            conn = self._local.vector_reader = self._connect(_VECTOR_READ_CACHE_KB)
+            conn.execute("PRAGMA query_only=ON")
         return conn
 
     @contextmanager
@@ -883,18 +899,19 @@ class Store:
             hooks.append(hook)
 
     def close_thread_conn(self) -> None:
-        """Close the calling thread's connection (for short-lived worker threads)."""
-        conn = getattr(self._local, "conn", None)
-        if conn is not None:
-            self._local.conn = None
-            with self._conns_lock:
-                self._all_conns.pop(id(conn), None)
-            conn.close()
+        """Close the calling thread's connections (for short-lived worker threads)."""
+        for name in ("conn", "vector_reader"):
+            conn = getattr(self._local, name, None)
+            if conn is not None:
+                setattr(self._local, name, None)
+                with self._conns_lock:
+                    self._all_conns.pop(id(conn), None)
+                conn.close()
 
     def close(self) -> None:
-        """Close this thread's connection and those of threads that have ended. A thread that is
+        """Close this thread's connections and those of threads that have ended. A thread that is
         still running keeps its own: closing a connection under another thread's query crashes the
-        process (they are opened with check_same_thread=False). It closes with that thread."""
+        process (they are opened with check_same_thread=False). They close with that thread."""
         me = threading.current_thread()
         with self._conns_lock:
             done = [k for k, (thread, _) in self._all_conns.items() if thread is me or not thread.is_alive()]
@@ -904,7 +921,7 @@ class Store:
                 conn.close()
             except sqlite3.ProgrammingError:
                 pass
-        self._local.conn = None
+        self._local.conn = self._local.vector_reader = None
 
     # ---- meta
     def get_meta(self, key: str, default: Any = None) -> Any:
@@ -1566,13 +1583,21 @@ class Store:
 
     def _stored_vectors(self, dim: int, vector_ids: Sequence[int]) -> tuple[np.ndarray, np.ndarray]:
         """What a backend's `fetch` reads (VectorStore.bind): the ids among these that have a row,
-        and their vectors as the index got them. On the calling thread's connection."""
+        and their vectors as the index got them.
+
+        It reads through the calling thread's vector reader. Each statement there is its own read
+        of the database as it is now, and is read to its end, so nothing stays open between
+        searches to hold the write-ahead log back. "Now" is late enough: an index holds a vector
+        only once its row is committed (it is patched after the commit, under the lock the search
+        holds). A caller that is inside a transaction or a read snapshot of its own gets the rows
+        that transaction sees, from its own connection."""
+        conn = self.conn if self.conn.in_transaction else self._vector_reader
         ids: list[int] = []
         blobs: list[bytes] = []
         for batch in _batches(np.asarray(vector_ids, dtype=np.int64).tolist()):
-            rows = self.conn.execute(
+            rows = conn.execute(
                 f"SELECT vector_id, data FROM vectors WHERE vector_id IN ({','.join('?' * len(batch))})", batch
-            )
+            ).fetchall()
             for vector_id, data in rows:
                 ids.append(vector_id)
                 blobs.append(data)

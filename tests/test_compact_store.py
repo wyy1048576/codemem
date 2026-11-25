@@ -6,6 +6,7 @@ the rows, its saved file, and the checks in front of every FAISS call.
 """
 
 import json
+import sqlite3
 import threading
 
 import faiss
@@ -260,6 +261,110 @@ def test_searches_during_writes_never_see_a_half_patched_index(tmp_path, backend
         t.join()
     assert errors == [] and _in_sync(s)
     s.close()
+
+
+# ---------------------------------------------------------------- where the candidates' vectors are read
+
+
+_READ = "FROM vectors WHERE vector_id IN"
+
+
+def test_candidates_are_read_through_a_connection_with_a_small_cache(tmp_path):
+    s = _open(tmp_path / "idx", "compact")
+    _seed(s, 30)
+    q = _vecs(1, seed=3)[0]
+    main, reader = s.conn, s._vector_reader
+    assert reader is not main and reader is s._vector_reader  # one per thread, kept
+    assert main.execute("PRAGMA cache_size").fetchone()[0] == -65536
+    assert reader.execute("PRAGMA cache_size").fetchone()[0] == -2000
+    with pytest.raises(sqlite3.OperationalError, match="readonly"):
+        reader.execute("DELETE FROM vectors")
+    seen: dict[str, list[str]] = {"main": [], "reader": []}
+    main.set_trace_callback(seen["main"].append)
+    reader.set_trace_callback(seen["reader"].append)
+    assert len(s.vector_search("code", q, 3)) == 3
+    assert any(_READ in sql for sql in seen["reader"]) and not any(_READ in sql for sql in seen["main"])
+    seen["main"].clear(), seen["reader"].clear()
+    with s._read_snapshot():  # a caller's own snapshot: the rows it sees, from its connection
+        assert len(s.vector_search("code", q, 3)) == 3
+    assert any(_READ in sql for sql in seen["main"]) and not any(_READ in sql for sql in seen["reader"])
+    s.close()
+
+
+def test_a_search_inside_a_read_snapshot_returns_what_the_snapshot_holds(tmp_path):
+    """Another process deletes vectors after the snapshot began: the search still reads their rows."""
+    a, b = _open(tmp_path / "idx", "compact"), _open(tmp_path / "idx", "compact")
+    _seed(a, 60)
+    q = _vecs(1, seed=3)[0]
+    assert _same_as_brute_force(a, n_values=(5,), seeds=range(1))
+    with a._read_snapshot():
+        want = _brute(a, q, 5)  # the first read fixes the snapshot
+        gone = [a.vector_rows("code")[(chunk_id, 0)][0] for chunk_id, _, _ in want[:3]]
+        b.delete_vectors("code", gone)
+        assert [h.chunk_id for h in a.vector_search("code", q, 5)] == [c for c, _, _ in want]
+    now = _brute(a, q, 5)
+    assert not {c for c, _, _ in now} & {c for c, _, _ in want[:3]}
+    assert [h.chunk_id for h in a.vector_search("code", q, 5)] == [c for c, _, _ in now]
+    a.close(), b.close()
+
+
+def test_reading_candidates_holds_nothing_open_between_searches(tmp_path):
+    """A read transaction left open on the reader would keep the write-ahead log from being
+    emptied: after a search, a checkpoint from another connection must find no reader in its way."""
+    s = _open(tmp_path / "idx", "compact")
+    ids = _seed(s, 30)
+    q = _vecs(1, seed=3)[0]
+    other = sqlite3.connect(tmp_path / "idx" / "index.db", timeout=0, isolation_level=None)
+    wal = tmp_path / "idx" / "index.db-wal"
+
+    def emptied() -> bool:
+        busy = other.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0]
+        return busy == 0 and wal.stat().st_size == 0
+
+    assert len(s.vector_search("code", q, 3)) == 3 and emptied()
+    s.put_vectors("code", EMBEDDER, [VectorRow(ids[0], 0, 1, 0, 1, "again")], _vecs(1, seed=11))
+    hit = s.vector_search("code", _vecs(1, seed=11)[0], 1)[0]  # the reader sees the row committed just now
+    assert hit.chunk_id == ids[0] and hit.score == pytest.approx(1.0, abs=1e-3) and emptied()
+    held = s._vector_reader.execute("SELECT vector_id FROM vectors")
+    held.fetchone()  # the same check sees a read that is left open
+    s.put_vectors("code", EMBEDDER, [VectorRow(ids[1], 0, 1, 0, 1, "again")], _vecs(1, seed=12))
+    assert not emptied()
+    held.fetchall()
+    assert emptied()
+    other.close(), s.close()
+
+
+def test_closing_closes_the_reader_with_the_thread_s_connection(tmp_path):
+    s = _open(tmp_path / "idx", "compact")
+    _seed(s, 10)
+    q = _vecs(1, seed=3)[0]
+    errors: list[BaseException] = []
+
+    def worker():
+        try:
+            assert len(s.vector_search("code", q, 3)) == 3
+            mine = [s.conn, s._vector_reader]
+            assert all(id(conn) in s._all_conns for conn in mine)
+            s.close_thread_conn()
+            assert not any(id(conn) in s._all_conns for conn in mine)
+            for conn in mine:
+                with pytest.raises(sqlite3.ProgrammingError):
+                    conn.execute("SELECT 1")
+            assert len(s.vector_search("code", q, 3)) == 3  # both are opened again when needed
+            s.close_thread_conn()
+        except BaseException as e:  # noqa: BLE001 - any error fails the test
+            errors.append(e)
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join()
+    assert errors == []
+    assert len(s.vector_search("code", q, 3)) == 3
+    reader = s._vector_reader
+    s.close()
+    assert s._all_conns == {} and s._local.vector_reader is None
+    with pytest.raises(sqlite3.ProgrammingError):
+        reader.execute("SELECT 1")
 
 
 # ---------------------------------------------------------------- the compact index: codes, then exact scores
