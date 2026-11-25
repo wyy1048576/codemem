@@ -53,6 +53,8 @@ def build_server(service: CodememService) -> MCPServer:
         notes = [freshness_note(fresh, service.store.pending_paths() if fresh is not None and fresh.pending_chunks else (0, []))]
         if resp.models_loading:
             notes.append(prompts.models_loading_notice())
+        # Appended here, not in format_results: the eval builds its hit text from format_results.
+        notes.append(prompts.search_footer(steering))
         return notice + format_results(resp) + "".join(f"\n\n{n}" for n in notes if n)
 
     @server.tool(name="get_chunk", description=prompts.tool_description("get_chunk", steering))
