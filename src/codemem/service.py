@@ -1,8 +1,10 @@
 """Long-lived owner of one repo's index: updates, freshness, the watcher, queries.
 
 The MCP server and `codemem watch` call `start()`. The CLI and the eval call `update()` and
-`search()` directly. Creating a service has no side effects beyond opening the index, because the
-eval adapter re-pins `repo_root` after construction.
+`search()` directly. Creating a service with an `index_dir` has no side effects beyond opening
+the index, because the eval adapter re-pins `repo_root` after construction. Without one, the
+checkout's default index folder is prepared first (worktrees.py): a new index starts from a copy
+of another checkout's, and the indexes of removed worktrees are deleted.
 
 Freshness (docs/architecture.md §4):
 - the watcher hands over batches of changed paths; a writer thread applies them (stage A), then
@@ -36,6 +38,7 @@ from .indexer import IndexStats, Indexer, git_head
 from .search import SearchResponse, make_card, search
 from .store import Store
 from .watcher import RepoWatcher, git_busy
+from .worktrees import prepare_index
 
 log = logging.getLogger(__name__)
 
@@ -124,9 +127,14 @@ class CodememService:
         embedder_factory=make_embedder,
     ):
         self.repo_root = find_repo_root(repo_root)
-        self.index_dir = Path(index_dir) if index_dir else default_index_dir(self.repo_root)
         self._own_config = config is None  # loaded from the repo's files: reload it when they change
         self.config = config or load_config(self.repo_root)
+        self.copied_from: Path | None = None  # the index folder this checkout's new index was copied from
+        if index_dir:
+            self.index_dir = Path(index_dir)
+        else:
+            self.index_dir = default_index_dir(self.repo_root)
+            self.copied_from = prepare_index(self.repo_root, self.index_dir, self.config.index_settings())
         self._make_embedder = embedder_factory
         self._embedders: dict[tuple, Embedder] = {}  # every embedder handed out so far, by model
         self.store = Store(
