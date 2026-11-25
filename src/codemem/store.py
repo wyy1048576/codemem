@@ -18,6 +18,7 @@ file is rebuilt from the rows, which needs no model. docs/architecture.md §5 li
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import math
@@ -27,7 +28,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -142,6 +143,10 @@ def bm25_weights5(weights: Sequence[float]) -> tuple[float, ...]:
 # --------------------------------------------------------------------------- vectors
 
 
+# What a backend reads stored vectors with (VectorStore.bind): ids -> (the ids found, their vectors).
+Fetch = Callable[[Sequence[int]], tuple[np.ndarray, np.ndarray]]
+
+
 class VectorStore(ABC):
     """The in-memory search index of one vector type, keyed by vector id: FAISS by default, or a
     subclass named in config (`vector_backend = "module:Class"`, docs/architecture.md §5). It is
@@ -153,12 +158,21 @@ class VectorStore(ABC):
     qualifies; only ids in `allowed_ids` when it is given. An approximate index (HNSW, IVF) can
     miss some, as it does anywhere else.
 
+    A backend that keeps less than the vectors themselves can read them back to score with:
+    `bind(fetch)` hands it the function for that.
+
     Saving is optional: `to_bytes` gives the index for `vec_<type><suffix>`, and `from_bytes`
     reads it back at the next start. A backend that returns None is rebuilt from the stored
     vectors instead, which needs no model."""
 
     dim: int
     suffix: str = ".vec"
+
+    def bind(self, fetch: Fetch) -> None:
+        """Called once, right after the store builds or loads this index. `fetch(ids)` reads
+        vectors from SQLite and returns the ids that still have a row and their vectors, row for
+        row, exactly as `upsert` got them; an id whose row another process deleted is left out.
+        It runs on the calling thread. A backend that holds the vectors needs nothing from it."""
 
     @abstractmethod
     def upsert(self, ids: Sequence[int], vecs: np.ndarray) -> None: ...
@@ -534,9 +548,12 @@ def _batches(items: Sequence[Any], size: int = 500) -> Iterator[Sequence[Any]]:
 class Store:
     def __init__(
         self, index_dir: Path | str, *, bm25_stem: bool = False, bm25_stopwords: bool = False,
-        vector_backend: str = "faiss",
+        vector_backend: str = "faiss", vector_options: Mapping[str, Any] | None = None,
     ):
+        """`vector_options` are the backend's own settings, passed to it by keyword when it is
+        built and when its saved file is read."""
         self.vector_backend = vector_backend
+        self.vector_options = dict(vector_options or {})
         self._backend = vector_backend_class(vector_backend)
         self.index_dir = Path(index_dir)
         self.index_dir.mkdir(parents=True, exist_ok=True)
@@ -1090,12 +1107,12 @@ class Store:
         """The saved index a note describes (notes from before backends were pluggable: FAISS)."""
         return self.index_dir / note.get("file", f"vec_{vec_type}.faiss") if note else None
 
-    def use_vector_backend(self, name: str) -> None:
-        """Search with another backend from now on. Each vector type's index is rebuilt from the
-        stored vectors when it is next used; nothing is re-embedded."""
+    def use_vector_backend(self, name: str, options: Mapping[str, Any] | None = None) -> None:
+        """Search with another backend, or other options of the same one, from now on. Each vector
+        type's index is rebuilt from the stored vectors when it is next used; nothing is re-embedded."""
         backend = vector_backend_class(name)
         with self._vec_lock:
-            self.vector_backend, self._backend = name, backend
+            self.vector_backend, self.vector_options, self._backend = name, dict(options or {}), backend
             self._types.clear()
 
     def vec_types(self) -> list[str]:
@@ -1325,26 +1342,49 @@ class Store:
         flat = flat[np.argsort(flat[:, 0], kind="stable")]  # the covering index gives them by chunk
         return _owners(flat[:, 0], flat[:, 1:])
 
+    def _stored_vectors(self, dim: int, vector_ids: Sequence[int]) -> tuple[np.ndarray, np.ndarray]:
+        """What a backend's `fetch` reads (VectorStore.bind): the ids among these that have a row,
+        and their vectors as the index got them. On the calling thread's connection."""
+        ids: list[int] = []
+        blobs: list[bytes] = []
+        for batch in _batches(np.asarray(vector_ids, dtype=np.int64).tolist()):
+            rows = self.conn.execute(
+                f"SELECT vector_id, data FROM vectors WHERE vector_id IN ({','.join('?' * len(batch))})", batch
+            )
+            for vector_id, data in rows:
+                ids.append(vector_id)
+                blobs.append(data)
+        if not ids:
+            return np.empty(0, dtype=np.int64), np.empty((0, dim), dtype=np.float32)
+        # One vector type's rows all have one length, so the blobs join into one table.
+        vecs = np.frombuffer(b"".join(blobs), dtype=np.float16).reshape(len(ids), -1)
+        return np.asarray(ids, dtype=np.int64), for_index(vecs, dim)
+
+    def _bound(self, store: VectorStore, dim: int) -> VectorStore:
+        store.bind(functools.partial(self._stored_vectors, dim))
+        return store
+
     def _load_saved(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex | None:
         """The saved index file, reconciled with the committed rows by vector id: vectors whose
         row is gone are dropped, rows the file lacks are added. Rows never change in place, so
         this is exact whichever epoch the file was saved at (another process, a crash, a save
         that is behind), and it costs only the difference instead of a full rebuild. No file, or
-        one from another backend: None, and the index is rebuilt from the rows."""
+        one from another backend or other options: None, and the index is rebuilt from the rows."""
         note = self._read_note(vec_type)
-        if note is None or note.get("backend", "faiss") != self.vector_backend:
+        if (note is None or note.get("backend", "faiss") != self.vector_backend
+                or note.get("options", {}) != self.vector_options):
             return None
         path = self._noted_file(vec_type, note)
         if not path.is_file() or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder"):
             return None
         try:
-            store = self._backend.from_bytes(path.read_bytes())
+            store = self._backend.from_bytes(path.read_bytes(), **self.vector_options)
         except Exception:  # corrupt or partial file: rebuild from the rows
             log.exception("could not load %s; rebuilding it from the stored vectors", path)
             return None
         if store.dim != dim:
             return None
-        ti = _TypeIndex(dim, epoch, store)
+        ti = _TypeIndex(dim, epoch, self._bound(store, dim))
         owners = self._stored_owners(vec_type)
         in_file = np.fromiter(store.ids(), dtype=np.int64)
         stale = np.setdiff1d(in_file, owners["vector"])
@@ -1358,7 +1398,7 @@ class Store:
         return ti
 
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:
-        ti = _TypeIndex(dim, epoch, self._backend(dim))
+        ti = _TypeIndex(dim, epoch, self._bound(self._backend(dim, **self.vector_options), dim))
         rows = self.conn.execute(
             "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors "
             "WHERE vec_type = ? ORDER BY vector_id",
@@ -1457,6 +1497,8 @@ class Store:
                     note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
                             "embedder": self.get_meta(f"vec.{vec_type}.embedder"),
                             "backend": self.vector_backend, "file": self._data_path(vec_type).name}
+                    if self.vector_options:
+                        note["options"] = self.vector_options
                     copies.append((vec_type, ti.store.to_bytes(), note))
                     ti.dirty = False
             for vec_type, data, note in copies:

@@ -1,12 +1,12 @@
-"""What every search index shares (docs/architecture.md §5): where each vector came from, and how
-many vectors a search asks its index for."""
+"""What every search index shares (docs/architecture.md §5): where each vector came from, how many
+vectors a search asks its index for, and the hook that lets an index read stored vectors back."""
 
 import numpy as np
 import pytest
 
 from codemem.embedder import l2_normalize
 from codemem.schema import Chunk, text_hash
-from codemem.store import FaissVectorStore, Store, VectorRow, _TypeIndex, for_index
+from codemem.store import FaissVectorStore, Store, VectorRow, VectorStore, _TypeIndex, for_index
 
 EMBEDDER = "fake|doc"
 
@@ -143,3 +143,42 @@ def test_one_backend_search_is_enough_when_chunks_have_several_vectors(tmp_path)
     hits = store.vector_search("code", v[0], 10)  # 30 parts of one chunk lead: one search is not enough
     assert hits[0].chunk_id == ids[0] and len({h.chunk_id for h in hits}) == 10 and len(asked) > 1 and asked[0] == 24
     store.close()
+
+
+# ---------------------------------------------------------------- the hook
+
+
+class BoundStore(FaissVectorStore):
+    """A plugin that records what `bind` gave it."""
+
+    fetches: list = []
+
+    def bind(self, fetch):
+        BoundStore.fetches.append(fetch)
+
+
+def test_bind_hands_every_backend_the_stored_vectors_once_built_and_once_loaded(tmp_path):
+    BoundStore.fetches.clear()
+    backend = f"{__name__}:BoundStore"
+    s = Store(tmp_path / "idx", vector_backend=backend)
+    ids = _seed(s, 5)
+    assert len(BoundStore.fetches) == 1
+    vids = [s.vector_rows("code")[(c, 0)][0] for c in ids]
+    found, vecs = BoundStore.fetches[0](np.asarray(vids[::-1] + [10**9]))  # ids as a list or an array; one has no row
+    assert sorted(found.tolist()) == sorted(vids) and vecs.dtype == np.float32 and vecs.shape == (5, 16)
+    by_id = dict(zip(found.tolist(), vecs))
+    as_upsert_got_them = for_index(_vecs(5), 16)
+    assert all(np.array_equal(by_id[vid], as_upsert_got_them[i]) for i, vid in enumerate(vids))
+    assert BoundStore.fetches[0]([])[1].shape == (0, 16)
+    s.save_vectors()
+    s.close()
+    s2 = Store(tmp_path / "idx", vector_backend=backend)
+    assert s2._type_index("code") is not None and len(BoundStore.fetches) == 2  # loaded from its file: bound again
+    s2.close()
+
+
+def test_the_base_class_ignores_bind():
+    class Plain(VectorStore):
+        upsert = remove = search = ids = __len__ = lambda self, *a: None
+
+    assert Plain().bind(lambda ids: None) is None
