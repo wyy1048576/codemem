@@ -177,6 +177,84 @@ def split_patch(text: str) -> dict[str, str]:
     return parts
 
 
+# ---- file paths of a git diff, without a full parse
+
+_DIFF_START = re.compile(r"^diff --git ", re.M)
+
+
+def diff_sections(patch: str) -> list[str]:
+    """The patch cut before each line that starts with "diff --git ". Text before the first one
+    (for example a commit message) is a part of its own."""
+    starts = [m.start() for m in _DIFF_START.finditer(patch)]
+    if not starts:
+        return [patch] if patch else []
+    bounds = ([0] if starts[0] > 0 else []) + starts + [len(patch)]
+    return [patch[a:b] for a, b in zip(bounds, bounds[1:])]
+
+
+_ESCAPES = {b"a": 7, b"b": 8, b"t": 9, b"n": 10, b"v": 11, b"f": 12, b"r": 13}
+
+
+def _unquote(name: str) -> str:
+    """A path as git writes it. Git puts a path with special characters in quotes, with C escapes
+    and octal bytes."""
+    if len(name) < 2 or not (name.startswith('"') and name.endswith('"')):
+        return name
+
+    def byte(m: re.Match) -> bytes:
+        code = m.group(1)
+        return bytes([int(code, 8) if len(code) == 3 else _ESCAPES.get(code, code[0])])
+
+    return re.sub(rb"\\([0-7]{3}|.)", byte, name[1:-1].encode("utf-8")).decode("utf-8", "replace")
+
+
+def _side(name: str, prefix: str) -> str | None:
+    """The path of a "---" or "+++" line, without its a/ or b/ prefix. None for /dev/null."""
+    name = _unquote(name.split("\t")[0])
+    if name == "/dev/null":
+        return None
+    return name[len(prefix):] if name.startswith(prefix) else name
+
+
+def _header_paths(line: str) -> tuple[str | None, str | None]:
+    """The two paths of a "diff --git a/X b/Y" line. A path with spaces makes the line unclear;
+    then the two halves are taken to be the same path, as they are for a change in place."""
+    rest = line[len("diff --git "):].rstrip("\n")
+    quoted = re.fullmatch(r'("(?:[^"\\]|\\.)*"|\S+) ("(?:[^"\\]|\\.)*"|\S+)', rest)
+    if quoted and (rest.startswith('"') or rest.endswith('"')):
+        return _side(quoted.group(1), "a/"), _side(quoted.group(2), "b/")
+    half = (len(rest) - 1) // 2
+    if len(rest) % 2 == 1 and rest[half] == " " and rest[2:half] == rest[half + 3:]:
+        return rest[2:half], rest[half + 3:]
+    m = re.fullmatch(r"a/(.+?) b/(.+)", rest)
+    return (m.group(1), m.group(2)) if m else (None, None)
+
+
+def file_paths(section: str) -> tuple[str | None, str | None]:
+    """The path before and the path after the change, for the diff of one file. None for a side
+    that does not exist (a new file has no path before, a deleted file has no path after)."""
+    lines = section.splitlines()
+    if not lines or not lines[0].startswith("diff --git "):
+        return None, None
+    old, new = _header_paths(lines[0])
+    for line in lines[1:]:
+        if line.startswith(("@@", "GIT binary patch", "Binary files ")):
+            break
+        if line.startswith("new file mode"):
+            old = None
+        elif line.startswith("deleted file mode"):
+            new = None
+        elif line.startswith(("rename from ", "copy from ")):
+            old = _unquote(line.split(" ", 2)[2])
+        elif line.startswith(("rename to ", "copy to ")):
+            new = _unquote(line.split(" ", 2)[2])
+        elif line.startswith("--- "):
+            old = _side(line[4:], "a/")
+        elif line.startswith("+++ "):
+            new = _side(line[4:], "b/")
+    return old, new
+
+
 class PatchMismatch(ValueError):
     """A diff does not fit the base text: its context or removed lines differ from the base."""
 

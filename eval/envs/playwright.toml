@@ -21,18 +21,22 @@ refresh = ["npm run build"]
 
 timeout_min = 10
 
+# --workers=4 in each test command: without it, Playwright takes the number of workers from the
+# processors of the host, not from the limit of the container. Then test time and load change
+# with the machine. Do not set CI anywhere: it turns on retries, which hide a failing test.
+
 # The browser must not be in /root/.cache: that folder is a build cache and is not in the image.
 [env]
 PLAYWRIGHT_BROWSERS_PATH = "/opt/browsers"
 
 [[suite]]
 test_files = ["tests/library/**/*.spec.ts", "tests/page/**/*.spec.ts"]
-test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} xvfb-run -a npx playwright test --config=tests/library/playwright.config.ts --project=chromium-library --project=chromium-page --reporter=junit {files}"
+test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} xvfb-run -a npx playwright test --config=tests/library/playwright.config.ts --project=chromium-library --project=chromium-page --reporter=junit --workers=4 {files}"
 
 [[suite]]
 test_files = ["tests/mcp/**/*.spec.ts"]
-test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} xvfb-run -a npx playwright test --config=tests/mcp/playwright.config.ts --project=chromium --reporter=junit {files}"
+test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} xvfb-run -a npx playwright test --config=tests/mcp/playwright.config.ts --project=chromium --reporter=junit --workers=4 {files}"
 
 [[suite]]
 test_files = ["tests/playwright-test/**/*.spec.ts", "tests/playwright-test/**/*.test.ts"]
-test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} node tests/playwright-test/stable-test-runner/node_modules/@playwright/test/cli test --config=tests/playwright-test/playwright.config.ts --project=playwright-test --reporter=junit {files}"
+test = "PLAYWRIGHT_JUNIT_OUTPUT_NAME={junit} node tests/playwright-test/stable-test-runner/node_modules/@playwright/test/cli test --config=tests/playwright-test/playwright.config.ts --project=playwright-test --reporter=junit --workers=4 {files}"
