@@ -34,14 +34,14 @@ from urllib.parse import urlsplit
 import numpy as np
 
 from . import __version__
+from .config import SERVE_HOST as DEFAULT_HOST
+from .config import SERVE_KEY_ENV as KEY_ENV  # the environment variable that holds the shared key, when there is one
+from .config import SERVE_PORT as DEFAULT_PORT
 from .config import Config
 from .embedder import Embedder, FakeEmbedder, SentenceTransformerEmbedder, l2_normalize, make_embedder
 
 log = logging.getLogger(__name__)
 
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8791
-KEY_ENV = "CODEMEM_SERVE_KEY"  # the environment variable that holds the shared key, when there is one
 MAX_BODY_BYTES = 16 * 1024 * 1024  # a request body; codemem's own requests are about 0.2 MB
 MAX_INPUTS = 2048  # texts in one request
 IDLE_TIMEOUT_S = 60.0  # a connection that sends nothing for this long is closed

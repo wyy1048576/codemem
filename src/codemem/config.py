@@ -45,6 +45,12 @@ DEFAULT_IGNORE = (
 BM25_FIELDS = ("name", "path", "signature", "doc", "body")
 _SPACE = re.compile(r"[^\s|]{1,64}")  # `|` separates the parts of an embedder key
 DEVICES = ("auto", "cpu", "xpu", "cuda", "mps")
+# Where `codemem serve-embeddings` listens, and the environment variable that holds its shared key.
+# Here, not in embedserver.py: the command line reads them for its help, and must not import the
+# search stack to do so.
+SERVE_HOST = "127.0.0.1"
+SERVE_PORT = 8791
+SERVE_KEY_ENV = "CODEMEM_SERVE_KEY"
 DTYPES = ("auto", "float32", "float16", "bfloat16")
 # Search-time score multipliers, neutral by default (docs/architecture.md §6). Halving tests,
 # classes and blocks scores better on the eval only because its answers are never tests and rarely
