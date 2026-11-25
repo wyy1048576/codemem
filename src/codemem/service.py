@@ -143,7 +143,7 @@ class CodememService:
         self._embedders: dict[tuple, Embedder] = {}  # every embedder handed out so far, by model
         self.store = Store(
             self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords,
-            vector_backend=self.config.vector_backend,
+            vector_backend=self.config.vector_backend, vector_options=self.config.vector_options(),
         )
         self.state = "ready" if self.has_index() else "empty"
         self.progress = 0.0
@@ -440,9 +440,9 @@ class CodememService:
             return
         if new != self.config:
             log.info("the config changed; the index follows it")
-            if new.vector_backend != self.store.vector_backend:
+            if (new.vector_backend, new.vector_options()) != (self.store.vector_backend, self.store.vector_options):
                 try:
-                    self.store.use_vector_backend(new.vector_backend)
+                    self.store.use_vector_backend(new.vector_backend, new.vector_options())
                 except Exception:
                     log.exception("could not load vector_backend %r; keeping the current config", new.vector_backend)
                     return
@@ -760,6 +760,12 @@ class CodememService:
             "skipped_files": store.skipped_files(),
             "error": self.last_error,
         }
+        cache = self.indexer.vector_cache()
+        if cache is None:
+            info["vector_cache"] = None  # off
+        else:
+            info["vector_cache"] = cache.stats() or {"path": str(cache.path), "entries": None}  # None: unreadable
+            cache.close()
         if check_staleness and self.state not in ("indexing", "updating"):
             scan = self.indexer.scan()
             head = git_head(self.repo_root)
