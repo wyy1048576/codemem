@@ -1,6 +1,7 @@
 """What a branch switch costs. One index follows its checkout from commit A to commit B and back
 (gitrepo.py: a changed, an added, a moved and a deleted file). Coming back to a commit seen before
-must cost no model call, and work queued for the branch that was left must not be done.
+must cost no model call, work queued for the branch that was left must not be done, and a search
+right after a switch embeds first what its own keywords rank on top.
 
 The model is a fake one that records every text it is asked to embed.
 """
@@ -289,3 +290,79 @@ def test_a_switch_back_during_a_model_call_ends_the_work_for_the_branch_left(ser
     assert _wait_for(lambda: _follows(service, a, ONLY_ON_A, ONLY_ON_B)), service.status(check_staleness=False)
     assert model.started == calls_on_a + 1 and model.documents[in_flight:] == []
     assert service.indexer.verify() == []
+
+
+# --------------------------------------------------------------------------- a search right after a switch
+
+
+class ModelByThread(RecordingEmbedder):
+    """Also records which thread asked: a search embeds in its own thread, the writer in its."""
+
+    def __init__(self):
+        super().__init__()
+        self.asked: list[tuple[str, str]] = []  # (thread name, text)
+
+    def embed_documents(self, texts):
+        self.asked.extend((threading.current_thread().name, text) for text in texts)
+        return super().embed_documents(texts)
+
+    def by_this_thread(self):
+        return [text for thread, text in self.asked if thread == threading.current_thread().name]
+
+
+@pytest.fixture
+def switched(repo, tmp_path, monkeypatch):
+    """A running service without file events, current on A, whose checkout was just switched to
+    B: the next search finds the switch itself, and the 11 chunks it queues."""
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+    monkeypatch.setattr("codemem.service.POLL_EVERY", 3600.0)  # no full check on a timer during the test
+    model = ModelByThread()
+    service = CodememService(repo, index_dir=tmp_path / "idx", embedder_factory=lambda m, c: model)
+    try:
+        assert service.update() is not None
+        service.start(watch=False, prewarm=False)
+        assert service.catch_up(budget=30).complete  # the start's own full check is done
+        git(repo, "checkout", "-q", "feature")
+        del model.asked[:]
+        yield service, model
+    finally:
+        service.close()
+
+
+def _first_lines(texts):
+    return [text.splitlines()[0] for text in texts]
+
+
+def test_a_search_embeds_its_keyword_results_first_however_long_the_queue(switched, monkeypatch):
+    """After a switch the queue can be minutes long, and a search does not wait for it. But a
+    pending chunk has no current vector, so the merge would rank it by its keywords alone: the
+    search embeds the pending chunks among its own keyword results, and only those."""
+    service, model = switched
+    monkeypatch.setattr("codemem.service.CATCHUP_MAX_CHUNKS", 5)  # the 11 chunks of this switch are a long queue
+    resp = service.search("record audit event", k=3, debug=True)
+    mine = model.by_this_thread()
+    assert mine and all("auth/audit.py" in line for line in _first_lines(mine))
+    assert any("def record_audit_event" in text for text in mine)
+    top = resp.results[0]
+    assert top.qualname == "record_audit_event" and {"bm25", "code"} <= set(top.ranks)
+    assert resp.freshness.indexing and resp.freshness.pending_chunks > 5  # the rest is reported, not waited for
+    assert _wait_for(lambda: service.store.dirty_count() == 0)  # and embedded by the writer
+    assert service.indexer.verify() == []
+
+
+def test_a_keyword_only_search_embeds_nothing_of_a_long_queue(switched, monkeypatch):
+    service, model = switched
+    monkeypatch.setattr("codemem.service.CATCHUP_MAX_CHUNKS", 5)
+    resp = service.search("record audit event", k=3, signals=["bm25"])
+    assert model.by_this_thread() == [] and resp.results[0].qualname == "record_audit_event"
+    assert resp.freshness.indexing
+
+
+def test_a_search_embeds_its_keyword_results_before_the_rest_of_a_short_queue(switched):
+    service, model = switched
+    resp = service.search("record audit event", k=3)
+    mine = model.by_this_thread()
+    audit = sum("auth/audit.py" in line for line in _first_lines(mine))
+    assert 0 < audit < len(mine)  # the whole queue fits in the search's time
+    assert all("auth/audit.py" in line for line in _first_lines(mine[:audit]))  # its own results went first
+    assert resp.freshness.complete and service.indexer.verify() == []

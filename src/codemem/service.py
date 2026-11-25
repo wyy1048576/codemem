@@ -10,8 +10,9 @@ Freshness (docs/architecture.md §4):
 - the watcher hands over batches of changed paths; a writer thread applies them (stage A), then
   embeds what they queued (stage B, in small batches, so new edits get applied in between);
 - `search()` hands every save seen so far to the writer thread and waits until it has applied
-  them (stage A), then embeds what is queued, newest edits first: all within `catchup_budget_ms`.
-  The writer gives it the model meanwhile. `get_chunk()` waits for stage A only;
+  them (stage A), then embeds what is queued: first the chunks its own keyword ranking puts on
+  top, then the newest edits, all within `catchup_budget_ms`. The writer gives it the model
+  meanwhile. `get_chunk()` waits for stage A only;
 - a reconcile (a scan of the whole repo) runs at startup, every few minutes, on `refresh()`, and
   when the ignore rules, the config or the git branch change;
 - the FAISS files are written once the index has been quiet for a while, and on close.
@@ -27,6 +28,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -35,7 +37,7 @@ from urllib.parse import urlparse
 from .config import Config, VectorConfig, default_index_dir, find_repo_root, load_config
 from .embedder import Embedder, make_embedder, release_idle
 from .indexer import IndexStats, Indexer, git_head
-from .search import SearchResponse, make_card, search
+from .search import BM25, SearchResponse, make_card, search
 from .store import Store
 from .watcher import RepoWatcher, git_busy
 from .worktrees import prepare_index
@@ -53,6 +55,7 @@ RETRY_FIRST = 1.0  # a step of the writer that failed is tried again after this 
 RETRY_MAX = 60.0  # ... then after twice as long each time, up to this
 BURST_PATHS = 2000  # more changed paths than this at once: scan everything instead
 _BATCH = 64  # queued chunks per embedding batch outside a build (new edits wait for one at most)
+_FILTERS = ("path_prefix", "kinds", "languages", "tests", "test_weight", "kind_weights")  # of a search
 # Characters per model call outside a build: about 0.6 s on an M1, so a search waits at most that
 # long for the background writer's current call. A build uses bigger calls, for speed.
 _CALL_CHARS = 3000
@@ -482,13 +485,16 @@ class CodememService:
         }
 
     def catch_up(
-        self, budget: float | None = None, *, embed: bool = True, wait_for_models: bool = True
+        self, budget: float | None = None, *, embed: bool = True, wait_for_models: bool = True,
+        first: Callable[[], list[int]] | None = None,
     ) -> Freshness:
         """Bring the index up to every save made before this call, for at most `budget` seconds
         (default `catchup_budget_ms`). The writer thread applies them (stage A) while this waits;
-        then this embeds what is queued (stage B), newest edits first. With `embed=False` it stops
-        after stage A (`get_chunk` needs no vectors). With `wait_for_models=False` it embeds only
-        if the model is in memory by then. What doesn't fit is reported, not waited for."""
+        then this embeds what is queued (stage B): the chunks `first()` names, in its order and
+        however long the queue is, then the newest edits. With `embed=False` it stops after stage
+        A (`get_chunk` needs no vectors). With `wait_for_models=False` it embeds, the chunks of
+        `first()` too, only if the model is in memory by then. What doesn't fit is reported, not
+        waited for."""
         budget = self.config.catchup_budget_ms / 1000 if budget is None else budget
         deadline = time.monotonic() + budget
         if self.state in ("empty", "indexing"):
@@ -514,11 +520,16 @@ class CodememService:
             pending = self.store.dirty_count()
             if pending == 0:
                 return Freshness(unconfirmed=not confirmed)
-            if pending > CATCHUP_MAX_CHUNKS:  # a big change: report, don't wait
+            big = pending > CATCHUP_MAX_CHUNKS  # a big change: report the rest, don't wait for it
+            if big and first is None:
                 return Freshness(pending, indexing=True, unconfirmed=not confirmed)
             if not wait_for_models and not self._models_ready(deadline):
-                return Freshness(pending, unconfirmed=not confirmed)  # embedding now would wait out the load
-            while time.monotonic() < deadline:
+                # Embedding now would wait out the load, for the chunks of `first()` as for the rest.
+                return Freshness(pending, indexing=big, unconfirmed=not confirmed)
+            if first is not None:
+                self._embed_first(first(), stats, deadline)
+                big = self.store.dirty_count() > CATCHUP_MAX_CHUNKS
+            while not big and time.monotonic() < deadline:
                 try:
                     done = self.indexer.embed_pending(
                         stats, deadline=deadline, batch_chunks=_BATCH, group=self.config.batch_size,
@@ -532,7 +543,36 @@ class CodememService:
                 time.sleep(0.02)  # what is left is in the writer thread's batch, which it is handing back
         if sum(stats.embedded.values()):
             self._last_write = time.monotonic()
-        return Freshness(self.store.dirty_count(), unconfirmed=not confirmed)
+        return Freshness(self.store.dirty_count(), indexing=big, unconfirmed=not confirmed)
+
+    def _embed_first(self, chunk_ids: list[int], stats: IndexStats, deadline: float) -> None:
+        """Stage B for the queued chunks among `chunk_ids`, one at a time and in that order, until
+        `deadline`: when the time runs out, the best-ranked ones are done."""
+        queued = self.store.dirty_seqs(chunk_ids)
+        todo = [i for i in chunk_ids if i in queued]
+        while todo and time.monotonic() < deadline:
+            try:
+                done = self.indexer.embed_pending(
+                    stats, only=todo[:1], deadline=deadline, batch_chunks=1, group=self.config.batch_size,
+                    group_chars=_CALL_CHARS,
+                )
+            except Exception:
+                log.exception("could not embed a search's keyword results before it")
+                return
+            if not done:
+                return
+            chunk_id = todo.pop(0)
+            if self.store.dirty_seqs([chunk_id]):
+                todo.append(chunk_id)  # it is in the writer thread's batch, which it is handing back
+                time.sleep(0.02)
+
+    def _keyword_results(self, query: str, options: dict[str, Any]) -> list[int]:
+        """The chunks a search's keyword ranking puts on top, best first: as many as one ranking
+        gives to the merge, under the search's own filters."""
+        filters = {k: v for k, v in options.items() if k in _FILTERS}
+        n = max(self.config.candidates, options.get("k") or 0)
+        resp = search(self.store, query, self.config, k=n, signals=[BM25], embedder_factory=self.embedder_factory, **filters)
+        return [r.chunk_id for r in resp.results]
 
     def prewarm(self) -> None:
         """Load the embedding models and the search indexes, so the first query doesn't wait. It
@@ -594,8 +634,15 @@ class CodememService:
         within `catchup_budget_ms` too: if it isn't in memory by then, the search uses keywords
         alone and says so."""
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
-        serving = self._worker is not None or self._watcher is not None
-        freshness = self.catch_up(wait_for_models=wait_for_models) if serving else Freshness()
+        freshness = Freshness()
+        if self._worker is not None or self._watcher is not None:
+            # A pending chunk has an old vector or none, so the merge ranks it by its keywords
+            # alone. The ones this query's keywords rank on top are embedded before anything else,
+            # under the catch-up's own rule for a model that is loading (`wait_for_models`).
+            signals = kwargs.get("signals")
+            by_meaning = signals is None or any(s != BM25 for s in signals)
+            first = (lambda: self._keyword_results(query, kwargs)) if by_meaning else None
+            freshness = self.catch_up(wait_for_models=wait_for_models, first=first)
         loading = not wait_for_models and "signals" not in kwargs and not self._models_ready(deadline)
         if loading:
             kwargs["signals"] = ["bm25"]
