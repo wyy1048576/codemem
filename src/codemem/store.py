@@ -1735,7 +1735,11 @@ class Store:
         pages = self.conn.execute("PRAGMA page_count").fetchone()[0]
         free = self.conn.execute("PRAGMA freelist_count").fetchone()[0]
         if pages and free / pages >= min_free_share:
-            self.conn.execute("PRAGMA incremental_vacuum")
+            # The pragma returns a row for each page it frees, and `execute` takes only the first
+            # step: one page a call. So it is called once per free page, in one transaction.
+            with self.transaction() as conn:
+                for _ in range(free):
+                    conn.execute("PRAGMA incremental_vacuum(1)")
             return True
         return False
 
