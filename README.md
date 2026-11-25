@@ -103,6 +103,8 @@ steering = "light"           # none | light | strong: how strongly agents are to
 debounce_ms = 500            # the index updates once saves stop for this long,
 debounce_max_wait_ms = 2000  # or at the latest this long after the first save
 catchup_budget_ms = 4000     # how long a search may spend catching up on recent saves
+model_idle_minutes = 0       # free the local model after this many minutes without a search or an
+                             # edit (1.3 GB on an M1); the next one loads it again. 0 keeps it
 
 [vectors.code]
 model = "jinaai/jina-code-embeddings-0.5b"   # a Hugging Face name, or a local model folder

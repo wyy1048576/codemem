@@ -519,7 +519,7 @@ The tool names stay stable, so other front-ends can be compared.
 |---|---|---|
 | `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding |
 | `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)` |
-| `index_status` | none | state and progress, counts, models, local or remote embeddings, the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
+| `index_status` | none | state and progress, counts, models, local or remote embeddings, whether the embedding model is in memory, the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
 
 **A card:**
@@ -547,8 +547,17 @@ those files.
 The parts it can hold: files saved moments ago that are still being indexed; chunks still being
 embedded (with the files they are in); or that codemem could not confirm it has seen the latest
 saves. `get_chunk` waits for the structure only, so its code, lines and links are current. While
-the embedding model is still loading (at startup), a search waits within the same budget, then
-answers from keywords alone with a note; the CLI and the eval always wait for the model.
+the embedding model is loading (when the server starts, or again after it was freed for being
+idle, §12.3), a search waits within the same budget, then answers from keywords alone with a note;
+the CLI and the eval always wait for the model.
+
+**Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
+model of every enabled vector type is in the memory of the process that answers, false when one is
+not, null when embeddings come from an API. `codemem status --json` prints it, and `index_status`
+ends with one JSON line that holds it beside `state`, `progress`, `chunks`, `vectors` and `stale`.
+As text it is the line `embedding model: in memory`, or `embedding model: not in this process's
+memory (it loads when a search or an update next needs it)`. A `codemem status` command is a
+process of its own: its line tells nothing about the model of a running MCP server.
 
 **stdout carries only MCP messages;** logs go to stderr.
 
@@ -602,6 +611,10 @@ A change to any of these must be made together with the eval:
   set.
 - **`vector_backend`:** `faiss` or `"module:Class"` (a `store.VectorStore` subclass). Index-time
   only so that eval systems with different backends don't share an index.
+- **`model_idle_minutes`:** a number, 0 or more; 0, the default, keeps the local embedding model
+  in memory. Otherwise the model is freed after that many minutes in which nothing was embedded,
+  and the next search or save loads it again. It changes no index. A new value in `.codemem.toml`
+  applies from the next full check.
 - **The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`, `space`,
   `api_key_env`, `dimensions`, `query_prefix`, `document_prefix`, `batch_size`, `max_concurrency`
   and `timeout_s`.
@@ -629,6 +642,10 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
 - gives `dim` (a property), `embed_documents(texts)` and `embed_queries(texts)`, each returning a
   float32 array of shape `(len(texts), dim)`; `ready` (a property, default true) may say a model is
   still loading;
+- may define `unload(idle_seconds=0.0)`, which frees its model and returns true; the next call
+  then loads the model again, and `ready` says false meanwhile. The default does nothing. codemem
+  calls it only while no call of the embedder is running and none has ended within
+  `model_idle_minutes`, so the class needs no clock or lock for it and can ignore the argument;
 - codemem wraps it: it normalizes the vectors, and names them by the plugin key (§5.4). A
   `fake:<dim>` model still wins over a plugin, so tests stay fast.
 - to be served by `codemem serve-embeddings` (§12.5) it also gives `embed_texts(texts)`, which
@@ -650,7 +667,8 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
 **Embedder factories.** `Indexer`, `search()` and `CodememService` take an `embedder_factory`
 called as `factory(spec: VectorConfig, config: Config) -> Embedder`, once per vector type (and
 once per distinct model for queries). `make_embedder` is the default, and also accepts a bare model
-name.
+name. `CodememService` also calls `touch()` and `unload(idle_seconds)` on what its factory returns;
+`Embedder` gives both a default that does nothing.
 
 ### 12.5 The embedding server (`codemem serve-embeddings`)
 
