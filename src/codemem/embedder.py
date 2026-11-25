@@ -19,10 +19,15 @@ The local model's packages (PyTorch, sentence-transformers) are imported only wh
 is used. A codemem that embeds through an API or a served model therefore runs in an environment
 built without them, and one that is asked for the local model there names what is missing and the
 two ways out.
+
+A local model is loaded at its first use and can leave memory while idle (`Embedder.unload`,
+docs/architecture.md §3.5); the next call loads it again.
 """
 
 from __future__ import annotations
 
+import functools
+import gc
 import hashlib
 import logging
 import os
@@ -30,7 +35,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from importlib.util import find_spec
 from typing import Any
@@ -82,6 +87,62 @@ def l2_normalize(vecs: np.ndarray) -> np.ndarray:
     return vecs / np.where((norms == 0) | (np.abs(norms - 1.0) < 1e-6), 1.0, norms)
 
 
+class _Uses:
+    """Who is using a model: the embedding calls in progress, and when the last one ended. It
+    decides when the model may leave memory (`Embedder.unload`): never under a running call, and
+    only after the idle time asked for. Tests replace `clock`, so they need not wait."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic):
+        self.clock = clock
+        self._lock = threading.Lock()
+        self._calls = 0
+        self._last = clock()
+
+    def __enter__(self) -> None:
+        with self._lock:
+            self._calls += 1
+
+    def __exit__(self, *exc: object) -> None:
+        with self._lock:
+            self._calls -= 1
+            self._last = self.clock()
+
+    def touch(self) -> None:
+        with self._lock:
+            self._last = self.clock()
+
+    def drop_if_idle(self, seconds: float, drop: Callable[[], bool]) -> bool:
+        """Run `drop`, which lets go of the model and says whether it held one, unless a call is
+        running or the last use is less than `seconds` old. A call that starts meanwhile waits."""
+        with self._lock:
+            if self._calls or self.clock() - self._last < seconds:
+                return False
+            return bool(drop())
+
+
+def _counted(embed: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
+    """Make an embedding method a use of the model (`self._uses`): no unload while it runs."""
+
+    @functools.wraps(embed)
+    def call(self, *args, **kwargs):
+        with self._uses:
+            return embed(self, *args, **kwargs)
+
+    return call
+
+
+def _release_memory(device: str) -> None:
+    """Hand a dropped model's memory back to the system. Collecting frees what reference cycles
+    kept of it. On a GPU (cuda, mps, xpu) PyTorch keeps freed blocks for reuse, and they stay in
+    the process's footprint until its cache is emptied."""
+    import torch
+
+    gc.collect()
+    backend = getattr(torch, device, None)
+    if hasattr(backend, "empty_cache"):
+        backend.empty_cache()
+
+
 class Embedder(ABC):
     model_name: str
 
@@ -118,18 +179,36 @@ class Embedder(ABC):
         """Can embed now, without loading a model first."""
         return True
 
+    def touch(self) -> None:
+        """Count as used now. A caller that will embed only if the model is in memory calls this
+        before it checks `ready`: a model it then finds stays for its idle time, so `unload`
+        cannot fall between the check and the call."""
+
+    def unload(self, idle_seconds: float = 0.0) -> bool:
+        """Free the model's memory, unless a call is using it or its last use is less than
+        `idle_seconds` old. The next call loads it again. True when it was freed. An embedder
+        that holds no model has nothing to free."""
+        return False
+
 
 class FakeEmbedder(Embedder):
     """Deterministic hashed bag-of-tokens vectors. No downloads, ~instant.
 
     Texts sharing tokens get similar vectors, which is enough to exercise the
     pipeline and the usage signal in tests. It is not semantic.
+
+    It also stands in for a model in memory: it starts loaded, `unload` drops it, and the next
+    call loads it again (`load`), so tests cover the idle unload without the real model.
     """
 
-    def __init__(self, dim: int = 64):
+    def __init__(self, dim: int = 64, clock: Callable[[], float] = time.monotonic):
         self.model_name = f"fake:{dim}"
         self._dim = dim
         self.calls: list[int] = []  # batch sizes, so tests can count embeddings
+        self.loads = 0  # loads after an unload
+        self._loaded = True
+        self._lock = threading.Lock()
+        self._uses = _Uses(clock)
 
     @property
     def dim(self) -> int:
@@ -139,7 +218,30 @@ class FakeEmbedder(Embedder):
     def key(self) -> str:
         return f"{self.model_name}|doc"
 
+    @property
+    def ready(self) -> bool:
+        return self._loaded
+
+    def touch(self) -> None:
+        self._uses.touch()
+
+    def load(self) -> None:
+        """What loading the model would be. Tests override it to make a load slow."""
+        self.loads += 1
+
+    def unload(self, idle_seconds: float = 0.0) -> bool:
+        return self._uses.drop_if_idle(idle_seconds, self._drop)
+
+    def _drop(self) -> bool:
+        had, self._loaded = self._loaded, False
+        return had
+
+    @_counted
     def _embed(self, texts: Sequence[str]) -> np.ndarray:
+        with self._lock:  # one load, however many calls wait for it
+            if not self._loaded:
+                self.load()
+                self._loaded = True
         self.calls.append(len(texts))
         out = np.zeros((len(texts), self._dim), dtype=np.float32)
         for row, text in enumerate(texts):
@@ -219,10 +321,30 @@ class SentenceTransformerEmbedder(Embedder):
         self._lock = threading.Lock()
         self._device: str | None = None
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._uses = _Uses()
 
     @property
     def ready(self) -> bool:
         return self._model is not None
+
+    def touch(self) -> None:
+        self._uses.touch()
+
+    def unload(self, idle_seconds: float = 0.0) -> bool:
+        if not self._lock.acquire(blocking=False):  # held by a load or a float32 pass: in use
+            return False
+        try:
+            if not self._uses.drop_if_idle(idle_seconds, self._drop):
+                return False
+            # Still under the lock: a call that needs the model again loads it once this is done.
+            _release_memory(self.device)
+            return True
+        finally:
+            self._lock.release()
+
+    def _drop(self) -> bool:
+        had, self._model = self._model is not None, None
+        return had
 
     @property
     def device(self) -> str:
@@ -277,6 +399,7 @@ class SentenceTransformerEmbedder(Embedder):
         getter = getattr(model, "get_embedding_dimension", None) or model.get_sentence_embedding_dimension
         return int(getter())
 
+    @_counted
     def _encode(self, texts: Sequence[str], prompt: str) -> np.ndarray:
         model = self.model
         if not texts:
@@ -463,7 +586,9 @@ class PluginEmbedder(Embedder):
     """An embedder class named in config (`vectors.<type>.embedder = "module:Class"`), built
     as Class(model, config). It subclasses Embedder and gives `dim`, `embed_documents` and
     `embed_queries`; codemem names its vectors by model, weights version, class and the settings
-    passed to it, so a new class or new weights re-embed. Its vectors are normalized here."""
+    passed to it, so a new class or new weights re-embed. Its vectors are normalized here. A
+    class that can free its model defines `unload()`; it is called only while no call of the
+    class is running and none has for the idle time, so the class needs no clock or lock for it."""
 
     def __init__(self, spec: str, model_name: str, config: Config, version: str | None):
         inner = load_object(spec)(model_name, config)
@@ -471,6 +596,7 @@ class PluginEmbedder(Embedder):
             raise TypeError(f"{spec} must subclass codemem.embedder.Embedder")
         self.inner, self.spec, self.model_name, self.version = inner, spec, model_name, version
         self._settings = f"L{config.max_seq_length}|{config.dtype}|{config.device}"
+        self._uses = _Uses()
 
     @property
     def dim(self) -> int:
@@ -485,12 +611,21 @@ class PluginEmbedder(Embedder):
     def ready(self) -> bool:
         return self.inner.ready
 
+    def touch(self) -> None:
+        self._uses.touch()
+
+    def unload(self, idle_seconds: float = 0.0) -> bool:
+        return self._uses.drop_if_idle(idle_seconds, self.inner.unload)
+
+    @_counted
     def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
         return l2_normalize(self.inner.embed_documents(texts))
 
+    @_counted
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         return l2_normalize(self.inner.embed_queries(texts))
 
+    @_counted
     def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
         return l2_normalize(self.inner.embed_texts(texts))
 
