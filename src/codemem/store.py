@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import sqlite3
 import threading
@@ -323,6 +324,7 @@ class _TypeIndex:
         self.dirty = False
         self._table = np.empty(0, dtype=_OWNER)
         self._held: list[np.ndarray] = []  # rows not merged into the table yet
+        self._per_chunk: float | None = None  # vectors per chunk, for the table as it is
 
     @property
     def table(self) -> np.ndarray:
@@ -345,6 +347,7 @@ class _TypeIndex:
     def hold(self, owners: np.ndarray) -> None:
         """Record where vectors came from that the backend already holds."""
         self._held.append(owners)
+        self._per_chunk = None
 
     def remove(self, vector_ids: Iterable[int]) -> None:
         table = self.table
@@ -352,6 +355,16 @@ class _TypeIndex:
         if gone.any():
             self.store.remove(table["vector"][gone].tolist())
             self._table = table[~gone]
+            self._per_chunk = None
+
+    def vectors_for(self, n: int) -> int:
+        """How many of the best vectors to ask for when the n best chunks are wanted: n when every
+        chunk has one vector, more when chunks have several parts (each row counts as 1/n_parts
+        of a chunk). An estimate: the search asks again when it was too few."""
+        if self._per_chunk is None:
+            parts = np.maximum(self.table["n_parts"], 1)
+            self._per_chunk = len(parts) / float((1.0 / parts).sum()) if len(parts) else 1.0
+        return math.ceil(n * self._per_chunk)
 
     def find(self, vector_ids: Sequence[int]) -> np.ndarray:
         """The rows of these vectors, in the order asked."""
@@ -1384,7 +1397,7 @@ class Store:
                 if len(allowed) < len(ti.table):  # a filter that keeps every vector is no filter
                     allowed_vids = allowed.tolist()
             best: dict[int, tuple[float, int]] = {}
-            size = n + 1
+            size = ti.vectors_for(n + 1)
             while True:
                 hits = ti.store.search(q, size, allowed_vids)
                 chunks = ti.find([vid for vid, _ in hits])["chunk"].tolist()
