@@ -4,6 +4,7 @@ runs over a stub of sentence-transformers and the service on the fake model, and
 the tests move, so no test loads a model or waits for an idle time. Most service tests run the
 writer's steps themselves (`_step`), one at a time, instead of starting its thread."""
 
+import logging
 import sys
 import threading
 import time
@@ -21,7 +22,7 @@ from codemem.embedder import (
 )
 from codemem.embedserver import ModelQueue
 from codemem.render import format_status
-from codemem.service import CodememService
+from codemem.service import CodememService, _Retry
 
 IDLE_MINUTES = 5
 EVERY_SIGNAL = ["bm25", "code", "usage"]
@@ -591,29 +592,139 @@ def test_with_the_writer_running_edits_stay_searchable_while_the_model_loads(ser
     assert not resp.models_loading and resp.freshness.complete and model.loads == 1
 
 
-def test_a_failed_load_is_reported_and_tried_again(service, model, clock, sample_repo):
-    _idle_out(service, model, clock)
-    failures = []
+# ---------------------------------------------------------------- when it cannot be loaded
 
-    def failing_load():
-        failures.append(1)
+
+def _tracebacks(caplog):
+    return [r.getMessage() for r in caplog.records if r.exc_info]
+
+
+def test_a_load_that_always_fails_is_tried_again_less_and_less_often(
+    service, model, clock, sample_repo, monkeypatch, caplog
+):
+    """A model that cannot be loaded (its packages are not installed) must not be tried every
+    second for ever, with a traceback each time."""
+    monkeypatch.setattr(_Retry, "clock", staticmethod(clock))
+    _idle_out(service, model, clock)
+    tries = []
+
+    def no_weights():
+        tries.append(clock())
         raise OSError("no weights")
 
-    model.load = failing_load
+    model.load = no_weights
     _add_function(sample_repo, "first_edit")
     service.notify({"auth/first_edit.py"})
-    assert service._step() and service._step()  # stage A, then a load that fails
-    service._prewarm.join(10)
+    assert service._step()  # stage A: the edit is applied, its vector has to wait for the model
+    waits = []
+    with caplog.at_level(logging.WARNING, logger="codemem.service"):
+        for _ in range(8):
+            service._step()  # stage B asks for the model: a load starts, in its own thread, and fails
+            service._prewarm.join(10)
+            waits.append(service._load_retry.at - clock())
+            service._step()
+            service._step()
+            assert len(tries) == len(waits)  # no other try before its time
+            clock.pass_seconds(waits[-1])
+    assert waits == [1, 2, 4, 8, 16, 32, 60, 60]
+    assert _tracebacks(caplog) == ["loading the embedding model fake:64 failed; next try in 1 s"]
+    assert sum("failed again" in r.getMessage() for r in caplog.records) == 7
     assert service.status(check_staleness=False)["error"] == "OSError: no weights"
-    assert service._load_retry_at > 0  # the failure set the time of the next try
-    service._load_retry_at = time.monotonic() + 3600
-    assert service._step() and len(failures) == 1  # not before then
-    service._load_retry_at = 0.0
-    del model.load
-    assert service._step()  # tried again: this time the weights are there
+
+    _add_function(sample_repo, "second_edit")
+    service.notify({"auth/second_edit.py"})
+    assert service._step()  # an update that works does not hide what still fails
+    assert service.last_error == "OSError: no weights" and service.store.dirty_count() == 2
+
+    del model.load  # the weights are there now
+    clock.pass_seconds(60)
+    service._step()
     service._prewarm.join(10)
     service._step()
-    assert service.store.dirty_count() == 0 and model.loads == 1
+    assert model.loads == 1 and service.store.dirty_count() == 0
+    assert service.last_error is None and service._load_retry.error is None
+
+
+def test_a_search_does_not_wait_for_a_load_that_has_failed(service, model, clock, monkeypatch):
+    monkeypatch.setattr(_Retry, "clock", staticmethod(clock))
+    _idle_out(service, model, clock)
+    tries = []
+
+    def no_weights():
+        tries.append(clock())
+        raise OSError("no weights")
+
+    model.load = no_weights
+    t = time.monotonic()
+    first = service.search("revoke session", k=3, wait_for_models=False)  # starts the load, which fails at once
+    second = service.search("revoke session", k=3, wait_for_models=False)  # the next try is not due
+    assert time.monotonic() - t < 3  # neither waits out its 4 s
+    assert first.models_loading and second.models_loading and second.signals == ["bm25"]
+    assert "revoke_session" in [r.qualname for r in second.results]
+    assert len(tries) == 1
+
+
+def test_an_update_that_cannot_work_is_retried_with_longer_pauses_and_one_traceback(
+    sample_repo, tmp_path, monkeypatch, caplog
+):
+    """The local model without its packages: every update fails the same way, before anything
+    is read, for as long as the server runs."""
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+    monkeypatch.setattr("codemem.embedder._CACHE", {})
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=Config())
+    pauses = []
+    svc._pause = lambda seconds, since: pauses.append(seconds)
+    try:
+        svc.request_reconcile()
+        with caplog.at_level(logging.WARNING, logger="codemem.service"):
+            for _ in range(8):
+                assert svc._step()
+        assert pauses == [1, 2, 4, 8, 16, 32, 60, 60]
+        assert _tracebacks(caplog) == ["the index update failed; next try in 1 s"]
+        assert sum("failed again" in r.getMessage() for r in caplog.records) == 7
+        assert 'pip install "codemem[local]"' in svc.status(check_staleness=False)["error"]
+    finally:
+        svc.close()
+
+
+def test_a_new_save_or_closing_ends_the_pause_after_a_failed_update(service):
+    t = time.monotonic()
+    since = service._received
+    service.notify({"auth/sessions.py"})
+    service._pause(60.0, since)  # something newer was handed over: it is tried at once
+    service._stop.set()
+    service._pause(60.0, service._received)
+    assert time.monotonic() - t < 5
+
+
+def test_embedding_that_fails_backs_off_without_holding_up_saves(service, model, clock, sample_repo, monkeypatch, caplog):
+    monkeypatch.setattr(_Retry, "clock", staticmethod(clock))
+    calls = []
+
+    def broken(texts):
+        calls.append(len(texts))
+        raise RuntimeError("the model said no")
+
+    model.embed_documents = broken
+    _add_function(sample_repo, "first_edit")
+    service.notify({"auth/first_edit.py"})
+    with caplog.at_level(logging.WARNING, logger="codemem.service"):
+        assert service._step() and service._step()  # stage A, then a stage B that fails
+        assert service.last_error == "RuntimeError: the model said no" and len(calls) == 1
+        service._step()
+        assert len(calls) == 1  # not again before its time
+        _add_function(sample_repo, "second_edit")
+        service.notify({"auth/second_edit.py"})
+        assert service._step()  # a save is applied meanwhile
+        assert service.store.get_chunk_by_key("auth/second_edit.py::second_edit") is not None
+        clock.pass_seconds(1)
+        service._step()
+        assert len(calls) == 2 and service._embed_retry.at - clock() == 2
+    assert _tracebacks(caplog) == ["embedding failed; next try in 1 s"]
+    del model.embed_documents
+    clock.pass_seconds(2)
+    service._step()
+    assert service.store.dirty_count() == 0 and service.last_error is None
 
 
 # ---------------------------------------------------------------- at the same moment
