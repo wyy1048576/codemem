@@ -108,6 +108,9 @@ CREATE TABLE IF NOT EXISTS vectors (
 );
 CREATE INDEX IF NOT EXISTS vectors_type ON vectors(vec_type, chunk_id);
 CREATE INDEX IF NOT EXISTS vectors_hash ON vectors(embedder, text_hash);
+-- Covers the read of where every vector came from (a search index's start), so it never reads
+-- the pages that hold the vectors themselves.
+CREATE INDEX IF NOT EXISTS vectors_owner ON vectors(vec_type, chunk_id, part, n_parts, start_off, end_off);
 """
 # Every table any schema version has created, dropped when an older index is rebuilt.
 _OLD_TABLES = ("meta", "files", "chunks", "calls", "edges", "fts_vocab", "fts", "embeddings", "vectors", "dirty_texts")
@@ -265,6 +268,13 @@ def prepare(vecs: np.ndarray, dim: int) -> np.ndarray:
     return out / np.where(norms == 0, 1.0, norms)
 
 
+def for_index(vecs: np.ndarray, dim: int) -> np.ndarray:
+    """Stored vectors as a search index gets them: `prepare`d, then rounded to 2 bytes per number
+    again. Normalizing moves the numbers off float16 values; rounding them back gives every
+    backend the same numbers, which a 2-byte index holds exactly."""
+    return prepare(vecs, dim).astype(np.float16).astype(np.float32)
+
+
 class VectorRow(NamedTuple):
     chunk_id: int
     part: int
@@ -285,35 +295,79 @@ class VectorHit:
     end_off: int
 
 
+# Where one vector of a search index came from: 32 bytes.
+_OWNER = np.dtype([
+    ("vector", np.int64), ("chunk", np.int64), ("part", np.int32), ("n_parts", np.int32),
+    ("start_off", np.int32), ("end_off", np.int32),
+])
+
+
+def _owners(vector_ids: Sequence[int], info: Sequence[Sequence[int]]) -> np.ndarray:
+    """Vector ids and their (chunk, part, n_parts, start_off, end_off), as an `_OWNER` table."""
+    table = np.empty(len(vector_ids), dtype=_OWNER)
+    table["vector"] = vector_ids
+    columns = np.asarray(info, dtype=np.int64).reshape(len(vector_ids), 5)
+    for name, column in zip(_OWNER.names[1:], columns.T):
+        table[name] = column
+    return table
+
+
 class _TypeIndex:
-    """The in-memory search index of one vector type and where each vector came from."""
+    """The in-memory search index of one vector type and where each vector came from: one
+    `_OWNER` row per vector, sorted by vector id, read with `find` and `vectors_of`."""
 
     def __init__(self, dim: int, epoch: int, store: VectorStore):
         self.store = store
         self.dim = dim
         self.epoch = epoch
-        self.owner: dict[int, tuple[int, int, int, int, int]] = {}  # vector id -> chunk, part, n, start, end
-        self.by_chunk: dict[int, list[int]] = defaultdict(list)
         self.dirty = False
+        self._table = np.empty(0, dtype=_OWNER)
+        self._held: list[np.ndarray] = []  # rows not merged into the table yet
+
+    @property
+    def table(self) -> np.ndarray:
+        if self._held:
+            table = np.concatenate([self._table, *self._held])
+            self._held = []
+            ids = table["vector"]
+            if not (ids[1:] > ids[:-1]).all():
+                # Ids are handed out in increasing order, so this is rare: a saved index or a
+                # catch-up brings rows older than the newest held. An id held twice keeps its last row.
+                table = table[np.argsort(ids, kind="stable")]
+                table = table[np.append(table["vector"][1:] != table["vector"][:-1], True)]
+            self._table = table
+        return self._table
 
     def add(self, vector_ids: Sequence[int], info: Sequence[tuple[int, int, int, int, int]], vecs: np.ndarray) -> None:
-        # Normalizing again moves the numbers off float16 values; rounding them back gives every
-        # backend the same numbers, which a 2-byte index holds exactly.
-        self.store.upsert(vector_ids, prepare(vecs, self.dim).astype(np.float16).astype(np.float32))
-        for vid, row in zip(vector_ids, info):
-            self.owner[vid] = row
-            self.by_chunk[row[0]].append(vid)
+        self.store.upsert(vector_ids, for_index(vecs, self.dim))
+        self.hold(_owners(vector_ids, info))
+
+    def hold(self, owners: np.ndarray) -> None:
+        """Record where vectors came from that the backend already holds."""
+        self._held.append(owners)
 
     def remove(self, vector_ids: Iterable[int]) -> None:
-        vector_ids = [v for v in vector_ids if v in self.owner]
-        self.store.remove(vector_ids)
-        for vid in vector_ids:
-            chunk_id = self.owner.pop(vid)[0]
-            vids = self.by_chunk.get(chunk_id)
-            if vids is not None:
-                vids.remove(vid)
-                if not vids:
-                    del self.by_chunk[chunk_id]
+        table = self.table
+        gone = np.isin(table["vector"], np.fromiter(vector_ids, dtype=np.int64))
+        if gone.any():
+            self.store.remove(table["vector"][gone].tolist())
+            self._table = table[~gone]
+
+    def find(self, vector_ids: Sequence[int]) -> np.ndarray:
+        """The rows of these vectors, in the order asked."""
+        table = self.table
+        ids = np.asarray(vector_ids, dtype=np.int64)
+        if not len(ids):
+            return table[:0]
+        at = np.minimum(np.searchsorted(table["vector"], ids), len(table) - 1)
+        if not len(table) or (table["vector"][at] != ids).any():
+            raise KeyError("a vector id that the search index does not hold")
+        return table[at]
+
+    def vectors_of(self, chunk_ids: Sequence[int]) -> np.ndarray:
+        """The ids of every vector of these chunks."""
+        table = self.table
+        return table["vector"][np.isin(table["chunk"], np.asarray(chunk_ids, dtype=np.int64))]
 
 
 # --------------------------------------------------------------------------- lock
@@ -1230,14 +1284,15 @@ class Store:
         """Bring an in-memory index to the committed rows by their ids. Vector rows never change in
         place (a new vector is a new row, and AUTOINCREMENT never reuses an id), so the set of ids
         says everything."""
-        now = {r[0] for r in self.conn.execute("SELECT vector_id FROM vectors WHERE vec_type = ?", (vec_type,))}
-        have = set(ti.owner)
-        ti.remove(have - now)
-        self._add_rows(ti, now - have)
+        rows = self.conn.execute("SELECT vector_id FROM vectors WHERE vec_type = ?", (vec_type,))
+        now = np.fromiter((r[0] for r in rows), dtype=np.int64)
+        have = ti.table["vector"]
+        ti.remove(np.setdiff1d(have, now))
+        self._add_rows(ti, np.setdiff1d(now, have).tolist())
         ti.epoch = epoch
         ti.dirty = True
 
-    def _add_rows(self, ti: _TypeIndex, vector_ids: Iterable[int]) -> None:
+    def _add_rows(self, ti: _TypeIndex, vector_ids: Sequence[int]) -> None:
         for batch in _batches(sorted(vector_ids), 4096):
             rows = self.conn.execute(
                 "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors "
@@ -1248,11 +1303,14 @@ class Store:
                 ti.add([r[0] for r in rows], [(r[1], r[2], r[3], r[4], r[5]) for r in rows],
                        np.stack([from_blob(r[7], r[6]) for r in rows]))
 
-    def _owner_rows(self, vec_type: str) -> list[tuple[int, tuple[int, int, int, int, int]]]:
+    def _stored_owners(self, vec_type: str) -> np.ndarray:
+        """Where every stored vector of a type came from, sorted by vector id."""
         rows = self.conn.execute(
             "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off FROM vectors WHERE vec_type = ?", (vec_type,)
         )
-        return [(r[0], (r[1], r[2], r[3], r[4], r[5])) for r in rows]
+        flat = np.fromiter((x for r in rows for x in r), dtype=np.int64).reshape(-1, 6)
+        flat = flat[np.argsort(flat[:, 0], kind="stable")]  # the covering index gives them by chunk
+        return _owners(flat[:, 0], flat[:, 1:])
 
     def _load_saved(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex | None:
         """The saved index file, reconciled with the committed rows by vector id: vectors whose
@@ -1274,17 +1332,16 @@ class Store:
         if store.dim != dim:
             return None
         ti = _TypeIndex(dim, epoch, store)
-        rows = dict(self._owner_rows(vec_type))
-        in_file = store.ids()
-        stale = in_file - rows.keys()
-        if stale:
-            store.remove(stale)
-        for vid in in_file & rows.keys():
-            ti.owner[vid] = rows[vid]
-            ti.by_chunk[rows[vid][0]].append(vid)
-        missing = rows.keys() - in_file
-        self._add_rows(ti, missing)
-        ti.dirty = bool(stale or missing)
+        owners = self._stored_owners(vec_type)
+        in_file = np.fromiter(store.ids(), dtype=np.int64)
+        stale = np.setdiff1d(in_file, owners["vector"])
+        if len(stale):
+            store.remove(stale.tolist())
+        held = np.isin(owners["vector"], in_file)
+        ti.hold(owners[held])
+        missing = owners["vector"][~held]
+        self._add_rows(ti, missing.tolist())
+        ti.dirty = bool(len(stale) or len(missing))
         return ti
 
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:
@@ -1321,16 +1378,18 @@ class Store:
             q = prepare(np.asarray(query), ti.dim)[0]
             allowed_vids = None
             if allowed_ids is not None:
-                allowed_vids = [v for c in allowed_ids for v in ti.by_chunk.get(c, ())]
-                if not allowed_vids:
+                allowed = ti.vectors_of(allowed_ids)
+                if not len(allowed):
                     return []
+                if len(allowed) < len(ti.table):  # a filter that keeps every vector is no filter
+                    allowed_vids = allowed.tolist()
             best: dict[int, tuple[float, int]] = {}
             size = n + 1
             while True:
                 hits = ti.store.search(q, size, allowed_vids)
+                chunks = ti.find([vid for vid, _ in hits])["chunk"].tolist()
                 best = {}
-                for vid, score in hits:
-                    chunk_id = ti.owner[vid][0]
+                for (vid, score), chunk_id in zip(hits, chunks):
                     if chunk_id not in best or score > best[chunk_id][0]:
                         best[chunk_id] = (score, vid)
                 if len(hits) < size:
@@ -1340,13 +1399,10 @@ class Store:
                     if hits[-1][1] < nth:
                         break  # every unseen vector scores below the n-th chunk: the top n is complete
                 size *= 2
-            parts = {chunk_id: ti.owner[vid] for chunk_id, (_, vid) in best.items()}
+            owners = ti.find([vid for _, vid in best.values()]).tolist()
+        parts = {chunk_id: where for _, chunk_id, *where in owners}  # part, n_parts, start_off, end_off
         ranked = self._order_ties([(c, s) for c, (s, _) in best.items()], n, higher_is_better=True)
-        out: list[VectorHit] = []
-        for chunk_id, score in ranked:
-            _, part, n_parts, start_off, end_off = parts[chunk_id]
-            out.append(VectorHit(chunk_id, score, best[chunk_id][1], part, n_parts, start_off, end_off))
-        return out
+        return [VectorHit(chunk_id, score, best[chunk_id][1], *parts[chunk_id]) for chunk_id, score in ranked]
 
     def _order_ties(self, hits: list[tuple[int, float]], n: int, higher_is_better: bool) -> list[tuple[int, float]]:
         """The first n hits (best first), with equal scores ordered by location (path, start line, key).
