@@ -260,11 +260,13 @@ def test_the_allocator_cache_is_emptied_once_after_a_burst_and_never_under_a_cal
     monkeypatch.setattr(embedder, "_empty_cache", lambda device: emptied.append(device) or True)
     emb, stub = local_model
     assert not emb.trim()  # no model, no call: nothing to give back
+    emb.embed_documents(["a"])  # a call has ended: there is something to give back
     stub.encode_gate.clear()
-    call = threading.Thread(target=lambda: emb.embed_documents(["a"]))
+    stub.encoding.clear()
+    call = threading.Thread(target=lambda: emb.embed_documents(["b"]))
     call.start()
     assert stub.encoding.wait(10)
-    assert not emb.trim() and emptied == []  # a call is running
+    assert not emb.trim() and emptied == []  # but not while another call is running
     stub.encode_gate.set()
     call.join(10)
     assert not emb.trim(idle_seconds=3600) and emptied == []  # the burst may not be over
