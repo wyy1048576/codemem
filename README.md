@@ -62,8 +62,10 @@ Every command accepts `--index-dir DIR`; the eval uses it for one index per comm
 
 ## Using it from an agent
 
-- **Claude Code:** `init --agents claude` writes a project `.mcp.json`. Or run
-  `claude mcp add codemem -- codemem mcp`.
+- **Claude Code:** `init --agents claude` writes a project `.mcp.json`, with `"alwaysLoad": true`.
+  Claude Code otherwise keeps an MCP server's tools behind a tool-search step, where the agent
+  sees only their names; with it, codemem's tools and their descriptions are there from the first
+  turn. `claude mcp add codemem -- codemem mcp` registers the server without that setting.
 - **Cursor:** `init --agents cursor` writes `.cursor/mcp.json`.
 - **Codex:** `init --agents codex` prints a `~/.codex/config.toml` snippet; it never edits that
   file.

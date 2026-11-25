@@ -134,11 +134,14 @@ def plan(
     command, prefix = launch_command()
     if "claude" in agents:
         # Claude Code starts project servers in the project root, so no path argument is needed.
+        # alwaysLoad: by default Claude Code keeps an MCP server's tools behind a tool-search
+        # step, where the agent sees their names only. With it, codemem's tools and their
+        # descriptions are in front of the agent from the first turn.
         path = repo_root / ".mcp.json"
         shown = " ".join([command, *prefix, "mcp"])
         actions.append(Action(
             "claude", f"add 'codemem' to {path.name} (or run: claude mcp add codemem -- {shown})",
-            path, _merge_mcp_json(path, {"command": command, "args": [*prefix, "mcp"]}),
+            path, _merge_mcp_json(path, {"command": command, "args": [*prefix, "mcp"], "alwaysLoad": True}),
         ))
         if write_hooks:  # hooks are a Claude Code feature, so the flag does nothing for other agents
             path = repo_root / ".claude" / "settings.json"

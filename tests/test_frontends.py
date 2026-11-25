@@ -435,10 +435,11 @@ def test_cli_init_writes_configs(sample_repo, tmp_path, fake_env, capsys):
     rc = main(["init", str(sample_repo), "--agents", "claude,cursor", "--yes", "--write-agent-notes", "--index-dir", idx])
     assert rc == 0
     mcp = json.loads((sample_repo / ".mcp.json").read_text())
-    assert mcp["mcpServers"]["codemem"] == {"command": "codemem", "args": ["mcp"]}
+    # alwaysLoad: Claude Code shows the tools from the first turn. Cursor's file does not get it.
+    assert mcp["mcpServers"]["codemem"] == {"command": "codemem", "args": ["mcp"], "alwaysLoad": True}
     assert "other" in mcp["mcpServers"]  # existing entries kept
     cursor = json.loads((sample_repo / ".cursor" / "mcp.json").read_text())
-    assert cursor["mcpServers"]["codemem"]["args"] == ["mcp", "${workspaceFolder}"]
+    assert cursor["mcpServers"]["codemem"] == {"command": "codemem", "args": ["mcp", "${workspaceFolder}"]}
     assert prompts.AGENT_NOTES_MARKER in (sample_repo / "CLAUDE.md").read_text()
     assert "indexed 6 files" in capsys.readouterr().out
     # Running again does not duplicate the notes.
@@ -983,7 +984,7 @@ def test_init_falls_back_to_python_m_codemem_when_the_command_is_not_on_path(sam
     monkeypatch.setattr(agents.shutil, "which", lambda name: None)
     (action,) = agents.plan(sample_repo, ["claude"])
     entry = json.loads(action.content)["mcpServers"]["codemem"]
-    assert entry == {"command": sys.executable, "args": ["-m", "codemem", "mcp"]}
+    assert entry == {"command": sys.executable, "args": ["-m", "codemem", "mcp"], "alwaysLoad": True}
 
 
 def test_python_m_codemem_is_the_command_line():
