@@ -434,7 +434,11 @@ class CodememService:
         return Freshness(self.store.dirty_count(), unconfirmed=not confirmed)
 
     def prewarm(self) -> None:
-        """Load the embedding models and the search indexes, so the first query doesn't wait."""
+        """Load the embedding models and the search indexes, so the first query doesn't wait. The
+        two load side by side: a model takes seconds, and so does a search index that has to be
+        rebuilt from the stored vectors."""
+        indexes = threading.Thread(target=self._load_indexes, name="codemem-indexes", daemon=True)
+        indexes.start()
         specs = {}
         for v in self.config.enabled_vec_types():
             spec = self.config.vectors[v]
@@ -444,6 +448,9 @@ class CodememService:
                 self.embedder_factory(spec, self.config).embed_queries(["warmup"])
             except Exception:
                 log.exception("could not load embedding model %s", spec.model)
+        indexes.join()
+
+    def _load_indexes(self) -> None:
         try:
             self.store.load_vectors()
         except Exception:
@@ -481,11 +488,15 @@ class CodememService:
     # ---- queries
     def search(self, query: str, *, wait_for_models: bool = True, **kwargs: Any) -> SearchResponse:
         """Catch up on pending saves, then search. With `wait_for_models=False` (the MCP server), a
-        search waits for a model that is still loading (about 7 s on an M1, at startup) only within
-        `catchup_budget_ms` too: if it isn't ready by then, the search uses keywords alone and says so."""
+        search waits for what is still loading at a start only within `catchup_budget_ms` too: the
+        embedding model (about 7 s on an M1), and the search indexes (read from their files, or
+        rebuilt from the stored vectors on the first start after the search index changed, which
+        takes half a minute for 200,000 vectors in the compact form). If they are not ready by
+        then, or will not be, the search uses keywords alone and says so."""
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
         freshness = self.catch_up() if self._worker is not None or self._watcher is not None else Freshness()
-        loading = not wait_for_models and "signals" not in kwargs and not self._models_ready(deadline)
+        loading = not wait_for_models and "signals" not in kwargs and not (
+            self._models_ready(deadline) and self._indexes_ready(deadline))
         if loading:
             kwargs["signals"] = ["bm25"]
         resp = search(self.store, query, self.config, embedder_factory=self.embedder_factory, **kwargs)
@@ -508,6 +519,25 @@ class CodememService:
                 return True
             time.sleep(0.05)
         return all(e.ready for e in embedders)
+
+    def _indexes_ready(self, until: float) -> bool:
+        """Whether the search indexes are in memory, waiting until `until` while they load, but
+        not for a rebuild that will not be done by then. Starts loading them in the background if
+        nothing has yet."""
+        if self.store.vectors_loaded():
+            return True
+        with self._cond:
+            if self._prewarm is None or not self._prewarm.is_alive():
+                self._prewarm = threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True)
+                self._prewarm.start()
+        while (now := time.monotonic()) < until:
+            if self.store.vectors_loaded():
+                return True
+            left = self.store.load_eta()
+            if left is not None and now + left > until:
+                return False
+            time.sleep(0.05)
+        return self.store.vectors_loaded()
 
     def resolve_ref(self, ref: str | int):
         ref_s = str(ref).strip()

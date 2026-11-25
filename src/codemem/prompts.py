@@ -117,8 +117,9 @@ def agent_notes(steering: str = "light") -> str | None:
 
 def models_loading_notice() -> str:
     return (
-        "Note: the embedding model is still loading (the first search after codemem starts); these "
-        "results come from keyword matching only. Search again in a few seconds for results by meaning."
+        "Note: codemem is still loading its embedding model or its search index (the first searches after "
+        "it starts); these results come from keyword matching only. Search again in a few seconds for "
+        "results by meaning."
     )
 
 

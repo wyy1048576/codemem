@@ -588,6 +588,7 @@ class _InUse(NamedTuple):
 
 
 _BACK_TO_EXACT = 0.8  # `auto`: an index that is compact goes back to exact only under this share of the budget
+_NOT_LOADED = object()  # Store._loaded: the type has vectors, and its index is not in memory
 
 
 def vector_backend_class(name: str) -> type[VectorStore]:
@@ -897,6 +898,12 @@ class Store:
         self._vec_lock = threading.RLock()
         self._save_lock = threading.Lock()
         self._types: dict[str, _TypeIndex] = {}
+        # Vector types whose index a thread is loading or rebuilding now (set when it is done), how
+        # far each rebuild is, and a number that changes with the backend: an index loaded for an
+        # earlier backend is dropped, not installed.
+        self._loading: dict[str, threading.Event] = {}
+        self._progress: dict[str, tuple[float, int, int]] = {}  # started (monotonic), vectors done, vectors in all
+        self._generation = 0
         # Every thread's connection, with its thread: close() must not close one a running thread uses.
         self._all_conns: dict[int, tuple[threading.Thread, sqlite3.Connection]] = {}
         self._conns_lock = threading.Lock()
@@ -1483,6 +1490,7 @@ class Store:
                 self.vector_memory_mb = memory_mb
             self._in_use = self._named()
             self._types.clear()
+            self._generation += 1
 
     def _named(self) -> _InUse | None:
         """The backend the configuration names, or None for `auto`."""
@@ -1677,6 +1685,7 @@ class Store:
                         old.append(vid)
             if old:
                 conn.executemany("DELETE FROM vectors WHERE vector_id = ?", [(v,) for v in old])
+            first = conn.execute("SELECT 1 FROM vectors WHERE vec_type = ? LIMIT 1", (vec_type,)).fetchone() is None
             new_ids: list[int] = []
             for r, v in zip(rows, vecs):
                 cur = conn.execute(
@@ -1695,9 +1704,13 @@ class Store:
                     if ti is not None and ti.epoch == epoch:
                         return  # a reader already reloaded it after the commit
                     if ti is None:
-                        # Not loaded yet: load it from the committed rows (which include these),
-                        # so save_vectors() can persist it.
-                        self._type_index(vec_type)
+                        # Not loaded. A type's first vectors start its index here, so that the
+                        # index grows with every batch of a build. An index of earlier vectors
+                        # is loaded when it is first used, from rows that include these: loading
+                        # it here would hold this commit, and all who wait for it, for as long as
+                        # a rebuild takes.
+                        if first and vec_type not in self._loading:
+                            self._load(vec_type, self._generation)
                         return
                     if ti.epoch != epoch - 1:
                         self._catch_up(ti, vec_type, epoch)  # it missed another process's change
@@ -1733,8 +1746,37 @@ class Store:
 
     # ---- vectors: the search index
     def _type_index(self, vec_type: str) -> _TypeIndex | None:
-        """The in-memory index of a vector type, loaded or rebuilt if missing or out of date."""
-        with self._vec_lock, self._read_snapshot():
+        """The in-memory index of a vector type, loaded or rebuilt if missing or out of date.
+
+        Loading happens outside the vector lock. A rebuild reads and codes every vector (half a
+        minute for 200,000 in the compact form), and a write's commit, a status call or a search
+        that can answer without vectors must not wait for that. One thread loads a type; others
+        that ask for it meanwhile wait for that thread, on an event, not on the lock. So this is
+        never called while holding the vector lock: the loading thread needs the lock at its end."""
+        while True:
+            with self._vec_lock:
+                ti = self._loaded(vec_type)
+                if ti is not _NOT_LOADED:
+                    return ti
+                done = self._loading.get(vec_type)
+                mine = done is None
+                if mine:
+                    done = self._loading[vec_type] = threading.Event()
+                    generation = self._generation
+            if not mine:
+                done.wait()
+                continue
+            try:
+                self._load(vec_type, generation)
+            finally:
+                with self._vec_lock:
+                    del self._loading[vec_type]
+                done.set()
+
+    def _loaded(self, vec_type: str) -> _TypeIndex | None | object:
+        """Under the vector lock: the in-memory index of a vector type, brought up to the committed
+        rows; None when the type has no vectors; `_NOT_LOADED` when it has to be loaded first."""
+        with self._read_snapshot():
             epoch = self._epoch(vec_type)
             ti = self._types.get(vec_type)
             if ti is not None and ti.epoch == epoch:
@@ -1745,10 +1787,37 @@ class Store:
                 return None
             if ti is not None and ti.dim == dim:
                 self._catch_up(ti, vec_type, epoch)  # another process wrote: apply only the difference
-            else:
-                ti = self._load_saved(vec_type, epoch, dim) or self._rebuild(vec_type, epoch, dim)
+                return ti
+            return _NOT_LOADED
+
+    def _load(self, vec_type: str, generation: int) -> None:
+        """Load a vector type's index from its saved file, or rebuild it from the rows, and install
+        it. The rows are read as one committed state. What was written while it loaded is applied
+        at the end, under the lock, by vector id."""
+        with self._read_snapshot():
+            epoch, dim = self._epoch(vec_type), self.vector_dim(vec_type)
+            if dim is None:
+                return
+            ti = self._load_saved(vec_type, epoch, dim) or self._rebuild(vec_type, epoch, dim)
+        with self._vec_lock, self._read_snapshot():
+            if generation != self._generation or self.vector_dim(vec_type) != dim:
+                return  # another backend, or another length, since it began: whoever needs it loads again
+            now = self._epoch(vec_type)
+            if now != ti.epoch:
+                self._catch_up(ti, vec_type, now)
             self._types[vec_type] = ti
-            return ti
+
+    def vectors_loaded(self) -> bool:
+        """Whether every vector type's search index is in memory: a search then waits for no load."""
+        with self._vec_lock:
+            return all(vec_type in self._types for vec_type in self.vec_types())
+
+    def load_eta(self) -> float | None:
+        """Seconds until the rebuild that is running is expected to end, from its pace so far.
+        None when none is running, or when one has only begun."""
+        now = time.monotonic()
+        left = [(now - started) * (total - done) / done for started, done, total in list(self._progress.values()) if done]
+        return max(left) if left else None
 
     def _catch_up(self, ti: _TypeIndex, vec_type: str, epoch: int) -> None:
         """Bring an in-memory index to the committed rows by their ids. Vector rows never change in
@@ -1812,6 +1881,19 @@ class Store:
         store.bind(functools.partial(self._stored_vectors, dim))
         return store
 
+    def _usable_note(self, vec_type: str, dim: int | None) -> dict[str, Any] | None:
+        """The note of a vector type's saved index, when a start can read that index: it was saved
+        from this database, by the backend in use with its options, for this length and embedder,
+        and its file is there. Whatever epoch it was saved at."""
+        use = self._search_index()
+        note = self._read_note(vec_type)
+        if (note is None or note.get("database") != self.database_id()
+                or note.get("backend", "faiss") != use.name or note.get("options", {}) != use.options
+                or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder")
+                or not self._noted_file(vec_type, note).is_file()):
+            return None
+        return note
+
     def _load_saved(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex | None:
         """The saved index file, reconciled with the committed rows by vector id: vectors whose
         row is gone are dropped, rows the file lacks are added. Rows never change in place, so
@@ -1820,13 +1902,10 @@ class Store:
         one from another database, another backend or other options: None, and the index is
         rebuilt from the rows."""
         use = self._search_index()
-        note = self._read_note(vec_type)
-        if (note is None or note.get("database") != self.database_id()
-                or note.get("backend", "faiss") != use.name or note.get("options", {}) != use.options):
+        note = self._usable_note(vec_type, dim)
+        if note is None:
             return None
         path = self._noted_file(vec_type, note)
-        if not path.is_file() or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder"):
-            return None
         try:
             store = use.cls.from_bytes(path.read_bytes(), **use.options)
         except Exception:  # corrupt or partial file: rebuild from the rows
@@ -1850,6 +1929,8 @@ class Store:
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:
         use = self._search_index()
         ti = _TypeIndex(dim, epoch, self._bound(use.cls(dim, **use.options), dim))
+        total = self.conn.execute("SELECT COUNT(*) FROM vectors WHERE vec_type = ?", (vec_type,)).fetchone()[0]
+        started, done = time.monotonic(), 0
         # Straight down the table, which is in vector-id order. Through an index on the type,
         # SQLite would then sort the rows, vectors and all: 2.4 to 3.3 s to read 200,000 rows, not 0.9 s.
         rows = self.conn.execute(
@@ -1860,15 +1941,20 @@ class Store:
         batch_ids: list[int] = []
         batch_info: list[tuple[int, int, int, int, int]] = []
         batch_vecs: list[np.ndarray] = []
-        for r in rows:
-            batch_ids.append(r[0])
-            batch_info.append((r[1], r[2], r[3], r[4], r[5]))
-            batch_vecs.append(from_blob(r[7], r[6]))
-            if len(batch_ids) >= 4096:
+        try:
+            for r in rows:
+                batch_ids.append(r[0])
+                batch_info.append((r[1], r[2], r[3], r[4], r[5]))
+                batch_vecs.append(from_blob(r[7], r[6]))
+                if len(batch_ids) >= (4096 if done else 512):  # a small first batch: the pace is known early
+                    ti.add(batch_ids, batch_info, np.stack(batch_vecs))
+                    done += len(batch_ids)
+                    self._progress[vec_type] = (started, done, total)  # for load_eta()
+                    batch_ids, batch_info, batch_vecs = [], [], []
+            if batch_ids:
                 ti.add(batch_ids, batch_info, np.stack(batch_vecs))
-                batch_ids, batch_info, batch_vecs = [], [], []
-        if batch_ids:
-            ti.add(batch_ids, batch_info, np.stack(batch_vecs))
+        finally:
+            self._progress.pop(vec_type, None)
         ti.dirty = True
         return ti
 
@@ -1876,39 +1962,51 @@ class Store:
         self, vec_type: str, query: np.ndarray, n: int, allowed_ids: Sequence[int] | None = None
     ) -> list[VectorHit]:
         """The n best chunks for a query by one vector type. A chunk with several parts scores its
-        best part. Equal scores are ordered by location."""
-        with self._vec_lock:
-            ti = self._type_index(vec_type)
-            if ti is None or len(ti.store) == 0 or n <= 0:
-                return []
-            q = prepare(np.asarray(query), ti.dim)[0]
-            allowed_vids = None
-            if allowed_ids is not None:
-                allowed = ti.vectors_of(allowed_ids)
-                if not len(allowed):
-                    return []
-                if len(allowed) < len(ti.table):  # a filter that keeps every vector is no filter
-                    allowed_vids = allowed.tolist()
-            best: dict[int, tuple[float, int]] = {}
-            size = ti.vectors_for(n + 1)
-            while True:
-                hits = ti.store.search(q, size, allowed_vids)
-                chunks = ti.find([vid for vid, _ in hits])["chunk"].tolist()
-                best = {}
-                for (vid, score), chunk_id in zip(hits, chunks):
-                    if chunk_id not in best or score > best[chunk_id][0]:
-                        best[chunk_id] = (score, vid)
-                if len(hits) < size:
-                    break  # every candidate was seen
-                if len(best) > n:
-                    nth = sorted((s for s, _ in best.values()), reverse=True)[n - 1]
-                    if hits[-1][1] < nth:
-                        break  # every unseen vector scores below the n-th chunk: the top n is complete
-                size *= 2
-            owners = ti.find([vid for _, vid in best.values()]).tolist()
+        best part. Equal scores are ordered by location. A type whose index is not in memory is
+        loaded first: this waits for that."""
+        while True:
+            with self._vec_lock:
+                ti = self._loaded(vec_type)
+                if ti is not _NOT_LOADED:
+                    best, owners = self._best_chunks(ti, query, n, allowed_ids)
+                    break
+            self._type_index(vec_type)
         parts = {chunk_id: where for _, chunk_id, *where in owners}  # part, n_parts, start_off, end_off
         ranked = self._order_ties([(c, s) for c, (s, _) in best.items()], n, higher_is_better=True)
         return [VectorHit(chunk_id, score, best[chunk_id][1], *parts[chunk_id]) for chunk_id, score in ranked]
+
+    def _best_chunks(
+        self, ti: _TypeIndex | None, query: np.ndarray, n: int, allowed_ids: Sequence[int] | None
+    ) -> tuple[dict[int, tuple[float, int]], list]:
+        """Under the vector lock: each chunk's best vector for a query, as chunk -> (score, vector
+        id), for at least the n best chunks, and where those vectors came from."""
+        if ti is None or len(ti.store) == 0 or n <= 0:
+            return {}, []
+        q = prepare(np.asarray(query), ti.dim)[0]
+        allowed_vids = None
+        if allowed_ids is not None:
+            allowed = ti.vectors_of(allowed_ids)
+            if not len(allowed):
+                return {}, []
+            if len(allowed) < len(ti.table):  # a filter that keeps every vector is no filter
+                allowed_vids = allowed.tolist()
+        best: dict[int, tuple[float, int]] = {}
+        size = ti.vectors_for(n + 1)
+        while True:
+            hits = ti.store.search(q, size, allowed_vids)
+            chunks = ti.find([vid for vid, _ in hits])["chunk"].tolist()
+            best = {}
+            for (vid, score), chunk_id in zip(hits, chunks):
+                if chunk_id not in best or score > best[chunk_id][0]:
+                    best[chunk_id] = (score, vid)
+            if len(hits) < size:
+                break  # every candidate was seen
+            if len(best) > n:
+                nth = sorted((s for s, _ in best.values()), reverse=True)[n - 1]
+                if hits[-1][1] < nth:
+                    break  # every unseen vector scores below the n-th chunk: the top n is complete
+            size *= 2
+        return best, ti.find([vid for _, vid in best.values()]).tolist()
 
     def _order_ties(self, hits: list[tuple[int, float]], n: int, higher_is_better: bool) -> list[tuple[int, float]]:
         """The first n hits (best first), with equal scores ordered by location (path, start line, key).
@@ -1936,11 +2034,18 @@ class Store:
         ordered = sorted(hits, key=lambda h: (sign * h[1], h[0] not in place, place.get(h[0], ("", 0, ""))))
         return ordered[:n]
 
-    def save_vectors(self) -> None:
+    def save_vectors(self, *, stale: bool = False) -> None:
         """Persist the in-memory indexes that changed, with the epoch they reflect. The indexes are
         copied while holding the vector lock (fast) and written after it is released, so searches
         don't wait for the disk. Saves run one at a time; data first, note second. A backend that
-        is not saved leaves no file, and is rebuilt from the stored vectors at the next start."""
+        is not saved leaves no file, and is rebuilt from the stored vectors at the next start.
+
+        With `stale` (an update that ends by saving: the CLI's, the eval's), the files are first
+        made what the next start needs, so that no search has to wait for it: `auto` picks again,
+        as a start would, and a vector type whose file is missing, behind the rows, or another
+        backend's is loaded, or rebuilt from the rows, and so written too."""
+        if stale:
+            self._load_stale()
         with self._save_lock:
             copies = []
             with self._vec_lock:
@@ -1964,6 +2069,27 @@ class Store:
                     _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
                 if old is not None and old.name != (note["file"] if data is not None else None):
                     old.unlink(missing_ok=True)  # another backend's file: no note describes it any more
+
+    def _load_stale(self) -> None:
+        with self._vec_lock:
+            use = self._search_index()
+            if self.vector_backend == "auto":
+                again = self._pick(use.name == "compact")
+                if again.name != use.name:
+                    log.info("search index of %s: %s from here on (%s)", self.index_dir, again.name, again.why)
+                    self._in_use, use = again, again
+                    self._types.clear()
+                    self._generation += 1
+        if use.cls.to_bytes is VectorStore.to_bytes:
+            return  # a backend that is not saved
+        for vec_type in self.vec_types():
+            with self._vec_lock:
+                current = vec_type in self._types
+            if not current:
+                note = self._usable_note(vec_type, self.vector_dim(vec_type))
+                current = note is not None and note.get("epoch") == self._epoch(vec_type)
+            if not current:
+                self._type_index(vec_type)
 
     def vectors_unsaved(self) -> bool:
         """Whether an in-memory index has changes its file doesn't have yet."""
