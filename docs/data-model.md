@@ -335,6 +335,9 @@ re-embeds that vector type only.
   and port of `base_url`. `<d>` is `dimensions`, or `full`; the document prefix is the first 8 hex
   characters of its sha256, or `0` for none. With a `space`, the address is in no part of an
   index's identity, so configurations that differ only in `base_url` use the same vectors.
+- **The precision and the device of a local key** are the ones the model runs in. The weights
+  are converted to `<dtype>` when the model is loaded, whatever the model's file stores; `auto`
+  gives float16 on a GPU and float32 on a CPU.
 - **Not part of the key:** `embedding_dim` (applied when the search index is built, so changing
   it re-embeds nothing), the query prefix (it only affects queries), and the API key.
 
@@ -549,7 +552,8 @@ embedded (with the files they are in); or that codemem could not confirm it has 
 saves. `get_chunk` waits for the structure only, so its code, lines and links are current. While
 the embedding model is loading (when the server starts, or again after it was freed for being
 idle, §12.3), a search waits within the same budget, then answers from keywords alone with a note;
-the CLI and the eval always wait for the model.
+after a load that failed it answers that way at once. The CLI and the eval always wait for the
+model.
 
 **Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
 model of every enabled vector type is in the memory of the process that answers, false when one is
@@ -614,7 +618,8 @@ A change to any of these must be made together with the eval:
 - **`model_idle_minutes`:** a number, 0 or more; 0, the default, keeps the local embedding model
   in memory. Otherwise the model is freed after that many minutes in which nothing was embedded,
   and the next search or save loads it again. It changes no index. A new value in `.codemem.toml`
-  applies from the next full check.
+  applies from the next full check. `codemem serve-embeddings` reads it when it starts, for the
+  model it serves (§12.5).
 - **The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`, `space`,
   `api_key_env`, `dimensions`, `query_prefix`, `document_prefix`, `batch_size`, `max_concurrency`
   and `timeout_s`.
@@ -646,6 +651,9 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   then loads the model again, and `ready` says false meanwhile. The default does nothing. codemem
   calls it only while no call of the embedder is running and none has ended within
   `model_idle_minutes`, so the class needs no clock or lock for it and can ignore the argument;
+- may define `trim(idle_seconds=0.0)`, which gives back what its calls needed besides the model
+  (on a GPU, the allocator's cache), keeps the model, and returns true. The default does nothing.
+  codemem calls it under the same guard, once after each burst of calls, 5 s after the last one;
 - codemem wraps it: it normalizes the vectors, and names them by the plugin key (§5.4). A
   `fake:<dim>` model still wins over a plugin, so tests stay fast.
 - to be served by `codemem serve-embeddings` (§12.5) it also gives `embed_texts(texts)`, which
@@ -667,8 +675,8 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
 **Embedder factories.** `Indexer`, `search()` and `CodememService` take an `embedder_factory`
 called as `factory(spec: VectorConfig, config: Config) -> Embedder`, once per vector type (and
 once per distinct model for queries). `make_embedder` is the default, and also accepts a bare model
-name. `CodememService` also calls `touch()` and `unload(idle_seconds)` on what its factory returns;
-`Embedder` gives both a default that does nothing.
+name. `CodememService` also calls `touch()`, `unload(idle_seconds)` and `trim(idle_seconds)` on what
+its factory returns; `Embedder` gives each a default that does nothing.
 
 ### 12.5 The embedding server (`codemem serve-embeddings`)
 
@@ -689,7 +697,7 @@ code 2 means the port is taken or the model cannot be served.
 |---|---|---|
 | `POST /v1/embeddings` | `model`: the served model's name. `input`: a string, or a list of 1 to 2,048 strings. `dimensions` (optional): a whole number from 1 to the model's length. `encoding_format` (optional): `float` or `base64` | `{"object": "list", "data": [{"object": "embedding", "index": i, "embedding": …}], "model": …, "usage": {"prompt_tokens": 0, "total_tokens": 0}}`, one entry per text, in order |
 | `GET /v1/models` | none | `{"object": "list", "data": [{"id": <model>, "object": "model", "created": …, "owned_by": "codemem", "codemem": {"space", "dimensions", "query_prefix", "document_prefix"}}]}`: the served model, and under `codemem` what a client sets beside it |
-| `GET /health` | none; no key needed | `{"status": "ok"}` once the model is loaded |
+| `GET /health` | none; no key needed | `{"status": "ok"}` once the server has loaded the model and takes requests |
 
 - **Each text is embedded exactly as given.** The server puts nothing before it. A client makes a
   query or a document by sending the model's prefix and the text as one string, which is what
@@ -700,6 +708,10 @@ code 2 means the port is taken or the model cannot be served.
 - **`usage`** is always zero: the server does not count tokens.
 - **The key.** When `CODEMEM_SERVE_KEY` is set in the server's environment, every request but
   `GET /health` needs the header `Authorization: Bearer <key>`.
+- **The model's memory.** After 5 s without a request the server gives back what its model calls
+  needed besides the model. With `model_idle_minutes` set in its config it also frees the model
+  after that many minutes without a request; the next request loads it again and is answered
+  when it is loaded. Without the setting the model stays in memory for as long as the server runs.
 
 **Errors** are `{"error": {"message", "type", "param": null, "code"}}`, with `type`
 `invalid_request_error` below 500 and `server_error` from 500.

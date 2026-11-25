@@ -162,8 +162,8 @@ codemem cannot check that. Use it when a provider moves to a new host, when a se
 serves the same model, and when one server is reached at different addresses (next section).
 
 **One model for several codemem processes.** Each codemem that runs the local model keeps it in
-memory, about 2.2 GB. With several git worktrees, or several containers, run the model once and
-let every codemem embed through it:
+memory, 1.3 GB on an M1's GPU. With several git worktrees, or several containers, run the model
+once and let every codemem embed through it:
 
 ```bash
 codemem serve-embeddings            # on 127.0.0.1:8791
