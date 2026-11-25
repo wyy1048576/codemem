@@ -27,6 +27,7 @@ build = [
 refresh = ["python -c 'import pandas'"]
 
 test_files = ["pandas/tests/**/test_*.py"]
-test = "python -m pytest {files} -p no:cacheprovider -n 8 --junitxml={junit}"
+# pytest-qt is off: it needs display libraries that the image does not have.
+test = "python -m pytest {files} -p no:cacheprovider -p no:pytest-qt -n 8 --junitxml={junit}"
 parser = "junit"
 timeout_min = 10
