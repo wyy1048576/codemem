@@ -873,3 +873,16 @@ def test_python_root_holds_the_alias_and_the_real_install(tmp_path):
     (bin_dir / "python").symlink_to(pythons / "cpython-3.11-linux" / "bin" / "python3.11")
     (bin_dir / "codemem").write_text("")
     assert codemem_python_root(bin_dir / "codemem") == pythons
+
+
+def test_diagnostic_args(monkeypatch):
+    monkeypatch.delenv("CMEVAL_E2E_DIAG_ARGS", raising=False)
+    monkeypatch.delenv("CMEVAL_E2E_BODIES", raising=False)
+    plain = e2e_run.agent_script("claude-haiku-5-5", RunSettings(time_limit_s=3000))
+    assert e2e_run.diagnostic_args() == [] and not e2e_run.keep_bodies()
+    monkeypatch.setenv("CMEVAL_E2E_DIAG_ARGS", "--thinking-display summarized")
+    monkeypatch.setenv("CMEVAL_E2E_BODIES", "1")
+    script = e2e_run.agent_script("claude-haiku-5-5", RunSettings(time_limit_s=3000))
+    assert e2e_run.diagnostic_args() == ["--thinking-display", "summarized"] and e2e_run.keep_bodies()
+    assert '"WebSearch,WebFetch" --thinking-display summarized >' in script
+    assert script.replace(" --thinking-display summarized", "") == plain
