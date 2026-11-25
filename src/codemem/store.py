@@ -307,9 +307,12 @@ class CompactVectorStore(VectorStore):
     returns is the real similarity. With no more vectors to choose from than it would score, it
     scores them all and skips the scan.
 
-    FAISS holds the codes by position, in the order they were added; `_ids` maps a position to
-    its vector id. A mistake in a FAISS call can end the process instead of raising, so whatever
-    goes into one is checked here first: lengths, number types, and the size of every selector."""
+    FAISS holds the codes by position; `_ids` maps a position to its vector id, and the codes are
+    kept in the order of those ids. So two indexes that hold the same vectors are the same bytes,
+    whatever edits either went through, and return the same candidates (at more than 1 bit FAISS's
+    scan depends on the order of the codes). A mistake in a FAISS call can end the process instead
+    of raising, so whatever goes into one is checked here first: lengths, number types, and the
+    size of every selector."""
 
     suffix = ".rabitq"
 
@@ -366,6 +369,12 @@ class CompactVectorStore(VectorStore):
         self.remove(id_arr)
         self._index.add(self._coded(vecs))
         self._ids = np.concatenate([self._ids, id_arr])
+        if not (self._ids[1:] > self._ids[:-1]).all():
+            # Ids are handed out in increasing order, so this is rare: a saved index or a catch-up
+            # brings vectors older than the newest held. Move them to their place.
+            order = np.argsort(self._ids, kind="stable")
+            self._index.permute_entries(order)  # the code at position i becomes the one that was at order[i]
+            self._ids = self._ids[order]
 
     def remove(self, ids: Iterable[int]) -> None:
         gone = np.isin(self._ids, np.fromiter(ids, dtype=np.int64))
@@ -455,6 +464,8 @@ class CompactVectorStore(VectorStore):
         if type(count) is not int or not 0 <= count <= len(body) // 8:
             raise ValueError("the file does not hold as many vector ids as it says")
         store._ids = np.frombuffer(body, dtype="<i8", count=count).astype(np.int64)
+        if not (store._ids[1:] > store._ids[:-1]).all():
+            raise ValueError("the file's vector ids are not in order")
         # The object deserialize_index returns owns the C++ index: it is kept as it is. A second
         # Python object for it (faiss.downcast_index) would outlive it and point at freed memory.
         index = faiss.deserialize_index(np.frombuffer(body, dtype=np.uint8, offset=8 * count))

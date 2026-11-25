@@ -498,20 +498,22 @@ def test_rows_deleted_behind_the_index_are_dropped_and_replaced():
 
 
 def test_ties_at_the_candidate_cut_are_all_kept():
-    """Copies of one vector have one code. A cut through them takes every copy, so the result does
-    not depend on the order the codes are held in."""
+    """Copies of one vector have one code. A cut through them takes every copy, so at 1 bit the
+    candidates do not depend on the order the codes are held in: the same vectors under other ids
+    (as in another database) give the same candidates."""
     v = for_index(_vecs(300, dim=32), 32)
     v[100:160] = v[100]
-    order = np.random.default_rng(1).permutation(300)
+    other_ids = np.random.default_rng(1).permutation(300) + 1  # vector j has id other_ids[j]: another order
     a, b = CompactVectorStore(32, rescore=8), CompactVectorStore(32, rescore=8)
     _bound(a, range(1, 301), v)
-    _bound(b, (order + 1).tolist(), v[order])
-    copies = set(range(101, 161))
-    for store in (a, b):
-        candidates = set(store._scan(v[100], 8, None).tolist())
-        assert copies <= candidates and len(candidates) < 80
-    assert set(a._scan(v[100], 8, None).tolist()) == set(b._scan(v[100], 8, None).tolist())
-    assert [i for i, _ in a.search(v[100], 2)] == [i for i, _ in b.search(v[100], 2)] == [101, 102]
+    _bound(b, other_ids.tolist(), v)
+    vector_of = {int(i): j + 1 for j, i in enumerate(other_ids)}
+    in_a = set(a._scan(v[100], 8, None).tolist())
+    in_b = {vector_of[i] for i in b._scan(v[100], 8, None).tolist()}
+    assert set(range(101, 161)) <= in_a and len(in_a) < 80 and in_a == in_b
+    for q in for_index(_vecs(20, dim=32, seed=6), 32):
+        assert set(a._scan(q, 8, None).tolist()) == {vector_of[i] for i in b._scan(q, 8, None).tolist()}
+    assert [i for i, _ in a.search(v[100], 2)] == [101, 102]
 
 
 def _codes(vs):
@@ -519,19 +521,24 @@ def _codes(vs):
     return {int(i): bytes(code) for i, code in zip(vs._ids, table)}
 
 
-def test_an_index_patched_step_by_step_holds_the_codes_of_a_rebuilt_one():
+@pytest.mark.parametrize("bits", [1, 4])
+def test_an_index_patched_step_by_step_is_the_index_rebuilt_from_the_rows(bits):
+    """The same codes in the same order, whatever edits it went through: the same bytes when saved,
+    and so the same candidates, also at more than 1 bit, where FAISS's scan depends on the order."""
     v = for_index(_vecs(400, dim=48), 48)
-    patched = CompactVectorStore(48, rescore=16)
+    patched = CompactVectorStore(48, bits=bits, rescore=16)
+    patched.upsert(list(range(201, 401)), v[200:])  # the newer half first, as a catch-up can bring it
     patched.upsert(list(range(1, 201)), v[:200])
     patched.remove(range(50, 120))
-    patched.upsert(list(range(201, 401)), v[200:])
     patched.upsert(list(range(60, 90)), v[59:89])  # some come back, later than their neighbours
+    patched.upsert([300, 10], v[[299, 9]])  # and two are replaced
     kept = sorted(patched.ids())
-    rebuilt = CompactVectorStore(48, rescore=16)
+    rebuilt = CompactVectorStore(48, bits=bits, rescore=16)
     rebuilt.upsert(kept, v[np.asarray(kept) - 1])
-    assert _codes(patched) == _codes(rebuilt) and patched._ids.tolist() != rebuilt._ids.tolist()
+    assert patched._ids.tolist() == rebuilt._ids.tolist() == kept
+    assert _codes(patched) == _codes(rebuilt) and patched.to_bytes() == rebuilt.to_bytes()
     for q in for_index(_vecs(10, dim=48, seed=4), 48):
-        assert set(patched._scan(q, 16, None).tolist()) == set(rebuilt._scan(q, 16, None).tolist())
+        assert patched._scan(q, 16, None).tolist() == rebuilt._scan(q, 16, None).tolist()
 
 
 @pytest.mark.parametrize("options", [{}, {"bits": 2}, {"bits": 4, "dim": 16}, {"dim": 24}])
@@ -597,8 +604,8 @@ def test_a_file_whose_index_is_not_the_one_described_is_refused():
     l2.train(np.zeros((1, 16), dtype=np.float32))
     l2.add(v)
     for index, count, ids in ((right, 5, range(5)), (right, 7, range(7)), (centred, 6, range(6)), (flat, 6, range(6)),
-                              (l2, 6, range(6))):
-        with pytest.raises(ValueError, match="not the one its first line describes|as many vector ids"):
+                              (l2, 6, range(6)), (right, 6, [0, 1, 2, 4, 3, 5]), (right, 6, [0, 1, 2, 2, 3, 4])):
+        with pytest.raises(ValueError, match="not the one its first line describes|as many vector ids|not in order"):
             CompactVectorStore.from_bytes(saved(index, count, ids))
 
 
