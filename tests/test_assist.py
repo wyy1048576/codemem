@@ -22,6 +22,7 @@ import pytest
 
 from codemem import assist
 from codemem.assist import AssistedEmbedder, probe_texts
+from codemem.cli import main
 from codemem.config import AssistConfig, Config, config_from_dict
 from codemem.embedder import (
     DOCUMENT_PROMPT, QUERY_PROMPT, Embedder, FakeEmbedder, SentenceTransformerEmbedder, make_embedder, release_idle,
@@ -871,6 +872,75 @@ def test_status_says_where_code_goes_and_what_the_endpoint_does(stub, sample_rep
         assert "assist: not used: " in text and "gives other vectors than the local model" in text
     finally:
         changed.close()
+
+
+def test_the_check_alone_prints_each_probe_texts_numbers_and_the_verdict(stub, sample_repo, tmp_path, monkeypatch, capsys):
+    """`codemem status --check-assist`: a provider is tried without a build."""
+    from codemem import embedder as embedders
+
+    def check(*more: str) -> tuple[int, str, str]:
+        monkeypatch.setattr(embedders, "_CACHE", {})  # as a process of its own
+        status = main(["status", str(sample_repo), "--index-dir", str(tmp_path / "idx"), "--check-assist", *more])
+        return status, *capsys.readouterr()
+
+    def local_calls() -> list[int]:
+        return next(e for e in embedders._CACHE.values() if type(e) is FakeEmbedder).calls
+
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+    status, out, err = check()
+    assert status == 2 and out == "" and "no assist endpoint to check" in err
+
+    (sample_repo / ".codemem.toml").write_text(
+        f'[embedding.assist]\nbase_url = "{stub.url}"\nmodel = "fake:64"\n', encoding="utf-8"
+    )
+    host = stub.url.removeprefix("http://").removesuffix("/v1")
+    stub.scale = 2.5  # the same model's vectors, not normalized
+    status, out, _ = check()
+    assert status == 0 and local_calls() == [PROBE]
+    lines = out.splitlines()
+    assert lines[0] == f"assist: fake:64 at {host}, compared with the local fake:64"
+    assert lines[1] == "  the local model's vectors for the probe texts: embedded now"
+    assert lines[2].split() == ["probe", "text", "characters", "cosine", "local", "length", "endpoint", "length"]
+    assert len(lines) == 3 + PROBE + 2
+    assert re.fullmatch(r"  plain words +96  1\.000000      1\.000000         2\.500000", lines[7])
+    assert re.fullmatch(r"  a long text +\d+  1\.000000      1\.000000         2\.500000", lines[9])
+    assert lines[10] == (
+        "  needed: a cosine of 0.99995 or more for every probe text, after the endpoint's vectors are scaled to length 1"
+    )
+    assert lines[11] == "assist: its vectors agree with the local model's (cosine 1.000000 at worst)"
+    assert len(stub.requests) == 1 and stub.work == []  # the probe texts only: no code of the repository
+
+    status, out, _ = check("--json")  # the local half is remembered: no model call
+    report, = json.loads(out)
+    assert status == 0 and local_calls() == [] and len(stub.requests) == 2
+    assert report["state"] == "sharing" and report["reason"] is None and report["needed"] == 0.99995
+    assert (report["host"], report["model"], report["local_model"]) == (host, "fake:64", "fake:64")
+    assert report["local_vectors"] == "remembered" and report["agreement"] == pytest.approx(1.0, abs=1e-6)
+    assert [row["probe"] for row in report["probes"]][-2:] == ["other alphabets", "a long text"]
+    assert all(row["endpoint_length"] == pytest.approx(2.5, abs=1e-5) for row in report["probes"])
+    later = CodememService(sample_repo, index_dir=tmp_path / "idx")  # and `codemem status` has the verdict
+    try:
+        assert "assist: its vectors agree with the local model's (cosine 1.000000 at worst) (as of " in format_status(
+            later.status()
+        )
+    finally:
+        later.close()
+
+    stub.salt = " other weights"
+    status, out, err = check()
+    assert status == 1 and "the local model's vectors for the probe texts: remembered from an earlier check" in out
+    assert err == ""  # the verdict is said once, on stdout
+    assert re.search(r"  plain words +96  0\.\d{6}      1\.000000         2\.500000", out)
+    assert out.splitlines()[-1].startswith(
+        f"assist: not used: {host} gives other vectors than the local model for the same texts (cosine 0."
+    )
+
+    stub.fail = [503]
+    status, out, _ = check()
+    assert status == 1 and out.splitlines()[-1] == (
+        f"assist: not used for now: embedding request to {host} failed: HTTP 503 " + '{"error": { "message": "not now"}}'
+    )
+    assert "characters" not in out  # nothing came back to compare
 
 
 def test_a_build_through_the_config_with_a_server_in_another_process(sample_repo, tmp_path, isolated_home):

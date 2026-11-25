@@ -153,7 +153,36 @@ def assist_line(helper: dict[str, Any]) -> str:
         return f"assist: not used for now: {reason}{as_of}"
     if state == "checking":
         return "assist: its vectors are being compared with the local model's"
-    return "assist: not checked yet (its vectors are compared with the local model's when a build has work to share)"
+    return (
+        "assist: not checked yet (its vectors are compared with the local model's when a build has work to share, "
+        "or by `codemem status --check-assist`)"
+    )
+
+
+def format_assist_check(report: dict[str, Any]) -> str:
+    """One comparison of the assist endpoint with a local model (`codemem status --check-assist`):
+    each probe text's numbers, then the verdict as `status` words it."""
+    made = {"remembered": "remembered from an earlier check", "embedded now": "embedded now"}
+    lines = [f"assist: {report['model']} at {report['host']}, compared with the local {report['local_model']}"]
+    if report.get("local_vectors"):
+        lines.append(f"  the local model's vectors for the probe texts: {made[report['local_vectors']]}")
+    if rows := report["probes"]:
+        def number(value: float | None) -> str:
+            return "-" if value is None else f"{value:.6f}"
+
+        width = max(len(row["probe"]) for row in rows)
+        lines.append(f"  {'probe text':<{width}}  characters    cosine  local length  endpoint length")
+        for row in rows:
+            lines.append(
+                f"  {row['probe']:<{width}}  {row['characters']:>10}  {number(row['cosine']):>8}  "
+                f"{number(row['local_length']):>12}  {number(row['endpoint_length']):>15}"
+            )
+        lines.append(
+            f"  needed: a cosine of {report['needed']} or more for every probe text, after the endpoint's vectors "
+            "are scaled to length 1"
+        )
+    lines.append(assist_line(report))
+    return "\n".join(lines)
 
 
 _REASONS = {"too_large": "too large", "parse_errors": "with parse errors"}  # the rest read as they are

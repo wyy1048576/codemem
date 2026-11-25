@@ -715,6 +715,13 @@ class CodememService:
             "callees": [brief(c) for c in self.store.callees_of(chunk.chunk_id)],
         }
 
+    def check_assist(self) -> list[dict[str, Any]]:
+        """Compare the assist endpoint's vectors with each local model's now, without a build
+        (`AssistedEmbedder.check`): one report per model, none without an assist."""
+        specs = [self.config.vectors[v] for v in self.config.enabled_vec_types()]
+        embedders = {id(e): e for e in (self.embedder_factory(spec, self.config) for spec in specs)}
+        return [e.check() for e in embedders.values() if isinstance(e, assist.AssistedEmbedder)]
+
     def status(self, *, check_staleness: bool = True) -> dict[str, Any]:
         store = self.store
         info: dict[str, Any] = {

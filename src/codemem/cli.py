@@ -158,11 +158,36 @@ def cmd_search(args) -> int:
 def cmd_status(args) -> int:
     svc = _service(args)
     try:
+        if args.check_assist:
+            return _check_assist(svc, args.json)
         info = svc.status(check_staleness=True)
         print(json.dumps(info, indent=2, default=str) if args.json else format_status(info))
     finally:
         svc.close()
     return 0
+
+
+def _check_assist(svc, as_json: bool) -> int:
+    """`status --check-assist`: 0 when the endpoint can share a build's work, 1 when it cannot, 2
+    when the config names none."""
+    checker = logging.getLogger("codemem.assist")
+    level = checker.level
+    if checker.getEffectiveLevel() > logging.DEBUG:  # without -v: its warnings are what the report says
+        checker.setLevel(logging.ERROR)
+    try:
+        reports = svc.check_assist()
+    finally:
+        checker.setLevel(level)
+    if not reports:
+        print("error: no assist endpoint to check: the config has no `[embedding.assist]` section", file=sys.stderr)
+        return 2
+    if as_json:
+        print(json.dumps(reports, indent=2))
+    else:
+        from .render import format_assist_check
+
+        print("\n\n".join(format_assist_check(report) for report in reports))
+    return 0 if any(report["state"] == "sharing" for report in reports) else 1
 
 
 def cmd_watch(args) -> int:
@@ -278,6 +303,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = common(sub.add_parser("status", help="counts, models, indexed commit, staleness"))
     sp.add_argument("--json", action="store_true")
+    sp.add_argument(
+        "--check-assist", action="store_true",
+        help="only compare the [embedding.assist] endpoint's vectors with the local model's, now and without a "
+        "build, and print each probe text's numbers and the verdict. Loads the local model unless its vectors for "
+        "the probe texts are remembered from an earlier check. Sends codemem's own probe texts, no code of the "
+        "repository. Exit status: 0 it can share a build's work, 1 it cannot, 2 no assist is set",
+    )
     sp.set_defaults(func=cmd_status)
 
     sp = sub.add_parser(
