@@ -1,17 +1,26 @@
-"""An embedder frees its model when asked, unless a call is using it or it was used too recently,
-and loads it again at its next use (docs/architecture.md §3.5). The local embedder runs over a
-stub of sentence-transformers, and time is a clock the tests move: no test loads a model or waits."""
+"""The embedding model leaves memory when idle and comes back at its next use
+(docs/architecture.md §3.5): first the embedders' part, then the service's. The local embedder
+runs over a stub of sentence-transformers and the service on the fake model, and time is a clock
+the tests move, so no test loads a model or waits for an idle time. Most service tests run the
+writer's steps themselves (`_step`), one at a time, instead of starting its thread."""
 
 import sys
 import threading
+import time
 import types
 from importlib.machinery import ModuleSpec
 
+import anyio
 import numpy as np
 import pytest
 
 from codemem.config import Config, config_from_dict
 from codemem.embedder import Embedder, FakeEmbedder, OpenAIEmbedder, PluginEmbedder, SentenceTransformerEmbedder
+from codemem.render import format_status
+from codemem.service import CodememService
+
+IDLE_MINUTES = 5
+EVERY_SIGNAL = ["bm25", "code", "usage"]
 
 
 class Clock:
@@ -32,13 +41,24 @@ class GatedModel(FakeEmbedder):
 
     def __init__(self, clock):
         super().__init__(64, clock)
-        self.gate, self.loading = threading.Event(), threading.Event()
+        self.gate, self.loading, self.unloaded = threading.Event(), threading.Event(), threading.Event()
         self.gate.set()
+        self.document_calls = 0  # started, whether or not they have the model yet
+
+    def embed_documents(self, texts):
+        self.document_calls += 1
+        return super().embed_documents(texts)
 
     def load(self):
         self.loading.set()
         assert self.gate.wait(10)
         super().load()
+
+    def unload(self, idle_seconds=0.0):
+        freed = super().unload(idle_seconds)
+        if freed:
+            self.unloaded.set()
+        return freed
 
 
 @pytest.fixture
@@ -241,3 +261,309 @@ def test_embedders_without_a_model_have_nothing_to_unload(monkeypatch):
     }}).embedding)
     api.touch()
     assert api.ready and not api.unload()
+
+
+# ================================================================ the service
+
+
+@pytest.fixture
+def service(sample_repo, tmp_path, fake_config, model):
+    """An index of the sample repo, built just now with `model`, which may leave after 5 idle minutes."""
+    fake_config.model_idle_minutes = IDLE_MINUTES
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=fake_config, embedder_factory=lambda s, c: model)
+    assert svc.update() is not None
+    yield svc
+    if svc._prewarm is not None:
+        svc._prewarm.join(10)  # a load a search started: let it finish before the index closes
+    svc.close()
+
+
+def _idle_out(service, model, clock):
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    service._step()
+    assert not model.ready
+
+
+def _add_function(repo, name):
+    (repo / "auth" / f"{name}.py").write_text(f"def {name}(user):\n    return user\n")
+
+
+def _wait_for(pred, timeout=10.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if pred():
+            return True
+        time.sleep(0.02)
+    return False
+
+
+# ---------------------------------------------------------------- when the model leaves
+
+
+def test_the_model_leaves_memory_after_the_idle_time_and_not_before(service, model, clock):
+    clock.pass_minutes(IDLE_MINUTES - 0.1)
+    service._step()
+    assert model.ready
+    clock.pass_minutes(0.2)
+    service._step()
+    assert not model.ready and model.loads == 0
+
+
+def test_a_search_and_an_update_each_restart_the_idle_time(service, model, clock, sample_repo):
+    clock.pass_minutes(4)
+    service.search("revoke session")  # embeds the query
+    clock.pass_minutes(4)
+    service._step()
+    assert model.ready  # 8 minutes after the build, 4 after the search
+    _add_function(sample_repo, "enforce_login_quota")
+    assert service.update().model_embedded["code"] == 1
+    clock.pass_minutes(4)
+    service._step()
+    assert model.ready  # 4 minutes after the update
+    clock.pass_minutes(1.1)
+    service._step()
+    assert not model.ready
+
+
+def test_zero_idle_minutes_keeps_the_model(service, model, clock):
+    service.config.model_idle_minutes = 0
+    clock.pass_minutes(100_000)
+    service._step()
+    assert model.ready
+
+
+def test_the_idle_time_is_a_setting_that_no_index_depends_on():
+    assert Config().model_idle_minutes == 0  # the model stays unless asked otherwise
+    cfg = config_from_dict({"model_idle_minutes": 2.5})
+    assert cfg.model_idle_minutes == 2.5 and cfg.index_settings() == Config().index_settings()
+    for bad in (-1, "ten"):
+        with pytest.raises(ValueError, match="model_idle_minutes"):
+            config_from_dict({"model_idle_minutes": bad})
+
+
+def test_two_vector_types_on_one_model_are_one_model_to_unload(service, model, clock):
+    asked = []
+    model.unload = lambda idle_seconds=0.0: asked.append(idle_seconds) or False
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    service._step()
+    assert asked == [IDLE_MINUTES * 60]  # once, although code and usage vectors both use it
+
+
+# ---------------------------------------------------------------- the next use loads it again
+
+
+def test_a_search_after_an_unload_answers_from_keywords_while_the_model_loads(service, model, clock):
+    service.config.catchup_budget_ms = 50
+    _idle_out(service, model, clock)
+    model.gate.clear()  # the reload takes longer than the search may wait
+    resp = service.search("revoke session", k=3, wait_for_models=False)
+    assert resp.models_loading and resp.signals == ["bm25"]
+    assert "revoke_session" in [r.qualname for r in resp.results]
+    model.gate.set()
+    service._prewarm.join(10)
+    resp = service.search("revoke session", k=3, wait_for_models=False)
+    assert not resp.models_loading and resp.signals == EVERY_SIGNAL
+    assert model.loads == 1
+
+
+def test_a_search_after_an_unload_gets_full_results_when_the_model_loads_in_time(service, model, clock):
+    _idle_out(service, model, clock)
+    resp = service.search("revoke session", k=3, wait_for_models=False)  # the load is instant, the budget 4 s
+    assert not resp.models_loading and resp.signals == EVERY_SIGNAL
+    assert model.ready and model.loads == 1
+
+
+def test_a_search_that_waits_for_the_model_loads_it_itself(service, model, clock):
+    _idle_out(service, model, clock)
+    resp = service.search("revoke session", k=3)  # the CLI and the eval
+    assert not resp.models_loading and resp.signals == EVERY_SIGNAL
+    assert model.ready and model.loads == 1
+
+
+def test_a_repeated_query_after_an_unload_still_brings_the_model_back(sample_repo, tmp_path, local_model):
+    """The local embedder keeps query vectors, so embedding the same query again loads nothing:
+    bringing the model back must not depend on it."""
+    emb, stub = local_model
+    cfg = Config(device="cpu", vector_cache="off")
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=cfg, embedder_factory=lambda s, c: emb)
+    try:
+        svc.prewarm()
+        assert emb.ready and emb.unload() and not emb.ready
+        assert svc._models_ready(time.monotonic() + 10)
+        assert stub.instances == 2
+        svc._prewarm.join(10)
+    finally:
+        svc.close()
+
+
+def test_an_update_after_an_unload_embeds_with_the_reloaded_model(service, model, clock, sample_repo):
+    _idle_out(service, model, clock)
+    _add_function(sample_repo, "enforce_login_quota")
+    stats = service.update()
+    assert stats.model_embedded == {"code": 1, "usage": 0} and stats.pending == 0
+    assert model.ready and model.loads == 1
+    resp = service.search("enforce login quota", k=1, signals=["code"])
+    assert resp.results[0].qualname == "enforce_login_quota"
+
+
+def test_the_writer_applies_saves_while_the_model_loads_again(service, model, clock, sample_repo):
+    _idle_out(service, model, clock)
+    model.gate.clear()
+    _add_function(sample_repo, "first_edit")
+    service.notify({"auth/first_edit.py"})
+    assert service._step()  # stage A
+    assert service.store.get_chunk_by_key("auth/first_edit.py::first_edit") is not None
+    assert service._step()  # stage B has to wait: the load starts, in its own thread
+    assert model.loading.wait(10) and not model.ready
+    _add_function(sample_repo, "second_edit")
+    service.notify({"auth/second_edit.py"})
+    assert service._step()  # so the writer is free for the next save
+    assert service.store.get_chunk_by_key("auth/second_edit.py::second_edit") is not None
+    assert service.store.dirty_count() == 2
+    model.gate.set()
+    service._prewarm.join(10)
+    assert service._step()  # stage B, now that the model is back
+    assert service.store.dirty_count() == 0 and model.loads == 1
+
+
+def test_with_the_writer_running_edits_stay_searchable_while_the_model_loads(service, model, clock, sample_repo):
+    """The same through the writer's own thread, which also frees the model: an edit is in the
+    keyword results while the model loads, later saves are applied meanwhile, and the vectors
+    follow once it is back."""
+    store = service.store
+    service.config.catchup_budget_ms = 200
+    service.start(watch=False, prewarm=False)
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    service.notify(set())  # wakes the writer: its next quiet step frees the model
+    assert model.unloaded.wait(10)
+    model.gate.clear()
+    before = model.document_calls
+    _add_function(sample_repo, "first_edit")
+    service.notify({"auth/first_edit.py"})
+    assert _wait_for(lambda: store.get_chunk_by_key("auth/first_edit.py::first_edit") is not None)
+    resp = service.search("first_edit", k=3, wait_for_models=False)
+    assert resp.results[0].qualname == "first_edit"
+    assert resp.models_loading and resp.signals == ["bm25"] and resp.freshness.pending_chunks == 1
+    assert model.loading.is_set() and not model.ready
+    assert model.document_calls == before + 1  # the loader's warm-up: neither the writer nor the search waits in a call
+    _add_function(sample_repo, "second_edit")
+    service.notify({"auth/second_edit.py"})
+    assert _wait_for(lambda: store.get_chunk_by_key("auth/second_edit.py::second_edit") is not None)
+    model.gate.set()
+    assert _wait_for(lambda: store.dirty_count() == 0)
+    service.config.catchup_budget_ms = 4000
+    resp = service.search("first_edit", k=3, wait_for_models=False)
+    assert not resp.models_loading and resp.freshness.complete and model.loads == 1
+
+
+def test_a_failed_load_is_reported_and_tried_again(service, model, clock, sample_repo):
+    _idle_out(service, model, clock)
+    failures = []
+
+    def failing_load():
+        failures.append(1)
+        raise OSError("no weights")
+
+    model.load = failing_load
+    _add_function(sample_repo, "first_edit")
+    service.notify({"auth/first_edit.py"})
+    assert service._step() and service._step()  # stage A, then a load that fails
+    service._prewarm.join(10)
+    assert service.status(check_staleness=False)["error"] == "OSError: no weights"
+    assert service._load_retry_at > 0  # the failure set the time of the next try
+    service._load_retry_at = time.monotonic() + 3600
+    assert service._step() and len(failures) == 1  # not before then
+    service._load_retry_at = 0.0
+    del model.load
+    assert service._step()  # tried again: this time the weights are there
+    service._prewarm.join(10)
+    service._step()
+    assert service.store.dirty_count() == 0 and model.loads == 1
+
+
+# ---------------------------------------------------------------- at the same moment
+
+
+def test_two_threads_that_need_the_model_load_it_once(service, model, clock, sample_repo):
+    _idle_out(service, model, clock)
+    model.gate.clear()
+    _add_function(sample_repo, "enforce_login_quota")
+    threads = [
+        threading.Thread(target=service.update),
+        threading.Thread(target=lambda: service.search("revoke session", wait_for_models=False)),
+    ]
+    for t in threads:
+        t.start()
+    assert model.loading.wait(10)
+    model.gate.set()
+    for t in threads:
+        t.join(10)
+        assert not t.is_alive()
+    if service._prewarm is not None:  # the search started the load, unless the update had finished it
+        service._prewarm.join(10)
+    assert model.ready and model.loads == 1 and service.store.dirty_count() == 0
+
+
+def test_a_search_that_found_the_model_keeps_it_for_the_idle_time(service, model, clock):
+    """An unload must not fall between a search's check for the model and its own embedding."""
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    assert service._models_ready(0.0)  # what a search does first
+    service._step()
+    assert model.ready
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    service._step()
+    assert not model.ready
+
+
+# ---------------------------------------------------------------- status
+
+
+def test_status_says_whether_the_model_is_in_memory(service, model, clock, sample_repo, tmp_path):
+    info = service.status(check_staleness=False)
+    assert info["models_loaded"] is True and "embedding model: in memory" in format_status(info)
+    _idle_out(service, model, clock)
+    info = service.status(check_staleness=False)
+    assert info["models_loaded"] is False
+    assert "embedding model: not in this process's memory" in format_status(info)
+    assert not model.ready and model.loads == 0  # asking does not load it
+
+    fresh = CodememService(sample_repo, index_dir=tmp_path / "idx", config=service.config)
+    try:  # a process that has not embedded anything holds no model, and status builds none
+        assert fresh.status(check_staleness=False)["models_loaded"] is False and fresh._embedders == {}
+    finally:
+        fresh.close()
+
+    api = config_from_dict({"embedding": {"provider": "openai", "model": "m", "base_url": "http://localhost:1/v1"}})
+    remote = CodememService(sample_repo, index_dir=tmp_path / "api-idx", config=api)
+    try:
+        info = remote.status(check_staleness=False)
+        assert info["models_loaded"] is None and "embedding model" not in format_status(info)
+    finally:
+        remote.close()
+
+
+def test_an_agent_sees_the_unloaded_model_in_index_status_and_in_the_search_note(service, model, clock):
+    from mcp import Client
+
+    from codemem.server import build_server
+
+    service.config.catchup_budget_ms = 50
+    _idle_out(service, model, clock)
+    model.gate.clear()
+    server = build_server(service)
+
+    async def run():
+        async with Client(server) as client:
+            text = (await client.call_tool("index_status", {})).content[0].text
+            assert "embedding model: not in this process's memory" in text and '"models_loaded": false' in text
+            text = (await client.call_tool("search_code", {"query": "revoke session", "k": 3})).content[0].text
+            assert "revoke_session" in text and "still loading" in text
+            model.gate.set()
+            service._prewarm.join(10)
+            text = (await client.call_tool("search_code", {"query": "revoke session", "k": 3})).content[0].text
+            assert "revoke_session" in text and "still loading" not in text
+            text = (await client.call_tool("index_status", {})).content[0].text
+            assert "embedding model: in memory" in text and '"models_loaded": true' in text
+
+    anyio.run(run)
+    assert model.loads == 1

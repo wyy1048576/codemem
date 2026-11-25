@@ -13,6 +13,10 @@ Freshness (docs/architecture.md §4):
 - a reconcile (a scan of the whole repo) runs at startup, every few minutes, on `refresh()`, and
   when the ignore rules, the config or the git branch change;
 - the FAISS files are written once the index has been quiet for a while, and on close.
+
+The embedding model (docs/architecture.md §3.5) loads in a background thread, at start-up and
+again after the writer has freed it for being idle (`model_idle_minutes`). The writer and a search
+with a budget wait for that thread instead of loading the model themselves.
 """
 
 from __future__ import annotations
@@ -25,8 +29,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from .config import Config, default_index_dir, find_repo_root, load_config
-from .embedder import make_embedder
+from .config import Config, VectorConfig, default_index_dir, find_repo_root, load_config
+from .embedder import Embedder, make_embedder
 from .indexer import IndexStats, Indexer, git_head
 from .search import SearchResponse, make_card, search
 from .store import Store
@@ -83,7 +87,8 @@ class CodememService:
         self.index_dir = Path(index_dir) if index_dir else default_index_dir(self.repo_root)
         self._own_config = config is None  # loaded from the repo's files: reload it when they change
         self.config = config or load_config(self.repo_root)
-        self.embedder_factory = embedder_factory
+        self._make_embedder = embedder_factory
+        self._embedders: dict[tuple, Embedder] = {}  # every embedder handed out so far, by model
         self.store = Store(
             self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords,
             vector_backend=self.config.vector_backend,
@@ -108,9 +113,17 @@ class CodememService:
         self._worker: threading.Thread | None = None
         self._watcher: RepoWatcher | None = None
         self._prewarm: threading.Thread | None = None
+        self._load_retry_at = 0.0  # monotonic time before which a failed model load is not tried again
         self._polling = False
         self._last_write = 0.0  # monotonic time of the last index change
         self._last_reconcile = 0.0
+
+    def embedder_factory(self, spec: VectorConfig, config: Config) -> Embedder:
+        """The embedder of a vector type. Each one handed out is remembered, so `status` and the
+        idle unload reach the models in use without building any."""
+        embedder = self._make_embedder(spec, config)
+        self._embedders[(spec.model, spec.embedder, spec.version)] = embedder
+        return embedder
 
     @property
     def indexer(self) -> Indexer:
@@ -297,6 +310,11 @@ class CodememService:
             if self.indexer.searches_waiting:
                 self._stop.wait(0.05)  # a search is embedding what it needs: leave it the model
                 return True
+            if not self._models_ready(0.0):
+                # The model is loading in its own thread (start-up, or the first use after an
+                # idle unload): saves are still applied meanwhile.
+                self._stop.wait(0.05)
+                return True
             stats = IndexStats()
             try:
                 # Stops at its next model call when a search wants the model or new saves arrive.
@@ -318,6 +336,7 @@ class CodememService:
         if self.store.vectors_unsaved() and now - self._last_write > SAVE_AFTER_IDLE:
             self.store.save_vectors()
             return True
+        self._unload_idle_models()  # here nothing is queued, so nothing is waiting for a model
         if self._watcher is not None and not self._watcher.alive() and not self._polling:
             log.warning("the file watcher stopped; scanning the repo every %.0f s instead", POLL_EVERY)
             self._polling = True
@@ -383,11 +402,14 @@ class CodememService:
             "seconds": round(time.monotonic() - t, 2),
         }
 
-    def catch_up(self, budget: float | None = None, *, embed: bool = True) -> Freshness:
+    def catch_up(
+        self, budget: float | None = None, *, embed: bool = True, wait_for_models: bool = True
+    ) -> Freshness:
         """Bring the index up to every save made before this call, for at most `budget` seconds
         (default `catchup_budget_ms`). The writer thread applies them (stage A) while this waits;
         then this embeds what is queued (stage B), newest edits first. With `embed=False` it stops
-        after stage A (`get_chunk` needs no vectors). What doesn't fit is reported, not waited for."""
+        after stage A (`get_chunk` needs no vectors). With `wait_for_models=False` it embeds only
+        if the model is in memory by then. What doesn't fit is reported, not waited for."""
         budget = self.config.catchup_budget_ms / 1000 if budget is None else budget
         deadline = time.monotonic() + budget
         if self.state in ("empty", "indexing"):
@@ -415,6 +437,8 @@ class CodememService:
                 return Freshness(unconfirmed=not confirmed)
             if pending > CATCHUP_MAX_CHUNKS:  # a big change: report, don't wait
                 return Freshness(pending, indexing=True, unconfirmed=not confirmed)
+            if not wait_for_models and not self._models_ready(deadline):
+                return Freshness(pending, unconfirmed=not confirmed)  # embedding now would wait out the load
             while time.monotonic() < deadline:
                 try:
                     done = self.indexer.embed_pending(
@@ -432,16 +456,21 @@ class CodememService:
         return Freshness(self.store.dirty_count(), unconfirmed=not confirmed)
 
     def prewarm(self) -> None:
-        """Load the embedding models and the search indexes, so the first query doesn't wait."""
+        """Load the embedding models and the search indexes, so the first query doesn't wait. It
+        runs in a thread at start-up, and again when a model that was freed while idle is needed."""
         specs = {}
         for v in self.config.enabled_vec_types():
             spec = self.config.vectors[v]
             specs.setdefault((spec.model, spec.embedder, spec.version), spec)
         for spec in specs.values():
             try:
-                self.embedder_factory(spec, self.config).embed_queries(["warmup"])
-            except Exception:
+                # A document, not a query: query vectors are cached, and a cached one would not
+                # bring a model back that was freed while idle.
+                self.embedder_factory(spec, self.config).embed_documents(["warmup"])
+            except Exception as e:
                 log.exception("could not load embedding model %s", spec.model)
+                self.last_error = f"{type(e).__name__}: {e}"
+                self._load_retry_at = time.monotonic() + 1.0
         try:
             self.store.load_vectors()
         except Exception:
@@ -479,10 +508,12 @@ class CodememService:
     # ---- queries
     def search(self, query: str, *, wait_for_models: bool = True, **kwargs: Any) -> SearchResponse:
         """Catch up on pending saves, then search. With `wait_for_models=False` (the MCP server), a
-        search waits for a model that is still loading (about 7 s on an M1, at startup) only within
-        `catchup_budget_ms` too: if it isn't ready by then, the search uses keywords alone and says so."""
+        search waits for a model that is loading (at start-up, or again after an idle unload) only
+        within `catchup_budget_ms` too: if it isn't in memory by then, the search uses keywords
+        alone and says so."""
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
-        freshness = self.catch_up() if self._worker is not None or self._watcher is not None else Freshness()
+        serving = self._worker is not None or self._watcher is not None
+        freshness = self.catch_up(wait_for_models=wait_for_models) if serving else Freshness()
         loading = not wait_for_models and "signals" not in kwargs and not self._models_ready(deadline)
         if loading:
             kwargs["signals"] = ["bm25"]
@@ -491,14 +522,17 @@ class CodememService:
         return resp
 
     def _models_ready(self, until: float) -> bool:
-        """Whether the embedding models are loaded, waiting until `until` while they load. Starts
-        loading them in the background if nothing has yet."""
+        """Whether the embedding models are in memory, waiting until `until` while they load.
+        Starts loading them in the background if nothing is; a failed load is tried again a
+        second later."""
         embedders = [self.embedder_factory(self.config.vectors[v], self.config) for v in self.config.enabled_vec_types()]
+        for e in embedders:
+            e.touch()  # first, so that an idle unload cannot fall between this check and the embedding
         if all(e.ready for e in embedders):
             return True
         with self._cond:
             start = self._prewarm is None or not self._prewarm.is_alive()
-            if start:
+            if start and time.monotonic() >= self._load_retry_at:
                 self._prewarm = threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True)
                 self._prewarm.start()
         while time.monotonic() < until:
@@ -506,6 +540,25 @@ class CodememService:
                 return True
             time.sleep(0.05)
         return all(e.ready for e in embedders)
+
+    def _unload_idle_models(self) -> None:
+        """Free every model nothing has embedded with for `model_idle_minutes` (0 keeps them).
+        The embedder refuses while a call is using its model, so this needs no lock of its own."""
+        minutes = self.config.model_idle_minutes
+        if minutes <= 0:
+            return
+        for embedder in list(self._embedders.values()):
+            if embedder.unload(minutes * 60):
+                log.info("unloaded %s after %g idle minutes", embedder.model_name, minutes)
+
+    def _models_loaded(self) -> bool | None:
+        """Whether the model of every enabled vector type is in this process's memory. None when
+        there is none to hold: embeddings from an API, or no vector type."""
+        specs = [self.config.vectors[v] for v in self.config.enabled_vec_types()]
+        if self.config.embedding.remote or not specs:
+            return None
+        embedders = [self._embedders.get((s.model, s.embedder, s.version)) for s in specs]
+        return all(e is not None and e.ready for e in embedders)
 
     def resolve_ref(self, ref: str | int):
         ref_s = str(ref).strip()
@@ -564,6 +617,7 @@ class CodememService:
                 }
                 for v in self.config.enabled_vec_types()
             },
+            "models_loaded": self._models_loaded(),
             "indexed_commit": store.get_meta("indexed_commit"),
             "indexed_at": store.get_meta("indexed_at"),
             "last_update": store.get_meta("last_update"),

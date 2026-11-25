@@ -152,6 +152,9 @@ class Config:
     debounce_ms: int = 500  # start an update once saves stop for this long ...
     debounce_max_wait_ms: int = 2000  # ... or at the latest this long after the first save
     catchup_budget_ms: int = 4000  # a search first applies and embeds pending edits for at most this long
+    # The local embedding model leaves memory after this many minutes without embedding, and the
+    # next search or edit loads it again; 0 keeps it in memory (docs/decisions.md §3)
+    model_idle_minutes: float = 0.0
 
     def enabled_vec_types(self) -> list[str]:
         return [name for name, v in self.vectors.items() if v.enabled]
@@ -334,7 +337,7 @@ _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
     "window_overlap_lines", "max_block_lines", "vector_cache", "vector_backend", "kinds", "test_weight",
-    "kind_weights", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms",
+    "kind_weights", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes",
 )
 
 
@@ -381,6 +384,8 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
+    if not isinstance(cfg.model_idle_minutes, (int, float)) or cfg.model_idle_minutes < 0:
+        raise ValueError(f"model_idle_minutes must be a number, 0 or more, got {cfg.model_idle_minutes!r}")
     if cfg.vector_backend != "faiss" and ":" not in cfg.vector_backend:
         raise ValueError(f"vector_backend must be faiss or 'module:Class', got {cfg.vector_backend!r}")
     from .texts import TEXT_BUILDERS
