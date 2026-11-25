@@ -8,6 +8,7 @@ import sqlite3
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 
 import anyio
 import pytest
@@ -166,6 +167,15 @@ def test_a_copy_is_one_consistent_snapshot_while_the_source_is_written(main_inde
     assert sorted(p.name for p in (tmp_path / "copy").iterdir() if not p.name.startswith(DB + "-")) == [DB, "write.lock"]
     copy.close()
     source.close()
+
+
+def test_a_copy_does_not_keep_its_source_databases_identity(main_index, tmp_path):
+    with closing(sqlite3.connect(main_index / DB, isolation_level=None)) as source:
+        source.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('database_id', '\"the-source\"')")
+    assert copy_index(main_index, tmp_path / "copy")
+    with closing(sqlite3.connect(tmp_path / "copy" / DB)) as copy:
+        assert copy.execute("SELECT value FROM meta WHERE key = 'database_id'").fetchone() is None
+        assert copy.execute("SELECT COUNT(*) FROM meta").fetchone()[0] > 0  # the rest of the meta rows came along
 
 
 def test_a_copy_never_replaces_an_index(main_index, tmp_path):

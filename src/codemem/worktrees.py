@@ -36,7 +36,9 @@ RECORD = "worktree.json"  # in a linked worktree's index folder: the worktree an
 COPY_LOCK_WAIT = 300.0  # another process is copying into the same folder: wait, then use its index
 # Meta rows that describe the checkout an index was built for. A copy starts without them, so
 # it does not count as this checkout's index until a full check has compared it with the files.
-_CHECKOUT_META = ("indexed_at", "last_scan_at", "last_update", "coverage", "repo_path")
+# `database_id` names the database a saved search index belongs to: a copy that kept it would
+# pass for its source, and the two would then read each other's saved files.
+_CHECKOUT_META = ("indexed_at", "last_scan_at", "last_update", "coverage", "repo_path", "database_id")
 # Every file codemem writes into an index folder. Clean-up deletes these and nothing else, the
 # record last: a clean-up that was interrupted is then finished by the next one.
 _OWN_FILES = (
