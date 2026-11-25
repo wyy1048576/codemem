@@ -227,6 +227,16 @@ def test_without_pytorch_the_local_model_says_how_to_get_it(monkeypatch):
         on_cpu.embed_documents(["x"])
 
 
+def test_the_fake_model_can_be_served_as_it_is():
+    """What `codemem serve-embeddings` needs of an embedder: a text embedded exactly as given, and
+    what the embedder puts before a query and a document (nothing, for the fake model)."""
+    e = FakeEmbedder(dim=32)
+    texts = ["revoke session token", "parse html document"]
+    assert e.prefixes == ("", "")
+    np.testing.assert_array_equal(e.embed_texts(texts), e.embed_documents(texts))
+    np.testing.assert_array_equal(e.embed_texts(texts), e.embed_queries(texts))
+
+
 def test_config_accepts_mps():
     assert config_from_dict({"device": "mps"}).device == "mps"
 

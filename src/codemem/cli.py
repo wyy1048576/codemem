@@ -12,6 +12,7 @@ from pathlib import Path
 from . import __version__, agents
 from .config import find_repo_root, load_config
 from .embedder import LocalModelUnavailable
+from .embedserver import DEFAULT_HOST, DEFAULT_PORT, KEY_ENV
 from .render import format_results, format_status
 
 
@@ -200,6 +201,39 @@ def cmd_mcp(args) -> int:
     return 0
 
 
+def cmd_serve_embeddings(args) -> int:
+    from .embedserver import serve
+
+    config = load_config(find_repo_root(args.path))
+    try:
+        server = serve(config, host=args.host, port=args.port)
+    except (OSError, ValueError) as e:  # the port is taken, or the model cannot be served
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    served = server.served
+    # All of stdout is TOML: the settings of a client, under comments that say where they go.
+    print(f"# codemem serve-embeddings: {served.model}, {served.dim} numbers per vector, at {server.url}")
+    print("# A codemem embeds through this server with the section below, in ~/.codemem/config.toml or in")
+    print("# <repo>/.codemem.toml. From a container or another machine, write the address this machine is")
+    print("# reached at in base_url: an index is tied to `space`, not to the address.")
+    if server.has_key:
+        print(f"# This server asks for a key: a client needs {KEY_ENV} in its environment too.")
+    print(server.client_config(), flush=True)
+    if not server.has_key and args.host not in ("127.0.0.1", "localhost", "::1"):
+        print(
+            f"warning: {args.host} is not the loopback address and no key is set: whoever can reach it can use "
+            f"the model. Set {KEY_ENV} to ask for a key.", file=sys.stderr,
+        )
+    print("serving (Ctrl+C to stop)", file=sys.stderr)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.close()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="codemem", description="Local hybrid code search for coding agents.")
     p.add_argument("--version", action="version", version=f"codemem {__version__}")
@@ -245,6 +279,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp = common(sub.add_parser("status", help="counts, models, indexed commit, staleness"))
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_status)
+
+    sp = sub.add_parser(
+        "serve-embeddings", help="serve the local embedding model to other codemem processes (OpenAI-style HTTP)"
+    )
+    sp.add_argument("path", nargs="?", help="repository whose config selects the model (default: the current one)")
+    sp.add_argument("--host", default=DEFAULT_HOST, help=f"address to listen on (default: {DEFAULT_HOST})")
+    sp.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port to listen on (default: {DEFAULT_PORT})")
+    sp.set_defaults(func=cmd_serve_embeddings)
 
     common(sub.add_parser("watch", help="foreground watcher (re-index on save)")).set_defaults(func=cmd_watch)
     common(sub.add_parser("mcp", help="MCP server over stdio (what agents launch)")).set_defaults(func=cmd_mcp)

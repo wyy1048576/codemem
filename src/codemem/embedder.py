@@ -11,6 +11,10 @@ search index, so changing it never re-embeds.
 prompt, max length, dtype, device): vectors with equal keys are interchangeable, so the store and
 the vector cache reuse them by (key, text hash).
 
+`embed_texts` and `prefixes` are what `codemem serve-embeddings` needs to put an embedder behind an
+HTTP endpoint (embedserver.py): the endpoint embeds each text as given, and its clients put the
+query or document prefix in front themselves.
+
 The local model's packages (PyTorch, sentence-transformers) are an optional install. Nothing here
 imports them until a local model is used, and then a missing package is named with its remedy.
 """
@@ -45,6 +49,7 @@ FALLBACK_PROMPTS = {
     QUERY_PROMPT: "Find the most relevant code snippet given the following query:\n",
     DOCUMENT_PROMPT: "Candidate code snippet:\n",
 }
+_AS_GIVEN = ""  # no prompt: the text exactly as given
 _QUERY_CACHE_SIZE = 512
 _LOCAL_PACKAGES = {"torch": "PyTorch", "sentence_transformers": "sentence-transformers"}
 
@@ -65,9 +70,11 @@ def require_local_model() -> None:
 
 
 def l2_normalize(vecs: np.ndarray) -> np.ndarray:
+    """Every row at length 1. A row that already is, to the precision of a float32, comes back as it
+    is: a vector a server has normalized is the same numbers after its client normalizes it again."""
     vecs = np.asarray(vecs, dtype=np.float32)
     norms = np.linalg.norm(vecs, axis=1, keepdims=True)
-    return vecs / np.where(norms == 0, 1.0, norms)
+    return vecs / np.where((norms == 0) | (np.abs(norms - 1.0) < 1e-6), 1.0, norms)
 
 
 class Embedder(ABC):
@@ -88,6 +95,18 @@ class Embedder(ABC):
 
     @abstractmethod
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray: ...
+
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        """Each text exactly as given, with nothing put before it. `codemem serve-embeddings` serves
+        this; an embedder that does not define it cannot be served."""
+        raise NotImplementedError(f"{type(self).__name__} cannot embed a text exactly as given")
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        """What this embedder puts before each query and before each document:
+        `embed_texts([prefix + text])` gives what `embed_queries([text])` and `embed_documents([text])`
+        give. A served model's clients carry the two as `query_prefix` and `document_prefix`."""
+        raise NotImplementedError(f"{type(self).__name__} does not say what it puts before a query or a document")
 
     @property
     def ready(self) -> bool:
@@ -130,6 +149,13 @@ class FakeEmbedder(Embedder):
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         return self._embed(texts)
+
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        return self._embed(texts)
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        return ("", "")
 
 
 def resolve_device(preference: str) -> str:
@@ -183,7 +209,8 @@ class SentenceTransformerEmbedder(Embedder):
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self._model = None
-        self._prompts: dict[str, dict[str, str]] = {}
+        self._prompts: dict[str, dict[str, str]] = {_AS_GIVEN: {"prompt": ""}}  # how each kind of text is encoded
+        self._prefixes = ("", "")  # the query and document prompts as text, known once the model is loaded
         self._lock = threading.Lock()
         self._device: str | None = None
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
@@ -232,6 +259,10 @@ class SentenceTransformerEmbedder(Embedder):
                     else:
                         log.warning("%s has no %r prompt; using built-in prefix", self.model_name, name)
                         self._prompts[name] = {"prompt": FALLBACK_PROMPTS[name]}
+                self._prefixes = (
+                    available.get(QUERY_PROMPT, FALLBACK_PROMPTS[QUERY_PROMPT]),
+                    available.get(DOCUMENT_PROMPT, FALLBACK_PROMPTS[DOCUMENT_PROMPT]),
+                )
                 self._model = model
             return self._model
 
@@ -267,6 +298,14 @@ class SentenceTransformerEmbedder(Embedder):
 
     def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
         return self._encode(texts, DOCUMENT_PROMPT)
+
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        return self._encode(texts, _AS_GIVEN)
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        self.model  # the prompts come with the model
+        return self._prefixes
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         """Queries are cached (the eval asks the same query of several systems that share a model)."""
@@ -432,6 +471,13 @@ class PluginEmbedder(Embedder):
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         return l2_normalize(self.inner.embed_queries(texts))
+
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        return l2_normalize(self.inner.embed_texts(texts))
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        return self.inner.prefixes
 
 
 _CACHE: dict[tuple, Embedder] = {}
