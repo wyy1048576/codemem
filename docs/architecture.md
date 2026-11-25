@@ -396,8 +396,8 @@ Five choices shape it:
   model's vector at another length is the same vector. One that cannot be scaled, all zeros or
   with a number that is not finite, refuses the endpoint. The texts are chosen to make the ways a
   provider can differ show up: code in two languages, a usage text, plain words, other alphabets,
-  and one text filled to the local model's limit to the token, whose end is about something else
-  than its start. An endpoint that cuts a text earlier than the local model reads less of that
+  and one text filled to the local model's limit to the token, in which no two lines are about
+  the same thing. An endpoint that cuts a text earlier than the local model reads less of that
   one. Another model behind the name, another precision and a prompt added on the provider's side
   move every pair. An endpoint that fails the check gets no text, and `status` says why in one
   sentence. `codemem status --check-assist` runs the check alone and prints each text's cosine

@@ -270,7 +270,7 @@ only what each file costs to recreate.
 | `~/.codemem/indexes/<worktree>-<hash>/worktree.json` | which worktree the folder serves, and its repository | tiny | written again at the next start in that worktree; until then the folder is not deleted when the worktree is removed |
 | `~/.codemem/cache/vectors.db` | every vector ever computed on this machine | grows about 4.5 KB per vector, never shrinks | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping |
 | `~/.codemem/model_hashes.json` | hashes of local model folders' files | tiny | each local model folder is read once more (about 1 s per GB) |
-| `~/.codemem/assist/probe-<hash>.npz` | the seven probe texts of an assist's check, the local model's vectors for them and its document prompt, one file per embedder key | 30 KB | the local model finds the text that fills its limit and embeds the seven once more, at the next check |
+| `~/.codemem/assist/probe-<hash>.npz` | the seven probe texts of an assist's check, the local model's vectors for them and its document prompt, one file per embedder key | about 40 KB (25 KB of vectors, the rest the texts) | the local model finds the text that fills its limit and embeds the seven once more, at the next check |
 | `~/.codemem/assist/checks.json` | what the last check of each assist endpoint found, per local model, for `codemem status` | tiny | `codemem status` says "not checked yet" until the next check |
 | the Hugging Face model cache (`HF_HOME`) | the downloaded model | ~1 GB | downloaded again at the next start (needs the network) |
 | `~/.codemem/config.toml`, `<repo>/.codemem.toml` | your settings | | yours to keep |
