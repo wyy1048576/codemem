@@ -6,10 +6,10 @@ SQLite is the source of truth for everything, vectors included: each row of `vec
 float16 vector at the model's full dimension, with the chunk, part (window) and text hash it
 came from. The search index is derived from those rows: by default FAISS, an exact inner-product
 index over vector ids that holds the same 2-byte numbers (or another `VectorStore` backend,
-named in config: `compact` keeps a small code per vector and scores its best candidates from
+named in config: `compact` keeps small codes of each vector and scores its best candidates from
 the rows), truncated to `embedding_dim` if set, kept in memory and saved as
-`vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it reflects (and the backend and
-options that wrote it). Every transaction that changes a vector type's
+`vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it reflects (and the database,
+backend and options it was saved from). Every transaction that changes a vector type's
 rows bumps its epoch in `meta`, and the index is patched right after the commit (never before, so
 it never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
 with a new id. So an index that is behind (a saved file from before a crash, or another process
@@ -28,6 +28,7 @@ import os
 import sqlite3
 import threading
 import time
+import uuid
 import zlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -112,11 +113,12 @@ CREATE TABLE IF NOT EXISTS vectors (
     data BLOB NOT NULL,
     UNIQUE (chunk_id, vec_type, part)
 );
-CREATE INDEX IF NOT EXISTS vectors_type ON vectors(vec_type, chunk_id);
 CREATE INDEX IF NOT EXISTS vectors_hash ON vectors(embedder, text_hash);
 -- Covers the read of where every vector came from (a search index's start), so it never reads
--- the pages that hold the vectors themselves.
+-- the pages that hold the vectors themselves. It also answers every lookup by vector type, or by
+-- type and chunk: an index of only those two columns, which older indexes have, is dropped.
 CREATE INDEX IF NOT EXISTS vectors_owner ON vectors(vec_type, chunk_id, part, n_parts, start_off, end_off);
+DROP INDEX IF EXISTS vectors_type;
 """
 # Every table any schema version has created, dropped when an older index is rebuilt.
 _OLD_TABLES = ("meta", "files", "chunks", "calls", "edges", "fts_vocab", "fts", "embeddings", "vectors", "dirty_texts")
@@ -267,9 +269,15 @@ class FaissVectorStore(VectorStore):
         return store
 
 
+_VECTOR_READ_CACHE_KB = 2000  # the page cache of a thread's connection for re-scoring reads
 _ROTATION_SEED = 20261125
-_QUERY_BITS = 4  # FAISS scans codes against a query rounded to this many bits per number
+_QUERY_BITS = 4  # FAISS takes estimates against a query rounded to this many bits per number
 _PER_RESULT = 4  # candidates scored exactly for each result asked for
+# With fine codes, how many of the scan's best they rank again: at least this many, ...
+_RANKED = 2000
+_RANKED_PER_CANDIDATE = 4  # ... this many for each candidate, ...
+_RANKED_ONE_IN = 50  # ... and one in this many of the vectors the search may return.
+_NO_THRESHOLD = -1e30  # below every estimate: FAISS's range search then returns all it is given
 _RABITQ_SINCE = (1, 15, 1)  # the FAISS those calls were checked against (docs/decisions.md §2)
 
 
@@ -294,24 +302,46 @@ def _rotation(dim: int) -> tuple[np.ndarray, str]:
     return rotation, hashlib.sha1(rotation.tobytes()).hexdigest()[:16]
 
 
-class CompactVectorStore(VectorStore):
-    """A small code per vector in memory, exact scores from the stored vectors
-    (docs/architecture.md §5). It is built as CompactVectorStore(index_dim, **options), the
-    options being the config's `[compact]` table. The code is RaBitQ's, from FAISS: the first
-    `dim` numbers of the vector (0 = all of them, at most COMPACT_MAX_DIM; `code_dim` once
-    resolved), scaled to length 1 and rotated, at `bits` bits per number plus 8 bytes. A search
-    scans the codes for its best candidates, at least `rescore` of them and at least 4 per result
-    asked for, reads their vectors through `fetch` and scores those exactly, so every score it
-    returns is the real similarity. With no more vectors to choose from than it would score, it
-    scores them all and skips the scan.
+def _rabitq(dim: int, bits: int) -> Any:
+    """An empty FAISS index of RaBitQ codes at `bits` bits per number, with its centre at zero.
+    RaBitQ codes a vector minus a centre, which train() sets to the mean of what it is shown. One
+    zero vector makes the centre zero: a code then depends only on its own vector, so an index
+    patched edit by edit holds the same codes as one rebuilt from the rows."""
+    index = faiss.IndexRaBitQ(dim, faiss.METRIC_INNER_PRODUCT, bits)
+    index.train(np.zeros((1, dim), dtype=np.float32))
+    return index
 
-    FAISS holds the codes by position, in the order they were added; `_ids` maps a position to
-    its vector id. A mistake in a FAISS call can end the process instead of raising, so whatever
-    goes into one is checked here first: lengths, number types, and the size of every selector."""
+
+class CompactVectorStore(VectorStore):
+    """Codes of each vector in memory, exact scores from the stored vectors
+    (docs/architecture.md §5). It is built as CompactVectorStore(index_dim, **options), the
+    options being the config's `[compact]` table.
+
+    The codes are RaBitQ's, from FAISS, of the first `dim` numbers of the vector (0 = all of
+    them, at most COMPACT_MAX_DIM; `code_dim` once resolved), scaled to length 1 and rotated.
+    Every vector has a coarse code, 1 bit per number plus 8 bytes: that is what a search scans.
+    With `bits` above 1 it also has a fine code of `bits` bits per number, and the scan's best
+    (2,000 or more: `_candidates`) are ranked again by their fine estimates. The best of that, at
+    least `rescore` and at least 4 per result asked for, are the candidates: their vectors are
+    read through `fetch` and scored exactly, so every score a search returns is the real
+    similarity. With no more vectors to choose from than it would score, it scores them all and
+    skips the codes.
+
+    FAISS can also scan fine codes by itself. It then takes a code's fine estimate whenever its
+    first bit leaves it a chance against the best found so far: a tenth to a quarter of the
+    codes, each at 25 times the cost of a 1-bit estimate, so that a search took 2 to 4 times as
+    long as with the exact index. And which codes that is depends on the order they are held in.
+    Here a search takes the fine estimate of the scan's best only, and its candidates depend
+    only on the vectors held.
+
+    FAISS holds the codes by position; `_ids` maps a position to its vector id, and the codes are
+    kept in the order of those ids, so two indexes that hold the same vectors are the same bytes.
+    A mistake in a FAISS call can end the process instead of raising, so whatever goes into one
+    is checked here first: lengths, number types, and the size of every selector."""
 
     suffix = ".rabitq"
 
-    def __init__(self, index_dim: int, /, *, bits: int = 1, dim: int = 0, rescore: int = 200):
+    def __init__(self, index_dim: int, /, *, bits: int = 4, dim: int = 0, rescore: int = 200):
         _require_rabitq()
         given = (index_dim, bits, dim, rescore)
         if not all(type(v) is int for v in given):
@@ -326,13 +356,19 @@ class CompactVectorStore(VectorStore):
         self.code_dim = min(index_dim, dim or index_dim, COMPACT_MAX_DIM)
         self.rescore = rescore
         self._rotation, self._rotation_id = _rotation(self.code_dim)
-        self._index = faiss.IndexRaBitQ(self.code_dim, faiss.METRIC_INNER_PRODUCT, bits)
-        # RaBitQ codes a vector minus a centre, which train() sets to the mean of what it is
-        # shown. One zero vector makes the centre zero: a code then depends only on its own
-        # vector, so an index patched edit by edit holds the same codes as one rebuilt from the rows.
-        self._index.train(np.zeros((1, self.code_dim), dtype=np.float32))
+        self._coarse = _rabitq(self.code_dim, 1)
+        self._fine = _rabitq(self.code_dim, bits) if bits > 1 else None
         self._ids = np.empty(0, dtype=np.int64)
         self._fetch: Fetch | None = None
+
+    @property
+    def _indexes(self) -> list[Any]:
+        return [self._coarse] if self._fine is None else [self._coarse, self._fine]
+
+    @property
+    def code_bytes(self) -> int:
+        """Bytes of codes per vector."""
+        return sum(index.code_size for index in self._indexes)
 
     def bind(self, fetch: Fetch) -> None:
         self._fetch = fetch
@@ -345,12 +381,19 @@ class CompactVectorStore(VectorStore):
         rows[~np.isfinite(rows).all(axis=1)] = 0.0
         return np.ascontiguousarray(rows @ self._rotation, dtype=np.float32)
 
+    def _in_step(self) -> None:
+        """Every FAISS index holds one code per vector id, or nothing more is asked of FAISS."""
+        for index in self._indexes:
+            if index.ntotal != len(self._ids):
+                raise RuntimeError(f"{len(self._ids)} vector ids for an index of {index.ntotal} codes")
+
     def _selector(self, chosen: np.ndarray) -> tuple[Any, np.ndarray]:
         """A FAISS selector of the positions where `chosen` is true, and the bitmap it reads.
         FAISS keeps only a pointer to the bitmap, so the caller holds it until the call is over;
         and the bitmap covers every position FAISS can ask about, or FAISS would read outside it."""
-        if chosen.dtype != np.bool_ or chosen.shape != (self._index.ntotal,):
-            raise RuntimeError(f"a selector over {chosen.shape} positions for an index of {self._index.ntotal} codes")
+        self._in_step()
+        if chosen.dtype != np.bool_ or chosen.shape != (len(self._ids),):
+            raise RuntimeError(f"a selector over {chosen.shape} positions for an index of {len(self._ids)} codes")
         bitmap = np.packbits(chosen, bitorder="little")
         return faiss.IDSelectorBitmap(len(bitmap), faiss.swig_ptr(bitmap)), bitmap
 
@@ -361,16 +404,27 @@ class CompactVectorStore(VectorStore):
         vecs = np.asarray(vecs, dtype=np.float32)
         if id_arr.ndim != 1 or vecs.shape != (len(id_arr), self.dim):
             raise ValueError(f"expected vectors of shape ({len(id_arr)}, {self.dim}), got {vecs.shape}")
+        self._in_step()
         self.remove(id_arr)
-        self._index.add(self._coded(vecs))
+        rows = self._coded(vecs)
+        for index in self._indexes:
+            index.add(rows)
         self._ids = np.concatenate([self._ids, id_arr])
+        self._in_step()
+        if not (self._ids[1:] > self._ids[:-1]).all():
+            # Ids are handed out in increasing order, so this is rare: a saved index or a catch-up
+            # brings vectors older than the newest held. Move them to their place.
+            order = np.argsort(self._ids, kind="stable")
+            for index in self._indexes:
+                index.permute_entries(order)  # the code at position i becomes the one that was at order[i]
+            self._ids = self._ids[order]
 
     def remove(self, ids: Iterable[int]) -> None:
         gone = np.isin(self._ids, np.fromiter(ids, dtype=np.int64))
         if gone.any():
-            selector, bitmap = self._selector(gone)  # `bitmap` is what the selector reads: it outlives the call
-            # FAISS closes the gaps without reordering, so the positions left match `_ids[~gone]`.
-            self._index.remove_ids(selector)
+            selector, bitmap = self._selector(gone)  # `bitmap` is what the selector reads: it outlives the calls
+            for index in self._indexes:
+                index.remove_ids(selector)  # FAISS closes the gaps without reordering
             self._ids = self._ids[~gone]
 
     def search(self, query, k, allowed_ids=None):
@@ -387,10 +441,10 @@ class CompactVectorStore(VectorStore):
         qualifying = len(self._ids) if allowed is None else int(np.count_nonzero(allowed))
         size = max(self.rescore, _PER_RESULT * int(k))
         while True:
-            if qualifying <= size:  # few enough to score every one exactly, without a scan
+            if qualifying <= size:  # few enough to score every one exactly, without the codes
                 candidates = self._ids if allowed is None else self._ids[allowed]
             else:
-                candidates = self._scan(q, size, allowed)
+                candidates = self._ids[self._candidates(q, size, allowed)]
             found, vecs = self._fetch(candidates)
             # Summed row by row, not `vecs @ q`: BLAS adds a row's products in an order that
             # depends on where the row sits, so copies of one vector would get unequal scores.
@@ -403,24 +457,42 @@ class CompactVectorStore(VectorStore):
                 return [(int(found[i]), float(scores[i])) for i in order]
             size *= 2  # another process deleted candidates' rows: take more candidates
 
-    def _scan(self, q: np.ndarray, size: int, allowed: np.ndarray | None) -> np.ndarray:
-        """Ids of the `size` codes that score best against a query, and of every code that ties
-        with the last of them: at 1 bit the candidates do not depend on the order the codes are
-        held in. (With more bits FAISS drops a code when its first bit rules it out, and which
-        codes that drops can depend on the order.) Called with more than `size` codes to choose from."""
+    def _candidates(self, q: np.ndarray, size: int, allowed: np.ndarray | None) -> np.ndarray:
+        """Positions of the `size` best codes for a query, and of every code that ties with the
+        last of them. Which they are depends on the vectors held, never on their order."""
+        self._in_step()
+        x = self._coded(q)
+        if self._fine is None:
+            return self._scan(x, size, allowed)
+        qualifying = len(self._ids) if allowed is None else int(np.count_nonzero(allowed))
+        ranked = max(_RANKED, _RANKED_PER_CANDIDATE * size, qualifying // _RANKED_ONE_IN)
+        ranked_again = np.zeros(len(self._ids), dtype=bool)
+        ranked_again[self._scan(x, ranked, allowed)] = True
+        selector, bitmap = self._selector(ranked_again)  # `bitmap` is what the selector reads
+        params = faiss.RaBitQSearchParameters(qb=_QUERY_BITS, centered=False, sel=selector)
+        _, estimates, positions = self._fine.range_search(x, _NO_THRESHOLD, params=params)
+        if len(positions) <= size:
+            return positions
+        cut = np.partition(estimates, len(estimates) - size)[len(estimates) - size]  # the size-th best
+        return positions[estimates >= cut]
+
+    def _scan(self, x: np.ndarray, size: int, allowed: np.ndarray | None) -> np.ndarray:
+        """Positions of the `size` coarse codes that score best against a coded query, and of
+        every code that ties with the last of them; all the allowed ones when they are no more."""
+        if size >= (len(self._ids) if allowed is None else np.count_nonzero(allowed)):
+            return np.arange(len(self._ids)) if allowed is None else np.flatnonzero(allowed)
         # `bitmap` is what the selector reads: it has to outlive the search.
         selector, bitmap = (None, None) if allowed is None else self._selector(allowed)
         params = faiss.RaBitQSearchParameters(qb=_QUERY_BITS, centered=False, sel=selector)
-        x = self._coded(q)
         ask = size + 1
         while True:
-            estimates, positions = self._index.search(x, min(ask, self._index.ntotal), params=params)
+            estimates, positions = self._coarse.search(x, min(ask, self._coarse.ntotal), params=params)
             valid = positions[0] >= 0
             estimates, positions = estimates[0][valid], positions[0][valid]
             if len(positions) <= size:
-                return self._ids[positions]
+                return positions
             if len(positions) < ask or estimates[-1] != estimates[size - 1]:
-                return self._ids[positions[estimates >= estimates[size - 1]]]
+                return positions[estimates >= estimates[size - 1]]
             ask *= 2
 
     def ids(self) -> set[int]:
@@ -430,41 +502,50 @@ class CompactVectorStore(VectorStore):
         return len(self._ids)
 
     def to_bytes(self) -> bytes:
-        """One line of JSON (what the codes were made with, and a checksum of the rest), the
-        vector ids, the FAISS index."""
-        body = self._ids.astype("<i8").tobytes() + faiss.serialize_index(self._index).tobytes()
+        """One line of JSON (what the codes were made with, the size of each FAISS index, and a
+        checksum of the rest), the vector ids, the FAISS indexes: the coarse one, then the fine."""
+        indexes = [faiss.serialize_index(index).tobytes() for index in self._indexes]
+        body = b"".join((self._ids.astype("<i8").tobytes(), *indexes))
         head = {"dim": self.dim, "code_dim": self.code_dim, "bits": self.bits, "count": len(self._ids),
-                "rotation": self._rotation_id, "crc32": zlib.crc32(body)}
+                "rotation": self._rotation_id, "index_bytes": [len(index) for index in indexes],
+                "crc32": zlib.crc32(body)}
         return json.dumps(head).encode("utf-8") + b"\n" + body
 
     @classmethod
     def from_bytes(cls, data: bytes, **options: int) -> CompactVectorStore:
         """Read a saved index, or raise: FAISS gets the bytes only when they are the bytes that
-        were saved, and its index is used only when it is the index the options describe."""
+        were saved, and its indexes are used only when they are the ones the options describe."""
         end = data.find(b"\n")
         head = json.loads(data[:end]) if end >= 0 else {}
         body = memoryview(data)[end + 1:]  # a view: the file's bytes are not copied a second time
         if zlib.crc32(body) != head.get("crc32"):
             raise ValueError("the file is damaged or incomplete")
         store = cls(head["dim"], **options)
-        count = head["count"]
+        count, sizes = head["count"], head.get("index_bytes")
         if (head["code_dim"], head["bits"], head["rotation"]) != (store.code_dim, store.bits, store._rotation_id):
             raise ValueError("the file's codes were made with other options, or with another rotation")
-        if type(count) is not int or not 0 <= count <= len(body) // 8:
-            raise ValueError("the file does not hold as many vector ids as it says")
+        if (type(count) is not int or count < 0 or not isinstance(sizes, list) or len(sizes) != len(store._indexes)
+                or not all(type(size) is int and size > 0 for size in sizes) or 8 * count + sum(sizes) != len(body)):
+            raise ValueError("the file does not hold the vector ids and indexes its first line names")
         store._ids = np.frombuffer(body, dtype="<i8", count=count).astype(np.int64)
-        # The object deserialize_index returns owns the C++ index: it is kept as it is. A second
-        # Python object for it (faiss.downcast_index) would outlive it and point at freed memory.
-        index = faiss.deserialize_index(np.frombuffer(body, dtype=np.uint8, offset=8 * count))
-        if not (
-            isinstance(index, faiss.IndexRaBitQ) and index.thisown and index.is_trained
-            and index.d == store.code_dim and index.rabitq.nb_bits == store.bits
-            and index.metric_type == faiss.METRIC_INNER_PRODUCT and index.code_size == store._index.code_size
-            and index.ntotal == count and index.codes.size() == count * index.code_size
-            and index.center.size() == index.d and not faiss.vector_to_array(index.center).any()
-        ):
-            raise ValueError("the file's FAISS index is not the one its first line describes")
-        store._index = index
+        if not (store._ids[1:] > store._ids[:-1]).all():
+            raise ValueError("the file's vector ids are not in order")
+        loaded, at = [], 8 * count
+        for size, empty in zip(sizes, store._indexes):
+            # The object deserialize_index returns owns the C++ index: it is kept as it is. A second
+            # Python object for it (faiss.downcast_index) would outlive it and point at freed memory.
+            index = faiss.deserialize_index(np.frombuffer(body, dtype=np.uint8, count=size, offset=at))
+            at += size
+            if not (
+                isinstance(index, faiss.IndexRaBitQ) and index.thisown and index.is_trained
+                and index.d == store.code_dim and index.rabitq.nb_bits == empty.rabitq.nb_bits
+                and index.metric_type == faiss.METRIC_INNER_PRODUCT and index.code_size == empty.code_size
+                and index.ntotal == count and index.codes.size() == count * index.code_size
+                and index.center.size() == index.d and not faiss.vector_to_array(index.center).any()
+            ):
+                raise ValueError("a FAISS index of the file is not the one its first line describes")
+            loaded.append(index)
+        store._coarse, store._fine = loaded[0], (loaded[1] if len(loaded) > 1 else None)
         return store
 
 
@@ -812,20 +893,41 @@ class Store:
         conn.executescript(_SCHEMA)
         if self.get_meta("schema_version") is None:
             self.set_meta("schema_version", SCHEMA_VERSION)
+        if self.get_meta("database_id") is None:
+            # A new database, or one that came without an identity (an older index, or a copy made
+            # to start another index). Of two processes that open it together, the first one's stays.
+            conn.execute(
+                "INSERT OR IGNORE INTO meta(key, value) VALUES('database_id', ?)", (json.dumps(uuid.uuid4().hex),)
+            )
 
     # ---- connections
+    def _connect(self, cache_kb: int) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute(f"PRAGMA cache_size=-{cache_kb}")  # at most this much of pages, as used
+        with self._conns_lock:
+            self._all_conns[id(conn)] = (threading.current_thread(), conn)
+        return conn
+
     @property
     def conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
         if conn is None:
-            conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None, check_same_thread=False)
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
-            conn.execute("PRAGMA cache_size=-65536")  # up to 64 MB of pages per connection, as used
-            self._local.conn = conn
-            with self._conns_lock:
-                self._all_conns[id(conn)] = (threading.current_thread(), conn)
+            conn = self._local.conn = self._connect(65536)  # up to 64 MB of pages per thread
+        return conn
+
+    @property
+    def _vector_reader(self) -> sqlite3.Connection:
+        """The calling thread's second connection, read-only, for the vectors a re-scoring search
+        index reads back. Each search reads a few hundred rows, other ones every time: through
+        `conn` they would fill its page cache (64 MB after 100 searches at 200,000 vectors) and
+        push out the pages that keyword search and cards use. This one keeps 2 MB."""
+        conn = getattr(self._local, "vector_reader", None)
+        if conn is None:
+            conn = self._local.vector_reader = self._connect(_VECTOR_READ_CACHE_KB)
+            conn.execute("PRAGMA query_only=ON")
         return conn
 
     @contextmanager
@@ -876,18 +978,19 @@ class Store:
             hooks.append(hook)
 
     def close_thread_conn(self) -> None:
-        """Close the calling thread's connection (for short-lived worker threads)."""
-        conn = getattr(self._local, "conn", None)
-        if conn is not None:
-            self._local.conn = None
-            with self._conns_lock:
-                self._all_conns.pop(id(conn), None)
-            conn.close()
+        """Close the calling thread's connections (for short-lived worker threads)."""
+        for name in ("conn", "vector_reader"):
+            conn = getattr(self._local, name, None)
+            if conn is not None:
+                setattr(self._local, name, None)
+                with self._conns_lock:
+                    self._all_conns.pop(id(conn), None)
+                conn.close()
 
     def close(self) -> None:
-        """Close this thread's connection and those of threads that have ended. A thread that is
+        """Close this thread's connections and those of threads that have ended. A thread that is
         still running keeps its own: closing a connection under another thread's query crashes the
-        process (they are opened with check_same_thread=False). It closes with that thread."""
+        process (they are opened with check_same_thread=False). They close with that thread."""
         me = threading.current_thread()
         with self._conns_lock:
             done = [k for k, (thread, _) in self._all_conns.items() if thread is me or not thread.is_alive()]
@@ -897,7 +1000,7 @@ class Store:
                 conn.close()
             except sqlite3.ProgrammingError:
                 pass
-        self._local.conn = None
+        self._local.conn = self._local.vector_reader = None
 
     # ---- meta
     def get_meta(self, key: str, default: Any = None) -> Any:
@@ -1315,6 +1418,13 @@ class Store:
         """The saved index a note describes (notes from before backends were pluggable: FAISS)."""
         return self.index_dir / note.get("file", f"vec_{vec_type}.faiss") if note else None
 
+    def database_id(self) -> str:
+        """This database's identity: a random token set when it is created. A saved search index
+        names it in its note and is read back only into that database. Vector ids start again at
+        1 in a new database, so the file of an index that was deleted would match other vectors
+        by id."""
+        return self.get_meta("database_id")
+
     def use_vector_backend(self, name: str, options: Mapping[str, Any] | None = None) -> None:
         """Search with another backend, or other options of the same one, from now on. Each vector
         type's index is rebuilt from the stored vectors when it is next used; nothing is re-embedded."""
@@ -1552,13 +1662,21 @@ class Store:
 
     def _stored_vectors(self, dim: int, vector_ids: Sequence[int]) -> tuple[np.ndarray, np.ndarray]:
         """What a backend's `fetch` reads (VectorStore.bind): the ids among these that have a row,
-        and their vectors as the index got them. On the calling thread's connection."""
+        and their vectors as the index got them.
+
+        It reads through the calling thread's vector reader. Each statement there is its own read
+        of the database as it is now, and is read to its end, so nothing stays open between
+        searches to hold the write-ahead log back. "Now" is late enough: an index holds a vector
+        only once its row is committed (it is patched after the commit, under the lock the search
+        holds). A caller that is inside a transaction or a read snapshot of its own gets the rows
+        that transaction sees, from its own connection."""
+        conn = self.conn if self.conn.in_transaction else self._vector_reader
         ids: list[int] = []
         blobs: list[bytes] = []
         for batch in _batches(np.asarray(vector_ids, dtype=np.int64).tolist()):
-            rows = self.conn.execute(
+            rows = conn.execute(
                 f"SELECT vector_id, data FROM vectors WHERE vector_id IN ({','.join('?' * len(batch))})", batch
-            )
+            ).fetchall()
             for vector_id, data in rows:
                 ids.append(vector_id)
                 blobs.append(data)
@@ -1577,9 +1695,11 @@ class Store:
         row is gone are dropped, rows the file lacks are added. Rows never change in place, so
         this is exact whichever epoch the file was saved at (another process, a crash, a save
         that is behind), and it costs only the difference instead of a full rebuild. No file, or
-        one from another backend or other options: None, and the index is rebuilt from the rows."""
+        one from another database, another backend or other options: None, and the index is
+        rebuilt from the rows."""
         note = self._read_note(vec_type)
-        if (note is None or note.get("backend", "faiss") != self.vector_backend
+        if (note is None or note.get("database") != self.database_id()
+                or note.get("backend", "faiss") != self.vector_backend
                 or note.get("options", {}) != self.vector_options):
             return None
         path = self._noted_file(vec_type, note)
@@ -1607,8 +1727,10 @@ class Store:
 
     def _rebuild(self, vec_type: str, epoch: int, dim: int) -> _TypeIndex:
         ti = _TypeIndex(dim, epoch, self._bound(self._backend(dim, **self.vector_options), dim))
+        # Straight down the table, which is in vector-id order. Through an index on the type,
+        # SQLite would then sort the rows, vectors and all: 2.4 to 3.3 s to read 200,000 rows, not 0.9 s.
         rows = self.conn.execute(
-            "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors "
+            "SELECT vector_id, chunk_id, part, n_parts, start_off, end_off, dim, data FROM vectors NOT INDEXED "
             "WHERE vec_type = ? ORDER BY vector_id",
             (vec_type,),
         )
@@ -1703,7 +1825,7 @@ class Store:
                     if not ti.dirty:
                         continue
                     note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
-                            "embedder": self.get_meta(f"vec.{vec_type}.embedder"),
+                            "embedder": self.get_meta(f"vec.{vec_type}.embedder"), "database": self.database_id(),
                             "backend": self.vector_backend, "file": self._data_path(vec_type).name}
                     if self.vector_options:
                         note["options"] = self.vector_options
@@ -1735,7 +1857,11 @@ class Store:
         pages = self.conn.execute("PRAGMA page_count").fetchone()[0]
         free = self.conn.execute("PRAGMA freelist_count").fetchone()[0]
         if pages and free / pages >= min_free_share:
-            self.conn.execute("PRAGMA incremental_vacuum")
+            # The pragma returns a row for each page it frees, and `execute` takes only the first
+            # step: one page a call. So it is called once per free page, in one transaction.
+            with self.transaction() as conn:
+                for _ in range(free):
+                    conn.execute("PRAGMA incremental_vacuum(1)")
             return True
         return False
 
