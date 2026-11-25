@@ -8,11 +8,13 @@ The model is a fake one that records every text it is asked to embed.
 
 import threading
 import time
+from contextlib import contextmanager
 
 import pytest
 from conftest import RecordingEmbedder
 from gitrepo import ONLY_ON_A, ONLY_ON_B, TO_A, TO_B, UNCHANGED, add_worktree, git, needs_git, two_commits
 
+from codemem.embedder import FakeEmbedder
 from codemem.indexer import Indexer, IndexStats
 from codemem.service import CodememService
 from codemem.store import Store, diff_snapshots
@@ -296,38 +298,100 @@ def test_a_switch_back_during_a_model_call_ends_the_work_for_the_branch_left(ser
 # --------------------------------------------------------------------------- a search right after a switch
 
 
-class ModelByThread(RecordingEmbedder):
-    """Also records which thread asked: a search embeds in its own thread, the writer in its."""
+class _ByThread:
+    """Notes which thread asked for each text: a search embeds in its own thread, the writer and
+    the model's loader in theirs."""
 
-    def __init__(self):
-        super().__init__()
-        self.asked: list[tuple[str, str]] = []  # (thread name, text)
-
-    def embed_documents(self, texts):
+    def note(self, texts):
+        if not hasattr(self, "asked"):
+            self.asked: list[tuple[str, str]] = []  # (thread name, text)
         self.asked.extend((threading.current_thread().name, text) for text in texts)
-        return super().embed_documents(texts)
 
     def by_this_thread(self):
-        return [text for thread, text in self.asked if thread == threading.current_thread().name]
+        return [text for thread, text in getattr(self, "asked", []) if thread == threading.current_thread().name]
 
 
-@pytest.fixture
-def switched(repo, tmp_path, monkeypatch):
+class ModelByThread(_ByThread, RecordingEmbedder):
+    def embed_documents(self, texts):
+        self.note(texts)
+        return super().embed_documents(texts)
+
+
+class Clock:
+    """Time that moves only when a test says so."""
+
+    now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+class ModelThatCanLeave(_ByThread, FakeEmbedder):
+    """The fake model as one that is freed when idle: on a clock the test moves, and with a load
+    the test can hold (`gate`). Before each document call of the test's own thread it tries to
+    free itself, as the writer's quiet step may at that very moment (`freed_under_the_search`)."""
+
+    IDLE_SECONDS = 300.0
+
+    def __init__(self, clock):
+        super().__init__(64, clock)
+        self.gate = threading.Event()
+        self.gate.set()
+        self.loaded_by: list[str] = []  # thread names
+        self.freed_under_the_search: list[bool] = []
+
+    def load(self):
+        assert self.gate.wait(30), "the test never let the model load"
+        self.loaded_by.append(threading.current_thread().name)
+        super().load()
+
+    def embed_documents(self, texts):
+        self.note(texts)
+        if threading.current_thread() is threading.main_thread():
+            self.freed_under_the_search.append(self.unload(self.IDLE_SECONDS))
+        return super().embed_documents(texts)
+
+
+@contextmanager
+def _running_after_a_switch(repo, index_dir, monkeypatch, model, **service_options):
     """A running service without file events, current on A, whose checkout was just switched to
     B: the next search finds the switch itself, and the 11 chunks it queues."""
-    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
     monkeypatch.setattr("codemem.service.POLL_EVERY", 3600.0)  # no full check on a timer during the test
-    model = ModelByThread()
-    service = CodememService(repo, index_dir=tmp_path / "idx", embedder_factory=lambda m, c: model)
+    service = CodememService(repo, index_dir=index_dir, embedder_factory=lambda m, c: model, **service_options)
     try:
         assert service.update() is not None
         service.start(watch=False, prewarm=False)
         assert service.catch_up(budget=30).complete  # the start's own full check is done
         git(repo, "checkout", "-q", "feature")
-        del model.asked[:]
-        yield service, model
+        del model.asked[:]  # from here on, the lists hold what the test's own searches cause
+        if isinstance(model, ModelThatCanLeave):
+            del model.freed_under_the_search[:]
+        yield service
     finally:
+        if isinstance(model, ModelThatCanLeave):
+            model.gate.set()
+        if service._prewarm is not None:
+            service._prewarm.join(10)  # a load a search or the writer started
         service.close()
+
+
+@pytest.fixture
+def switched(repo, tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+    model = ModelByThread()
+    with _running_after_a_switch(repo, tmp_path / "idx", monkeypatch, model) as service:
+        yield service, model
+
+
+@pytest.fixture
+def switched_with_a_model_that_can_leave(repo, tmp_path, monkeypatch, fake_config):
+    """The same, with a model that can be freed and loaded again, and a long queue: more than 5
+    queued chunks are too many to wait for."""
+    monkeypatch.setattr("codemem.service.CATCHUP_MAX_CHUNKS", 5)
+    clock = Clock()
+    model = ModelThatCanLeave(clock)
+    with _running_after_a_switch(repo, tmp_path / "idx", monkeypatch, model, config=fake_config) as service:
+        yield service, model, clock
 
 
 def _first_lines(texts):
@@ -367,3 +431,51 @@ def test_a_search_embeds_its_keyword_results_before_the_rest_of_a_short_queue(sw
     assert 0 < audit < len(mine)  # the whole queue fits in the search's time
     assert all("auth/audit.py" in line for line in _first_lines(mine[:audit]))  # its own results went first
     assert resp.freshness.complete and service.indexer.verify() == []
+
+
+# --------------------------------------------------------------------------- ... while the model is not in memory
+
+
+def test_a_search_with_a_budget_does_not_load_the_model_for_its_keyword_results(switched_with_a_model_that_can_leave):
+    """The model was freed for being idle, and loading it again takes longer than a search may
+    wait. The MCP server's search waits for the load within its budget, in the loader's thread,
+    and then answers from keywords: its keyword results are embedded under the same rule as the
+    rest of the queue, not in a model call of its own that would wait out the load."""
+    service, model, _ = switched_with_a_model_that_can_leave
+    assert model.unload() and not model.ready
+    model.gate.clear()
+    service.catch_up(budget=30, embed=False)  # the switch is applied: 11 chunks are queued
+    service.config.catchup_budget_ms = 1000  # of which the search spends most on waiting for the model
+    resp = service.search("record audit event", k=3, wait_for_models=False)
+    assert model.by_this_thread() == []  # no model call in the search's own thread
+    assert resp.models_loading and resp.signals == ["bm25"] and resp.results[0].qualname == "record_audit_event"
+    assert resp.freshness.indexing and resp.freshness.pending_chunks == 11
+    assert not model.ready and {thread for thread, _ in model.asked} == {"codemem-prewarm"}
+    model.gate.set()  # the load ends, and the writer embeds the queue
+    assert _wait_for(lambda: service.store.dirty_count() == 0)
+    assert model.loaded_by == ["codemem-prewarm"] and service.indexer.verify() == []
+
+
+def test_a_search_counts_as_a_use_of_the_model_before_it_embeds_its_keyword_results(switched_with_a_model_that_can_leave):
+    """A model nobody has used for longer than its idle time can be freed at any moment. The
+    search counts as a use before it checks that the model is in memory, so the model cannot
+    leave between that check and the search's own embedding."""
+    service, model, clock = switched_with_a_model_that_can_leave
+    clock.now += 3600
+    resp = service.search("record audit event", k=3, wait_for_models=False, debug=True)
+    assert model.by_this_thread() and model.freed_under_the_search
+    assert not any(model.freed_under_the_search) and model.loaded_by == []
+    assert resp.results[0].qualname == "record_audit_event" and "code" in resp.results[0].ranks
+
+
+def test_a_search_that_may_wait_for_the_model_loads_it_for_its_keyword_results(switched_with_a_model_that_can_leave):
+    """Without a budget for the model (the CLI's and the eval's kind of search), the search loads
+    a freed model where it first needs it: for its own keyword results."""
+    service, model, _ = switched_with_a_model_that_can_leave
+    assert model.unload() and not model.ready
+    resp = service.search("record audit event", k=3, debug=True)
+    mine = model.by_this_thread()
+    assert model.loaded_by == ["MainThread"] and mine
+    assert all("auth/audit.py" in line for line in _first_lines(mine))
+    assert resp.results[0].qualname == "record_audit_event" and "code" in resp.results[0].ranks
+    assert resp.freshness.indexing and not resp.models_loading

@@ -668,7 +668,8 @@ the vectors stage B had not replaced yet are still in place.
 
 **Each git worktree is a checkout of its own.** Its index folder is named after its path, so two
 worktrees never share an index, and a codemem started inside a worktree (an MCP server, the CLI)
-serves that worktree, with its own watcher and writer.
+serves that worktree, with its own watcher and writer. Each such process also holds the embedding
+model, unless they share one through `codemem serve-embeddings` (§3.5).
 
 **A new worktree's index starts from a copy.** Without one, codemem would chunk every file again
 just to find that almost all of them equal the main checkout's.
@@ -939,6 +940,7 @@ embedding API. After that, updates are small.
  server.py   search_code() ─► service.py CodememService.search()
                                 ├─ catch_up()   RepoWatcher.barrier() ─► hand over unapplied paths
                                 │               ─► wait for the writer's stage A
+                                │               ─► _models_ready(): the model is in memory, or loads in time
                                 │               ─► _embed_first(): Indexer.embed_pending() for the queued
                                 │                  chunks among _keyword_results()
                                 │               ─► Indexer.embed_pending() for the newest edits, until 4 s
