@@ -684,7 +684,7 @@ def test_an_update_that_cannot_work_is_retried_with_longer_pauses_and_one_traceb
         assert pauses == [1, 2, 4, 8, 16, 32, 60, 60]
         assert _tracebacks(caplog) == ["the index update failed; next try in 1 s"]
         assert sum("failed again" in r.getMessage() for r in caplog.records) == 7
-        assert 'pip install "codemem[local]"' in svc.status(check_staleness=False)["error"]
+        assert "pip install torch sentence-transformers" in svc.status(check_staleness=False)["error"]
     finally:
         svc.close()
 
