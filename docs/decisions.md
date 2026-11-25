@@ -40,7 +40,7 @@ In normal use (the local model, already downloaded), codemem needs nothing outsi
 |---|---|---|---|---|
 | **The embedding model**, `jinaai/jina-code-embeddings-0.5b`, from Hugging Face | trained for code search; small enough for a laptop (0.5B); free and private | Before the first download (no network, Hugging Face down, wrong name): searches answer from keywords only, each after a wait of about 4 s, and new edits wait in the queue. Once downloaded, it loads with no network | `index_status` shows the load error. Search notes say the model is "still loading" (a known gap, §8) | Keyword search keeps working. Copy the model cache (`HF_HOME`) from another machine, point `vectors.code.model` at a local folder, or use an API |
 | **sentence-transformers + PyTorch** | run the model on CUDA, Apple GPUs (MPS) or the CPU | without them, the local model can't run (as above) | as above | an embedding API. Both stay installed even then (§8) |
-| **FAISS** (`faiss-cpu`) | exact vector search in memory, fast, no server, wheels for every platform | codemem doesn't start | an import error | none: required |
+| **FAISS** (`faiss-cpu`) | exact vector search in memory, fast, no server, wheels for every platform; it also makes and scans the compact index's codes (RaBitQ), which is checked against FAISS 1.15.1 | codemem doesn't start. With a FAISS older than 1.15.1, `vector_backend = "compact"` is refused; `faiss` works | an import error; for the compact index, one sentence naming the FAISS version | none: required. For the compact index: `vector_backend = "faiss"` |
 | **SQLite with FTS5** | ships with Python; transactions; built-in BM25 | without FTS5 (rare custom Python builds) no index can be created | an error on the first index | a standard Python build (python.org, Homebrew, uv) |
 | **tree-sitter + grammars** (versions pinned) | one parser and official grammar for each of the nine languages | a language whose grammar fails can't be chunked; a file that fails to parse is indexed from what was recovered | `index_status` lists files with parse errors | none needed per file |
 | **watchdog** (OS file events) | the same events API on macOS, Linux and Windows | network drives, WSL or Linux watch limits: no events | a warning in the log; `index_status` says "not watching" | automatic: a full check every 10 s and before each search (0.5 s on vLLM) |
@@ -65,6 +65,9 @@ The values codemem runs with, and why each was picked. All of these are settings
 | **safety full check** | every 5 min (every 10 s without file events) | catches a missed event; one check costs 0.3–0.5 s on vLLM | constants |
 | **writing the search index to disk** | after 30 s idle, at shutdown, on `refresh_index` | writing it on every save blocked searches for 2.2 s on vLLM (520 MB of files, with 4 bytes per number); the CLI and the eval write at once, because the eval measures the index size | constant |
 | **the vector cache** | on, shared by every index on the machine | rebuilds, branch switches and other commits cost no model calls | `vector_cache = "off"` |
+| **the search index** | exact (`faiss`): every vector in memory | no setting to tune, and a search reads nothing from disk. The compact index takes 12 times less memory at 200,000 vectors (31 MB against 374 MB) and returned the same top 10 in 99.3% of 268 real-question searches; it needs the index file in the system's file cache to be fast (architecture.md §5) | `vector_backend = "compact"` |
+| **the compact index's code** | every number of the vector, at 1 bit | shorter codes lost the top 10 for questions (512 numbers: 80% of searches at 200 candidates), and more bits on fewer numbers kept less per byte | `[compact] dim`, `bits` |
+| **candidates the compact index scores exactly** | 200, and at least 4 per result asked for | 200 kept the top 10 in 99.3% of question searches on 31k vectors, 500 in all of them, for about 2 ms more per search | `[compact] rescore` |
 | **file size cap** | 10 MB | hand-written files can reach megabytes (TypeScript's `checker.ts`); larger ones are generated data | `max_file_size` |
 | **vendored and generated code** | skipped | copies crowd results and cost embedding time; `third_party/` is kept, as it is often the project's own code | `use_default_ignore`, `skip_generated` |
 | **text length per vector** | 1,024 tokens (about 3,000 characters) | keeps CPU indexing tractable; longer code is split into windows, so nothing is lost | `max_seq_length` |
@@ -96,6 +99,10 @@ Values in the code, not in the config.
 | git wait | 10 s | `service.py` | how long an update waits for a running git command |
 | write lock wait | 30 s | `store.py` | how long a second writer process waits before giving up |
 | `k` cap | 50 | `server.py` | results per MCP search |
+| `COMPACT_MAX_DIM` | 4,096 numbers | `config.py` | the longest code of the compact index: every FAISS call it makes was run under a memory checker for each length from 1 to 130 and around each of 192, 256, 384, 512, 768, 896, 1,024, 1,536, 2,048, 3,072 and 4,096 |
+| `_PER_RESULT` | 4 candidates | `store.py` | the compact index scores exactly at least this many candidates for each result asked for (and never fewer than `[compact] rescore`) |
+| `_QUERY_BITS` | 4 bits | `store.py` | how finely FAISS rounds the query while it scans the codes; 8 bits kept one more search in 268 at half again the scan time |
+| `_ROTATION_SEED` | 20261125 | `store.py` | names the rotation the compact codes are made after. Another value makes every saved `.rabitq` file unreadable: each is then rebuilt from `index.db` |
 
 ---
 
@@ -130,7 +137,7 @@ Three identities decide whether codemem can reuse what it has:
 | Change | Redone | Cost |
 |---|---|---|
 | the model, the embedder, new weights in a model folder, `dtype`, the device | that vector type is re-embedded | a full embedding (vLLM: about 5 h on the M1), unless the cache has it |
-| `embedding_dim`, `vector_backend` | the search index is rebuilt from the stored vectors | seconds |
+| `embedding_dim`, `vector_backend`, the `[compact]` options | the search index is rebuilt from the stored vectors | seconds |
 | text settings (`max_seq_length`, `code_header`, `window_chars`, `window_overlap_lines`, `max_usage_items`, `include_commits`) | every text is rebuilt; only changed ones are re-embedded | depends on how many change |
 | `max_defs_per_name` | every call is relinked | seconds; usage texts that change are re-embedded |
 | file selection or chunking (`ignore`, `languages`, `max_file_size`, `use_default_ignore`, `skip_generated`, `max_block_lines`), BM25 tokenization | the index is rebuilt | the structure (vLLM: about 70 s), vectors from the cache |
@@ -151,6 +158,7 @@ only what each file costs to recreate.
 |---|---|---|---|
 | `~/.codemem/indexes/<repo>-<hash>/index.db` | the index | ~640 MB | rebuilt by the next update: the structure in about 70 s, vectors from the cache |
 | `~/.codemem/indexes/<repo>-<hash>/vec_*.faiss` | saved copies of the search indexes | ~260 MB | rebuilt from `index.db` in about 2 s |
+| `~/.codemem/indexes/<repo>-<hash>/vec_*.rabitq` | the compact index's saved copies: vector ids and codes | 128 bytes per vector (26 MB at 200,000 vectors) | rebuilt from `index.db`: about 5 s at 200,000 vectors |
 | `~/.codemem/cache/vectors.db` | every vector ever computed on this machine | grows about 4.5 KB per vector, never shrinks | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping |
 | `~/.codemem/model_hashes.json` | hashes of local model folders' files | tiny | each local model folder is read once more (about 1 s per GB) |
 | the Hugging Face model cache (`HF_HOME`) | the downloaded model | ~1 GB | downloaded again at the next start (needs the network) |
@@ -181,3 +189,5 @@ Searches, updates and everything else stay on your machine.
 | the model fails to load | each search waits about 4 s (the first took 7.5 s in a test), and the note says the model is "still loading" | say it failed, and stop waiting for it |
 | the vector cache only grows | about 4.5 KB per vector, forever | a "last used" date per entry, and a size cap |
 | PyTorch is always installed | about 1 GB, even when only an API is used | make the local model an optional install; needs a one-line change in the eval's dependencies |
+| the compact index after a restart | each search reads its candidates' rows from the disk, about 25 ms more, until the system's file cache holds them | read the vector rows once in the background at start, so the file cache holds them |
+| the compact index's agreement is measured on one model and 31k vectors | on a larger index, or another model's vectors, 200 candidates may keep less of the exact top 10 | measure it on each eval repo and each model, and raise `rescore` where needed |

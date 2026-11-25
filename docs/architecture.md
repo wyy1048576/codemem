@@ -487,7 +487,7 @@ and reports any difference.
  │     dirty_texts  the queue between stage A and stage B
  │     meta         the settings the index was built with, the git commit, version counters
  ├── vec_code.faiss ...... saved copies of the in-memory search indexes,  ┐ rebuilt from the
- ├── vec_usage.faiss         one per text type                            ┘ vectors table if lost
+ ├── vec_usage.faiss         one per text type (.rabitq: the compact one) ┘ vectors table if lost
  └── write.lock .......... one writer at a time
 
  ~/.codemem/cache/vectors.db ... the vector cache, shared by every index on the machine
@@ -505,8 +505,121 @@ same speed. Vectors are scaled back to length 1 as they enter the index and roun
 again, so every backend gets the same numbers. Keeping 4 bytes would change scores by at most
 0.0003: on 40 real-model queries, 38 top-10 lists came out in the same order, and the other two
 swapped results that were practically tied. It sits behind a small
-interface (`VectorStore`), so an approximate index (HNSW or IVF, which trade a little accuracy for
-speed on very large repos) can replace it through the config; a switch re-embeds nothing.
+interface (`VectorStore`), so another index can replace it through the config; a switch re-embeds
+nothing. Two come with codemem: this exact one (`vector_backend = "faiss"`, the default), and the
+compact one below. An approximate index (HNSW or IVF, which trade a little accuracy for speed on
+very large repos) can be plugged in as a class.
+
+**The compact index** (`vector_backend = "compact"`) keeps a small code of each vector in memory
+instead of the vector, and reads from SQLite only the vectors it has to compare exactly. A search
+has two steps:
+
+```
+ the query vector ("disabled users stay logged in")
+      │
+      ▼  1. scan the codes, in memory: 120 bytes a vector              11.5 ms at 200,000 vectors
+      │     keep the best 204 or more (of the allowed ones, when a filter is given)
+      ▼  2. read those vectors from SQLite, score them exactly            2.4 ms
+      │
+      ▼  the best vectors, each with its real similarity
+```
+
+- **The code** is RaBitQ's, made and scanned by FAISS. The vector is scaled to length 1 and turned
+  by a fixed random rotation. Then one bit is kept per number (is it above zero?), plus 8 bytes
+  that correct the estimate. 896 numbers take 120 bytes, against 1,792.
+- **Step 1 only chooses candidates.** A similarity estimated from one bit per number is rough. It
+  can tell the best 200 vectors from 200,000 others, but it cannot order them. So step 2 reads the
+  candidates' stored vectors and computes the real similarity. Every score that leaves the index
+  is the exact one (it differs from the exact index's by less than 0.000001), so result lists can
+  be merged by score.
+- **How many candidates:** at least `rescore` (200), and at least 4 for each result asked for. A
+  search asks for the best 50 chunks, which is 51 vectors when every chunk has one, so 204 are
+  scored.
+- **When step 1 is skipped.** If no more vectors qualify than would be scored (a small index, or a
+  filter that leaves few), all of them are read and scored. The result is then the exact index's.
+- **Why the rotation.** How well one bit per number works depends on how a model spreads its
+  numbers. After a random rotation the error of the estimate has the same bound for any vectors.
+  On our real questions the exact top 10 was among the 200 candidates in 99.3% of searches with
+  the rotation, and in 96.3% without.
+- **Why the centre is zero.** RaBitQ can subtract an average vector before it takes the bits, and
+  FAISS learns that average from the vectors it is shown. A learned average ties every code to the
+  vectors the index held at that moment: an index patched edit by edit and one rebuilt from its
+  rows would hold different codes, and could return different results. With the centre fixed at
+  zero, a code depends only on its own vector. A learned centre did not help at 896 numbers (98.5%
+  against 99.3%); at 512 numbers it added 3 points.
+- **Copies of one vector** have one code, and so one estimate. A cut through them takes them all,
+  so at 1 bit the candidates never depend on the order the codes are held in. (With more bits
+  FAISS skips a code whose first bit already rules it out, and what it skips can depend on that
+  order.)
+- **Filters** become one bit per vector, which FAISS tests while it scans.
+- **Deleted rows.** If another process deletes a candidate's row before this process has caught
+  up, the vector is left out and the search takes more candidates.
+
+**How much of each vector to code.** Measured on 30,977 real code vectors of
+`jina-code-embeddings-0.5b` (896 numbers), through `Store.vector_search`, against the exact index.
+The number is the share of searches whose top 10 is the same set of chunks. Two kinds of query:
+268 real questions (the eval's issue texts), and 500 held-out code vectors.
+
+| The code | Bytes per vector | Questions: 100 candidates | 200 | 500 | Code vectors: 100 | 200 | 500 |
+|---|---|---|---|---|---|---|---|
+| 128 numbers × 1 bit | 24 | 13% | 26% | 46% | 90% | 96% | 98% |
+| 256 × 1 bit | 40 | 30% | 49% | 75% | 98% | 99.2% | 100% |
+| 512 × 1 bit | 72 | 65% | 80% | 94% | 100% | 100% | 100% |
+| **896 × 1 bit** (the default) | 120 | 93% | **99.3%** | 100% | 100% | 100% | 100% |
+| 512 × 2 bits | 148 | 94% | 97% | 99.6% | 100% | 100% | 100% |
+| 256 × 4 bits | 148 | 82% | 93% | 98% | 100% | 100% | 100% |
+| 896 × 2 bits | 244 | 100% | 100% | 100% | 100% | 100% | 100% |
+
+Questions are the hard case. Their best matches score about 0.33 to 0.40, and the 200th best
+0.23: the gap is as small as the error of a short code. Code vectors find near copies of
+themselves (0.73 to 0.93), which any code keeps. So the default codes every number (`dim = 0`) at
+1 bit: at equal bytes, more numbers at 1 bit kept more than fewer numbers at 2 or 4 bits
+(the rows of 120 and 148 bytes). With 500 candidates the default kept the top 10 in every search,
+and 99.8% of the top 50 against 97.2% with 204. These are 31k vectors: a larger index gives the
+same 200 candidates a smaller share of it, so `rescore` is the setting to raise there.
+
+**What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50):
+
+| At 200,000 vectors of 896 numbers | Exact (`faiss`) | Compact, the default (896 × 1 bit) | Compact, `dim = 256` |
+|---|---|---|---|
+| in memory, per vector: the index | 1,800 bytes | 120 + 8 (its id) | 40 + 8 |
+| in memory, per vector: where it came from | 32 | 32 | 32 |
+| the process's memory after loading (what it keeps) | 374 MB | 31 MB | 18 MB |
+| the saved file, per vector | 1,800 bytes | 128 | 48 |
+| start from the saved file | 0.8 s | 0.3 s | 0.4 s |
+| start from the rows | 5.8 s | 4.7 s | 3.3 s |
+| one search: median (95th percentile) | 39 ms (64) | 14.5 ms (19.5) | 7.0 ms (8.9) |
+| of which the scan / the read of 256 rows | all scan | 11.5 / 2.4 ms | 4.1 / 2.2 ms |
+| one search under a filter that keeps 10% | 15 ms | 8.7 ms | 8.0 ms |
+| 100 vectors added / deleted | 115 / 31 ms | 8 / 14 ms | 5 / 14 ms |
+| top 10 equal to the exact index's (31k real vectors, questions) | | 99.3% | 49% |
+
+Three more things to know about the cost:
+- **Below about 30,000 vectors the exact index is as fast**, because reading 204 rows takes as long
+  as scanning so few vectors (at 31k: 6.5 ms exact, 6.2 ms compact).
+- **The rows must be in the operating system's file cache.** When they are not (after a restart),
+  a search reads its candidates from the disk: about 25 ms more at 204 to 256 rows, for each
+  search, until the pages it needs have been read once.
+- **The rows it reads pass through SQLite's page cache**, like every read of the store. That cache
+  holds up to 64 MB per connection, and 100 searches at 200,000 vectors fill it.
+
+The compact index is saved as `vec_<type>.rabitq` (the ids and the codes: 128 bytes per vector),
+so a start reads it instead of coding every vector again.
+
+**A mistake in a FAISS call can end the process** instead of raising an error, and that would take
+the MCP server with it. So the compact index checks whatever it hands to FAISS first: the length
+and number type of every array, the size of every filter, and that no number is a NaN or an
+infinity (such a vector is coded as zeros and never returned). Its saved file carries a checksum,
+and is given to FAISS only when the checksum, the options and the rotation are the expected ones.
+What FAISS was not checked with is refused with a message: a code of more than 4,096 numbers
+when the config is read, a FAISS older than 1.15.1 when the index is opened.
+
+**Where each vector came from** (its chunk, its part, its lines) is kept in memory as one 32-byte
+row per vector, in an array sorted by vector id: 6.4 MB at 200,000 vectors, for either index. A
+chunk with several vectors scores its best one. When chunks have several vectors, the store asks
+the index for proportionally more vectors, so that the best 50 chunks are complete after one scan.
+An SQLite index over these columns (about 25 bytes per vector on disk) lets a start read them
+without touching the pages that hold the vectors: 0.2 s instead of 0.8 s at 200,000 vectors.
 
 **Keeping the copy in step with SQLite.** The in-memory index changes only after a commit, so it
 never holds a vector that could be rolled back. Every commit that changes a type's vectors also
@@ -626,7 +739,7 @@ codemem is for short, vague feature questions. A vague-question eval is the next
 | a language | a spec in `languages/` (which nodes are functions, classes, calls, tests, comments) |
 | a kind of embedded text | a text builder in `texts.py` |
 | an embedding model | nothing, if sentence-transformers can load it; else an embedder class (README) |
-| a search index | a `VectorStore` subclass (README) |
+| a search index | a `VectorStore` subclass (README); `FaissVectorStore` and `CompactVectorStore` in `store.py` are the two that come with codemem |
 | smarter call links | a replacement for `callgraph.resolve_edges` |
 
 ---
