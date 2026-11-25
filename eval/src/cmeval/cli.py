@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -12,6 +13,7 @@ from .dashboard import DEFAULT_PORT
 from .tasks import TaskError, load_tasks
 
 MAX_PROBLEMS_SHOWN = 50
+PROXY_PORT = 8787  # proxy.DEFAULT_PORT. proxy.py is imported only when the command runs
 
 # Commands that exist in the plan but are not built yet.
 PLANNED = {
@@ -425,6 +427,32 @@ def cmd_dashboard(args) -> int:
     return 0
 
 
+def cmd_proxy(args) -> int:
+    from .proxy import serve
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        summary = serve(args.log, host=args.host, port=args.port, upstream=args.upstream, bodies_dir=args.bodies,
+                        progress=say)
+    except OSError as exc:  # for example the port is in use
+        print(f"proxy: {exc} (port {args.port}; another one: --port {args.port + 1})", file=sys.stderr)
+        return 1
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
+def cmd_proxy_summary(args) -> int:
+    from .proxy import summarize
+
+    try:
+        summary = summarize(args.file)
+    except FileNotFoundError:
+        print(f"{args.file}: no such file", file=sys.stderr)
+        return 1
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
 def cmd_planned(args) -> int:
     print(f"cmeval {args.command}: not built yet", file=sys.stderr)
     return 2
@@ -559,6 +587,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
     p.add_argument("--open", action="store_true", help="open the page in the web browser")
     p.set_defaults(func=cmd_dashboard)
+
+    p = sub.add_parser("proxy", help="a recording proxy for the model API: one JSON line for each request, with its usage")
+    p.add_argument("--log", type=Path, required=True, help="log file (.jsonl); new lines are appended")
+    p.add_argument("--host", default="127.0.0.1", help="address to listen on (default 127.0.0.1)")
+    p.add_argument("--port", type=int, default=PROXY_PORT, help=f"port (default {PROXY_PORT}; 0: any free port)")
+    p.add_argument("--upstream", default="https://api.anthropic.com", help="the API (default https://api.anthropic.com)")
+    p.add_argument("--bodies", type=Path, default=None, help="also write each request and answer body to this folder")
+    p.set_defaults(func=cmd_proxy)
+
+    p = sub.add_parser("proxy-summary", help="token sums, errors, and checks of a proxy log, as JSON")
+    p.add_argument("file", type=Path)
+    p.set_defaults(func=cmd_proxy_summary)
 
     for name, help_text in PLANNED.items():
         p = sub.add_parser(name, help=f"{help_text} (not built yet)")

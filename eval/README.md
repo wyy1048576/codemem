@@ -54,6 +54,23 @@ Gold labels come from `src/cmeval/labels.py`: the files, classes, and functions 
 | `cmeval generate RECIPE --tasks FILE [--admission] [--id ID ...] [--split dev\|test] [--limit N] [--jobs 2] [--repeats 3] [--force]` | Tasks with a test environment, for end-to-end runs. For each task of the recipe's repo that has a test change: build a Docker image of the repo at the task's commit, then run the task's test files before and after the real fix, three times each. A task is valid when at least one test fails in every run before the fix and passes in every run after it, and no test that passed before fails or changes between runs. `--admission` takes a fixed sample of 10 tasks (3 easy, 4 medium, 3 hard) and passes when 6 are valid. Recipes are in `envs/`, one TOML file for each repo; the fields are described in `src/cmeval/generate.py`. Images are named `cmeval-env/<recipe>:<task id>`. Records and logs go to `CMEVAL_HOME/generate/<recipe>/<task id>/`. Needs Docker |
 | `cmeval e2e grader-check RECIPE --tasks FILE [--id ID ...] [--jobs 1] [--cpus 8]` | A check of the grader of end-to-end runs. For each valid task of the recipe's repo (a task with `tests.json` from `cmeval generate`): grade the real fix and an empty change. To grade a change, a fresh container of the task's image applies the change, puts the hidden test files of the real pull request in place (they overwrite the agent's version of those files), runs the refresh commands, and runs the task's test command. The change completes the task when every fail-to-pass test and every pass-to-pass test passes. An empty change never completes a task. A task passes the check when the real fix completes it and the empty change does not make the tests pass. Prints one line for each task and the count of tasks that pass. Exit code 3 when a task does not pass. Records (`grade.json`) and logs go to `CMEVAL_HOME/e2e/grader-check/<recipe>/<task id>/{gold,empty}/`. Needs Docker |
 | `cmeval dashboard [--port 8765] [--open]` | A local web page with the live progress of long jobs (see "Watch a long job") |
+| `cmeval proxy --log FILE [--host 127.0.0.1] [--port 8787] [--upstream URL] [--bodies DIR]` | A recording proxy for the model API, for end-to-end runs (see "Record the model requests of an agent") |
+| `cmeval proxy-summary FILE` | Token sums, errors, and checks of a proxy log, as JSON |
+
+## Record the model requests of an agent
+
+An end-to-end run measures the tokens that the agent uses. The recording proxy sits between Claude Code and the API (`docs/plan/track-a-evals.md`, section 5):
+
+```
+cmeval proxy --log run.jsonl --port 8787
+ANTHROPIC_BASE_URL=http://127.0.0.1:8787 claude -p "..."
+```
+
+- The proxy sends each request to `--upstream` (default `https://api.anthropic.com`) and streams the answer back as it arrives. Headers and body go through unchanged. Only the hop-by-hop headers and `Host` change, and the proxy asks for an uncompressed answer (`accept-encoding: identity`).
+- For each request it appends one JSON line to the log: the clocks (headers, first byte, end), the shape of the request (model, number of messages and tools), the API's `usage` block, the stop reason, `request-id`, the rate-limit headers, and an error's type and message. The fields are described at the top of `src/cmeval/proxy.py`.
+- The log never holds a credential: only whether `Authorization` and `x-api-key` were present. It holds no bodies either. `--bodies DIR` writes each request and answer body to DIR, to debug a mismatch.
+- Ctrl-C or SIGTERM stops the proxy and prints the summary. `cmeval proxy-summary FILE` prints it for any log: requests by path and status, token sums for `/v1/messages` (all models and each model), requests with no usage block, streams that did not end, errors (429 and 529 show a usage limit or an overload), and the first and last request time. `count_tokens` requests are counted apart and are not in the token sums.
+- The runner uses the same proxy from Python: `with RecordingProxy(log) as proxy:` gives `proxy.url` on a free port. `cross_check(summarize(log), model_usage)` compares the sums with the `modelUsage` object of Claude Code's final `result` event, class by class, within 1%.
 
 ## Watch a long job
 
