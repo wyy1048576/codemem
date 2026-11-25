@@ -144,6 +144,8 @@ class Config:
     window_overlap_lines: int = 3
     max_block_lines: int = 200
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
+    # The cache file's size cap, in GB (10^9 bytes); past it the least recently used vectors go. 0 = no cap.
+    vector_cache_max_gb: float = 8.0
     # The in-memory search index: faiss (exact, every vector in memory) | compact (a small code
     # per vector, exact scores from the stored vectors) | "module:Class" subclassing
     # store.VectorStore. Vectors stay in SQLite, so a change rebuilds the search index from them,
@@ -348,8 +350,8 @@ def _env_overrides() -> dict[str, Any]:
 _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
-    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_backend", "kinds", "test_weight",
-    "kind_weights", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms",
+    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb", "vector_backend", "kinds",
+    "test_weight", "kind_weights", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms",
 )
 
 
@@ -396,6 +398,9 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
+    cap = cfg.vector_cache_max_gb
+    if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not 0 <= cap < float("inf"):
+        raise ValueError(f"vector_cache_max_gb must be a size in GB, or 0 for no cap, got {cap!r}")
     if cfg.vector_backend not in {"faiss", "compact"} and ":" not in cfg.vector_backend:
         raise ValueError(f"vector_backend must be faiss, compact or 'module:Class', got {cfg.vector_backend!r}")
     compact = dict(raw.get("compact") or {})

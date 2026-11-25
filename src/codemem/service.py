@@ -573,6 +573,12 @@ class CodememService:
             "skipped_files": store.skipped_files(),
             "error": self.last_error,
         }
+        cache = self.indexer.vector_cache()
+        if cache is None:
+            info["vector_cache"] = None  # off
+        else:
+            info["vector_cache"] = cache.stats() or {"path": str(cache.path), "entries": None}  # None: unreadable
+            cache.close()
         if check_staleness and self.state not in ("indexing", "updating"):
             scan = self.indexer.scan()
             head = git_head(self.repo_root)
