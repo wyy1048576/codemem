@@ -597,6 +597,7 @@ def _codemem_install(tmp_path, monkeypatch, recipe, task):
 
 
 def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
+    monkeypatch.delenv("CMEVAL_CODEMEM_STEERING", raising=False)
     recipe, task = gen.Recipe(name="r", repo="acme/auth", base_image="i", test="pytest"), make_task()
     checkout, python_root, hf, meta = _codemem_install(tmp_path, monkeypatch, recipe, task)
     codemem = e2e_run.codemem_preconditions(recipe, task, RunSettings(gpus=True))
@@ -611,6 +612,12 @@ def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
     assert e2e_run.codemem_mounts(codemem, Path("/runs/x/cmindex")) == [
         "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",
         "-v", "/runs/x/cmindex:/cmindex"]
+    monkeypatch.setenv("CMEVAL_CODEMEM_STEERING", "strong")
+    env = e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4))["mcpServers"]["codemem"]["env"]
+    assert env["CODEMEM_STEERING"] == "strong"
+    monkeypatch.setenv("CMEVAL_CODEMEM_STEERING", "hard")
+    with pytest.raises(gen.GenerateError, match="must be one of none, light, strong"):
+        e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4))
 
 
 def test_codemem_preconditions(make_task, tmp_path, monkeypatch):
