@@ -6,11 +6,12 @@ SQLite is the source of truth for everything, vectors included: each row of `vec
 float16 vector at the model's full dimension, with the chunk, part (window) and text hash it
 came from. The search index is derived from those rows: by default FAISS, an exact inner-product
 index over vector ids that holds the same 2-byte numbers (or another `VectorStore` backend,
-named in config), truncated to `embedding_dim` if set, kept in memory and saved as
-`vec_<type>.faiss` with a `vec_<type>.json` note of the epoch it reflects (and the backend that
-wrote it). Every transaction that changes a vector type's
-rows bumps its epoch in `meta`, and FAISS is patched right after the commit (never before, so it
-never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
+named in config: `compact` keeps a small code per vector and scores its best candidates from
+the rows), truncated to `embedding_dim` if set, kept in memory and saved as
+`vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it reflects (and the backend and
+options that wrote it). Every transaction that changes a vector type's
+rows bumps its epoch in `meta`, and the index is patched right after the commit (never before, so
+it never holds an uncommitted vector). Vector rows never change in place: a new vector is a new row
 with a new id. So an index that is behind (a saved file from before a crash, or another process
 wrote) catches up by comparing vector ids and applying only the difference; a missing or corrupt
 file is rebuilt from the rows, which needs no model. docs/architecture.md §5 lists the tables.
@@ -19,6 +20,7 @@ file is rebuilt from the rows, which needs no model. docs/architecture.md §5 li
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import logging
 import math
@@ -26,6 +28,7 @@ import os
 import sqlite3
 import threading
 import time
+import zlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
@@ -37,6 +40,7 @@ from typing import Any, NamedTuple
 import faiss
 import numpy as np
 
+from .config import COMPACT_MAX_DIM
 from .plugins import load_object
 from .schema import CALLABLE_KINDS, Chunk
 from .texts import Ref
@@ -263,10 +267,214 @@ class FaissVectorStore(VectorStore):
         return store
 
 
+_ROTATION_SEED = 20261125
+_QUERY_BITS = 4  # FAISS scans codes against a query rounded to this many bits per number
+_PER_RESULT = 4  # candidates scored exactly for each result asked for
+_RABITQ_SINCE = (1, 15, 1)  # the FAISS those calls were checked against (docs/decisions.md §2)
+
+
+def _require_rabitq() -> None:
+    """One sentence, not a native crash, when the installed FAISS is not one the compact index
+    was checked against."""
+    version = tuple(int(part) for part in faiss.__version__.split(".")[:3] if part.isdigit())
+    if version < _RABITQ_SINCE or not hasattr(faiss, "IndexRaBitQ"):
+        raise RuntimeError(
+            f'vector_backend = "compact" needs FAISS {".".join(map(str, _RABITQ_SINCE))} or newer for its RaBitQ '
+            f"codes; this is FAISS {faiss.__version__}"
+        )
+
+
+@functools.lru_cache(maxsize=2)
+def _rotation(dim: int) -> tuple[np.ndarray, str]:
+    """The random rotation the compact codes are made after, and a hash that names it in saved
+    files. One fixed rotation per length: equal vectors get equal codes in every index, and a
+    file is only read by a process that makes the same rotation."""
+    rotation, _ = np.linalg.qr(np.random.default_rng(_ROTATION_SEED).standard_normal((dim, dim), dtype=np.float32))
+    rotation.setflags(write=False)  # shared by every index of this length
+    return rotation, hashlib.sha1(rotation.tobytes()).hexdigest()[:16]
+
+
+class CompactVectorStore(VectorStore):
+    """A small code per vector in memory, exact scores from the stored vectors
+    (docs/architecture.md §5). It is built as CompactVectorStore(index_dim, **options), the
+    options being the config's `[compact]` table. The code is RaBitQ's, from FAISS: the first
+    `dim` numbers of the vector (0 = all of them, at most COMPACT_MAX_DIM; `code_dim` once
+    resolved), scaled to length 1 and rotated, at `bits` bits per number plus 8 bytes. A search
+    scans the codes for its best candidates, at least `rescore` of them and at least 4 per result
+    asked for, reads their vectors through `fetch` and scores those exactly, so every score it
+    returns is the real similarity. With no more vectors to choose from than it would score, it
+    scores them all and skips the scan.
+
+    FAISS holds the codes by position, in the order they were added; `_ids` maps a position to
+    its vector id. A mistake in a FAISS call can end the process instead of raising, so whatever
+    goes into one is checked here first: lengths, number types, and the size of every selector."""
+
+    suffix = ".rabitq"
+
+    def __init__(self, index_dim: int, /, *, bits: int = 1, dim: int = 0, rescore: int = 200):
+        _require_rabitq()
+        given = (index_dim, bits, dim, rescore)
+        if not all(type(v) is int for v in given):
+            raise ValueError(f"the index's dim, and bits, dim and rescore, must be whole numbers, got {given}")
+        if index_dim < 1 or not 1 <= bits <= 8 or not 0 <= dim <= COMPACT_MAX_DIM or rescore < 1:
+            raise ValueError(
+                f"need an index dim of 1 or more, bits 1 to 8, dim 0 to {COMPACT_MAX_DIM} and rescore of 1 or more, "
+                f"got {given}"
+            )
+        self.dim = index_dim
+        self.bits = bits
+        self.code_dim = min(index_dim, dim or index_dim, COMPACT_MAX_DIM)
+        self.rescore = rescore
+        self._rotation, self._rotation_id = _rotation(self.code_dim)
+        self._index = faiss.IndexRaBitQ(self.code_dim, faiss.METRIC_INNER_PRODUCT, bits)
+        # RaBitQ codes a vector minus a centre, which train() sets to the mean of what it is
+        # shown. One zero vector makes the centre zero: a code then depends only on its own
+        # vector, so an index patched edit by edit holds the same codes as one rebuilt from the rows.
+        self._index.train(np.zeros((1, self.code_dim), dtype=np.float32))
+        self._ids = np.empty(0, dtype=np.int64)
+        self._fetch: Fetch | None = None
+
+    def bind(self, fetch: Fetch) -> None:
+        self._fetch = fetch
+
+    def _coded(self, vecs: np.ndarray) -> np.ndarray:
+        """Rows as FAISS takes them: the first `code_dim` numbers, scaled to length 1 and rotated,
+        as contiguous float32. A row with a NaN or an infinity is coded as a zero vector."""
+        with np.errstate(invalid="ignore"):
+            rows = prepare(vecs, self.code_dim)
+        rows[~np.isfinite(rows).all(axis=1)] = 0.0
+        return np.ascontiguousarray(rows @ self._rotation, dtype=np.float32)
+
+    def _selector(self, chosen: np.ndarray) -> tuple[Any, np.ndarray]:
+        """A FAISS selector of the positions where `chosen` is true, and the bitmap it reads.
+        FAISS keeps only a pointer to the bitmap, so the caller holds it until the call is over;
+        and the bitmap covers every position FAISS can ask about, or FAISS would read outside it."""
+        if chosen.dtype != np.bool_ or chosen.shape != (self._index.ntotal,):
+            raise RuntimeError(f"a selector over {chosen.shape} positions for an index of {self._index.ntotal} codes")
+        bitmap = np.packbits(chosen, bitorder="little")
+        return faiss.IDSelectorBitmap(len(bitmap), faiss.swig_ptr(bitmap)), bitmap
+
+    def upsert(self, ids: Sequence[int], vecs: np.ndarray) -> None:
+        if len(ids) == 0:
+            return
+        id_arr = np.asarray(ids, dtype=np.int64)
+        vecs = np.asarray(vecs, dtype=np.float32)
+        if id_arr.ndim != 1 or vecs.shape != (len(id_arr), self.dim):
+            raise ValueError(f"expected vectors of shape ({len(id_arr)}, {self.dim}), got {vecs.shape}")
+        self.remove(id_arr)
+        self._index.add(self._coded(vecs))
+        self._ids = np.concatenate([self._ids, id_arr])
+
+    def remove(self, ids: Iterable[int]) -> None:
+        gone = np.isin(self._ids, np.fromiter(ids, dtype=np.int64))
+        if gone.any():
+            selector, bitmap = self._selector(gone)  # `bitmap` is what the selector reads: it outlives the call
+            # FAISS closes the gaps without reordering, so the positions left match `_ids[~gone]`.
+            self._index.remove_ids(selector)
+            self._ids = self._ids[~gone]
+
+    def search(self, query, k, allowed_ids=None):
+        if k <= 0 or len(self._ids) == 0:
+            return []
+        if self._fetch is None:
+            raise RuntimeError("CompactVectorStore scores from the stored vectors: call bind(fetch) first")
+        q = np.asarray(query, dtype=np.float32).reshape(-1)
+        if q.shape != (self.dim,):
+            raise ValueError(f"expected a query of {self.dim} numbers, got {q.shape[0]}")
+        if not np.isfinite(q).all():
+            return []
+        allowed = None if allowed_ids is None else np.isin(self._ids, np.asarray(allowed_ids, dtype=np.int64))
+        qualifying = len(self._ids) if allowed is None else int(np.count_nonzero(allowed))
+        size = max(self.rescore, _PER_RESULT * int(k))
+        while True:
+            if qualifying <= size:  # few enough to score every one exactly, without a scan
+                candidates = self._ids if allowed is None else self._ids[allowed]
+            else:
+                candidates = self._scan(q, size, allowed)
+            found, vecs = self._fetch(candidates)
+            # Summed row by row, not `vecs @ q`: BLAS adds a row's products in an order that
+            # depends on where the row sits, so copies of one vector would get unequal scores.
+            with np.errstate(invalid="ignore"):
+                scores = (vecs * q).sum(axis=1)
+            real = np.isfinite(scores)  # a stored vector with a NaN or an infinity has no score
+            found, scores = found[real], scores[real]
+            order = np.lexsort((found, -scores))[:k]
+            if len(order) == k or qualifying <= size:
+                return [(int(found[i]), float(scores[i])) for i in order]
+            size *= 2  # another process deleted candidates' rows: take more candidates
+
+    def _scan(self, q: np.ndarray, size: int, allowed: np.ndarray | None) -> np.ndarray:
+        """Ids of the `size` codes that score best against a query, and of every code that ties
+        with the last of them: at 1 bit the candidates do not depend on the order the codes are
+        held in. (With more bits FAISS drops a code when its first bit rules it out, and which
+        codes that drops can depend on the order.) Called with more than `size` codes to choose from."""
+        # `bitmap` is what the selector reads: it has to outlive the search.
+        selector, bitmap = (None, None) if allowed is None else self._selector(allowed)
+        params = faiss.RaBitQSearchParameters(qb=_QUERY_BITS, centered=False, sel=selector)
+        x = self._coded(q)
+        ask = size + 1
+        while True:
+            estimates, positions = self._index.search(x, min(ask, self._index.ntotal), params=params)
+            valid = positions[0] >= 0
+            estimates, positions = estimates[0][valid], positions[0][valid]
+            if len(positions) <= size:
+                return self._ids[positions]
+            if len(positions) < ask or estimates[-1] != estimates[size - 1]:
+                return self._ids[positions[estimates >= estimates[size - 1]]]
+            ask *= 2
+
+    def ids(self) -> set[int]:
+        return set(self._ids.tolist())
+
+    def __len__(self) -> int:
+        return len(self._ids)
+
+    def to_bytes(self) -> bytes:
+        """One line of JSON (what the codes were made with, and a checksum of the rest), the
+        vector ids, the FAISS index."""
+        body = self._ids.astype("<i8").tobytes() + faiss.serialize_index(self._index).tobytes()
+        head = {"dim": self.dim, "code_dim": self.code_dim, "bits": self.bits, "count": len(self._ids),
+                "rotation": self._rotation_id, "crc32": zlib.crc32(body)}
+        return json.dumps(head).encode("utf-8") + b"\n" + body
+
+    @classmethod
+    def from_bytes(cls, data: bytes, **options: int) -> CompactVectorStore:
+        """Read a saved index, or raise: FAISS gets the bytes only when they are the bytes that
+        were saved, and its index is used only when it is the index the options describe."""
+        end = data.find(b"\n")
+        head = json.loads(data[:end]) if end >= 0 else {}
+        body = memoryview(data)[end + 1:]  # a view: the file's bytes are not copied a second time
+        if zlib.crc32(body) != head.get("crc32"):
+            raise ValueError("the file is damaged or incomplete")
+        store = cls(head["dim"], **options)
+        count = head["count"]
+        if (head["code_dim"], head["bits"], head["rotation"]) != (store.code_dim, store.bits, store._rotation_id):
+            raise ValueError("the file's codes were made with other options, or with another rotation")
+        if type(count) is not int or not 0 <= count <= len(body) // 8:
+            raise ValueError("the file does not hold as many vector ids as it says")
+        store._ids = np.frombuffer(body, dtype="<i8", count=count).astype(np.int64)
+        # The object deserialize_index returns owns the C++ index: it is kept as it is. A second
+        # Python object for it (faiss.downcast_index) would outlive it and point at freed memory.
+        index = faiss.deserialize_index(np.frombuffer(body, dtype=np.uint8, offset=8 * count))
+        if not (
+            isinstance(index, faiss.IndexRaBitQ) and index.thisown and index.is_trained
+            and index.d == store.code_dim and index.rabitq.nb_bits == store.bits
+            and index.metric_type == faiss.METRIC_INNER_PRODUCT and index.code_size == store._index.code_size
+            and index.ntotal == count and index.codes.size() == count * index.code_size
+            and index.center.size() == index.d and not faiss.vector_to_array(index.center).any()
+        ):
+            raise ValueError("the file's FAISS index is not the one its first line describes")
+        store._index = index
+        return store
+
+
 def vector_backend_class(name: str) -> type[VectorStore]:
-    """`faiss` or "module:Class" -> the VectorStore subclass."""
+    """`faiss`, `compact` or "module:Class" -> the VectorStore subclass."""
     if name == "faiss":
         return FaissVectorStore
+    if name == "compact":
+        _require_rabitq()
+        return CompactVectorStore
     cls = load_object(name)
     if not (isinstance(cls, type) and issubclass(cls, VectorStore)):
         raise TypeError(f"{name} must be a subclass of codemem.store.VectorStore")
@@ -551,7 +759,7 @@ class Store:
         vector_backend: str = "faiss", vector_options: Mapping[str, Any] | None = None,
     ):
         """`vector_options` are the backend's own settings, passed to it by keyword when it is
-        built and when its saved file is read."""
+        built and when its saved file is read (Config.vector_options())."""
         self.vector_backend = vector_backend
         self.vector_options = dict(vector_options or {})
         self._backend = vector_backend_class(vector_backend)

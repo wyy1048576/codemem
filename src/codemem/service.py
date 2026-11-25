@@ -86,7 +86,7 @@ class CodememService:
         self.embedder_factory = embedder_factory
         self.store = Store(
             self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords,
-            vector_backend=self.config.vector_backend,
+            vector_backend=self.config.vector_backend, vector_options=self.config.vector_options(),
         )
         self.state = "ready" if self.has_index() else "empty"
         self.progress = 0.0
@@ -338,9 +338,9 @@ class CodememService:
             return
         if new != self.config:
             log.info("the config changed; the index follows it")
-            if new.vector_backend != self.store.vector_backend:
+            if (new.vector_backend, new.vector_options()) != (self.store.vector_backend, self.store.vector_options):
                 try:
-                    self.store.use_vector_backend(new.vector_backend)
+                    self.store.use_vector_backend(new.vector_backend, new.vector_options())
                 except Exception:
                     log.exception("could not load vector_backend %r; keeping the current config", new.vector_backend)
                     return
