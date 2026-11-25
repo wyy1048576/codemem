@@ -384,6 +384,36 @@ def cmd_generate(args) -> int:
     return 0
 
 
+def cmd_e2e_grader_check(args) -> int:
+    from . import e2e
+    from . import generate as gen
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        if args.id:
+            wanted = set(args.id)
+            tasks = [t for t in tasks if t.id in wanted]
+        ready = [t for t in tasks if gen.tests_path(recipe, t).exists()]
+        if len(ready) < len(tasks):
+            say(f"note: {len(tasks) - len(ready)} tasks have no tests.json (not valid or not generated); skipped")
+        if not ready:
+            print(f"e2e: no task of {recipe.repo} in {args.tasks} has tests.json; run cmeval generate first",
+                  file=sys.stderr)
+            return 1
+        say(f"{recipe.repo}: grader check of {len(ready)} tasks, {args.jobs} at a time")
+        records = e2e.grader_check(recipe, ready, jobs=args.jobs, cpus=args.cpus, progress=say)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e: {exc}", file=sys.stderr)
+        return 1
+    passed = sum(1 for r in records if r["passed"])
+    print(f"{recipe.name}: {passed} of {len(records)} tasks pass the grader check")
+    if any(r.get("error") for r in records):
+        return 1
+    return 0 if passed == len(records) else 3
+
+
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
@@ -514,6 +544,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repeats", type=int, default=3, help="test runs before and after the fix (default 3)")
     p.add_argument("--force", action="store_true", help="do a task again that has a saved record")
     p.set_defaults(func=cmd_generate)
+
+    p = sub.add_parser("e2e", help="end-to-end runs of a coding agent on tasks with a test environment")
+    e2e_sub = p.add_subparsers(dest="e2e_command", required=True)
+    p = e2e_sub.add_parser("grader-check", help="grade the real fix and an empty change of each valid task")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--jobs", type=int, default=1, help="tasks checked at the same time (default 1)")
+    p.add_argument("--cpus", type=int, default=8, help="processors for one grading container (default 8)")
+    p.set_defaults(func=cmd_e2e_grader_check)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
