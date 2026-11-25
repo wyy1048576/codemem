@@ -112,6 +112,7 @@ save and one search:
 | search and cards | `search.py`, `render.py` | §6 |
 | MCP server and CLI | `server.py`, `cli.py`, `prompts.py`, `agents.py` | §7 |
 | serving the local model to other codemem processes | `embedserver.py` | §3.5 |
+| an endpoint that shares a build's embedding work | `assist.py` | §3.5 |
 
 All logic lives in one library; the MCP server and the CLI are thin front-ends over one object,
 `CodememService`, which owns an index. While an agent session runs, its MCP server owns the index,
@@ -365,6 +366,80 @@ Three choices shape it:
 
 The server holds no index and no state. When it is down, its clients behave as with any API that
 is down (decisions.md §2).
+
+**A second source for a build's vectors.** Building is almost all embedding (§10), and on weak
+hardware the local model is the slow part. An *assist* (`[embedding.assist]`, `assist.py`) is an
+endpoint that serves the same model, a `serve-embeddings` server on a machine with a GPU or a
+hosted API, and embeds part of a build's texts while the local model embeds the rest.
+
+```
+ one embedding call of a build: up to 256 texts, the longest first
+
+   t1  t2  t3  t4 ...                                          ... t254 t255 t256
+   ──────────────────►                                    ◄──────────────────────
+   the local model, 16 at a time,                 the endpoint, 32 a request,
+   in the caller's thread                         4 requests at once
+
+   the two meet where their measured speeds put them; every vector is stored as the local model's
+```
+
+Four choices shape it:
+
+- **One index, under the local model's name.** The vectors of both sources are stored under the
+  local embedder's key, so an index built with an assist is the index the local model alone would
+  build, and switching the assist on or off re-embeds nothing. The price is that the endpoint has
+  to give the same vectors, and nothing in an OpenAI-style reply says whether it does. So there is
+  a check before the endpoint gets any text: seven fixed texts are embedded both ways and each
+  pair must agree to a cosine of 0.99995 (the reason for the number is in decisions.md §3). The
+  texts are chosen to make the ways a provider can differ show up: code in two languages, a usage
+  text, plain words, other alphabets, and one text longer than the local model reads, whose end
+  is about something else than its start. An endpoint that cuts texts at another length gives
+  another vector for that one. A prompt added on the provider's side, another model behind the
+  name and another precision move every pair, and vectors that are not normalized are refused as
+  they come. An endpoint that fails the check gets no text, and `status` says why in one sentence.
+- **The split is inside the embedder.** The indexer makes one call per group of texts and gets
+  all vectors back in order, as without an assist (§4.1); neither of its stages knows about the
+  endpoint. Inside
+  the call the texts are a row that both sources work through from opposite ends. The local model
+  takes its usual batches from the front, in the caller's thread, so the model lock and the idle
+  clock see what they saw before, and a shared call is one use of the model. The endpoint takes
+  from the back.
+- **The local model never waits for the endpoint.** The endpoint takes a text only if it is
+  expected back before the local model would have reached it, by two measured speeds: the local
+  model's seconds per character, and the endpoint's over everything it has in the air at once.
+  That holds for a server with one model, where requests wait for each other, and for an API that
+  answers them side by side. A slow endpoint so takes little. A request that fails puts its texts
+  back in the row. When the local model has nothing else left and a request is out, it
+  embeds that request's texts itself, at once if it would be done first, else once the request is
+  overdue by the time the local model needs for them; the first result counts. A request that
+  hangs so costs a call about twice that time, not its timeout. An endpoint that failed rests, 1 s
+  and then twice as long each time up to 60 s, and is compared again before it gets work.
+- **Small calls stay local.** A call of one local batch or less (16 texts) never reaches the
+  endpoint: an edit, a search's catch-up and a model warm-up run as they do without an assist,
+  and so does the 4 s limit of §4.2. Queries are always embedded locally, so a search depends on
+  no network. What is shared is a build's large calls, which `codemem index` and `codemem init`
+  make.
+
+Measured with stand-in models that take a set time per character, so the numbers are the
+mechanism's and not a model's (1,024 code texts in calls of 256, vectors of 896 numbers, the
+endpoint a `serve-embeddings` server in its own process, an M1 at load average 4):
+
+| The endpoint, against the local model's speed | Build speed, against the local model alone | Of the two speeds added |
+|---|---|---|
+| a quarter | 1.26 times | 99% |
+| half | 1.46 times | 97% |
+| equal | 1.87 times | 97% |
+| twice | 2.49 times | 99% |
+| four times | 3.42 times | 103% |
+| eight times | 3.57 times | 95% |
+| not there | 1.00 times | |
+| stops answering after a quarter of the texts | 1.11 times | |
+
+The speeds are measured in characters, as the indexer measures a model call. With a stand-in
+whose time went by text and not by length, the estimates were off and an endpoint a quarter as
+fast was left with 5% of the texts, for 1.05 times the speed: less than its share, never a loss.
+
+With an assist, the texts of a build are sent to the endpoint, and `status` says so.
 
 ---
 
@@ -931,6 +1006,7 @@ embedding API. After that, updates are small.
                                   ├─ _take()      store.dirty_batch() ─► texts.py build_parts() ─► text hashes
                                   ├─ _compute()   this index ─► vectorcache.py VectorCache ─► embedder.py
                                   │               make_embedder(...).embed_documents()
+                                  │               (with an assist: assist.py AssistedEmbedder shares the call)
                                   └─ _put()       store.put_vectors() ─► the in-memory search index
 ```
 
@@ -988,6 +1064,7 @@ embedding API. After that, updates are small.
 | `texts.py` | the code and usage texts, and windows |
 | `embedder.py` | the embedders: local, API, plugin, and a fake one for tests |
 | `embedserver.py` | `serve-embeddings`: an embedder behind an OpenAI-style HTTP endpoint, for other codemem processes |
+| `assist.py` | an endpoint that shares a build's embedding work with the local model: the check, the split, the rests |
 | `plugins.py` | loads `"module:Class"` plugins named in the config |
 | `vectorcache.py` | the shared vector cache |
 | `store.py` | SQLite, the in-memory search index, filters, consistency |

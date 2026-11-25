@@ -259,6 +259,25 @@ def test_the_probe_holds_a_text_longer_than_the_model_reads():
         assert set(words[:50]) != set(words[-50:])  # its end is not its start again
 
 
+def test_a_local_embedder_that_does_not_name_its_prefix_gets_no_help(stub):
+    """A plugin embedder need not say what it puts before a document; the endpoint's texts could
+    then not be given the same, so it is not used, unless the config names the prefix."""
+
+    class Plain(Slow):
+        @property
+        def prefixes(self):
+            raise NotImplementedError("Plain does not say what it puts before a query or a document")
+
+    emb = assisted(stub.url, Plain())
+    emb.embed_documents(code_texts(40))
+    status = emb.status()
+    assert status["state"] == "refused" and "Plain does not say what it puts before" in status["reason"]
+    assert stub.requests == []
+    named = assisted(stub.url, Plain(), document_prefix="")
+    named.embed_documents(code_texts(40))
+    assert named.status()["state"] == "sharing"
+
+
 def test_the_local_half_of_a_check_is_kept_between_processes(stub):
     """The local model's probe vectors belong to its key: a later process asks the endpoint only."""
     first = assisted(stub.url)

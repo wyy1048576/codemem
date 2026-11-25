@@ -227,6 +227,56 @@ variable in its own environment. The key is never written to a file or a log.
 The server holds no index and no other state, so it can be restarted at any time. What happens
 while it is down, and its limits: [decisions.md §2 and §3](docs/decisions.md).
 
+**A second source for a build's embeddings.** A first build is almost all model time, and on a
+machine with a weak GPU or none that is hours. An *assist* is an endpoint that embeds part of a
+build's texts while the local model embeds the rest. It has to serve the same model. The index is
+the one the local model alone would build: every vector is stored as the local model's.
+
+With a `codemem serve-embeddings` server on another machine that has a GPU:
+
+```toml
+[embedding.assist]
+base_url = "http://gpu-box:8791/v1"            # where that server listens
+model = "jinaai/jina-code-embeddings-0.5b"     # the model it prints at start
+api_key_env = "CODEMEM_SERVE_KEY"              # only if that server asks for a key
+```
+
+With a hosted API that serves the model (Jina's own API is reported to; this example has not been
+run against it):
+
+```toml
+[embedding.assist]
+base_url = "https://api.jina.ai/v1"
+model = "jina-code-embeddings-0.5b"            # the provider's name for the model
+api_key_env = "JINA_API_KEY"
+request = { task = "nl2code.passage" }         # fields of the provider's own, sent with each request
+document_prefix = ""                           # for a provider that puts the model's prompt in front itself
+batch_size = 32                                # texts per request
+max_concurrency = 4                            # requests in flight
+timeout_s = 30
+```
+
+- **It gets work only after it has given the local model's vectors.** At the first build with
+  work to share, seven fixed texts are embedded both ways and compared. Every one must agree to a
+  cosine of 0.99995. Below that the endpoint gets nothing and the build goes on alone: another
+  model behind the name, another precision, a prompt added on the provider's side, vectors that
+  are not normalized, or texts cut at another length than `max_seq_length` tokens (one of the
+  seven is longer than that). `codemem status` says which, in one line. A hosted model usually
+  reads far longer texts than 1,024 tokens: it passes only if a field of its own, set in
+  `request`, makes it cut at the same length.
+- **What it shares.** The large embedding calls of a build (`codemem index`, `codemem init`):
+  more than `batch_size` texts at once. Edits, a search's catch-up and every query stay with the
+  local model.
+- **How much.** By measured speed: the endpoint takes the texts it is expected to return before
+  the local model would reach them. With stand-in models of set speeds, a build ran 1.26 times as
+  fast with an endpoint a quarter as fast as the local model, 1.87 times at equal speed and 3.4
+  times at four times the speed ([architecture.md §3.5](docs/architecture.md)).
+- **When it fails.** A request that fails or is late gives its texts back to the local model
+  within the same call. The endpoint then rests (1 s, doubling up to 60 s) and is compared again
+  before it gets work. A build never waits for it.
+- **Your code goes there.** The texts of a build are sent to the endpoint, and `codemem status`
+  says so.
+
 **Your own model, embedder or search index**, for experiments such as a fine-tuned encoder or an
 HNSW index:
 
