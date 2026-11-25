@@ -7,8 +7,9 @@ import shutil
 import sqlite3
 import time
 
+import anyio
 import pytest
-from gitrepo import ONLY_ON_A, ONLY_ON_B, TO_B, add_worktree, commit, git, needs_git, two_commits
+from gitrepo import ONLY_ON_A, ONLY_ON_B, TO_B, UNCHANGED, add_worktree, commit, git, needs_git, two_commits
 
 from codemem.cli import main
 from codemem.config import default_index_dir
@@ -225,12 +226,71 @@ def test_a_server_started_in_a_new_worktree_copies_then_checks(repo, main_index,
         service.close()
 
 
+def test_the_mcp_server_started_in_a_new_worktree_serves_it_from_the_copy(repo, main_index, tmp_path, isolated_home, fake_config):
+    """Real `codemem mcp` over stdio, launched in the worktree's folder as an agent host does."""
+    import sys
+
+    from mcp import Client, StdioServerParameters
+
+    tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
+    # A chunk of a file that is the same on both commits keeps the main index's id in a copy; a
+    # build of the worktree from nothing numbers it differently.
+    main, fresh = Store(main_index), Store(tmp_path / "fresh")
+    Indexer(tree, fresh, fake_config).update()
+    copied_id = main.get_chunk_by_key(UNCHANGED[0]).chunk_id
+    assert fresh.get_chunk_by_key(UNCHANGED[0]).chunk_id != copied_id
+    main.close()
+    fresh.close()
+
+    env = {**os.environ, "CODEMEM_MODEL": "fake:64", "CODEMEM_HOME": str(isolated_home)}
+    params = StdioServerParameters(command=sys.executable, args=["-m", "codemem.cli", "mcp"], env=env, cwd=str(tree))
+
+    async def run():
+        with anyio.fail_after(60):
+            async with Client(params) as client:
+                for _ in range(200):
+                    status = (await client.call_tool("index_status", {})).content[0].text
+                    if "state: ready" in status and "pending:" not in status:
+                        break
+                    await anyio.sleep(0.1)
+                assert "state: ready" in status and f"repo: {tree}" in status
+                assert f"index: {default_index_dir(tree)}" in status
+                assert f"[id {copied_id}]" in (await client.call_tool("get_chunk", {"ref": UNCHANGED[0]})).content[0].text
+                found = (await client.call_tool("search_code", {"query": "expire sessions"})).content[0].text
+                assert "expire_sessions" in found  # only on the worktree's commit
+                gone = (await client.call_tool("get_chunk", {"ref": ONLY_ON_A[0]})).content[0].text
+                assert "No indexed function matches" in gone
+
+    anyio.run(run)
+    assert (default_index_dir(tree) / RECORD).is_file()
+
+
 def test_an_index_folder_the_caller_chose_is_left_alone(repo, main_index, tmp_path):
     tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
     service = CodememService(tree, index_dir=tmp_path / "chosen")
     try:
         assert service.copied_from is None and service.store.counts()["chunks"] == 0
         assert not (tmp_path / "chosen" / RECORD).exists()
+    finally:
+        service.close()
+
+
+def test_a_failed_copy_or_clean_up_never_stops_a_start(repo, main_index, tmp_path, monkeypatch):
+    def fail(*args):
+        raise OSError("disk full")
+
+    tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
+    monkeypatch.setattr("codemem.worktrees.removable_indexes", fail)
+    service = CodememService(tree)
+    assert service.copied_from == main_index  # the clean-up failed: the copy is made all the same
+    service.close()
+    shutil.rmtree(default_index_dir(tree))
+    monkeypatch.setattr("codemem.worktrees.copy_index", fail)
+    service = CodememService(tree)
+    try:
+        assert service.copied_from is None  # the copy failed: the index is built from nothing
+        assert service.update().files_changed == 6
+        assert service.indexer.verify() == []
     finally:
         service.close()
 

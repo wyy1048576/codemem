@@ -52,8 +52,10 @@ def git_common_dir(root: Path) -> Path | None:
         return None
     try:
         target = Path((own / "commondir").read_text("utf-8").strip())
-    except OSError:
+    except FileNotFoundError:
         return own.resolve()
+    except (OSError, ValueError):
+        return None
     return (target if target.is_absolute() else own / target).resolve()
 
 
@@ -76,7 +78,7 @@ def checkouts(common: Path) -> list[Path]:
     for admin in admins:
         try:
             dot_git = Path((admin / "gitdir").read_text("utf-8").strip())
-        except OSError:
+        except (OSError, ValueError):
             continue
         out.append((dot_git if dot_git.is_absolute() else admin / dot_git).resolve().parent)
     return out
@@ -273,16 +275,18 @@ def prepare_index(root: Path, index_dir: Path, settings: dict[str, Any]) -> Path
     another checkout has one, and record a linked worktree's index for later clean-up. Returns
     the index folder that was copied, or None. A failure here costs time, never the start: the
     index is then built from nothing."""
-    source = None
     try:
         for folder in removable_indexes(root):
             log.info("the worktree of the index %s is gone; deleting the index", folder)
             remove_index(folder)
+    except Exception:
+        log.warning("could not delete the indexes of removed worktrees", exc_info=True)
+    source = None
+    try:
         if not (index_dir / DB).exists():
-            source = copy_source(root, settings)
-            if source is not None and not copy_index(source, index_dir):
-                source = None
-            if source is not None:
+            candidate = copy_source(root, settings)
+            if candidate is not None and copy_index(candidate, index_dir):
+                source = candidate
                 log.info("the index for %s starts as a copy of %s", root, source)
         record_worktree(root, index_dir)
     except Exception:
