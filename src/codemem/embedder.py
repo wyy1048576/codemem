@@ -401,11 +401,25 @@ class OpenAIEmbedder(Embedder):
             if r.status_code >= 400:
                 raise RuntimeError(f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}")
             data = sorted(r.json()["data"], key=lambda d: d["index"])
-            vecs = np.asarray([d["embedding"] for d in data], dtype=np.float32)
-            if vecs.ndim != 2 or len(vecs) != len(texts):
-                raise RuntimeError(f"{self.host} returned {len(vecs)} embeddings for {len(texts)} texts")
-            return l2_normalize(vecs)
+            if len(data) != len(texts):
+                raise RuntimeError(f"{self.host} returned {len(data)} embeddings for {len(texts)} texts")
+            return self._shape([d["embedding"] for d in data])
         raise AssertionError("unreachable")
+
+    def _shape(self, rows: list[list[float]]) -> np.ndarray:
+        """A reply's vectors at the configured length, normalized. `dimensions` goes to the provider,
+        but one that ignores it answers with full vectors: the first numbers of those are the short
+        vector, so they are cut here, and what the key names is what gets stored."""
+        if len({len(row) for row in rows}) != 1:
+            raise RuntimeError(f"{self.host} returned vectors of different lengths")
+        vecs = np.asarray(rows, dtype=np.float32)
+        want = self.cfg.dimensions
+        if want and vecs.shape[1] < want:
+            raise RuntimeError(
+                f"{self.host} returned vectors of {vecs.shape[1]} numbers for {self.model_name}, fewer than "
+                f"[embedding] dimensions = {want}"
+            )
+        return l2_normalize(vecs[:, :want] if want else vecs)
 
     def _embed(self, texts: Sequence[str], prefix: str) -> np.ndarray:
         if not texts:

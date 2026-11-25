@@ -25,10 +25,11 @@ def _vec(text: str, dim: int) -> list[float]:
 
 class _Server:
     """A fake `/v1/embeddings`: vectors from each input's words, returned out of order (the API
-    gives an index for each). `fail` holds status codes to answer with first (429, 503, ...)."""
+    gives an index for each). `fail` holds status codes to answer with first (429, 503, ...).
+    With `honours_dimensions = False` it answers with full vectors whatever length is asked for."""
 
     def __init__(self, dim: int = 8):
-        self.dim, self.requests, self.fail = dim, [], []
+        self.dim, self.requests, self.fail, self.honours_dimensions = dim, [], [], True
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -41,7 +42,7 @@ class _Server:
                     self.end_headers()
                     self.wfile.write(b'{"error": {"message": "slow down"}}')
                     return
-                dim = body.get("dimensions") or outer.dim
+                dim = (outer.honours_dimensions and body.get("dimensions")) or outer.dim
                 data = [{"index": i, "embedding": _vec(t, dim)} for i, t in enumerate(body["input"])]
                 out = json.dumps({"data": data[::-1], "model": body["model"]}).encode()
                 self.send_response(200)
@@ -104,6 +105,32 @@ def test_rate_limits_and_server_errors_are_retried(server):
     vecs = OpenAIEmbedder(_config(server).embedding).embed_documents(["def f(): pass"])
     assert vecs.shape == (1, 8) and len(server.requests) == 3
     assert np.isclose(np.linalg.norm(vecs[0]), 1.0)  # normalized
+
+
+def test_a_provider_that_ignores_dimensions_still_gives_vectors_of_that_length(server, sample_repo, tmp_path):
+    """`dimensions` is sent, and what comes back is checked: full vectors are cut to their first
+    numbers and normalized again, so the stored vectors are what the key says they are."""
+    text = "def revoke_session(session_id): pass"
+    honoured = OpenAIEmbedder(_config(server, dimensions=6).embedding).embed_documents([text])
+    full = OpenAIEmbedder(_config(server).embedding).embed_documents([text])
+    server.honours_dimensions = False
+    cut = OpenAIEmbedder(_config(server, dimensions=6).embedding).embed_documents([text])
+    assert cut.shape == (1, 6) and np.isclose(np.linalg.norm(cut[0]), 1.0)
+    np.testing.assert_allclose(cut[0], full[0, :6] / np.linalg.norm(full[0, :6]), rtol=0, atol=1e-6)
+    assert not np.allclose(cut, honoured, atol=1e-3)  # this fake API's short vectors are not a cut of its long ones
+
+    store = Store(tmp_path / "idx")
+    try:
+        Indexer(sample_repo, store, _config(server, dimensions=6)).update()
+        assert store.vector_dim("code") == 6 and store.get_meta("vec.code.embedder").endswith("|dims=6|doc=0")
+    finally:
+        store.close()
+
+
+def test_fewer_numbers_than_dimensions_asks_for_is_an_error(server):
+    server.honours_dimensions = False  # full vectors of 8 numbers
+    with pytest.raises(RuntimeError, match="returned vectors of 8 numbers for test-embed, fewer than .* dimensions = 12"):
+        OpenAIEmbedder(_config(server, dimensions=12).embedding).embed_documents(["x"])
 
 
 def test_other_errors_fail_at_once_with_the_providers_message(server):
