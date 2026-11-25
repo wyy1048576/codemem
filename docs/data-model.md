@@ -5,8 +5,8 @@ agent:
 - what each stored record holds, and the rules for keys, line numbers and hashes (§1–§9);
 - the version stamps that must change when a format does (§10);
 - what can grow without breaking indexes (§11);
-- the interfaces other code relies on: the MCP tools, the eval adapter, the configuration and the
-  plugin classes (§12).
+- the interfaces other code relies on: the MCP tools, the eval adapter, the configuration, the
+  plugin classes and the embedding server (§12).
 
 How the system works, and why, is in [architecture.md](architecture.md).
 
@@ -16,6 +16,7 @@ How the system works, and why, is in [architecture.md](architecture.md).
 | how chunks are cut | `languages/` and `chunker.py` |
 | what gets embedded | `texts.py` |
 | storage | `store.py` (SQLite and the search index) and `vectorcache.py` |
+| the embedding server | `embedserver.py` |
 
 ---
 
@@ -322,13 +323,18 @@ re-embeds that vector type only.
 | Embedder | Key | Example |
 |---|---|---|
 | local | `model[#version] \| doc \| L<max_seq_length> \| <dtype> \| <device>` | `jinaai/jina-code-embeddings-0.5b\|doc\|L1024\|float16\|mps` |
-| API | `api:<host> \| <model> \| dims=<d> \| doc=<hash of the document prefix>` | `api:api.studio.nebius.com\|Qwen/Qwen3-Embedding-8B\|dims=1024\|doc=0` |
+| API, by its address | `api:<host> \| <model> \| dims=<d> \| doc=<hash of the document prefix>` | `api:api.studio.nebius.com\|Qwen/Qwen3-Embedding-8B\|dims=1024\|doc=0` |
+| API, by its `space` | `api:<space> \| <model> \| dims=<d> \| doc=<hash of the document prefix>` | `api:st-L1024-float16-mps\|jinaai/jina-code-embeddings-0.5b\|dims=full\|doc=861b2167` |
 | plugin | `model[#version] \| plugin=<module:Class> \| L<max_seq_length> \| <dtype> \| <device>` (dtype and device as configured) | `/models/enc#3fa2b1c9d0e1\|plugin=mypkg.embed:MyEmbedder\|L1024\|auto\|auto` |
 | fake (tests) | `fake:<dim> \| doc` | `fake:64\|doc` |
 
 - **The weights version** (`#version`) is `vectors.<type>.version` if set, else, for a model in a
   local folder, the first 12 hex characters of a sha256 over every file's relative path and
   content (dot files and folders skipped), else nothing. A model named on Hugging Face has none.
+- **An API's key holds who serves the vectors:** `[embedding] space` when it is set, else the host
+  and port of `base_url`. `<d>` is `dimensions`, or `full`; the document prefix is the first 8 hex
+  characters of its sha256, or `0` for none. With a `space`, the address is in no part of an
+  index's identity, so configurations that differ only in `base_url` use the same vectors.
 - **Not part of the key:** `embedding_dim` (applied when the search index is built, so changing
   it re-embeds nothing), the query prefix (it only affects queries), and the API key.
 
@@ -569,6 +575,7 @@ A change to any of these must be made together with the eval:
   counts its tokens.
 - `config_from_dict(dict)`, `Config.enabled_vec_types()`, `Config.model_id()`,
   `Config.index_settings()`, `embedder.resolve_device()`, `codemem.__version__`.
+  `resolve_device()` answers `cpu` in an install without PyTorch, whatever it is asked.
 - `CODEMEM_MODEL`-style fake models: `fake` and `fake:16` work, and `fake:not-a-number` fails
   indexing.
 - `full=True` wipes in place and never deletes the folder, because the eval keeps its marker files
@@ -595,14 +602,22 @@ A change to any of these must be made together with the eval:
   set.
 - **`vector_backend`:** `faiss` or `"module:Class"` (a `store.VectorStore` subclass). Index-time
   only so that eval systems with different backends don't share an index.
-- **The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`,
+- **The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`, `space`,
   `api_key_env`, `dimensions`, `query_prefix`, `document_prefix`, `batch_size`, `max_concurrency`
   and `timeout_s`.
   - Index-time (in `index_settings()` as `embedding`, only for an API provider, so local indexes
-    keep their settings): provider, model, base URL, dimensions, document prefix.
+    keep their settings): provider, model, dimensions, document prefix, and who serves the vectors.
+    That is `space` when it is set, and then `base_url` is not among the settings; otherwise it is
+    `base_url`, and there is no `space` entry.
+  - `space` is a name of 1 to 64 characters with no whitespace and no `|`. It stands for the
+    address in the embedder key (§5.4) and in `index_settings()`. Whoever sets it states that
+    every address used under the name returns the same vector for the same text.
   - Search-time or operational: the key's variable name, the query prefix, `batch_size`,
     `max_concurrency`, `timeout_s`.
   - The key itself is read from the named environment variable at each request and is never stored.
+  - A reply is brought to the configured form before it is stored: with `dimensions`, vectors
+    longer than that are cut to their first numbers, and fewer numbers is an error; every vector is
+    normalized to length 1.
 - Every setting and its default: README, "Configuration".
 
 ### 12.4 Plugin classes
@@ -616,6 +631,10 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   still loading;
 - codemem wraps it: it normalizes the vectors, and names them by the plugin key (§5.4). A
   `fake:<dim>` model still wins over a plugin, so tests stay fast.
+- to be served by `codemem serve-embeddings` (§12.5) it also gives `embed_texts(texts)`, which
+  embeds each text exactly as given, and `prefixes` (a property), the pair of strings it puts
+  before a query and before a document. They must agree: `embed_texts([prefix + text])` equals
+  `embed_queries([text])` and `embed_documents([text])`. The server checks this at start.
 
 **A search index** (`vector_backend`):
 - subclasses `codemem.store.VectorStore`, is built as `Class(dim: int)`, and keeps `dim`;
@@ -632,3 +651,52 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
 called as `factory(spec: VectorConfig, config: Config) -> Embedder`, once per vector type (and
 once per distinct model for queries). `make_embedder` is the default, and also accepts a bare model
 name.
+
+### 12.5 The embedding server (`codemem serve-embeddings`)
+
+`codemem serve-embeddings [PATH] [--host 127.0.0.1] [--port 8791]` serves one embedder over HTTP:
+the config's local model (`[vectors.*] model` with `device`, `dtype`, `max_seq_length` and
+`batch_size`; a `fake:<dim>` model; a plugin embedder that can be served, §12.4), whatever
+`[embedding] provider` says. Every enabled vector type must name the same model. `PATH` is the
+repository whose `.codemem.toml` is read, by default the one of the current directory.
+
+**At start** it prints to stdout, as TOML under comment lines, the `[embedding]` section of a
+client: `provider = "openai"`, `base_url`, `model`, `space`, `query_prefix`, `document_prefix`,
+and `api_key_env = "CODEMEM_SERVE_KEY"` when a key is set. Everything else goes to stderr. Exit
+code 2 means the port is taken or the model cannot be served.
+
+**Routes.** Bodies are JSON in OpenAI's shapes.
+
+| Route | Request | Reply |
+|---|---|---|
+| `POST /v1/embeddings` | `model`: the served model's name. `input`: a string, or a list of 1 to 2,048 strings. `dimensions` (optional): a whole number from 1 to the model's length. `encoding_format` (optional): `float` or `base64` | `{"object": "list", "data": [{"object": "embedding", "index": i, "embedding": …}], "model": …, "usage": {"prompt_tokens": 0, "total_tokens": 0}}`, one entry per text, in order |
+| `GET /v1/models` | none | `{"object": "list", "data": [{"id": <model>, "object": "model", "created": …, "owned_by": "codemem", "codemem": {"space", "dimensions", "query_prefix", "document_prefix"}}]}`: the served model, and under `codemem` what a client sets beside it |
+| `GET /health` | none; no key needed | `{"status": "ok"}` once the model is loaded |
+
+- **Each text is embedded exactly as given.** The server puts nothing before it. A client makes a
+  query or a document by sending the model's prefix and the text as one string, which is what
+  `query_prefix` and `document_prefix` do.
+- **`embedding`** is a list of numbers that carries each float32 exactly, or with `base64` the
+  little-endian float32 bytes in base64. Vectors have length 1. With `dimensions`, a vector is
+  cut to its first numbers and normalized again.
+- **`usage`** is always zero: the server does not count tokens.
+- **The key.** When `CODEMEM_SERVE_KEY` is set in the server's environment, every request but
+  `GET /health` needs the header `Authorization: Bearer <key>`.
+
+**Errors** are `{"error": {"message", "type", "param": null, "code"}}`, with `type`
+`invalid_request_error` below 500 and `server_error` from 500.
+
+| Status | When |
+|---|---|
+| 400 | the body is not a JSON object; `input` is missing, empty or not text; `dimensions` or `encoding_format` has a value the server does not take |
+| 401 | the key is missing or wrong (`code`: `invalid_api_key`) |
+| 404 | an unknown route; or `model` is not the served model (`code`: `model_not_found`) |
+| 405 | a route's other method; `Allow` names the right one |
+| 411 | no `Content-Length` |
+| 413 | a body over 16 MB, or more than 2,048 texts. The body is not read and the connection is closed |
+| 500 | the model failed on a batch; the message carries the model's error. Every request with a text in that batch fails, and the server goes on |
+| 503 | the server is stopping |
+
+A codemem client retries 429, 500 and above, and dropped connections; it fails at once on the
+others, with the server's message.
+

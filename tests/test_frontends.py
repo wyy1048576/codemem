@@ -9,6 +9,7 @@ import pytest
 
 from codemem import agents, prompts
 from codemem.cli import main
+from codemem.config import Config
 from codemem.embedder import make_embedder
 from codemem.render import format_status
 from codemem.service import CodememService
@@ -427,6 +428,31 @@ def test_cli_without_pytorch_names_the_remedy_and_status_still_works(sample_repo
     try:
         assert svc.update() is None  # what the MCP server's writer does: the error is kept for index_status
         assert 'pip install "codemem[local]"' in format_status(svc.status())
+    finally:
+        svc.close()
+
+
+def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sample_repo, tmp_path, monkeypatch):
+    """The MCP server's service in an install without the `local` extra, with a config that asks
+    for the local model: no update is applied, nothing is dropped, and a search answers from
+    keywords once its wait for the model is over."""
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+    built = CodememService(sample_repo, index_dir=tmp_path / "idx")
+    built.update()
+    vectors = built.store.counts()["vectors"]
+    built.close()
+
+    monkeypatch.delenv("CODEMEM_MODEL")
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+    monkeypatch.setattr("codemem.embedder._CACHE", {})
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=Config(catchup_budget_ms=300))
+    try:
+        svc.start(watch=False, prewarm=False)
+        assert _wait_for(lambda: "codemem[local]" in (svc.last_error or ""))
+        resp = svc.search("revoke session", k=3, wait_for_models=False)
+        assert resp.signals == ["bm25"] and resp.models_loading
+        assert resp.results[0].qualname == "revoke_session"
+        assert svc.store.counts()["vectors"] == vectors and sum(vectors.values()) > 0
     finally:
         svc.close()
 

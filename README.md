@@ -24,13 +24,22 @@ exact strings.
 ## Install
 
 ```bash
-uv tool install git+https://github.com/<org>/codemem   # or: pipx install git+...
+uv tool install "codemem[local] @ git+https://github.com/<org>/codemem"   # or: pipx install "codemem[local] @ git+..."
 ```
+
+`[local]` is the local embedding model: PyTorch and sentence-transformers. A codemem that embeds
+through an API, or through another codemem's `serve-embeddings` (below), needs neither:
+
+```bash
+uv tool install git+https://github.com/<org>/codemem
+```
+
+On an Apple Silicon Mac the environment is 887 MB with `[local]` and 89 MB without it.
 
 For development:
 
 ```bash
-uv sync
+uv sync --extra local      # plain `uv sync` leaves PyTorch out; the fast suite passes either way
 uv run pytest              # fast suite with a fake embedding model, no download
 uv run pytest -m model     # the real jina-code-embeddings-0.5b (downloads ~1 GB once)
 ```
@@ -55,9 +64,10 @@ codemem status
 | `codemem status [PATH] [--json]` | what is indexed, pending or skipped, which model, the indexed commit |
 | `codemem watch [PATH]` | a foreground watcher: re-index on save |
 | `codemem mcp [PATH]` | the MCP server over stdio (what agents launch) |
+| `codemem serve-embeddings [PATH] [--host 127.0.0.1] [--port 8791]` | serve the local embedding model to other codemem processes, over HTTP ("One model for several codemem processes", below) |
 | `codemem languages` | supported languages and file extensions |
 
-Every command accepts `--index-dir DIR`; the eval uses it for one index per commit.
+The commands that use an index accept `--index-dir DIR`; the eval uses it for one index per commit.
 
 ## Using it from an agent
 
@@ -132,14 +142,84 @@ provider = "openai"                 # local (default) | openai
 model = "Qwen/Qwen3-Embedding-8B"   # used for every vector type, documents and queries alike
 base_url = "https://api.studio.nebius.com/v1"
 api_key_env = "NEBIUS_API_KEY"      # "" = no key (a local server)
-dimensions = 1024                   # optional: shorter vectors
+dimensions = 1024                   # optional: shorter vectors; a longer reply is cut to this length
 query_prefix = "Instruct: Given a code search request, retrieve the relevant code\nQuery: "
+document_prefix = ""                # before each document
+space = ""                          # optional: a name for these vectors, in place of the address (below)
 batch_size = 64                     # texts per request
 max_concurrency = 4                 # requests in flight
 ```
 
 This sends your code to the provider, and `codemem status` says so. With an API,
 `[vectors.*] model` is not used. A smoke test against Nebius: `NEBIUS_API_KEY=… uv run pytest -m api`.
+
+**An index belongs to the address it was built through, unless you name its vectors.** The index
+remembers who made its vectors: the address in `base_url`, the model, `dimensions` and the
+document prefix. Change one and the vectors are embedded again. `space` is a name that takes the
+place of the address:
+
+```toml
+space = "qwen8b-1024"               # up to 64 characters, no spaces, no "|"
+```
+
+Two configurations with the same `space`, model, `dimensions` and document prefix share vectors,
+whatever their `base_url`. Setting it is a promise that every address you use under that name
+returns the same vectors for the same text: the same model and weights, at the same precision.
+codemem cannot check that. Use it when a provider moves to a new host, when a second provider
+serves the same model, and when one server is reached at different addresses (next section).
+
+**One model for several codemem processes.** Each codemem that runs the local model keeps it in
+memory, about 2.2 GB. With several git worktrees, or several containers, run the model once and
+let every codemem embed through it:
+
+```bash
+codemem serve-embeddings            # on 127.0.0.1:8791; it needs the [local] install, its clients do not
+```
+
+It serves the local model your config selects (`[vectors.*] model`, `device`, `dtype`,
+`max_seq_length`) in the same OpenAI style as an API, and prints the settings a client needs:
+
+```toml
+[embedding]
+provider = "openai"
+base_url = "http://127.0.0.1:8791/v1"
+model = "jinaai/jina-code-embeddings-0.5b"
+space = "st-L1024-float16-mps"
+query_prefix = "Find the most relevant code snippet given the following query:\n"
+document_prefix = "Candidate code snippet:\n"
+```
+
+Put that section in `~/.codemem/config.toml`, or in a repo's `.codemem.toml`, of every codemem
+that should use the server. The server itself always serves the local model, so the section may
+sit in the config file the server reads too. Keep all of it:
+
+- **The two prefixes are how a query differs from a document.** The server embeds each text exactly
+  as it is sent, and the client puts the model's prompt in front. A query and a document then get
+  the same vectors as with the model in process: for `jina-code-embeddings-0.5b` in float16 on an
+  M1 the numbers are identical (`scripts/check_served_vectors.py` checks any model and device).
+- **`space` names the model's settings on the server:** its runtime, longest text, precision and
+  device. It lets an index built through one address be used through another.
+
+*In containers.* The server runs on the host, where the GPU is. Each container has a codemem
+installed without `[local]`, and the same section with the host's address, as the container sees
+it, in `base_url`:
+
+| Docker | The server listens on | `base_url` in the container |
+|---|---|---|
+| Docker Desktop (macOS, Windows) | the loopback address, the default | `http://host.docker.internal:8791/v1` |
+| Docker Engine on Linux | the gateway address of the containers' network: `codemem serve-embeddings --host 172.18.0.1` | `http://172.18.0.1:8791/v1` |
+
+`docker network inspect <network> -f '{{(index .IPAM.Config 0).Gateway}}'` prints the gateway
+address. The address plays no part in the index: one built on the host opens in a container
+without embedding anything again, because both sides carry the same `space`.
+
+*A key.* The server listens on the loopback address unless `--host` says otherwise, and asks for
+no key. To ask for one, start it with the key in the environment variable `CODEMEM_SERVE_KEY`;
+the printed section then has `api_key_env = "CODEMEM_SERVE_KEY"`, and each client needs the same
+variable in its own environment. The key is never written to a file or a log.
+
+The server holds no index and no other state, so it can be restarted at any time. What happens
+while it is down, and its limits: [decisions.md §2 and §3](docs/decisions.md).
 
 **Your own model, embedder or search index**, for experiments such as a fine-tuned encoder or an
 HNSW index:
@@ -169,6 +249,9 @@ version = "run-7"                            # optional label for the weights
 
 **Other notes:**
 - `CODEMEM_MODEL=fake` uses a fast, meaningless hash-based model everywhere, for tests and timing.
+  `serve-embeddings` serves it too.
+- Without `[local]`, a codemem that is asked for the local model says so and names the two ways
+  out: install `codemem[local]`, or embed through an API or a `serve-embeddings` server.
 - On Apple Silicon, `auto` picks the Mac GPU (`mps`). `device = "xpu"` (Intel Arc) needs a
   PyTorch build with XPU support, and falls back to the CPU with a warning.
 
@@ -187,6 +270,7 @@ only, keywords and code, everything, and weight variants). The grep baselines ar
 
 ```bash
 cd eval && uv sync --extra codemem
+uv pip install -e "..[local]"         # the local embedding model: the eval's codemem extra leaves it out
 uv run cmeval run --tasks tasks/swebv-dev50.jsonl --config configs/codemem-v3.toml --run-id my-run
 uv run cmeval score my-run            # add --tokens estimate without an ANTHROPIC_API_KEY
 uv run cmeval report my-run --baseline cm3-bm25 --primary cm3-bm25-code --primary cm3-full
