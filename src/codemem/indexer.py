@@ -966,7 +966,8 @@ class Indexer:
 
     # ---- the whole update
     def update(self, *, full: bool = False, paths: Iterable[str | Path] | None = None, save: bool = True) -> IndexStats:
-        """Stage A, then stage B until the queue is empty, then (with `save`) the FAISS files."""
+        """Stage A, then stage B until the queue is empty, then (with `save`) the search indexes'
+        files, brought to what the next start reads (Store.save_vectors)."""
         stats = IndexStats()
         t_start = time.perf_counter()
         try:
@@ -974,7 +975,7 @@ class Indexer:
             self.embed_pending(stats)
             if save:
                 t = time.perf_counter()
-                self.store.save_vectors()
+                self.store.save_vectors(stale=True)
                 stats.add_time("write_vectors", time.perf_counter() - t)
             cache = self.vector_cache()
             if cache is not None:

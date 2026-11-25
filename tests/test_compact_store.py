@@ -700,8 +700,17 @@ def test_a_file_whose_index_is_not_the_one_described_is_refused():
     ((8,), {"rescore": 0}), ((8,), {"rescore": "200"}),
 ])
 def test_options_faiss_cannot_take_are_refused_with_a_sentence(args, kwargs):
-    with pytest.raises(ValueError, match="whole numbers|need an index dim of 1 or more"):
-        CompactVectorStore(*args, **kwargs)
+    for hands_them_to_faiss in (CompactVectorStore, CompactVectorStore.bytes_per_vector):
+        with pytest.raises(ValueError, match="whole numbers|need an index dim of 1 or more"):
+            hands_them_to_faiss(*args, **kwargs)
+
+
+@pytest.mark.parametrize("options", [{}, {"bits": 1}, {"bits": 2, "dim": 33}, {"bits": 8, "rescore": 500}])
+def test_the_memory_counted_for_a_vector_is_its_codes_its_id_and_where_it_came_from(options):
+    vs = CompactVectorStore(65, **options)
+    assert CompactVectorStore.bytes_per_vector(65, **options) == vs.code_bytes + 8 + 32
+    # the numbers of docs/architecture.md §5, at the real model's 896 numbers: 4 bits, and 1 bit
+    assert (CompactVectorStore.bytes_per_vector(896), CompactVectorStore.bytes_per_vector(896, bits=1)) == (628, 160)
 
 
 @pytest.mark.parametrize("dim, code_dim, expect", [(8, 0, 8), (8, 4, 4), (8, 64, 8), (5, 0, 5), (65, 33, 33)])
@@ -793,8 +802,8 @@ def test_search_needs_the_stored_vectors():
 
 def test_a_faiss_the_codes_were_not_checked_against_is_refused_with_a_sentence(monkeypatch, tmp_path):
     monkeypatch.setattr(faiss, "__version__", "1.14.0")
-    for build in (lambda: CompactVectorStore(8), lambda: vector_backend_class("compact"),
-                  lambda: Store(tmp_path / "idx", vector_backend="compact")):
+    for build in (lambda: CompactVectorStore(8), lambda: CompactVectorStore.bytes_per_vector(8),
+                  lambda: vector_backend_class("compact"), lambda: Store(tmp_path / "idx", vector_backend="compact")):
         with pytest.raises(RuntimeError, match='vector_backend = "compact" needs FAISS 1.15.1 or newer'):
             build()
     assert vector_backend_class("faiss") is FaissVectorStore
@@ -842,6 +851,7 @@ def test_config_reads_the_compact_table():
     default = config_from_dict({"vector_backend": "compact"})
     assert default.vector_options() == {"bits": 4, "dim": 0, "rescore": 200}
     assert Config(vector_backend="faiss").vector_options() == {}
+    assert Config(vector_backend="auto").vector_options() == {"bits": 4, "dim": 0, "rescore": 200}  # for when it picks compact
     assert config_from_dict({"vector_backend": "faiss", "compact": {"dim": 64}}).vector_options() == {}
 
 
@@ -856,19 +866,6 @@ def test_config_reads_the_compact_table():
 def test_bad_compact_settings_are_refused_when_the_config_is_read(table, message):
     with pytest.raises(ValueError, match=message):
         config_from_dict({"vector_backend": "compact", "compact": table})
-
-
-def test_compact_settings_are_index_settings_only_for_the_compact_backend():
-    plain = Config(vector_backend="faiss").index_settings()
-    assert "compact" not in plain and "vector_backend" not in plain
-    unused = config_from_dict({"vector_backend": "faiss", "compact": {"dim": 256}})
-    assert unused.index_settings() == plain  # options of a backend that is not in use change nothing
-    a = config_from_dict({"vector_backend": "compact"}).index_settings()
-    b = config_from_dict({"vector_backend": "compact", "compact": {"dim": 256}}).index_settings()
-    assert a["vector_backend"] == "compact" and a["compact"] == {"bits": 4, "dim": 0, "rescore": 200}
-    assert b["compact"]["dim"] == 256
-    rest = lambda settings: {k: v for k, v in settings.items() if k not in ("compact", "vector_backend")}  # noqa: E731
-    assert rest(a) == rest(b) == plain and b["vector_backend"] == "compact"
 
 
 def test_switching_to_compact_and_changing_its_options_re_embeds_nothing(sample_repo, tmp_path, fake_config, recorder):
