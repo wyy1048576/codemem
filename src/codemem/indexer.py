@@ -67,6 +67,7 @@ _SETTING_TIERS = {
     "max_defs_per_name": "links",
     "embedding": "vectors",  # another API provider, model or dimensions: re-embed
     "vector_backend": None,  # nothing stored: the search index rebuilds itself from the stored vectors
+    "compact": None,  # likewise
 }
 
 

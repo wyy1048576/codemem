@@ -94,7 +94,8 @@ skip_generated = true        # skip files marked "Code generated ... DO NOT EDIT
 languages = ["python", "go"] # default: every supported language
 code_header = true           # put the path and enclosing class above the embedded code
 vector_cache = "global"      # global = reuse vectors across indexes on this machine | off
-vector_backend = "faiss"     # the in-memory search index; a plugin class can replace it (below)
+vector_backend = "faiss"     # the in-memory search index: faiss (every vector, exact) | compact (a
+                             # small code per vector, [compact] below) | a plugin class (below)
 kinds = ["function", "method"]  # search-time filter; default: every kind
 test_weight = 1.0            # search-time: lower it to rank tests lower
 kind_weights = { class = 1.0, block = 1.0 }  # search-time: lower them to rank classes or blocks lower
@@ -107,6 +108,12 @@ catchup_budget_ms = 4000     # how long a search may spend catching up on recent
 model = "jinaai/jina-code-embeddings-0.5b"   # a Hugging Face name, or a local model folder
 [vectors.usage]
 model = "jinaai/jina-code-embeddings-0.5b"
+
+[compact]                    # read when vector_backend = "compact"
+bits = 1                     # bits per number of the in-memory code, 1 to 8
+dim = 0                      # numbers of each vector the code covers (the first N); 0 = as many as the index uses
+rescore = 200                # candidates scored exactly from the stored vectors: at least this many,
+                             # and at least 4 per result asked for
 
 [bm25]
 weights = [10.0, 3.0, 5.0, 2.0, 1.0]   # name, path, signature, doc, body
@@ -164,7 +171,9 @@ version = "run-7"                            # optional label for the weights
   `ids` and `__len__`, built as `HnswStore(dim)`. `search` returns at most k `(id, score)` pairs,
   best first, with real similarity scores, and only ids in `allowed_ids` when it is given. Saving
   it is optional (`to_bytes` / `from_bytes`, and a file `suffix`); one that isn't saved is rebuilt
-  from the stored vectors at each start. Switching re-embeds nothing.
+  from the stored vectors at each start. An index that keeps less than the vectors can read them
+  back from SQLite: define `bind(fetch)` and call `fetch(ids)` in `search` (data-model.md §12.4).
+  Switching re-embeds nothing.
 - `tests/test_plugins.py` has a small numpy search index and a wrapped embedder to copy from.
 
 **Other notes:**
