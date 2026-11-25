@@ -6,13 +6,16 @@ stub that can be told how."""
 import json
 import logging
 import os
+import re
 import socket
 import subprocess
 import sys
 import threading
 import time
 import tomllib
+import types
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib.machinery import ModuleSpec
 
 import numpy as np
 import pytest
@@ -20,15 +23,34 @@ import pytest
 from codemem import assist
 from codemem.assist import AssistedEmbedder, probe_texts
 from codemem.config import AssistConfig, Config, config_from_dict
-from codemem.embedder import FakeEmbedder, make_embedder, release_idle
+from codemem.embedder import (
+    DOCUMENT_PROMPT, QUERY_PROMPT, Embedder, FakeEmbedder, SentenceTransformerEmbedder, make_embedder, release_idle,
+)
 from codemem.embedserver import EmbeddingServer, local_embedder
 from codemem.indexer import Indexer
-from codemem.render import format_status
+from codemem.render import assist_line, format_status
 from codemem.search import search
 from codemem.service import CodememService
 from codemem.store import Store, diff_snapshots
 
-PROBE = len(probe_texts(1024))  # texts in one check
+PROBE = len(probe_texts(FakeEmbedder(64), 1024))  # texts in one check
+
+
+def tokens(text: str) -> list[str]:
+    """What stands in for a model's tokens here: a run of letters, digits and underscores, or one
+    other character."""
+    return re.findall(r"\w+|[^\w\s]", text)
+
+
+def read(text: str, limit: int | None) -> str:
+    """What a model that reads `limit` tokens reads of a text: all of it, or its first `limit` tokens."""
+    kept = tokens(text)
+    return text if limit is None or len(kept) <= limit else " ".join(kept[:limit])
+
+
+def long_text(i: int, lines: int = 80) -> str:
+    """A text of ten tokens a line whose end is about other things than its start."""
+    return "\n".join(f"row_{i}_{j} = load(table_{j}, key={i})" for j in range(lines))
 
 
 def code_texts(n: int) -> list[str]:
@@ -51,11 +73,83 @@ class Slow(FakeEmbedder):
         return super()._embed(texts)
 
 
+class Reader(Slow):
+    """A local model that reads `limit` tokens of a text, and says which texts that cuts."""
+
+    def __init__(self, limit: int, per_text: float = 0.002):
+        super().__init__(per_text)
+        self.limit = limit
+
+    def cut(self, texts):
+        return [len(tokens(t)) > self.limit for t in texts]
+
+    def _embed(self, texts):
+        return super()._embed([read(t, self.limit) for t in texts])
+
+
+class _Tokenizer:
+    """Stands in for a model's tokenizer: `tokens` of a text between two tokens of its own. Like
+    the real ones, it keeps whether it cuts as a setting that each call sets."""
+
+    def __init__(self):
+        self.cuts, self.calls = True, []
+
+    def num_special_tokens_to_add(self) -> int:
+        return 2
+
+    def __call__(self, texts, truncation=True, padding=True, max_length=None, verbose=True):
+        self.cuts = bool(truncation)
+        self.calls.append(list(texts))
+        ids = [[0, *range(1, len(tokens(t)) + 1), 0] for t in texts]
+        return {"input_ids": [row[:max_length] if truncation and max_length else row for row in ids]}
+
+
+class _Model:
+    """Stands in for sentence_transformers.SentenceTransformer: it reads the prompt and the text
+    as one string, `max_seq_length` tokens of it with the tokenizer's two, and gives the fake
+    model's vector for what it read."""
+
+    prompts = {QUERY_PROMPT: "Find code:\n", DOCUMENT_PROMPT: "Code:\n"}
+    max_seq_length = 32768
+    per_text = 0.0  # seconds a text takes
+
+    def __init__(self, name, device=None):
+        self.tokenizer = _Tokenizer()
+
+    def to(self, target):
+        return self
+
+    def get_sentence_embedding_dimension(self) -> int:
+        return 64
+
+    def encode(self, texts, prompt_name=None, prompt="", **kwargs):
+        before = self.prompts[prompt_name] if prompt_name else prompt
+        time.sleep(self.per_text * len(texts))
+        return FakeEmbedder(64).embed_texts([read(before + t, self.max_seq_length - 2) for t in texts])
+
+
+@pytest.fixture
+def reading_model(monkeypatch):
+    """The stand-in model in place of sentence-transformers, for the real local embedder to load."""
+    pytest.importorskip("torch")  # the embedder resolves its device and converts the weights through it
+    module = types.SimpleNamespace(SentenceTransformer=_Model, __spec__=ModuleSpec("sentence_transformers", None))
+    monkeypatch.setitem(sys.modules, "sentence_transformers", module)
+    return _Model
+
+
+WORDS = [a + b for a in "bdfgklmnprst" for b in ("alo", "ime", "onu", "ura")]  # 48 words, a token each
+
+
+def words(n: int, start: int = 0) -> str:
+    """A text of `n` tokens; another `start` gives another text."""
+    return " ".join(WORDS[(start + j) % len(WORDS)] for j in range(n))
+
+
 class Stub:
     """An OpenAI-style endpoint that answers with the fake model's vectors and can be told to
     differ from it: `fail` holds status codes to answer with first, `delay` seconds are slept per
     request, `scale` stretches each vector, `prompt` is put before each text on its side, `limit`
-    cuts each text after that many words, `salt` makes it another model."""
+    cuts each text after that many tokens, `salt` makes it another model."""
 
     def __init__(self, dim: int = 64, **knobs):
         self.dim, self.requests = dim, []
@@ -75,9 +169,7 @@ class Stub:
                 if outer.fail:
                     status, out = outer.fail.pop(0), b'{"error": {\n  "message": "not now"}}'
                 else:
-                    texts = [outer.prompt + t + outer.salt for t in body["input"]]
-                    if outer.limit is not None:
-                        texts = [" ".join(t.split()[: outer.limit]) for t in texts]
+                    texts = [read(outer.prompt + t + outer.salt, outer.limit) for t in body["input"]]
                     vecs = outer.scale * FakeEmbedder(outer.dim).embed_texts(texts)
                     data = [{"index": i, "embedding": v} for i, v in enumerate(vecs.tolist())]
                     status, out = 200, json.dumps({"data": data, "model": body["model"]}).encode()
@@ -98,8 +190,9 @@ class Stub:
 
     @property
     def work(self) -> list[dict]:
-        """The requests that carried a build's texts: every one but the checks."""
-        return [r for r in self.requests if len(r["input"]) != PROBE or "handler_" in r["input"][0]]
+        """The requests that carried a build's texts: every one but the checks, which end with
+        the probe's long text."""
+        return [r for r in self.requests if "session_0 = open_session(" not in r["input"][-1]]
 
     def close(self):
         self.httpd.shutdown()
@@ -196,38 +289,135 @@ def test_document_texts_carry_the_local_models_prefix_and_the_providers_own_fiel
 # ---------------------------------------------------------------- no mixing without proof
 
 
-@pytest.mark.parametrize("knobs, local, reason", [
-    ({"limit": 1024}, None, "cuts texts at another length than 1024 tokens"),
-    ({}, "cut", "cuts texts at another length than 1024 tokens"),
+@pytest.mark.parametrize("knobs, limit, reason", [
+    ({"limit": 200}, None, "another one for a long text"),
+    ({"limit": 200}, 1024, "another one for a text as long as the local model reads"),
     ({"prompt": "passage: "}, None, "another model, another prompt before the text, or another precision"),
-    ({"scale": 3.0}, None, "returns vectors that are not normalized (length 3"),
     ({"salt": " v2"}, None, "gives other vectors than the local model for the same texts"),
     ({"dim": 32}, None, "returns vectors of 32 numbers for fake:64 and the local model's have 64"),
+    ({"scale": 0.0}, None, "a vector for fake:64 that cannot be scaled to length 1"),
+    ({"scale": float("nan")}, None, "a vector for fake:64 that cannot be scaled to length 1"),
 ])
-def test_an_endpoint_that_differs_gets_no_text_and_says_why(knobs, local, reason, caplog):
-    """Another longest text (on either side), a prompt of the provider's own, vectors that are not
-    normalized, another model behind the name: each fails the check, and the build goes on alone."""
-
-    class Cut(Slow):  # a local model that reads 1024 words of a text, as the real one reads 1024 tokens
-        def _embed(self, texts):
-            return super()._embed([" ".join(t.split()[:1024]) for t in texts])
-
+def test_an_endpoint_that_differs_gets_no_text_and_says_why(knobs, limit, reason, caplog):
+    """An endpoint that cuts a text earlier than the local model (which reads every text whole, or
+    1024 tokens of it), a prompt of the provider's own, another model behind the name, vectors
+    that cannot be scaled: each fails the check, and the build goes on alone."""
     stub = Stub(**knobs)
     texts = code_texts(60)
     try:
-        emb = assisted(stub.url, Cut() if local else Slow())
+        emb = assisted(stub.url, Reader(limit) if limit else Slow())
         with caplog.at_level(logging.WARNING, logger="codemem"):
             got = emb.embed_documents(texts)
             emb.embed_documents(texts)
         np.testing.assert_array_equal(got, FakeEmbedder(64).embed_documents(texts))
         status = emb.status()
         assert status["state"] == "refused" and reason in status["reason"]
+        assert ("it probably cuts a text earlier than the local model does" in status["reason"]) == ("limit" in knobs)
         assert emb.shared["endpoint"] == 0 and stub.work == [] and len(stub.requests) == 1  # the one check
         said = [r.getMessage() for r in caplog.records if "assist endpoint is not used" in r.getMessage()]
         assert len(said) == 1 and reason in said[0]
         assert "\n" not in status["reason"]
     finally:
         stub.close()
+
+
+@pytest.mark.parametrize("knobs, limit", [
+    ({"scale": 3.0}, None),  # vectors that are not normalized
+    ({}, 300),  # an endpoint that reads further than the local model
+    ({"limit": 300}, 300),  # one that cuts where the local model does
+])
+def test_an_endpoint_whose_vectors_only_need_scaling_or_that_reads_as_far_shares(knobs, limit, caplog):
+    """Its vectors are scaled to length 1 before they are compared and before they are stored. And
+    however far it reads, it is never handed a text the local model cuts, so it is compared on
+    texts the local model reads whole."""
+    stub = Stub(**knobs)
+    long = [long_text(i) for i in range(6)]  # 800 tokens each
+    texts = long + code_texts(60)
+    try:
+        emb = assisted(stub.url, Reader(limit) if limit else Slow())
+        with caplog.at_level(logging.DEBUG, logger="codemem.assist"):
+            got = emb.embed_documents(texts)
+        said = [r.getMessage() for r in caplog.records if r.getMessage().startswith("an embedding call of 66 texts")]
+        assert len(said) == 1 and re.fullmatch(
+            rf".* s: the local model embedded {emb.shared['local']} \({6 if limit else 0} are longer than it reads\), "
+            rf"127\.0\.0\.1:\d+ embedded {emb.shared['endpoint']}", said[0],
+        )
+        alone = (Reader(limit, 0) if limit else FakeEmbedder(64)).embed_documents(texts)
+        if "scale" in knobs:
+            np.testing.assert_allclose(got, alone, atol=1e-6)
+            np.testing.assert_allclose(np.linalg.norm(got, axis=1), 1.0, atol=1e-6)
+        else:
+            np.testing.assert_array_equal(got, alone)
+        assert emb.status()["state"] == "sharing" and emb.shared["endpoint"] > 0
+        sent = [t for r in stub.work for t in r["input"]]
+        assert sent and len(stub.requests) == len(stub.work) + 1
+        if limit:
+            assert emb.shared["cut"] == 6 and not any(len(tokens(t)) > limit for t in sent)
+            assert "(6 of those are longer than the local model reads and stay with it)" in assist_line(emb.status())
+            assert not np.allclose(got[:6], FakeEmbedder(64).embed_documents(long), atol=1e-3)  # read whole, they differ
+        else:
+            assert emb.shared["cut"] == 0
+    finally:
+        stub.close()
+
+
+def test_a_call_of_texts_the_local_model_cuts_is_not_shared_at_all(stub):
+    emb = assisted(stub.url, Reader(300))
+    texts = [long_text(i) for i in range(40)]
+    np.testing.assert_array_equal(emb.embed_documents(texts), Reader(300, 0).embed_documents(texts))
+    assert emb.status()["state"] == "sharing" and stub.work == [] and emb.shared == {"local": 0, "endpoint": 0, "cut": 0}
+
+
+@pytest.mark.parametrize("prompt, most", [("Code:\n", 28), ("", 30), ("Candidate code snippet:\n", 26)])
+def test_the_local_model_says_a_text_is_cut_exactly_when_it_cuts_it(reading_model, monkeypatch, prompt, most):
+    """At 32 tokens, of which the tokenizer's own are 2 and the prompt's 2, 0 or 4: a text that
+    fills the rest to the token is read whole, and one token more is cut."""
+    monkeypatch.setattr(reading_model, "prompts", {QUERY_PROMPT: "", DOCUMENT_PROMPT: prompt})
+    emb = SentenceTransformerEmbedder("stub-model", device="cpu", max_seq_length=32)
+    texts = [words(n) for n in (most - 1, most, most + 1, most + 2)]
+    assert emb.cut(texts) == [False, False, True, True]
+    read_whole = FakeEmbedder(64).embed_texts([prompt + t for t in texts])  # by a source that reads every text whole
+    same = [np.array_equal(mine, whole) for mine, whole in zip(emb.embed_documents(texts), read_whole)]
+    assert same == [True, True, False, False]  # the model cuts exactly the texts it says it cuts
+    model = emb.model
+    assert model.tokenizer.calls == [] and model.tokenizer.cuts  # counted on a copy: the model's own still cuts
+    assert emb.unload() and emb.cut(texts) == [False, False, True, True]  # and again after the model was dropped
+
+
+def test_a_short_plain_text_is_known_to_be_read_whole_without_tokenizing_it(reading_model):
+    """At 1024 tokens, less the tokenizer's 2, the 6 characters of the prompt and 8 to spare: a
+    plain ASCII text of 1008 characters cannot be more tokens than the model reads."""
+    emb = SentenceTransformerEmbedder("stub-model", device="cpu", max_seq_length=1024)
+    assert emb.cut(["(" * 1008, "x" * 1008, ""]) == [False, False, False] and emb._counter.calls == []
+    assert emb.cut(["(" * 1009, "é"]) == [False, False]
+    assert emb._counter.calls == [["Code:\n" + "(" * 1009, "Code:\né"]]  # longer, or not plain ASCII: counted
+    assert emb.cut(["(" * 1020, "(" * 1021]) == [False, True]  # with the prompt's 2 and the tokenizer's 2: 1024 and 1025
+    assert emb.cut([]) == []
+
+
+def test_a_text_at_the_local_limit_may_go_to_the_endpoint_and_one_token_more_stays_local(reading_model, stub, monkeypatch):
+    """The real local embedder over the stand-in model, at 32 tokens, and an endpoint that reads
+    every text whole: texts of exactly 32 tokens with the prompt and the tokenizer's own are
+    shared, texts of 33 are not, and the vectors are the local model's."""
+    monkeypatch.setattr(reading_model, "per_text", 0.003)
+
+    def local():
+        return SentenceTransformerEmbedder("stub-model", device="cpu", batch_size=4, max_seq_length=32)
+
+    at, over = [words(28, k) for k in range(30)], [words(29, k) for k in range(10)]
+    texts = over + at
+    emb = AssistedEmbedder(local(), AssistConfig(base_url=stub.url, model="fake:64"), batch_size=4, max_seq_length=32)
+    got = emb.embed_documents(texts)
+    np.testing.assert_array_equal(got, local().embed_documents(texts))
+    assert emb.status()["state"] == "sharing" and emb.shared["endpoint"] > 0 and emb.shared["cut"] == 10
+    sent = {t for r in stub.work for t in r["input"]}
+    assert sent and sent <= {"Code:\n" + t for t in at}  # with the local model's prompt, and none of the longer ones
+    read_whole = FakeEmbedder(64).embed_texts(["Code:\n" + t for t in texts])
+    same = [np.array_equal(mine, whole) for mine, whole in zip(got, read_whole)]
+    assert same == [False] * 10 + [True] * 30  # the endpoint would have given other vectors for the ten
+    check = [r for r in stub.requests if r not in stub.work]
+    assert len(check) == 1 and len(tokens(check[0]["input"][-1])) == 30  # the probe's last text: 32 with the tokenizer's 2
+    assert all(len(tokens(t)) <= 30 for t in check[0]["input"])
 
 
 def test_what_the_same_model_gives_on_other_hardware_passes_and_what_changes_rankings_does_not():
@@ -243,20 +433,49 @@ def test_what_the_same_model_gives_on_other_hardware_passes_and_what_changes_ran
         other /= np.linalg.norm(other, axis=1, keepdims=True)
         return (cosine * local + np.sqrt(1 - cosine**2) * other).astype(np.float32)
 
-    labels = [label for label, _ in probe_texts(1024)]
-    agreement, reason = assist.difference(local, at(0.999996), labels, "host", "m", 1024)
-    assert reason is None and agreement == pytest.approx(0.999996, abs=2e-6)
-    agreement, reason = assist.difference(local, at(0.99978), labels, "host", "m", 1024)
-    assert agreement == pytest.approx(0.99978, abs=2e-6) and "another precision" in reason
+    probes = probe_texts(Reader(1024), 1024)
+    found = assist.difference(local, at(0.999996), probes, "host", "m")
+    assert found["reason"] is None and found["agreement"] == pytest.approx(0.999996, abs=2e-6)
+    found = assist.difference(local, at(0.99978), probes, "host", "m")
+    assert found["agreement"] == pytest.approx(0.99978, abs=2e-6) and "another precision" in found["reason"]
     assert 0.99978 < assist.SAME_VECTORS < 0.999996
 
+    found = assist.difference(local, 27.5 * at(0.999996), probes, "host", "m")  # the same vectors, not normalized
+    assert found["reason"] is None and found["agreement"] == pytest.approx(0.999996, abs=2e-6)
+    assert [row["probe"] for row in found["probes"]] == [label for label, _ in probes]
+    for row, (_, text) in zip(found["probes"], probes):
+        assert row["characters"] == len(text) and row["cosine"] == pytest.approx(0.999996, abs=2e-6)
+        assert row["local_length"] == pytest.approx(1.0, abs=1e-6) and row["endpoint_length"] == pytest.approx(27.5, abs=1e-4)
 
-def test_the_probe_holds_a_text_longer_than_the_model_reads():
-    for limit in (256, 1024, 8192):
-        (label, text), words = probe_texts(limit)[-1], None
-        words = text.split()
-        assert len(words) > limit and label == "a text longer than the model reads"  # a token is a word at most
-        assert set(words[:50]) != set(words[-50:])  # its end is not its start again
+    last = local.copy()
+    last[-1] = at(0.9)[-1]  # only the text at the local model's limit differs
+    found = assist.difference(local, last, probes, "host", "m")
+    assert found["agreement"] == pytest.approx(0.9, abs=1e-5)
+    assert "another one for a text as long as the local model reads (cosine 0.90000, 0.99995 needed)" in found["reason"]
+    for broken in (0.0, np.nan, np.inf):
+        bad = local.copy()
+        bad[2, 5 if broken else slice(None)] = broken
+        found = assist.difference(local, bad, probes, "host", "m")
+        assert found["agreement"] is None and "cannot be scaled to length 1" in found["reason"]
+        assert found["probes"][2]["endpoint_length"] == (0.0 if broken == 0.0 else None)
+
+
+def test_the_last_probe_text_ends_at_the_local_models_limit():
+    """Every probe text is one the local model reads whole, and the last is filled to its limit to
+    the token: the longest text an endpoint is ever handed."""
+    for limit in (40, 256, 1024, 8192):
+        probes = probe_texts(Reader(limit), limit)
+        label, text = probes[-1]
+        assert label == "a text as long as the local model reads" and len(tokens(text)) == limit
+        assert not any(Reader(limit).cut([text for _, text in probes]))
+    assert [label for label, _ in probe_texts(Reader(40), 40)] == [  # without the two it would cut
+        "a function", "a usage text", "plain words", "other alphabets", "a text as long as the local model reads",
+    ]
+    label, text = probe_texts(FakeEmbedder(64), 1024)[-1]  # a model that reads every text whole
+    lines = text.split("\n")
+    assert label == "a long text" and len(text.split()) == 7 * len(lines) > 1024  # a token is a word at most
+    does = [re.fullmatch(r"\w+ = (\w+)\(.*", line).group(1) for line in lines]
+    assert len(set(does)) == len(lines) == 256  # no two lines do the same thing to the same thing
 
 
 def test_a_local_embedder_that_does_not_name_its_prefix_gets_no_help(stub):
@@ -278,8 +497,42 @@ def test_a_local_embedder_that_does_not_name_its_prefix_gets_no_help(stub):
     assert named.status()["state"] == "sharing"
 
 
-def test_the_local_half_of_a_check_is_kept_between_processes(stub):
-    """The local model's probe vectors belong to its key: a later process asks the endpoint only."""
+def test_a_local_embedder_that_cannot_say_which_texts_it_cuts_gets_no_help(stub):
+    """A plugin embedder need not define `cut`; no text could then be handed on safely."""
+
+    class Silent(Slow):
+        def cut(self, texts):
+            return Embedder.cut(self, texts)
+
+    texts = code_texts(40)
+    emb = assisted(stub.url, Silent())
+    np.testing.assert_array_equal(emb.embed_documents(texts), FakeEmbedder(64).embed_documents(texts))
+    status = emb.status()
+    assert status["state"] == "refused" and stub.requests == []
+    assert status["reason"] == (
+        "Silent does not say which texts it reads only in part, so an endpoint cannot share its work"
+    )
+
+    class Late(Slow):  # one whose count fails after the check passed
+        fails = False
+
+        def cut(self, texts):
+            if self.fails:
+                raise NotImplementedError("the tokens of late could not be counted (ValueError: no tokenizer)")
+            return super().cut(texts)
+
+    emb = assisted(stub.url, Late())
+    emb.embed_documents(texts)
+    assert emb.status()["state"] == "sharing" and emb.shared["endpoint"] > 0
+    emb.inner.fails, asked = True, len(stub.requests)
+    np.testing.assert_array_equal(emb.embed_documents(texts), FakeEmbedder(64).embed_documents(texts))
+    assert emb.status()["state"] == "refused" and len(stub.requests) == asked
+    assert "the tokens of late could not be counted (ValueError: no tokenizer), so an endpoint" in emb.status()["reason"]
+
+
+def test_the_local_half_of_a_check_is_kept_between_processes(stub, isolated_home):
+    """The probe texts and the local model's vectors for them belong to its key: a later process
+    asks the endpoint only."""
     first = assisted(stub.url)
     first.embed_documents(code_texts(40))
     assert PROBE in first.inner.calls and first.status()["state"] == "sharing"
@@ -292,6 +545,40 @@ def test_the_local_half_of_a_check_is_kept_between_processes(stub):
     other_model = assisted(stub.url, Slow(dim=32))  # another key: its own probe vectors, and a refusal
     other_model.embed_documents(code_texts(40))
     assert PROBE in other_model.inner.calls and other_model.status()["state"] == "refused"
+
+    kept = sorted((isolated_home / "assist").glob("probe-*.npz"))
+    assert len(kept) == 2 and not list((isolated_home / "assist").glob("*.tmp"))
+    for file in kept:
+        file.write_bytes(b"not a file of ours")
+    again = assisted(stub.url)  # what cannot be read is made again
+    again.embed_documents(code_texts(40))
+    assert PROBE in again.inner.calls and again.status()["state"] == "sharing"
+
+
+def test_the_local_models_prefix_is_asked_for_once_and_only_when_the_config_names_none(stub):
+    class Prompted(Slow):
+        asked = 0
+
+        @property
+        def prefixes(self):
+            type(self).asked += 1
+            return ("query: ", "passage: ")
+
+        def embed_documents(self, texts):
+            return self._embed(["passage: " + t for t in texts])
+
+    stub.prompt = "passage: "  # a provider that puts the prompt in front itself
+    named = assisted(stub.url, Prompted(), document_prefix="")
+    named.embed_documents(code_texts(40))
+    assert named.status()["state"] == "sharing" and Prompted.asked == 0
+    stub.prompt, before = "", len(stub.requests)
+    first = assisted(stub.url, Prompted())  # the probe is remembered, the prefix is not yet
+    first.embed_documents(code_texts(40))
+    assert first.status()["state"] == "sharing" and Prompted.asked == 1 and PROBE not in first.inner.calls
+    later = assisted(stub.url, Prompted())
+    later.embed_documents(code_texts(40))
+    assert later.status()["state"] == "sharing" and Prompted.asked == 1
+    assert all(t.startswith("passage: ") for r in stub.requests[before:] for t in r["input"])
 
 
 # ---------------------------------------------------------------- an endpoint that fails, is slow, or says "later"

@@ -143,7 +143,10 @@ def assist_line(helper: dict[str, Any]) -> str:
         agreed = f"assist: its vectors agree with the local model's (cosine {helper.get('agreement'):.6f} at worst)"
         if not texts.get("endpoint"):
             return agreed + as_of
-        return f"{agreed}; it embedded {texts['endpoint']} texts, the local model {texts['local']}"
+        shares = f"{agreed}; it embedded {texts['endpoint']} texts, the local model {texts['local']}"
+        if not texts.get("cut"):
+            return shares
+        return f"{shares} ({texts['cut']} of those are longer than the local model reads and stay with it)"
     if state == "refused":
         return f"assist: not used: {reason}{as_of}"
     if state == "resting":

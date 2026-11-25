@@ -27,6 +27,7 @@ its calls needed besides it.
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import functools
 import gc
@@ -202,6 +203,14 @@ class Embedder(ABC):
         give. A served model's clients carry the two as `query_prefix` and `document_prefix`."""
         raise NotImplementedError(f"{type(self).__name__} does not say what it puts before a query or a document")
 
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        """For each document text, whether this embedder reads less than all of it: with its
+        document prefix and the tokenizer's own tokens it is longer than the model's limit. Another
+        source of the same model may read it whole and give another vector, so such a text is
+        never embedded elsewhere (assist.py). An embedder that cannot say raises NotImplementedError
+        with the reason, and gets no assist."""
+        raise NotImplementedError(f"{type(self).__name__} does not say which texts it reads only in part")
+
     @property
     def ready(self) -> bool:
         """Can embed now, without loading a model first."""
@@ -325,6 +334,9 @@ class FakeEmbedder(Embedder):
     def prefixes(self) -> tuple[str, str]:
         return ("", "")
 
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        return [False] * len(texts)  # it reads every text whole
+
 
 def resolve_device(preference: str) -> str:
     """The device a local model runs on. An environment without PyTorch has nothing to run on a GPU: cpu."""
@@ -377,6 +389,8 @@ class SentenceTransformerEmbedder(Embedder):
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self._model = None
+        self._counter = None  # a copy of the model's tokenizer that only counts (`cut`)
+        self._count_lock = threading.Lock()
         self._prompts: dict[str, dict[str, str]] = {_AS_GIVEN: {"prompt": ""}}  # how each kind of text is encoded
         self._prefixes = ("", "")  # the query and document prompts as text, known once the model is loaded
         self._lock = threading.Lock()
@@ -404,7 +418,7 @@ class SentenceTransformerEmbedder(Embedder):
             self._lock.release()
 
     def _drop(self) -> bool:
-        had, self._model = self._model is not None, None
+        had, self._model, self._counter = self._model is not None, None, None
         return had
 
     def trim(self, idle_seconds: float = 0.0) -> bool:
@@ -505,6 +519,39 @@ class SentenceTransformerEmbedder(Embedder):
     def prefixes(self) -> tuple[str, str]:
         _ = self.model  # loads it: the prompts come with the model
         return self._prefixes
+
+    @_counted
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        """Counted as the model counts: the document prefix and the text as one string, the
+        tokenizer's own tokens included, against the length the model cuts at. A text of exactly
+        that many tokens is read whole; one token more and it is cut. A plain ASCII text of fewer
+        characters than the limit cannot reach it, a token being one character at least, and is
+        not tokenized for this."""
+        model = self.model
+        limit = model.max_seq_length
+        if not limit:
+            return [False] * len(texts)
+        prefix = self.prefixes[1]
+        try:
+            with self._count_lock:
+                if self._counter is None:
+                    # A tokenizer keeps whether it cuts as a setting of its own. Counting on the
+                    # model's would switch that off under a call embedding in another thread.
+                    self._counter = copy.deepcopy(model.tokenizer)
+                counter = self._counter
+                # 8: for a token a tokenizer puts in beside the text's own and does not count as special
+                spare = limit - counter.num_special_tokens_to_add() - len(prefix) - 8 if prefix.isascii() else -1
+                out = [False] * len(texts)
+                long = [i for i, text in enumerate(texts) if len(text) > spare or not text.isascii()]
+                if long:
+                    counted = counter([prefix + texts[i] for i in long], truncation=False, padding=False, verbose=False)
+                    for i, ids in zip(long, counted["input_ids"]):
+                        out[i] = len(ids) > limit
+        except Exception as e:
+            raise NotImplementedError(
+                f"the tokens of {self.model_name} could not be counted ({type(e).__name__}: {e})"
+            ) from e
+        return out
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         """Queries are cached (the eval asks the same query of several systems that share a model)."""
@@ -722,6 +769,9 @@ class PluginEmbedder(Embedder):
     @property
     def prefixes(self) -> tuple[str, str]:
         return self.inner.prefixes
+
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        return self.inner.cut(texts)
 
 
 _CACHE: dict[tuple, Embedder] = {}
