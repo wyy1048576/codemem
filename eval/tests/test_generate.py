@@ -57,6 +57,7 @@ def test_recipe_with_suites_and_env(tmp_path):
     script = gen._script(recipe, T, repeats=1)
     assert """bash -c 'one '"'"'t/one/a.ts'"'"' /work/before-1.0.xml'""" in script
     assert """bash -c 'two '"'"'t/two/b.ts'"'"' /work/after-1.1.xml'""" in script
+    assert 'echo "before-1 $rc' in script
 
 
 def test_recipe_needs_test_or_suites(tmp_path):
