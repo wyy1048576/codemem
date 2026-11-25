@@ -16,7 +16,8 @@ Freshness (docs/architecture.md §4):
 
 The embedding model (docs/architecture.md §3.5) loads in a background thread, at start-up and
 again after the writer has freed it for being idle (`model_idle_minutes`). The writer and a search
-with a budget wait for that thread instead of loading the model themselves.
+with a budget wait for that thread instead of loading the model themselves. In its quiet steps the
+writer also gives back what the model's calls needed besides the model (`embedder.release_idle`).
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .config import Config, VectorConfig, default_index_dir, find_repo_root, load_config
-from .embedder import Embedder, make_embedder
+from .embedder import Embedder, make_embedder, release_idle
 from .indexer import IndexStats, Indexer, git_head
 from .search import SearchResponse, make_card, search
 from .store import Store
@@ -338,7 +339,8 @@ class CodememService:
         if self.store.vectors_unsaved() and now - self._last_write > SAVE_AFTER_IDLE:
             self.store.save_vectors()
             return True
-        self._unload_idle_models()  # here nothing is queued, so nothing is waiting for a model
+        for embedder in list(self._embedders.values()):  # nothing is queued here: a quiet moment for the models
+            release_idle(embedder, self.config.model_idle_minutes)
         if self._watcher is not None and not self._watcher.alive() and not self._polling:
             log.warning("the file watcher stopped; scanning the repo every %.0f s instead", POLL_EVERY)
             self._polling = True
@@ -542,20 +544,6 @@ class CodememService:
                 return True
             time.sleep(0.05)
         return all(e.ready for e in embedders)
-
-    def _unload_idle_models(self) -> None:
-        """Free every model nothing has embedded with for `model_idle_minutes` (0 keeps them).
-        The embedder refuses while a call is using its model, so this needs no lock of its own."""
-        minutes = self.config.model_idle_minutes
-        if minutes <= 0:
-            return
-        for embedder in list(self._embedders.values()):
-            try:
-                if embedder.unload(minutes * 60):
-                    log.info("unloaded %s after %g idle minutes", embedder.model_name, minutes)
-            except Exception:  # the writer must go on; touching it puts the next try an idle time away
-                log.exception("could not unload %s", embedder.model_name)
-                embedder.touch()
 
     def _models_loaded(self) -> bool | None:
         """Whether the model of every enabled vector type is in this process's memory. None when

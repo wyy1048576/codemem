@@ -21,7 +21,8 @@ built without them, and one that is asked for the local model there names what i
 two ways out.
 
 A local model is loaded at its first use and can leave memory while idle (`Embedder.unload`,
-docs/architecture.md §3.5); the next call loads it again.
+docs/architecture.md §3.5); the next call loads it again. `Embedder.trim` gives back only what
+its calls needed besides it.
 """
 
 from __future__ import annotations
@@ -58,6 +59,9 @@ FALLBACK_PROMPTS = {
 }
 _AS_GIVEN = ""  # no prompt: the text exactly as given
 _QUERY_CACHE_SIZE = 512
+# A model's working memory is given back once it has made no call for this long. Calls closer
+# together are one burst, so nothing is given back between two calls of a batch.
+TRIM_AFTER_IDLE = 5.0
 # The local model's packages, by the name pip installs them under, with the name to print.
 _LOCAL_PACKAGES = {"torch": "PyTorch", "sentence-transformers": "sentence-transformers"}
 
@@ -89,14 +93,16 @@ def l2_normalize(vecs: np.ndarray) -> np.ndarray:
 
 class _Uses:
     """Who is using a model: the embedding calls in progress, and when the last one ended. It
-    decides when the model may leave memory (`Embedder.unload`): never under a running call, and
-    only after the idle time asked for. Tests replace `clock`, so they need not wait."""
+    decides when a model's memory may be given back, never under a running call and only after
+    the idle time asked for: the model itself (`Embedder.unload`), or only what its calls needed
+    besides it (`Embedder.trim`). Tests replace `clock`, so they need not wait."""
 
     def __init__(self, clock: Callable[[], float] = time.monotonic):
         self.clock = clock
         self._lock = threading.Lock()
         self._calls = 0
         self._last = clock()
+        self._trimmed = True  # no call has run since the last trim: nothing to give back
 
     def __enter__(self) -> None:
         with self._lock:
@@ -106,6 +112,7 @@ class _Uses:
         with self._lock:
             self._calls -= 1
             self._last = self.clock()
+            self._trimmed = False
 
     def touch(self) -> None:
         with self._lock:
@@ -117,7 +124,19 @@ class _Uses:
         with self._lock:
             if self._calls or self.clock() - self._last < seconds:
                 return False
-            return bool(drop())
+            dropped = bool(drop())
+            self._trimmed = self._trimmed or dropped  # what the model's calls needed goes with it
+            return dropped
+
+    def trim_if_idle(self, seconds: float, trim: Callable[[], bool]) -> bool:
+        """Run `trim`, which gives back what calls needed besides the model, once after a burst of
+        calls: not while one is running, not before the last use is `seconds` old, and not again
+        until another call has ended. A call that starts meanwhile waits."""
+        with self._lock:
+            if self._calls or self._trimmed or self.clock() - self._last < seconds:
+                return False
+            self._trimmed = True
+            return bool(trim())
 
 
 def _counted(embed: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
@@ -131,16 +150,23 @@ def _counted(embed: Callable[..., np.ndarray]) -> Callable[..., np.ndarray]:
     return call
 
 
-def _release_memory(device: str) -> None:
-    """Hand a dropped model's memory back to the system. Collecting frees what reference cycles
-    kept of it. On a GPU (cuda, mps, xpu) PyTorch keeps freed blocks for reuse, and they stay
-    with the process until its cache is emptied."""
+def _empty_cache(device: str) -> bool:
+    """Empty the device's allocator cache; False for a device without one. On a GPU (cuda, mps,
+    xpu) PyTorch keeps freed blocks for reuse, and they stay with the process until this."""
     import torch
 
-    gc.collect()
     backend = getattr(torch, device, None)
-    if hasattr(backend, "empty_cache"):
-        backend.empty_cache()
+    if not hasattr(backend, "empty_cache"):
+        return False
+    backend.empty_cache()
+    return True
+
+
+def _release_memory(device: str) -> None:
+    """Hand a dropped model's memory back to the system: collect what reference cycles kept of
+    it, then empty the device's allocator cache."""
+    gc.collect()
+    _empty_cache(device)
 
 
 class Embedder(ABC):
@@ -190,6 +216,30 @@ class Embedder(ABC):
         that holds no model has nothing to free."""
         return False
 
+    def trim(self, idle_seconds: float = 0.0) -> bool:
+        """Give back what the model's calls needed besides the model itself (on a GPU, the
+        allocator's cache), once after a burst of calls: not under a running call, not before
+        the last use is `idle_seconds` old, and not again until another call has ended. The
+        model stays in memory. True when something was given back."""
+        return False
+
+
+def release_idle(embedder: Embedder, idle_minutes: float) -> None:
+    """What a quiet moment does for a model. Whoever owns the model calls this about once a
+    second while it has no work for it (the service's writer, the embedding server's queue): the
+    model is freed after `idle_minutes` without a call (0 keeps it), and otherwise what its calls
+    needed besides it is given back, once after each burst. The embedder refuses both under a
+    running call. An error is logged, not raised, and counts as a use, so the next try is an idle
+    time away."""
+    try:
+        if idle_minutes > 0 and embedder.unload(idle_minutes * 60):
+            log.info("unloaded %s after %g idle minutes", embedder.model_name, idle_minutes)
+        else:
+            embedder.trim(TRIM_AFTER_IDLE)
+    except Exception:
+        log.exception("could not give back the memory of %s", embedder.model_name)
+        embedder.touch()
+
 
 class FakeEmbedder(Embedder):
     """Deterministic hashed bag-of-tokens vectors. No downloads, ~instant.
@@ -197,8 +247,9 @@ class FakeEmbedder(Embedder):
     Texts sharing tokens get similar vectors, which is enough to exercise the
     pipeline and the usage signal in tests. It is not semantic.
 
-    It also stands in for a model in memory: it starts loaded, `unload` drops it, and the next
-    call loads it again (`load`), so tests cover the idle unload without the real model.
+    It also stands in for a model in memory: it starts loaded, `unload` drops it, the next call
+    loads it again (`load`), and `trim` counts in `trims`, so tests cover the idle unload and the
+    trim without the real model.
     """
 
     def __init__(self, dim: int = 64, clock: Callable[[], float] = time.monotonic):
@@ -206,6 +257,7 @@ class FakeEmbedder(Embedder):
         self._dim = dim
         self.calls: list[int] = []  # batch sizes, so tests can count embeddings
         self.loads = 0  # loads after an unload
+        self.trims = 0  # times its calls' working memory was given back
         self._loaded = True
         self._lock = threading.Lock()
         self._uses = _Uses(clock)
@@ -235,6 +287,13 @@ class FakeEmbedder(Embedder):
     def _drop(self) -> bool:
         had, self._loaded = self._loaded, False
         return had
+
+    def trim(self, idle_seconds: float = 0.0) -> bool:
+        return self._uses.trim_if_idle(idle_seconds, self._trim)
+
+    def _trim(self) -> bool:
+        self.trims += self._loaded
+        return self._loaded
 
     @_counted
     def _embed(self, texts: Sequence[str]) -> np.ndarray:
@@ -345,6 +404,9 @@ class SentenceTransformerEmbedder(Embedder):
     def _drop(self) -> bool:
         had, self._model = self._model is not None, None
         return had
+
+    def trim(self, idle_seconds: float = 0.0) -> bool:
+        return self._uses.trim_if_idle(idle_seconds, lambda: self._model is not None and _empty_cache(self.device))
 
     @property
     def device(self) -> str:
@@ -594,8 +656,9 @@ class PluginEmbedder(Embedder):
     as Class(model, config). It subclasses Embedder and gives `dim`, `embed_documents` and
     `embed_queries`; codemem names its vectors by model, weights version, class and the settings
     passed to it, so a new class or new weights re-embed. Its vectors are normalized here. A
-    class that can free its model defines `unload()`; it is called only while no call of the
-    class is running and none has for the idle time, so the class needs no clock or lock for it."""
+    class that can free its model defines `unload()`, and one that can give back its calls' working
+    memory defines `trim()`; each is called only while no call of the class is running and none has
+    for the idle time, so the class needs no clock or lock for them."""
 
     def __init__(self, spec: str, model_name: str, config: Config, version: str | None):
         inner = load_object(spec)(model_name, config)
@@ -623,6 +686,9 @@ class PluginEmbedder(Embedder):
 
     def unload(self, idle_seconds: float = 0.0) -> bool:
         return self._uses.drop_if_idle(idle_seconds, self.inner.unload)
+
+    def trim(self, idle_seconds: float = 0.0) -> bool:
+        return self._uses.trim_if_idle(idle_seconds, self.inner.trim)
 
     @_counted
     def embed_documents(self, texts: Sequence[str]) -> np.ndarray:

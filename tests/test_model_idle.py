@@ -15,7 +15,9 @@ import numpy as np
 import pytest
 
 from codemem.config import Config, config_from_dict
-from codemem.embedder import Embedder, FakeEmbedder, OpenAIEmbedder, PluginEmbedder, SentenceTransformerEmbedder
+from codemem.embedder import (
+    TRIM_AFTER_IDLE, Embedder, FakeEmbedder, OpenAIEmbedder, PluginEmbedder, SentenceTransformerEmbedder,
+)
 from codemem.render import format_status
 from codemem.service import CodememService
 
@@ -34,6 +36,9 @@ class Clock:
 
     def pass_minutes(self, minutes):
         self.now += 60 * minutes
+
+    def pass_seconds(self, seconds):
+        self.now += seconds
 
 
 class GatedModel(FakeEmbedder):
@@ -91,6 +96,21 @@ def test_touching_a_model_counts_as_a_use(model, clock):
     assert not model.unload(idle_seconds=300)
     clock.pass_minutes(6)
     assert model.unload(idle_seconds=300)
+
+
+def test_working_memory_is_given_back_once_after_a_burst_of_calls(model, clock):
+    for _ in range(3):
+        model.embed_documents(["revoke session"])
+    assert not model.trim(idle_seconds=5)  # a moment after a call: the burst may not be over
+    clock.pass_seconds(6)
+    assert model.trim(idle_seconds=5) and model.trims == 1 and model.ready
+    clock.pass_minutes(10)
+    assert not model.trim(idle_seconds=5) and model.trims == 1  # no call since: nothing to give back
+    model.embed_queries(["revoke session"])
+    clock.pass_seconds(6)
+    assert model.trim(idle_seconds=5) and model.trims == 2
+    model.embed_queries(["revoke session"])
+    assert model.unload() and not model.trim()  # what the calls needed went with the model
 
 
 def test_calls_that_arrive_together_wait_for_one_load(model):
@@ -230,6 +250,28 @@ def test_the_local_model_is_not_freed_under_a_running_call(local_model):
     assert emb.unload() and not emb.ready
 
 
+def test_the_allocator_cache_is_emptied_once_after_a_burst_and_never_under_a_call(local_model, monkeypatch):
+    from codemem import embedder
+
+    emptied = []
+    monkeypatch.setattr(embedder, "_empty_cache", lambda device: emptied.append(device) or True)
+    emb, stub = local_model
+    assert not emb.trim()  # no model, no call: nothing to give back
+    stub.encode_gate.clear()
+    call = threading.Thread(target=lambda: emb.embed_documents(["a"]))
+    call.start()
+    assert stub.encoding.wait(10)
+    assert not emb.trim() and emptied == []  # a call is running
+    stub.encode_gate.set()
+    call.join(10)
+    assert not emb.trim(idle_seconds=3600) and emptied == []  # the burst may not be over
+    assert emb.trim() and emptied == ["cpu"] and emb.ready
+    assert not emb.trim() and emptied == ["cpu"]  # once
+    emb.embed_documents(["a"])
+    assert emb.unload() and emptied == ["cpu", "cpu"]  # the unload empties it itself
+    assert not emb.trim() and emptied == ["cpu", "cpu"]
+
+
 # ---------------------------------------------------------------- plugins and the API
 
 
@@ -283,18 +325,33 @@ def test_a_plugin_embedder_is_asked_to_unload_only_while_no_call_runs(monkeypatc
     assert emb.ready
 
 
+def test_a_plugin_embedder_is_asked_to_trim_once_after_a_burst(monkeypatch):
+    class Trimmable(_UnloadablePlugin):
+        trims = 0
+
+        def trim(self, idle_seconds=0.0):
+            self.trims += 1
+            return True
+
+    emb = _plugin(monkeypatch, Trimmable)
+    assert not emb.trim() and emb.inner.trims == 0  # no call yet
+    emb.embed_documents(["a"])
+    assert not emb.trim(idle_seconds=3600) and emb.inner.trims == 0
+    assert emb.trim() and not emb.trim() and emb.inner.trims == 1 and emb.ready
+
+
 def test_embedders_without_a_model_have_nothing_to_unload(monkeypatch):
     class Plain(_UnloadablePlugin):
         unload = Embedder.unload  # a plugin that does not define the hook
 
     emb = _plugin(monkeypatch, Plain)
     emb.embed_documents(["a"])
-    assert not emb.unload() and emb.ready
+    assert not emb.unload() and not emb.trim() and emb.ready
     api = OpenAIEmbedder(config_from_dict({"embedding": {
         "provider": "openai", "model": "m", "base_url": "http://localhost:1/v1",
     }}).embedding)
     api.touch()
-    assert api.ready and not api.unload()
+    assert api.ready and not api.unload() and not api.trim()
 
 
 # ================================================================ the service
@@ -373,6 +430,30 @@ def test_the_idle_time_is_a_setting_that_no_index_depends_on():
     for bad in (-1, "ten"):
         with pytest.raises(ValueError, match="model_idle_minutes"):
             config_from_dict({"model_idle_minutes": bad})
+
+
+def test_the_writer_gives_working_memory_back_once_after_each_burst(service, model, clock):
+    """With the model kept for ever, too: this needs no setting."""
+    service.config.model_idle_minutes = 0
+    service._step()
+    assert model.trims == 0  # the build's calls are a moment old: the burst may not be over
+    clock.pass_seconds(TRIM_AFTER_IDLE + 1)
+    service._step()
+    service._step()
+    assert model.trims == 1 and model.ready
+    service.search("revoke session")
+    service._step()
+    assert model.trims == 1
+    clock.pass_seconds(TRIM_AFTER_IDLE + 1)
+    service._step()
+    assert model.trims == 2 and model.ready and model.loads == 0
+
+
+def test_an_unload_takes_the_working_memory_with_it(service, model, clock):
+    clock.pass_minutes(IDLE_MINUTES + 1)
+    service._step()
+    service._step()
+    assert not model.ready and model.trims == 0
 
 
 def test_two_vector_types_on_one_model_are_one_model_to_unload(service, model, clock):
