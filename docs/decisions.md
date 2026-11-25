@@ -14,11 +14,10 @@ work is redone, and the files it keeps. How the system works is in
                  │  tree-sitter + 8 grammars ......... reading code (chunks, calls)               │
                  │  SQLite with FTS5 (in Python) ..... storing everything; keyword search         │
                  │  FAISS ............................ the in-memory vector search index         │
-  codemem  ────► │  watchdog ......................... file events from the operating system     │
-  (Python 3.11+) │  MCP SDK (mcp) + httpx ............ the MCP server; the API client             │
+  codemem  ────► │  sentence-transformers + PyTorch .. running the local embedding model          │
+  (Python 3.11+) │  watchdog ......................... file events from the operating system     │
+                 │  MCP SDK (mcp) + httpx ............ the MCP server; the API client             │
                  │  pathspec, numpy .................. .gitignore rules; vectors                   │
-                 ├─────────────────────────── installed with codemem[local] ─────────────────────┤
-                 │  sentence-transformers + PyTorch .. running the local embedding model          │
                  └────────────────────────────────────────────────────────────────────────────────┘
                  ┌─────────────────────────── outside codemem ─────────────────────────────────────┐
                  │  Hugging Face ..... the embedding model, downloaded once (~1 GB), then offline  │
@@ -34,8 +33,9 @@ work is redone, and the files it keeps. How the system works is in
 
 In normal use (the local model, already downloaded), codemem needs nothing outside your machine.
 A codemem that embeds through an API or a `serve-embeddings` server needs that endpoint for its
-vectors, and no PyTorch: its environment is 89 MB, against 887 MB with `[local]` (Apple Silicon,
-Python 3.11).
+vectors. It never imports sentence-transformers or PyTorch, so it also runs in an environment
+built without the two (README, "One model for several codemem processes"): 46 packages and 81 MB,
+against 887 MB for the environment `uv sync` builds (Apple Silicon, Python 3.11, uv 0.12.19).
 
 ---
 
@@ -44,7 +44,7 @@ Python 3.11).
 | Dependency | Why this one | If it's missing or down | How you'd notice | Backup |
 |---|---|---|---|---|
 | **The embedding model**, `jinaai/jina-code-embeddings-0.5b`, from Hugging Face | trained for code search; small enough for a laptop (0.5B); free and private | Before the first download (no network, Hugging Face down, wrong name): searches answer from keywords only, each after a wait of about 4 s, and new edits wait in the queue. Once downloaded, it loads with no network | `index_status` shows the load error. Search notes say the model is "still loading" (a known gap, §8) | Keyword search keeps working. Copy the model cache (`HF_HOME`) from another machine, point `vectors.code.model` at a local folder, or use an API |
-| **sentence-transformers + PyTorch** (the `local` extra) | run the model on CUDA, Apple GPUs (MPS) or the CPU | An install without the extra can't run the local model. `codemem index` and `search` stop with one sentence that names what is missing and both ways out. Under the MCP server, an update fails before it changes the index: an existing index keeps its chunks and vectors and answers from keywords, each search after a wait of about 4 s (§8), and a repo with no index gets none | the sentence, on the command line and as the error in `index_status` | `pip install "codemem[local]"`, or an embedding API, or a `serve-embeddings` server |
+| **sentence-transformers + PyTorch** | run the model on CUDA, Apple GPUs (MPS) or the CPU | They are imported only when the local model is used. In an environment built without them, for a client of an API or of a served model, the local model can't run: `codemem index` and `search` stop with one sentence that names what is missing, what to install and what to set instead. Under the MCP server, an update fails before it changes the index: an existing index keeps its chunks and vectors and answers from keywords, each search after a wait of about 4 s (§8), and a repo with no index gets none | the sentence, on the command line and as the error in `index_status` | `pip install torch sentence-transformers`, or an embedding API, or a `serve-embeddings` server |
 | **FAISS** (`faiss-cpu`) | exact vector search in memory, fast, no server, wheels for every platform | codemem doesn't start | an import error | none: required |
 | **SQLite with FTS5** | ships with Python; transactions; built-in BM25 | without FTS5 (rare custom Python builds) no index can be created | an error on the first index | a standard Python build (python.org, Homebrew, uv) |
 | **tree-sitter + grammars** (versions pinned) | one parser and official grammar for each of the nine languages | a language whose grammar fails can't be chunked; a file that fails to parse is indexed from what was recovered | `index_status` lists files with parse errors | none needed per file |
@@ -222,5 +222,6 @@ whoever can reach that address; `CODEMEM_SERVE_KEY` asks for a key then (§3).
 | an API outage | each search waits about 31 s, then fails; `index_status` shows no error | fall back to keywords at once, with a note, and show the error in `index_status` |
 | the model fails to load | each search waits about 4 s (the first took 7.5 s in a test), and the note says the model is "still loading" | say it failed, and stop waiting for it |
 | the vector cache only grows | about 4.5 KB per vector, forever | a "last used" date per entry, and a size cap |
+| PyTorch is always installed | about 0.8 GB, even for a codemem that only embeds through an API or a `serve-embeddings` server | make the local model an optional install; needs a one-line change in the eval's dependencies. Such a client's environment can be built without the two packages by hand (README, "One model for several codemem processes") |
 | the local embedder gives jina's two prompts to every model | a model without jina's prompt names (`nl2code_query`, `nl2code_document`) is embedded with jina's prompt texts in front, which it was not trained with. `serve-embeddings` prints the same two texts as its clients' prefixes, so a served model matches the model in process | the model's own `query` and `document` prompts, else `query_prefix` and `document_prefix`. The key of those models then has to change, and the document prefix becomes an index-time setting of local indexes |
 | the embedding server's client reads vectors as JSON text | 1.2 to 2.1 ms a text in a build (§3): 1 to 2% of the model's time on the M1, and a larger share the faster the model is. A search does not notice it | the server also answers `encoding_format = "base64"`, which costs 0.06 to 0.12 ms a text in the same measurement; have the client ask for it |

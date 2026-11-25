@@ -164,7 +164,7 @@ class FakeEmbedder(Embedder):
 
 
 def resolve_device(preference: str) -> str:
-    """The device a local model runs on. An install without PyTorch has nothing to run on a GPU: cpu."""
+    """The device a local model runs on. An environment without PyTorch has nothing to run on a GPU: cpu."""
     if preference == "cpu" or find_spec("torch") is None:
         return "cpu"
     import torch

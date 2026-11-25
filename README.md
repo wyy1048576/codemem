@@ -24,22 +24,13 @@ exact strings.
 ## Install
 
 ```bash
-uv tool install "codemem[local] @ git+https://github.com/<org>/codemem"   # or: pipx install "codemem[local] @ git+..."
+uv tool install git+https://github.com/<org>/codemem   # or: pipx install git+...
 ```
-
-`[local]` is the local embedding model: PyTorch and sentence-transformers. A codemem that embeds
-through an API, or through another codemem's `serve-embeddings` (below), needs neither:
-
-```bash
-uv tool install git+https://github.com/<org>/codemem
-```
-
-On an Apple Silicon Mac the environment is 887 MB with `[local]` and 89 MB without it.
 
 For development:
 
 ```bash
-uv sync --extra local      # plain `uv sync` leaves PyTorch out; the fast suite passes either way
+uv sync
 uv run pytest              # fast suite with a fake embedding model, no download
 uv run pytest -m model     # the real jina-code-embeddings-0.5b (downloads ~1 GB once)
 ```
@@ -173,7 +164,7 @@ memory, about 2.2 GB. With several git worktrees, or several containers, run the
 let every codemem embed through it:
 
 ```bash
-codemem serve-embeddings            # on 127.0.0.1:8791; it needs the [local] install, its clients do not
+codemem serve-embeddings            # on 127.0.0.1:8791
 ```
 
 It serves the local model your config selects (`[vectors.*] model`, `device`, `dtype`,
@@ -200,9 +191,8 @@ sit in the config file the server reads too. Keep all of it:
 - **`space` names the model's settings on the server:** its runtime, longest text, precision and
   device. It lets an index built through one address be used through another.
 
-*In containers.* The server runs on the host, where the GPU is. Each container has a codemem
-installed without `[local]`, and the same section with the host's address, as the container sees
-it, in `base_url`:
+*In containers.* The server runs on the host, where the GPU is. Each container has a codemem and
+the same section, with the host's address, as the container sees it, in `base_url`:
 
 | Docker | The server listens on | `base_url` in the container |
 |---|---|---|
@@ -212,6 +202,20 @@ it, in `base_url`:
 `docker network inspect <network> -f '{{(index .IPAM.Config 0).Gateway}}'` prints the gateway
 address. The address plays no part in the index: one built on the host opens in a container
 without embedding anything again, because both sides carry the same `space`.
+
+*A client without the model's packages.* A codemem that embeds through the server, or through an
+API, never imports PyTorch or sentence-transformers. Its environment can be built without the two,
+which keeps a container image small. uv leaves named packages out of an install, with everything
+only they need:
+
+```bash
+printf 'torch\nsentence-transformers\n' > no-local-model.txt
+uv pip install --excludes no-local-model.txt git+https://github.com/<org>/codemem   # or: uv tool install --excludes ...
+```
+
+That environment is 46 packages and 81 MB on an Apple Silicon Mac, against 887 MB for the one
+`uv sync` builds. A codemem in it that is asked for the local model stops with one sentence: what
+is missing, what to install, and what to set instead.
 
 *A key.* The server listens on the loopback address unless `--host` says otherwise, and asks for
 no key. To ask for one, start it with the key in the environment variable `CODEMEM_SERVE_KEY`;
@@ -250,8 +254,6 @@ version = "run-7"                            # optional label for the weights
 **Other notes:**
 - `CODEMEM_MODEL=fake` uses a fast, meaningless hash-based model everywhere, for tests and timing.
   `serve-embeddings` serves it too.
-- Without `[local]`, a codemem that is asked for the local model says so and names the two ways
-  out: install `codemem[local]`, or embed through an API or a `serve-embeddings` server.
 - On Apple Silicon, `auto` picks the Mac GPU (`mps`). `device = "xpu"` (Intel Arc) needs a
   PyTorch build with XPU support, and falls back to the CPU with a warning.
 

@@ -575,7 +575,7 @@ A change to any of these must be made together with the eval:
   counts its tokens.
 - `config_from_dict(dict)`, `Config.enabled_vec_types()`, `Config.model_id()`,
   `Config.index_settings()`, `embedder.resolve_device()`, `codemem.__version__`.
-  `resolve_device()` answers `cpu` in an install without PyTorch, whatever it is asked.
+  `resolve_device()` answers `cpu` in an environment without PyTorch, whatever it is asked.
 - `CODEMEM_MODEL`-style fake models: `fake` and `fake:16` work, and `fake:not-a-number` fails
   indexing.
 - `full=True` wipes in place and never deletes the folder, because the eval keeps its marker files

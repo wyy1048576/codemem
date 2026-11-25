@@ -273,7 +273,8 @@ never served from the cache.
 of an eval) would each hold a copy, and a container has no GPU to run it on. So the local model
 can be served: `codemem serve-embeddings` (`embedserver.py`) puts it behind the same OpenAI-style
 endpoint that an embedding API has, and the other processes embed through it with
-`[embedding] provider = "openai"`. They need no PyTorch.
+`[embedding] provider = "openai"`. They never import PyTorch, so a container's codemem also runs
+in an environment built without it (README).
 
 ```
  codemem in worktree A ──┐
