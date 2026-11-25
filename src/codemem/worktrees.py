@@ -1,11 +1,13 @@
 """How an index follows git worktrees (docs/architecture.md §4.6).
 
 A repository can have several checkouts: the main one, and one for each `git worktree add`. Each
-checkout has its own index folder, named after its path. A checkout with no index starts from a
-copy of the index of another checkout of the same repository, so its first full check re-chunks
-only the files whose content differs.
+checkout has its own index folder, named after its path. This module does two things for them:
 
-This applies to default index folders only (`config.default_index_dir`), never to a folder the
+- a checkout with no index starts from a copy of the index of another checkout of the same
+  repository, so its first full check re-chunks only the files whose content differs;
+- the index of a linked worktree is deleted once the worktree is gone.
+
+Both apply to default index folders only (`config.default_index_dir`), never to a folder the
 caller chose.
 """
 
@@ -19,7 +21,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from .config import default_index_dir
+from .config import codemem_home, default_index_dir
 from .indexer import git_head
 from .store import SCHEMA_VERSION, IndexLock
 from .watcher import git_dir
@@ -27,10 +29,16 @@ from .watcher import git_dir
 log = logging.getLogger(__name__)
 
 DB = "index.db"
+RECORD = "worktree.json"  # in a linked worktree's index folder: the worktree and its repository
 COPY_LOCK_WAIT = 300.0  # another process is copying into the same folder: wait, then use its index
 # Meta rows that describe the checkout an index was built for. A copy starts without them, so
 # it does not count as this checkout's index until a full check has compared it with the files.
 _CHECKOUT_META = ("indexed_at", "last_scan_at", "last_update", "coverage", "repo_path")
+# Every file codemem writes into an index folder. Clean-up deletes these and nothing else, the
+# record last: a clean-up that was interrupted is then finished by the next one.
+_OWN_FILES = (
+    DB, f"{DB}-wal", f"{DB}-shm", f"{DB}-journal", f"{DB}.copy-*", "vec_*", "write.lock", f"{RECORD}.*.tmp", RECORD,
+)
 
 
 # --------------------------------------------------------------------------- git
@@ -173,22 +181,110 @@ def copy_index(source: Path, index_dir: Path) -> bool:
     return True
 
 
+# --------------------------------------------------------------------------- clean-up
+
+
+def _read_record(folder: Path) -> tuple[Path, Path] | None:
+    """(worktree folder, shared git folder) from an index folder's record, or None."""
+    try:
+        record = json.loads((folder / RECORD).read_text("utf-8"))
+        worktree, repository = record["worktree"], record["repository"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(worktree, str) or not isinstance(repository, str) or not worktree or not repository:
+        return None
+    return Path(worktree), Path(repository)
+
+
+def record_worktree(root: Path, index_dir: Path) -> None:
+    """Note in a linked worktree's default index folder which worktree it serves, so that the
+    folder can be found and deleted once the worktree is gone."""
+    common = git_common_dir(root)
+    if common is None or not is_linked_worktree(root):
+        return
+    record = {"worktree": str(root.resolve()), "repository": str(common)}
+    path = index_dir / RECORD
+    try:
+        if json.loads(path.read_text("utf-8")) == record:
+            return
+    except (OSError, ValueError):
+        pass
+    index_dir.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{RECORD}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(record, indent=1), "utf-8")
+    os.replace(tmp, path)
+
+
+def removable_indexes(root: Path) -> list[Path]:
+    """Index folders of linked worktrees of `root`'s repository that are gone.
+
+    A folder qualifies only if all of this holds, so that nothing else can ever be deleted:
+    it is a real folder directly inside codemem's index folder; it has a record, which codemem
+    writes only for a linked worktree's default index; the record names this repository; the
+    folder's name is the one codemem gives that worktree's index; the worktree's folder no
+    longer exists; and git no longer has the worktree registered (a folder that is only missing
+    for now, on a drive that is not mounted, stays registered)."""
+    common = git_common_dir(root)
+    indexes = codemem_home() / "indexes"
+    if common is None or not indexes.is_dir():
+        return []
+    registered = {os.path.normcase(str(p)) for p in checkouts(common)}
+    out = []
+    for folder in sorted(indexes.iterdir()):
+        record = None if folder.is_symlink() or not folder.is_dir() else _read_record(folder)
+        if record is None:
+            continue
+        worktree, repository = record
+        if (
+            _same(repository, common)
+            and default_index_dir(worktree).name == folder.name
+            and not worktree.exists()
+            and os.path.normcase(str(worktree.resolve())) not in registered
+        ):
+            out.append(folder)
+    return out
+
+
+def remove_index(folder: Path) -> None:
+    """Delete the files codemem wrote into an index folder, then the folder if nothing else is
+    in it. Skipped while a codemem process is writing that index."""
+    lock = IndexLock(folder)
+    try:
+        lock.acquire(timeout=0)
+    except TimeoutError:
+        return
+    lock.release()
+    for pattern in _OWN_FILES:
+        for path in folder.glob(pattern):
+            if path.is_file() and not path.is_symlink():
+                path.unlink()
+    try:
+        folder.rmdir()
+    except OSError:  # something codemem did not write is in it: it stays
+        log.info("left %s in place: it holds files codemem did not write", folder)
+
+
 # --------------------------------------------------------------------------- the entry point
 
 
 def prepare_index(root: Path, index_dir: Path, settings: dict[str, Any]) -> Path | None:
-    """What every codemem start does before it opens a checkout's default index folder: start a
-    new index from a copy if another checkout of the repository has one. Returns the index
-    folder that was copied, or None. A failure here costs time, never the start: the index is
-    then built from nothing."""
+    """What every codemem start does before it opens a checkout's default index folder: delete
+    the indexes of this repository's removed worktrees, start a new index from a copy if
+    another checkout has one, and record a linked worktree's index for later clean-up. Returns
+    the index folder that was copied, or None. A failure here costs time, never the start: the
+    index is then built from nothing."""
+    source = None
     try:
-        if (index_dir / DB).exists():
-            return None
-        source = copy_source(root, settings)
-        if source is None or not copy_index(source, index_dir):
-            return None
-        log.info("the index for %s starts as a copy of %s", root, source)
-        return source
+        for folder in removable_indexes(root):
+            log.info("the worktree of the index %s is gone; deleting the index", folder)
+            remove_index(folder)
+        if not (index_dir / DB).exists():
+            source = copy_source(root, settings)
+            if source is not None and not copy_index(source, index_dir):
+                source = None
+            if source is not None:
+                log.info("the index for %s starts as a copy of %s", root, source)
+        record_worktree(root, index_dir)
     except Exception:
-        log.warning("could not start the index in %s from a copy", index_dir, exc_info=True)
-        return None
+        log.warning("could not prepare the index folder %s", index_dir, exc_info=True)
+    return source

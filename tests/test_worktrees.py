@@ -1,6 +1,7 @@
-"""A new git worktree's index starts from a copy of another checkout's (worktrees.py). Every
-repository and worktree here is made under `tmp_path`."""
+"""A new git worktree's index starts from a copy of another checkout's, and the index of a removed
+worktree is deleted (worktrees.py). Every repository and worktree here is made under `tmp_path`."""
 
+import json
 import os
 import shutil
 import sqlite3
@@ -13,8 +14,10 @@ from codemem.cli import main
 from codemem.config import default_index_dir
 from codemem.indexer import Indexer
 from codemem.service import CodememService
-from codemem.store import Store, diff_snapshots
-from codemem.worktrees import DB, checkouts, copy_index, copy_source, git_common_dir, is_linked_worktree
+from codemem.store import IndexLock, Store, diff_snapshots
+from codemem.worktrees import (
+    DB, RECORD, checkouts, copy_index, copy_source, git_common_dir, is_linked_worktree, removable_indexes,
+)
 
 pytestmark = needs_git
 
@@ -227,6 +230,7 @@ def test_an_index_folder_the_caller_chose_is_left_alone(repo, main_index, tmp_pa
     service = CodememService(tree, index_dir=tmp_path / "chosen")
     try:
         assert service.copied_from is None and service.store.counts()["chunks"] == 0
+        assert not (tmp_path / "chosen" / RECORD).exists()
     finally:
         service.close()
 
@@ -297,6 +301,121 @@ def test_an_index_that_was_never_checked_is_not_copied(repo, main_index, tmp_pat
     shutil.rmtree(main_index)
     second = add_worktree(repo, tmp_path / "trees" / "second", "--detach", "feature")
     assert copy_source(second, _settings(second)) is None
+
+
+# --------------------------------------------------------------------------- clean-up
+
+
+def _start(checkout):
+    """What any codemem start does for a checkout's default index folder."""
+    CodememService(checkout).close()
+
+
+def test_the_index_of_a_removed_worktree_is_deleted(repo, main_index, tmp_path):
+    kept = add_worktree(repo, tmp_path / "trees" / "kept", "feature")
+    gone = add_worktree(repo, tmp_path / "trees" / "gone", "-b", "gone")
+    for tree in (kept, gone):
+        _indexed(tree)
+    kept_index, gone_index = default_index_dir(kept), default_index_dir(gone)
+    assert json.loads((gone_index / RECORD).read_text()) == {"worktree": str(gone), "repository": str(repo / ".git")}
+    assert not (main_index / RECORD).exists()  # the main checkout is no worktree: never recorded, never deleted
+    _start(repo)
+    assert gone_index.is_dir()  # the worktree exists
+
+    git(repo, "worktree", "remove", "--force", str(gone))
+    assert removable_indexes(kept) == [gone_index]  # seen from any checkout of the repository
+    _start(repo)
+    assert not gone_index.exists()
+    assert (kept_index / DB).is_file() and (main_index / DB).is_file()
+
+
+def test_a_missing_worktree_keeps_its_index_while_git_still_lists_it(repo, main_index, tmp_path):
+    """A folder can be missing for a while (a drive that is not mounted). git still lists the
+    worktree then, and the index stays until git forgets it."""
+    tree = add_worktree(repo, tmp_path / "trees" / "away", "feature")
+    _indexed(tree)
+    index = default_index_dir(tree)
+    shutil.rmtree(tree)
+    _start(repo)
+    assert (index / DB).is_file()
+    git(repo, "worktree", "prune")
+    _start(repo)
+    assert not index.exists()
+
+
+def test_clean_up_refuses_everything_it_cannot_prove_is_a_removed_worktrees_index(repo, main_index, tmp_path, isolated_home):
+    tree = add_worktree(repo, tmp_path / "trees" / "gone", "feature")
+    _indexed(tree)
+    index = default_index_dir(tree)
+    indexes = isolated_home / "indexes"
+    record = (index / RECORD).read_text()
+
+    # Another repository's worktree, recorded and gone: not this repository's to delete.
+    other = tmp_path / "other"
+    shutil.copytree(repo, other, ignore=shutil.ignore_patterns(".git"))
+    two_commits(other)
+    other_tree = add_worktree(other, tmp_path / "trees" / "other-gone", "feature")
+    _indexed(other_tree)
+    other_index = default_index_dir(other_tree)
+    git(other, "worktree", "remove", "--force", str(other_tree))
+
+    git(repo, "worktree", "remove", "--force", str(tree))
+    assert removable_indexes(repo) == [index]
+
+    # A copy of the folder under another name: not the folder codemem made for that worktree.
+    renamed = indexes / "a-backup"
+    shutil.copytree(index, renamed)
+    # A folder with no record, and records that cannot be read or name nothing.
+    unrecorded = indexes / "unrecorded"
+    shutil.copytree(index, unrecorded)
+    (unrecorded / RECORD).unlink()
+    for name, text in (("broken", "{not json"), ("empty", "{}"), ("wrong-types", '{"worktree": 1, "repository": []}')):
+        shutil.copytree(index, indexes / name)
+        (indexes / name / RECORD).write_text(text)
+    # A link in the index folder to a folder elsewhere that holds the same record.
+    elsewhere = tmp_path / "elsewhere" / index.name
+    shutil.copytree(index, elsewhere)
+    shutil.move(str(index), str(tmp_path / "moved-away"))
+    index.symlink_to(elsewhere, target_is_directory=True)
+    assert removable_indexes(repo) == []
+    _start(repo)
+    for folder in (renamed, unrecorded, indexes / "broken", indexes / "empty", indexes / "wrong-types", elsewhere,
+                   other_index, main_index):
+        assert (folder / DB).is_file(), folder
+
+    # The real folder again, with a file codemem did not write and one being written right now.
+    index.unlink()
+    shutil.move(str(tmp_path / "moved-away"), str(index))
+    assert (index / RECORD).read_text() == record and removable_indexes(repo) == [index]
+    lock = IndexLock(index)
+    lock.acquire()
+    try:
+        _start(repo)
+        assert (index / DB).is_file()  # a codemem process is writing it: left for a later start
+    finally:
+        lock.release()
+    for name in ("notes.txt", f"{DB}.bak"):
+        (index / name).write_text("mine")
+    (index / "vec_folder").mkdir()
+    _start(repo)
+    assert sorted(p.name for p in index.iterdir()) == [f"{DB}.bak", "notes.txt", "vec_folder"]  # codemem's own files went
+    _start(repo)  # and what is left has no record: it is never looked at again
+    assert removable_indexes(repo) == [] and len(list(index.iterdir())) == 3
+
+
+def test_a_worktree_made_again_in_the_same_folder_keeps_the_folders_index(repo, main_index, tmp_path):
+    tree = add_worktree(repo, tmp_path / "trees" / "again", "-b", "first")
+    _indexed(tree)
+    git(repo, "worktree", "remove", "--force", str(tree))
+    add_worktree(repo, tmp_path / "trees" / "again", "feature")
+    service = CodememService(tree)
+    try:
+        assert service.copied_from is None  # the folder's index is there: one update brings it to the new commit
+        stats = service.update()
+        assert {"files_changed": stats.files_changed, "files_deleted": stats.files_deleted} == TO_B
+        assert service.indexer.verify() == []
+    finally:
+        service.close()
 
 
 def test_a_copied_index_equals_a_fresh_build_when_the_source_had_work_queued(repo, tmp_path, fake_config):
