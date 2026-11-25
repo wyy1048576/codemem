@@ -36,6 +36,17 @@ def test_load_recipe_pandas():
     assert recipe.repo == "pandas-dev/pandas"
     assert recipe.name == "pandas"
     assert "{files}" in recipe.test and "{junit}" in recipe.test
+    # A test file that does not import before the fix must not stop the other files.
+    assert "--continue-on-collection-errors" in recipe.test
+
+
+def test_load_recipe_playwright():
+    recipe = gen.load_recipe("playwright")
+    assert len(recipe.suites) == 3
+    # A fixed number of workers, so test time does not depend on the host's processors.
+    assert all("--workers=4" in suite.test for suite in recipe.suites)
+    # CI turns on retries.
+    assert all("CI=" not in suite.test for suite in recipe.suites) and "CI" not in dict(recipe.env)
 
 
 def test_load_recipe_rejects_unknown_fields(tmp_path):

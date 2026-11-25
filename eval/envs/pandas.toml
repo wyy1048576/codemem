@@ -33,6 +33,7 @@ refresh = ["python -c 'import pandas'"]
 
 test_files = ["pandas/tests/**/test_*.py"]
 # pytest-qt is off: it needs display libraries that the image does not have.
-test = "python -m pytest {files} -p no:cacheprovider -p no:pytest-qt -n 8 --junitxml={junit}"
+# --continue-on-collection-errors: before the fix, a new test file can fail to import. The other files must still run.
+test = "python -m pytest {files} -p no:cacheprovider -p no:pytest-qt -n 8 --continue-on-collection-errors --junitxml={junit}"
 parser = "junit"
 timeout_min = 10
