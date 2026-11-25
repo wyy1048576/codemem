@@ -17,16 +17,19 @@ import json
 import logging
 import os
 import sqlite3
+import unicodedata
+from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
-from .config import codemem_home, default_index_dir
+from .config import Config, codemem_home, default_index_dir
 from .indexer import git_head
 from .store import SCHEMA_VERSION, IndexLock
 from .watcher import git_dir
 
 log = logging.getLogger(__name__)
+T = TypeVar("T")
 
 DB = "index.db"
 RECORD = "worktree.json"  # in a linked worktree's index folder: the worktree and its repository
@@ -66,26 +69,58 @@ def is_linked_worktree(root: Path) -> bool:
     return own is not None and (own / "commondir").is_file()
 
 
-def checkouts(common: Path) -> list[Path]:
-    """Every checkout of the repository whose shared git folder is `common`: the main one (a bare
-    repository has none), then the linked worktrees git has registered. Each
-    `<common>/worktrees/<id>/gitdir` holds the path of one worktree's `.git` file."""
-    out = [common.parent] if common.name == ".git" else []
+def linked_worktrees(common: Path, *, certain: bool = False) -> list[Path]:
+    """The folders of the linked worktrees git has registered: each
+    `<common>/worktrees/<id>/gitdir` holds the path of one worktree's `.git` file. An entry that
+    cannot be read is left out. With `certain` it raises instead: "git does not list it" must
+    never be concluded from a list that could not be read."""
     try:
         admins = sorted((common / "worktrees").iterdir())
+    except FileNotFoundError:  # git removes the folder with its last worktree
+        return []
     except OSError:
-        return out
+        if certain:
+            raise
+        return []
+    out = []
     for admin in admins:
         try:
             dot_git = Path((admin / "gitdir").read_text("utf-8").strip())
         except (OSError, ValueError):
+            if certain:
+                raise
             continue
         out.append((dot_git if dot_git.is_absolute() else admin / dot_git).resolve().parent)
     return out
 
 
+def checkouts(common: Path) -> list[Path]:
+    """Every checkout of the repository whose shared git folder is `common`: the main one (a bare
+    repository has none), then the linked worktrees."""
+    return ([common.parent] if common.name == ".git" else []) + linked_worktrees(common)
+
+
 def _same(a: Path, b: Path) -> bool:
     return os.path.normcase(str(a.resolve())) == os.path.normcase(str(b.resolve()))
+
+
+def _spelling_free(path: Path) -> str:
+    """A path without its letter case and Unicode form. On a disk that ignores case, git and
+    codemem can hold two spellings of one folder; where "the same folder" is the safe answer,
+    paths are compared this way."""
+    return unicodedata.normalize("NFC", str(path)).casefold()
+
+
+def _is_gone(path: Path) -> bool:
+    """`path` certainly does not exist. No permission to look, or a disk that does not answer, is
+    not "gone"."""
+    try:
+        os.lstat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return True
+    except OSError:
+        return False
+    return False
 
 
 # --------------------------------------------------------------------------- starting from a copy
@@ -150,12 +185,16 @@ def copy_index(source: Path, index_dir: Path) -> bool:
     lock = IndexLock(index_dir)
     lock.acquire(timeout=COPY_LOCK_WAIT)  # one process at a time decides and copies
     try:
-        # A `-wal` or `-shm` file without its database is left from an index deleted by hand:
-        # SQLite would replay it into the copy.
-        if any((index_dir / f"{DB}{suffix}").exists() for suffix in ("", "-wal", "-shm")):
+        # A `-wal`, `-shm` or `-journal` file without its database is left from an index deleted
+        # by hand: SQLite would replay it into the copy.
+        if any((index_dir / f"{DB}{suffix}").exists() for suffix in ("", "-wal", "-shm", "-journal")):
             return False
-        for stale in index_dir.glob(f"{DB}.copy-*"):  # a copy that was interrupted
-            stale.unlink()
+        # Also left from an index that is gone: a copy that was interrupted, and saved search
+        # indexes. The store matches those to vector rows by id, and the copy brings another
+        # index's ids.
+        for stale in (*index_dir.glob(f"{DB}.copy-*"), *index_dir.glob("vec_*")):
+            if stale.is_file():
+                stale.unlink()
         tmp = index_dir / f"{DB}.copy-{os.getpid()}"
         try:
             with (
@@ -200,12 +239,16 @@ def _read_record(folder: Path) -> tuple[Path, Path] | None:
 
 def record_worktree(root: Path, index_dir: Path) -> None:
     """Note in a linked worktree's default index folder which worktree it serves, so that the
-    folder can be found and deleted once the worktree is gone."""
+    folder can be found and deleted once the worktree is gone. Any other checkout's index folder
+    has no record."""
     common = git_common_dir(root)
+    path = index_dir / RECORD
     if common is None or not is_linked_worktree(root):
+        # The folder of a removed worktree is in use again, by another kind of checkout: this
+        # index is that checkout's now, and no clean-up may take it for the worktree's.
+        path.unlink(missing_ok=True)
         return
     record = {"worktree": str(root.resolve()), "repository": str(common)}
-    path = index_dir / RECORD
     try:
         if json.loads(path.read_text("utf-8")) == record:
             return
@@ -222,15 +265,20 @@ def removable_indexes(root: Path) -> list[Path]:
 
     A folder qualifies only if all of this holds, so that nothing else can ever be deleted:
     it is a real folder directly inside codemem's index folder; it has a record, which codemem
-    writes only for a linked worktree's default index; the record names this repository; the
-    folder's name is the one codemem gives that worktree's index; the worktree's folder no
-    longer exists; and git no longer has the worktree registered (a folder that is only missing
-    for now, on a drive that is not mounted, stays registered)."""
+    keeps only in a linked worktree's default index folder; the record names this repository;
+    the folder's name is the one codemem gives that worktree's index; the worktree's folder
+    certainly does not exist; and git no longer has the worktree registered (a folder that is
+    only missing for now, on a drive that is not mounted, stays registered). If git's list of
+    worktrees cannot be read, no folder qualifies."""
     common = git_common_dir(root)
     indexes = codemem_home() / "indexes"
     if common is None or not indexes.is_dir():
         return []
-    registered = {os.path.normcase(str(p)) for p in checkouts(common)}
+    try:
+        listed = {_spelling_free(p) for p in ([common.parent] if common.name == ".git" else [])}
+        listed |= {_spelling_free(p) for p in linked_worktrees(common, certain=True)}
+    except (OSError, ValueError):
+        return []
     out = []
     for folder in sorted(indexes.iterdir()):
         record = None if folder.is_symlink() or not folder.is_dir() else _read_record(folder)
@@ -240,8 +288,8 @@ def removable_indexes(root: Path) -> list[Path]:
         if (
             _same(repository, common)
             and default_index_dir(worktree).name == folder.name
-            and not worktree.exists()
-            and os.path.normcase(str(worktree.resolve())) not in registered
+            and _is_gone(worktree)
+            and _spelling_free(worktree.resolve()) not in listed
         ):
             out.append(folder)
     return out
@@ -269,26 +317,36 @@ def remove_index(folder: Path) -> None:
 # --------------------------------------------------------------------------- the entry point
 
 
-def prepare_index(root: Path, index_dir: Path, settings: dict[str, Any]) -> Path | None:
-    """What every codemem start does before it opens a checkout's default index folder: delete
-    the indexes of this repository's removed worktrees, start a new index from a copy if
-    another checkout has one, and record a linked worktree's index for later clean-up. Returns
-    the index folder that was copied, or None. A failure here costs time, never the start: the
-    index is then built from nothing."""
+def _attempt(what: str, step: Callable[[], T]) -> T | None:
+    """One step of preparing an index folder. A failure costs time, never the start of codemem."""
     try:
+        return step()
+    except Exception:
+        log.warning("could not %s", what, exc_info=True)
+        return None
+
+
+def prepare_index(root: Path, index_dir: Path, config: Config) -> Path | None:
+    """What every codemem start does before it opens a checkout's default index folder: delete
+    the indexes of this repository's removed worktrees, start a new index from a copy if another
+    checkout has one, and record whether the folder serves a linked worktree. Returns the index
+    folder that was copied, or None: the index is then built from nothing."""
+
+    def clean_up() -> None:
         for folder in removable_indexes(root):
             log.info("the worktree of the index %s is gone; deleting the index", folder)
             remove_index(folder)
-    except Exception:
-        log.warning("could not delete the indexes of removed worktrees", exc_info=True)
-    source = None
-    try:
-        if not (index_dir / DB).exists():
-            candidate = copy_source(root, settings)
-            if candidate is not None and copy_index(candidate, index_dir):
-                source = candidate
-                log.info("the index for %s starts as a copy of %s", root, source)
-        record_worktree(root, index_dir)
-    except Exception:
-        log.warning("could not prepare the index folder %s", index_dir, exc_info=True)
+
+    def start_from_a_copy() -> Path | None:
+        if (index_dir / DB).exists():
+            return None
+        source = copy_source(root, config.index_settings())
+        if source is None or not copy_index(source, index_dir):
+            return None
+        log.info("the index for %s starts as a copy of %s", root, source)
+        return source
+
+    _attempt("delete the indexes of removed worktrees", clean_up)
+    source = _attempt(f"start the index in {index_dir} from a copy", start_from_a_copy)
+    _attempt(f"record which checkout the index in {index_dir} serves", lambda: record_worktree(root, index_dir))
     return source

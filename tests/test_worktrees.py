@@ -14,12 +14,13 @@ import pytest
 from gitrepo import ONLY_ON_A, ONLY_ON_B, TO_B, UNCHANGED, add_worktree, commit, git, needs_git, two_commits
 
 from codemem.cli import main
-from codemem.config import default_index_dir
+from codemem.config import Config, default_index_dir, load_config
 from codemem.indexer import Indexer
+from codemem.search import search
 from codemem.service import CodememService
 from codemem.store import IndexLock, Store, diff_snapshots
 from codemem.worktrees import (
-    DB, RECORD, checkouts, copy_index, copy_source, git_common_dir, is_linked_worktree, removable_indexes,
+    DB, RECORD, _is_gone, checkouts, copy_index, copy_source, git_common_dir, is_linked_worktree, removable_indexes,
 )
 
 pytestmark = needs_git
@@ -177,11 +178,12 @@ def test_a_copy_never_replaces_an_index(main_index, tmp_path):
     assert own.get_meta("mine") is True and own.counts()["chunks"] == 0
     own.close()
 
-    leftover = tmp_path / "leftover"  # an index deleted by hand, its write-ahead log left behind
-    leftover.mkdir()
-    (leftover / f"{DB}-wal").write_bytes(b"old")
-    assert not copy_index(main_index, leftover)
-    assert not (leftover / DB).exists() and (leftover / f"{DB}-wal").read_bytes() == b"old"
+    for suffix in ("-wal", "-shm", "-journal"):  # an index deleted by hand, one of SQLite's side files left behind
+        leftover = tmp_path / f"leftover{suffix}"
+        leftover.mkdir()
+        (leftover / f"{DB}{suffix}").write_bytes(b"old")
+        assert not copy_index(main_index, leftover)
+        assert not (leftover / DB).exists() and (leftover / f"{DB}{suffix}").read_bytes() == b"old"
 
     assert not copy_index(tmp_path / "no-such-index", tmp_path / "new")
 
@@ -190,6 +192,34 @@ def test_a_copy_never_replaces_an_index(main_index, tmp_path):
     (interrupted / f"{DB}.copy-123").write_bytes(b"half")
     assert copy_index(main_index, interrupted)
     assert sorted(p.name for p in interrupted.iterdir()) == [DB, "write.lock"]
+
+
+def test_a_copy_clears_the_saved_search_indexes_a_deleted_index_left(repo, main_index, tmp_path):
+    """Fixed bug: the store matches a saved search index to the vector rows by id. Files left by
+    an index that was deleted by hand would be taken for the copy's, which has another index's ids."""
+    tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
+    index = default_index_dir(tree)
+    own = Store(index)  # an index of its own, built from nothing: its vector ids are not the main index's
+    Indexer(tree, own, load_config(tree)).update()
+    own.close()
+    assert list(index.glob("vec_*"))
+    for name in (DB, f"{DB}-wal", f"{DB}-shm"):
+        (index / name).unlink(missing_ok=True)
+    service = CodememService(tree)
+    fresh = Store(tmp_path / "fresh")
+    try:
+        assert service.copied_from == main_index and not list(index.glob("vec_*"))
+        service.update()
+        Indexer(tree, fresh, service.config).update()
+        for query in ("expire sessions", "record audit event", "disable user"):
+            by_meaning = [
+                [r.key for r in search(store, query, service.config, k=5, signals=["code", "usage"]).results]
+                for store in (service.store, fresh)
+            ]
+            assert by_meaning[0] == by_meaning[1]
+    finally:
+        fresh.close()
+        service.close()
 
 
 def test_two_starts_at_once_make_one_copy(main_index, tmp_path):
@@ -314,6 +344,11 @@ def test_a_failed_copy_or_clean_up_never_stops_a_start(repo, main_index, tmp_pat
         assert service.indexer.verify() == []
     finally:
         service.close()
+    shutil.rmtree(default_index_dir(tree))
+    monkeypatch.setattr(Config, "index_settings", fail)  # a model folder that cannot be read, say
+    service = CodememService(tree)
+    assert service.copied_from is None and (default_index_dir(tree) / RECORD).is_file()
+    service.close()
 
 
 def test_the_main_checkout_copies_from_a_worktree_too(repo, tmp_path):
@@ -482,6 +517,63 @@ def test_clean_up_refuses_everything_it_cannot_prove_is_a_removed_worktrees_inde
     assert sorted(p.name for p in index.iterdir()) == [f"{DB}.bak", "notes.txt", "vec_folder"]  # codemem's own files went
     _start(repo)  # and what is left has no record: it is never looked at again
     assert removable_indexes(repo) == [] and len(list(index.iterdir())) == 3
+
+
+def test_a_folder_taken_over_by_another_checkout_is_no_longer_a_worktrees_index(repo, main_index, tmp_path):
+    """Fixed bug: a worktree is removed, and its folder becomes a clone, a checkout of its own. The
+    index folder is the same (it is named after the path), so the worktree's record must go: or
+    the clone's index would be deleted the day its folder is missing."""
+    tree = add_worktree(repo, tmp_path / "trees" / "reused", "feature")
+    _indexed(tree)
+    index = default_index_dir(tree)
+    git(repo, "worktree", "remove", "--force", str(tree))
+    git(tmp_path, "clone", "-q", str(repo), str(tree))
+    _indexed(tree)
+    assert (index / DB).is_file() and not (index / RECORD).exists()
+    shutil.rmtree(tree)
+    _start(repo)
+    assert (index / DB).is_file()
+
+
+def test_another_spelling_of_a_worktrees_folder_is_the_same_worktree(repo, main_index, tmp_path):
+    """Fixed bug: on a disk that ignores case, git can list `Trees/Away` while codemem was started
+    in `trees/away`. The missing worktree is still listed, whatever the spelling."""
+    tree = add_worktree(repo, tmp_path / "Trees" / "Away", "feature")
+    spelled = tmp_path / "trees" / "away"
+    if not spelled.exists():
+        pytest.skip("this disk tells upper case from lower case")
+    _indexed(spelled)
+    index = default_index_dir(spelled)
+    assert index != default_index_dir(tree) and "away" in json.loads((index / RECORD).read_text())["worktree"]
+    shutil.rmtree(tree)
+    _start(repo)
+    assert (index / DB).is_file()
+    git(repo, "worktree", "prune")
+    _start(repo)
+    assert not index.exists()
+
+
+def test_nothing_is_deleted_when_it_cannot_be_known_that_a_worktree_is_gone(repo, main_index, tmp_path):
+    tree = add_worktree(repo, tmp_path / "trees" / "gone", "feature")
+    _indexed(tree)
+    index = default_index_dir(tree)
+    git(repo, "worktree", "remove", "--force", str(tree))
+    unreadable = repo / ".git" / "worktrees" / "unreadable"  # an entry that names no folder
+    unreadable.mkdir(parents=True)
+    assert removable_indexes(repo) == []
+    _start(repo)
+    assert (index / DB).is_file()
+    unreadable.rmdir()
+    assert removable_indexes(repo) == [index]
+
+    if os.name == "nt" or os.geteuid() == 0:
+        return  # no way here to make a folder that cannot be looked into
+    tree.parent.chmod(0)  # nor when nobody can tell whether the worktree's folder exists
+    try:
+        assert not _is_gone(tree) and removable_indexes(repo) == []
+    finally:
+        tree.parent.chmod(0o755)
+    assert _is_gone(tree) and removable_indexes(repo) == [index]
 
 
 def test_a_worktree_made_again_in_the_same_folder_keeps_the_folders_index(repo, main_index, tmp_path):

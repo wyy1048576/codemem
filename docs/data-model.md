@@ -417,7 +417,9 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 
 **An index that starts as a copy** of another checkout's (architecture.md §4.6) is that
 `index.db` as one SQLite backup, with every `files.mtime` set to 0 and without the `meta` rows
-`indexed_at`, `last_scan_at`, `last_update`, `coverage` and `repo_path`. An index without
+`indexed_at`, `last_scan_at`, `last_update`, `coverage` and `repo_path`. `vec_*` files that an
+index deleted by hand left in the folder are removed first: a saved search index is matched to
+the vector rows by id, and the copy has another index's ids. An index without
 `indexed_at` has not been compared with its checkout's files yet: `codemem search` asks for
 `codemem index` first, and the MCP server answers from it with its note that the index is still
 being built.

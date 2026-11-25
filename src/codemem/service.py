@@ -137,7 +137,7 @@ class CodememService:
             self.index_dir = Path(index_dir)
         else:
             self.index_dir = default_index_dir(self.repo_root)
-            self.copied_from = prepare_index(self.repo_root, self.index_dir, self.config.index_settings())
+            self.copied_from = prepare_index(self.repo_root, self.index_dir, self.config)
         self._make_embedder = embedder_factory
         self._embedders: dict[tuple, Embedder] = {}  # every embedder handed out so far, by model
         self.store = Store(

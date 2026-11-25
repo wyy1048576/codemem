@@ -265,13 +265,18 @@ deletes one only if all of this holds:
 
 1. it is a real folder (not a link) directly inside `~/.codemem/indexes/`;
 2. it holds a `worktree.json`, which codemem writes only into the default index folder of a
-   linked worktree, never into a main checkout's or into a folder given with `--index-dir`;
+   linked worktree, never into a main checkout's or into a folder given with `--index-dir`. A
+   start in a folder that has become another kind of checkout (a clone where a worktree used to
+   be) removes the record;
 3. that record names the repository codemem was started in;
 4. the folder's name is the one codemem gives the recorded worktree;
-5. the worktree's folder no longer exists;
+5. the worktree's folder certainly does not exist. A folder that codemem has no permission to
+   look at counts as existing;
 6. git no longer lists the worktree. After `git worktree remove` it does not. A folder that
    is missing for another reason (a drive that is not mounted, `rm -rf`) is still listed, and
-   its index stays until `git worktree prune` or git's own clean-up drops it.
+   its index stays until `git worktree prune` or git's own clean-up drops it. Two spellings of
+   one path that differ only in letter case count as the same folder. If git's list cannot be
+   read, nothing is deleted.
 
 Then it deletes the files codemem itself writes there (`index.db` and its SQLite side files,
 `vec_*`, `write.lock`, `worktree.json`) and removes the folder if it is empty. Any other file
