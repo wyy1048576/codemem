@@ -416,6 +416,74 @@ def cmd_e2e_grader_check(args) -> int:
     return 0 if passed == len(records) else 3
 
 
+def cmd_e2e_run(args) -> int:
+    from . import e2e_run
+    from . import generate as gen
+    from .status import JobStatus
+
+    try:
+        e2e_run.check_model(args.model)
+        setups = list(dict.fromkeys(args.setup or ["grep"]))
+        for name in setups:
+            e2e_run.get_setup(name)
+        recipe = gen.load_recipe(args.recipe)
+        tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e run: {exc}", file=sys.stderr)
+        return 1
+    if args.id:
+        wanted = set(args.id)
+        tasks = [t for t in tasks if t.id in wanted]
+    ready = [t for t in tasks if gen.tests_path(recipe, t).exists()]
+    if len(ready) < len(tasks):
+        print(f"note: {len(tasks) - len(ready)} tasks have no tests.json (not valid or not generated); skipped",
+              file=sys.stderr)
+    ready = ready[: args.limit] if args.limit else ready
+    if not ready:
+        print(f"e2e run: no task of {recipe.repo} in {args.tasks} has tests.json; run cmeval generate first",
+              file=sys.stderr)
+        return 1
+    order = e2e_run.plan_runs(ready, setups, args.reps)
+    if args.dry_run:
+        states = Counter()
+        for task, setup, rep in order:
+            state = e2e_run.run_state(e2e_run.run_dir(args.run_id, task.id, setup, rep))
+            states[state] += 1
+            print(f"{task.id} {setup} {rep} {state}")
+        print(f"{len(order)} runs: {states['done']} done, {states['redo']} to do again, {states['todo']} to do")
+        return 0
+    with JobStatus("e2e-run", args.run_id) as status:
+        progress = _printer(status)
+        progress(f"{recipe.repo}: {len(ready)} tasks x {len(setups)} setups x {args.reps} reps = {len(order)} runs, "
+                 f"model {args.model}")
+        try:
+            batch = e2e_run.run_batch(recipe, ready, run_id=args.run_id, setups=setups, model=args.model,
+                                      reps=args.reps, progress=progress, status=status)
+        except (gen.GenerateError, OSError) as exc:
+            print(f"e2e run: {exc}", file=sys.stderr)
+            status.fail(str(exc))
+            return 1
+        if batch.message:
+            print(f"e2e run: {batch.message}", file=sys.stderr)
+            status.fail(batch.message)
+        status.result(runs=batch.done, already_done=batch.skipped, discarded=batch.discarded)
+    print(f"run {args.run_id}: {batch.done} runs done, {batch.skipped} already done, {batch.discarded} discarded; "
+          f"files in {e2e_run.e2e_dir() / 'runs' / args.run_id}")
+    return batch.exit_code
+
+
+def cmd_e2e_score(args) -> int:
+    from .e2e_score import format_score, score
+
+    try:
+        summary = score(args.run_id)
+    except FileNotFoundError as exc:
+        print(f"e2e score: {exc}", file=sys.stderr)
+        return 1
+    print(format_score(summary))
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
@@ -582,6 +650,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jobs", type=int, default=1, help="tasks checked at the same time (default 1)")
     p.add_argument("--cpus", type=int, default=8, help="processors for one grading container (default 8)")
     p.set_defaults(func=cmd_e2e_grader_check)
+    p = e2e_sub.add_parser("run", help="run Claude Code on each valid task in its container, record it, and grade it")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--run-id", required=True, help="name of the run folder in CMEVAL_HOME/e2e/runs")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--setup", action="append", help="setup; can be given more than once (default grep)")
+    p.add_argument("--model", default="claude-haiku-5-5", help="a full model id (default claude-haiku-5-5)")
+    p.add_argument("--reps", type=int, default=1, help="repetitions of each task and setup (default 1)")
+    p.add_argument("--limit", type=int, help="at most this number of tasks")
+    p.add_argument("--dry-run", action="store_true", help="print the runs and how many exist already; run nothing")
+    p.set_defaults(func=cmd_e2e_run)
+    p = e2e_sub.add_parser("score", help="tables of an end-to-end run: completion, tokens, time, by setup")
+    p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
+    p.set_defaults(func=cmd_e2e_score)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
