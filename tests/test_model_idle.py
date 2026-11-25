@@ -176,8 +176,10 @@ def test_the_local_model_loads_at_its_first_use_and_again_after_an_unload(local_
     assert emb.ready and stub.instances == 2
 
 
-def test_for_the_apple_gpu_another_precision_is_converted_on_the_cpu_first(transformer, monkeypatch):
-    """Converting on that GPU leaves the first format's blocks in its allocator while the model lives."""
+def test_the_model_runs_in_the_precision_its_key_names_on_every_device(transformer, monkeypatch):
+    """The file's precision is not the key's: the weights are always converted. For the Apple GPU
+    that happens on the CPU first, because converting there leaves the file's blocks in the GPU's
+    allocator while the model lives."""
     import torch
 
     from codemem import embedder
@@ -185,12 +187,15 @@ def test_for_the_apple_gpu_another_precision_is_converted_on_the_cpu_first(trans
     def load(device, dtype):
         monkeypatch.setattr(embedder, "resolve_device", lambda preference: device)
         del transformer.built_on[:], transformer.moves[:]
-        SentenceTransformerEmbedder("stub-model", device=device, dtype=dtype).embed_documents(["a"])
-        return transformer.built_on, transformer.moves
+        emb = SentenceTransformerEmbedder("stub-model", device=device, dtype=dtype)
+        emb.embed_documents(["a"])
+        return emb.key.split("|")[-2:], transformer.built_on, transformer.moves
 
-    assert load("mps", "float16") == (["cpu"], [torch.float16, "mps"])
-    assert load("cuda", "float16") == (["cuda"], [torch.float16, "cuda"])  # on the device, then a move that changes nothing
-    assert load("mps", "float32") == (["mps"], [])  # as the file has it
+    assert load("cpu", "auto") == (["float32", "cpu"], ["cpu"], [torch.float32, "cpu"])
+    assert load("mps", "auto") == (["float16", "mps"], ["cpu"], [torch.float16, "mps"])
+    assert load("mps", "float32") == (["float32", "mps"], ["cpu"], [torch.float32, "mps"])
+    assert load("cuda", "auto") == (["float16", "cuda"], ["cuda"], [torch.float16, "cuda"])
+    assert load("cpu", "bfloat16") == (["bfloat16", "cpu"], ["cpu"], [torch.bfloat16, "cpu"])
 
 
 def test_the_local_model_is_loaded_once_by_calls_that_arrive_together(local_model):

@@ -362,6 +362,8 @@ class SentenceTransformerEmbedder(Embedder):
 
     @property
     def key(self) -> str:
+        """The model, the longest text, and the precision and device the model runs in: the
+        weights are converted to that precision when they are loaded."""
         model = f"{self.model_name}#{self.version}" if self.version else self.model_name  # unchanged for hub names
         return f"{model}|doc|L{self.max_seq_length}|{self.dtype}|{self.device}"
 
@@ -374,14 +376,14 @@ class SentenceTransformerEmbedder(Embedder):
                 from sentence_transformers import SentenceTransformer
 
                 log.info("loading %s on %s (%s)", self.model_name, self.device, self.dtype)
-                # For the Apple GPU, another precision than the file's is converted on the CPU,
-                # then moved. Converted on that GPU, the blocks of the file's format stay in its
-                # allocator for as long as the model lives: 1.1 GB on an M1 for the default
-                # model, stored as bfloat16. Other GPUs convert on the device (not measured).
-                first = "cpu" if self.dtype != "float32" and self.device == "mps" else self.device
+                # The weights are converted to the precision the key names, whatever the file
+                # stores: the default model's file is bfloat16, and is loaded as stored. For the
+                # Apple GPU that happens on the CPU, before the move: converted on that GPU, the
+                # blocks of the file's format stay in its allocator for as long as the model
+                # lives (1.1 GB on an M1). Other GPUs convert on the device (not measured).
+                first = "cpu" if self.device == "mps" else self.device
                 model = SentenceTransformer(self.model_name, device=first)
-                if self.dtype != "float32":
-                    model = model.to(getattr(torch, self.dtype)).to(self.device)
+                model = model.to(getattr(torch, self.dtype)).to(self.device)
                 if self.max_seq_length:
                     model.max_seq_length = min(model.max_seq_length or 10**9, self.max_seq_length)
                 available = getattr(model, "prompts", {}) or {}
