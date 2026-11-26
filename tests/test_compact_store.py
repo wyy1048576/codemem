@@ -537,8 +537,27 @@ def _candidate_ids(vs, q, size, allowed=None):
     return set(vs._ids[vs._candidates(q, size, allowed)].tolist())
 
 
+def _signed_permutation(dim):
+    """A rotation that every BLAS multiplies by exactly: each number of a rotated row is one number
+    of the row, its sign perhaps flipped. The store's rotation is a float32 matrix product, which
+    a BLAS can round differently in a call of another size (docs/architecture.md §5)."""
+    rng = np.random.default_rng(dim)
+    rotation = np.zeros((dim, dim), dtype=np.float32)
+    rotation[np.arange(dim), rng.permutation(dim)] = rng.choice(np.array([-1.0, 1.0], dtype=np.float32), size=dim)
+    rotation.setflags(write=False)
+    return rotation, f"signed-permutation-{dim}"
+
+
+@pytest.fixture
+def exact_rotation(monkeypatch):
+    """Codes that are a function of the vector alone on every BLAS. The tests that hold two
+    indexes to the same bits use it: they check the bookkeeping (codes kept with their ids, in id
+    order, through removes, moves and failed calls) and the cut through ties, not how a BLAS rounds."""
+    monkeypatch.setattr("codemem.store._rotation", _signed_permutation)
+
+
 @pytest.mark.parametrize("bits", [1, 4])
-def test_ties_at_the_candidate_cut_are_all_kept(bits):
+def test_ties_at_the_candidate_cut_are_all_kept(bits, exact_rotation):
     """Copies of one vector have the same codes. A cut through them takes every copy, so the
     candidates do not depend on the order the codes are held in: the same vectors under other ids
     (as in another database) give the same candidates."""
@@ -626,7 +645,7 @@ def _codes(vs):
 
 
 @pytest.mark.parametrize("bits", [1, 4])
-def test_an_index_patched_step_by_step_is_the_index_rebuilt_from_the_rows(bits):
+def test_an_index_patched_step_by_step_is_the_index_rebuilt_from_the_rows(bits, exact_rotation):
     """The same codes in the same order, whatever edits it went through: the same bytes when
     saved, and the same candidates."""
     v = for_index(_vecs(400, dim=48), 48)
@@ -878,7 +897,7 @@ def _fail_the(monkeypatch, call, nth):
 
 
 @pytest.mark.parametrize("bits", [1, 4])
-def test_an_upsert_that_fails_part_of_the_way_leaves_the_index_as_it_was(bits, monkeypatch):
+def test_an_upsert_that_fails_part_of_the_way_leaves_the_index_as_it_was(bits, monkeypatch, exact_rotation):
     """A change is several FAISS calls, on two indexes when there is a fine code. Whichever of
     them fails, the index holds exactly what it held before, and the error is raised."""
     v = for_index(_vecs(400, dim=32), 32)
