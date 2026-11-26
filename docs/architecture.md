@@ -1132,6 +1132,14 @@ checksum, the options and the rotation are the expected ones. What FAISS was not
 refused with a message: a code of more than 4,096 numbers when the config is read, a FAISS older
 than 1.15.1 when the index is opened.
 
+**A call that raises** (FAISS cannot get memory) must not leave the two FAISS indexes with
+different codes. A change is several calls: codes are added to each index, and for an id that
+is held already or is older than the newest held, codes are dropped and moved as well. New
+codes that one index took are taken off again when the other fails. Dropping and moving is
+done on copies of the two indexes, which replace them once every call has worked. Either way
+the index holds what it held before, the write raises, and the store adds the vectors again
+when it next catches up with the rows.
+
 **Loading a search index.** A search index is saved beside `index.db` and read back at the next
 start: 0.9 s for the exact index of 200,000 vectors, 0.5 s for the compact one. It is rebuilt
 from the stored vectors instead when the saved copy cannot be used: there is none, it is another

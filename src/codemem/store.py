@@ -465,19 +465,40 @@ class CompactVectorStore(VectorStore):
         if id_arr.ndim != 1 or vecs.shape != (len(id_arr), self.dim):
             raise ValueError(f"expected vectors of shape ({len(id_arr)}, {self.dim}), got {vecs.shape}")
         self._in_step()
-        self.remove(id_arr)
         rows = self._coded(vecs)
-        for index in self._indexes:
-            index.add(rows)
-        self._ids = np.concatenate([self._ids, id_arr])
-        self._in_step()
-        if not (self._ids[1:] > self._ids[:-1]).all():
-            # Ids are handed out in increasing order, so this is rare: a saved index or a catch-up
-            # brings vectors older than the newest held. Move them to their place.
-            order = np.argsort(self._ids, kind="stable")
+        # FAISS holds the codes in two indexes and changes them one call at a time. If a call fails
+        # after others worked, the index must still hold what it held before: the store then adds
+        # the vectors again when it next catches up, where an index left out of step would refuse
+        # every call until the process ended.
+        held = (self._ids, self._coarse, self._fine)
+        at_the_end = (len(self._ids) == 0 or id_arr[0] > self._ids[-1]) and bool((id_arr[1:] > id_arr[:-1]).all())
+        try:
+            if not at_the_end:
+                # Ids are handed out in increasing order, so this is rare: an id that is held
+                # already, or older than the newest held (a saved index or a catch-up brings
+                # those). Codes are then dropped and moved as well, which FAISS cannot take back:
+                # it is done on copies, and they take the indexes' place when all of it worked.
+                self._coarse, self._fine = (
+                    None if index is None else faiss.deserialize_index(faiss.serialize_index(index))
+                    for index in (self._coarse, self._fine)
+                )
+                self.remove(id_arr)
             for index in self._indexes:
-                index.permute_entries(order)  # the code at position i becomes the one that was at order[i]
-            self._ids = self._ids[order]
+                index.add(rows)
+            self._ids = np.concatenate([self._ids, id_arr])
+            self._in_step()
+            if not (self._ids[1:] > self._ids[:-1]).all():
+                order = np.argsort(self._ids, kind="stable")  # move them to their place
+                for index in self._indexes:
+                    index.permute_entries(order)  # the code at position i becomes the one that was at order[i]
+                self._ids = self._ids[order]
+        except BaseException:
+            self._ids, self._coarse, self._fine = held
+            for index in self._indexes:
+                if index.ntotal > len(self._ids):  # codes this call added at its end: take them off again
+                    added = np.packbits(np.arange(index.ntotal) >= len(self._ids), bitorder="little")
+                    index.remove_ids(faiss.IDSelectorBitmap(len(added), faiss.swig_ptr(added)))  # `added` outlives the call
+            raise
 
     def remove(self, ids: Iterable[int]) -> None:
         gone = np.isin(self._ids, np.fromiter(ids, dtype=np.int64))

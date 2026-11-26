@@ -554,6 +554,9 @@ it doesn't own.
   - A process sees an epoch change made by another process: it catches up by id before searching.
   - `index.db` goes back to an earlier state under a search index that was saved later: the two
     `save_id`s differ, and the index is rebuilt from the rows.
+  - FAISS fails in the middle of a change to a compact index: the index is left as it was before
+    the change, and the write raises after its commit. The index is then one epoch behind, and
+    catches up by id before the next search.
   - Another process deletes vectors while a compact index is searching: the rows it can no longer
     read are left out of the result, and the search takes more candidates to fill it.
 - **Large deletions** give pages back to the OS (`auto_vacuum = INCREMENTAL`).

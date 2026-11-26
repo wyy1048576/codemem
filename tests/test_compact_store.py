@@ -861,6 +861,84 @@ def test_ids_and_codes_that_are_out_of_step_raise_before_faiss_is_asked(bits, sp
             call()
 
 
+def _fail_the(monkeypatch, call, nth):
+    """Make the nth call of a FAISS method on a code index raise, as FAISS does when it cannot get
+    memory. The calls before it go through. Returns the list the calls are counted in."""
+    made = []
+    real = getattr(faiss.IndexRaBitQ, call)
+
+    def counted(index, *args):
+        made.append(index)
+        if len(made) == nth:
+            raise MemoryError(f"the {call} that fails")
+        return real(index, *args)
+
+    monkeypatch.setattr(faiss.IndexRaBitQ, call, counted)
+    return made
+
+
+@pytest.mark.parametrize("bits", [1, 4])
+def test_an_upsert_that_fails_part_of_the_way_leaves_the_index_as_it_was(bits, monkeypatch):
+    """A change is several FAISS calls, on two indexes when there is a fine code. Whichever of
+    them fails, the index holds exactly what it held before, and the error is raised."""
+    v = for_index(_vecs(400, dim=32), 32)
+    kept = list(range(101, 301))
+
+    def built():
+        vs = CompactVectorStore(32, bits=bits, rescore=8)
+        _bound(vs, kept, v[100:300])
+        return vs
+
+    vs = built()
+    before, found = vs.to_bytes(), [vs.search(q, 5) for q in v[:300:30]]
+    upserts = {"new ids": [301, 302], "ids it holds": [150, 151], "ids older than the newest": [5, 6],
+               "all of these": [350, 150, 50]}
+    failed = set()
+    for what, ids in upserts.items():
+        for call in ("add", "remove_ids", "permute_entries"):
+            for nth in (1, 2):
+                with monkeypatch.context() as m:
+                    made = _fail_the(m, call, nth)
+                    try:
+                        vs.upsert(ids, v[np.asarray(ids) - 1])
+                    except MemoryError:
+                        failed.add((what, call, nth))
+                if (what, call, nth) not in failed:
+                    vs = built()  # this upsert makes that call less often: it went through
+                    continue
+                assert len(made) == nth and vs.ids() == set(kept) and vs.to_bytes() == before
+                assert [index.ntotal for index in vs._indexes] == [200] * len(vs._indexes)
+                assert [vs.search(q, 5) for q in v[:300:30]] == found
+    calls = {  # what each of these upserts asks of FAISS, once for each of its indexes
+        "new ids": {"add"}, "ids it holds": {"remove_ids", "add", "permute_entries"},
+        "ids older than the newest": {"add", "permute_entries"}, "all of these": {"remove_ids", "add", "permute_entries"},
+    }
+    every = {(what, call, nth) for what in calls for call in calls[what] for nth in range(1, len(vs._indexes) + 1)}
+    assert failed == every
+    for ids in upserts.values():  # and when nothing fails, the index is the one built once from the same vectors
+        vs.upsert(ids, v[np.asarray(ids) - 1])
+    final = sorted(set(kept) | {i for ids in upserts.values() for i in ids})
+    once = CompactVectorStore(32, bits=bits, rescore=8)
+    once.upsert(final, v[np.asarray(final) - 1])
+    assert vs._ids.tolist() == final and vs.to_bytes() == once.to_bytes()
+
+
+def test_the_store_adds_the_vectors_again_after_an_upsert_that_failed(tmp_path, monkeypatch):
+    """The rows are committed before the index takes them. When the index fails to, the write
+    raises, the index is as it was, and the next search brings it up to the rows by vector id."""
+    s = _open(tmp_path / "idx", "compact")
+    _seed(s, 60)
+    with monkeypatch.context() as m:
+        _fail_the(m, "add", 2)  # the fine index, after the coarse one took the codes
+        with pytest.raises(MemoryError):
+            _seed(s, 5, seed=7, prefix="g")
+    assert s.counts()["vectors"]["code"] == 65 and len(s._types["code"].store) == 60
+    assert _same_as_brute_force(s) and _in_sync(s) and len(s._types["code"].store) == 65
+    _seed(s, 5, seed=8, prefix="h")
+    assert _same_as_brute_force(s) and _in_sync(s)
+    s.close()
+
+
 def test_search_needs_the_stored_vectors():
     vs = CompactVectorStore(8)
     vs.upsert([1], for_index(_vecs(1, dim=8), 8))
