@@ -364,9 +364,10 @@ def test_another_process_writes_and_this_one_catches_up(tmp_path):
     a.close(), b.close()
 
 
-def test_a_saved_index_is_reconciled_with_the_rows(tmp_path):
-    """A file saved at an older epoch (another process, a crash, a lazy save), even under a newer
-    note, is brought up to the committed rows by vector id: it serves exactly what a rebuild would."""
+def test_a_saved_index_is_reconciled_with_the_rows(tmp_path, monkeypatch):
+    """A file saved at an older epoch (another process, a crash, a lazy save) is brought up to the
+    committed rows by vector id: it serves exactly what a rebuild would. Under a newer note it is
+    not the file that note describes, and the index is rebuilt."""
     s = Store(tmp_path / "idx")
     _seed(s, ["one", "two"])
     s.save_vectors()
@@ -375,19 +376,27 @@ def test_a_saved_index_is_reconciled_with_the_rows(tmp_path):
     vid = next(iter(s.vector_rows("code").values()))[0]
     s.delete_vectors("code", [vid])
     _seed(s, ["three"], seed=2)  # same count as before, different ids
-    s.save_vectors()
-    s.close()
-    saved.write_bytes(older)  # older data under a newer note
-    s2 = Store(tmp_path / "idx")
-    assert _in_sync(s2, "code")
+    s.close()  # not saved again: the file is behind the rows
     q = _vecs(1, seed=2)[0]
-    hits = [(h.chunk_id, round(h.score, 5)) for h in s2.vector_search("code", q, 3)]
-    s2.close()
+    rebuilds = []
+    rebuild = Store._rebuild
+    monkeypatch.setattr(Store, "_rebuild", lambda self, *a: rebuilds.append(a) or rebuild(self, *a))
+
+    def hits_of_a_start():
+        store = Store(tmp_path / "idx")
+        assert _in_sync(store, "code")
+        hits = [(h.chunk_id, round(h.score, 5)) for h in store.vector_search("code", q, 3)]
+        store.save_vectors()
+        store.close()
+        return hits
+
+    hits = hits_of_a_start()
+    assert len(hits) == 2 and rebuilds == []  # read, and brought up to the rows
+    saved.write_bytes(older)  # older data under the note of the save just made
+    assert hits_of_a_start() == hits and len(rebuilds) == 1
     for f in (tmp_path / "idx").glob("vec_code.*"):
         f.unlink()
-    s3 = Store(tmp_path / "idx")  # no saved file: a full rebuild from the rows
-    assert [(h.chunk_id, round(h.score, 5)) for h in s3.vector_search("code", q, 3)] == hits
-    s3.close()
+    assert hits_of_a_start() == hits and len(rebuilds) == 2  # no saved file: a full rebuild from the rows
 
 
 def test_searches_during_writes_never_see_a_half_patched_index(tmp_path):

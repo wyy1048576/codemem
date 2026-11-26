@@ -10,13 +10,14 @@ which keeps small codes of each vector and scores its best candidates from the r
 named in config. By default (`auto`) it is the exact one while that fits a memory budget, and
 the compact one when it does not (Store._pick). It is truncated to `embedding_dim` if set, kept
 in memory and saved as `vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it
-reflects (and the database, backend and options it was saved from). Every transaction that
-changes a vector type's rows bumps its epoch in `meta`, and the index is patched right after the
-commit (never before, so it never holds an uncommitted vector). Vector rows never change in
-place: a new vector is a new row with a new id. So an index that is behind (a saved file from
-before a crash, or another process wrote) catches up by comparing vector ids and applying only
-the difference; a missing or corrupt file is rebuilt from the rows, which needs no model, and
-outside the vector lock (Store._type_index). docs/architecture.md §5 lists the tables.
+reflects (and the database, backend and options it was saved from, and the checksum of the
+file). Every transaction that changes a vector type's rows bumps its epoch in `meta`, and the
+index is patched right after the commit (never before, so it never holds an uncommitted vector).
+Vector rows never change in place: a new vector is a new row with a new id. So an index that is
+behind (a saved file from before a crash, or another process wrote) catches up by comparing
+vector ids and applying only the difference; a missing file, or one whose bytes are not the
+bytes that were saved, is rebuilt from the rows, which needs no model, and outside the vector
+lock (Store._type_index). docs/architecture.md §5 lists the tables.
 """
 
 from __future__ import annotations
@@ -1907,13 +1908,13 @@ class Store:
     def _usable_note(self, vec_type: str, dim: int | None) -> dict[str, Any] | None:
         """The note of a vector type's saved index, when a start can read that index: it was saved
         from this database, by the backend in use with its options, for this length and embedder,
-        and its file is there. Whatever epoch it was saved at."""
+        it holds the checksum of its file, and the file is there. Whatever epoch it was saved at."""
         use = self._search_index()
         note = self._read_note(vec_type)
         if (note is None or note.get("database") != self.database_id()
                 or note.get("backend", "faiss") != use.name or note.get("options", {}) != use.options
                 or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder")
-                or not self._noted_file(vec_type, note).is_file()):
+                or type(note.get("crc32")) is not int or not self._noted_file(vec_type, note).is_file()):
             return None
         return note
 
@@ -1921,17 +1922,23 @@ class Store:
         """The saved index file, reconciled with the committed rows by vector id: vectors whose
         row is gone are dropped, rows the file lacks are added. Rows never change in place, so
         this is exact whichever epoch the file was saved at (another process, a crash, a save
-        that is behind), and it costs only the difference instead of a full rebuild. No file, or
-        one from another database, another backend or other options: None, and the index is
-        rebuilt from the rows."""
+        that is behind), and it costs only the difference instead of a full rebuild. No file, one
+        from another database, another backend or other options, or one whose bytes are not the
+        bytes that were saved: None, and the index is rebuilt from the rows."""
         use = self._search_index()
         note = self._usable_note(vec_type, dim)
         if note is None:
             return None
         path = self._noted_file(vec_type, note)
         try:
-            store = use.cls.from_bytes(path.read_bytes(), **use.options)
-        except Exception:  # corrupt or partial file: rebuild from the rows
+            data = path.read_bytes()
+            if zlib.crc32(data) != note["crc32"]:
+                # Damaged, cut short, or another index's file under this note. A backend can read
+                # such bytes without a word and score with them, or allocate without end: it gets none.
+                log.warning("%s is not the file its note describes; rebuilding it from the stored vectors", path)
+                return None
+            store = use.cls.from_bytes(data, **use.options)
+        except Exception:  # a file that cannot be read: rebuild from the rows
             log.exception("could not load %s; rebuilding it from the stored vectors", path)
             return None
         if store.dim != dim:
@@ -2060,8 +2067,9 @@ class Store:
     def save_vectors(self, *, stale: bool = False) -> None:
         """Persist the in-memory indexes that changed, with the epoch they reflect. The indexes are
         copied while holding the vector lock (fast) and written after it is released, so searches
-        don't wait for the disk. Saves run one at a time; data first, note second. A backend that
-        is not saved leaves no file, and is rebuilt from the stored vectors at the next start.
+        don't wait for the disk. Saves run one at a time; data first, note second. The note holds
+        the checksum of the data: a start reads no other bytes under it (_load_saved). A backend
+        that is not saved leaves no file, and is rebuilt from the stored vectors at the next start.
 
         With `stale` (an update that ends by saving: the CLI's, the eval's), the files are first
         made what the next start needs, so that no search has to wait for it: `auto` picks again,
@@ -2088,6 +2096,7 @@ class Store:
                 if data is None:
                     self._note_path(vec_type).unlink(missing_ok=True)
                 else:
+                    note["crc32"] = zlib.crc32(data)
                     _atomic_write(self.index_dir / note["file"], data)
                     _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
                 if old is not None and old.name != (note["file"] if data is not None else None):

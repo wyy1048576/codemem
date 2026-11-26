@@ -6,6 +6,7 @@ the rows, its saved file, and the checks in front of every FAISS call.
 """
 
 import json
+import logging
 import sqlite3
 import threading
 
@@ -173,17 +174,37 @@ def test_restart_from_the_saved_file(tmp_path, backend, monkeypatch):
     s3.close()
 
 
-def test_a_damaged_file_is_rebuilt_from_the_rows(tmp_path, backend):
+def test_a_damaged_file_is_rebuilt_from_the_rows(tmp_path, backend, monkeypatch, caplog):
+    """The note holds the checksum of the file, and a file with other bytes is not handed to the
+    backend: FAISS reads an exact index with one flipped bit as it is, and scores with it."""
     s = _open(tmp_path / "idx", backend)
     _seed(s, 20)
     s.save_vectors()
     s.close()
     path = tmp_path / "idx" / json.loads((tmp_path / "idx" / "vec_code.json").read_text())["file"]
-    for damaged in (b"garbage", path.read_bytes()[:-9], b""):
-        path.write_bytes(damaged)
-        s2 = _open(tmp_path / "idx", backend)
-        assert _same_as_brute_force(s2) and _in_sync(s2)
-        s2.close()
+    saved = path.read_bytes()
+    one_bit = bytearray(saved)
+    one_bit[len(saved) // 2] ^= 0x40  # in a stored number
+    cls = {"faiss": FaissVectorStore, "compact": CompactVectorStore}[backend]
+    rebuilds = []
+    rebuild = Store._rebuild
+    with monkeypatch.context() as m:
+        m.setattr(Store, "_rebuild", lambda self, *a: rebuilds.append(a) or rebuild(self, *a))
+        m.setattr(cls, "from_bytes", lambda *a, **k: pytest.fail("the backend must not be given these bytes"))
+        for n, damaged in enumerate((b"garbage", saved[:-9], b"", bytes(one_bit), saved + b"\0"), 1):
+            path.write_bytes(damaged)
+            caplog.clear()
+            with caplog.at_level(logging.WARNING, logger="codemem.store"):
+                s2 = _open(tmp_path / "idx", backend)
+                assert _same_as_brute_force(s2) and _in_sync(s2) and len(rebuilds) == n
+                s2.close()
+            assert [r.levelname for r in caplog.records] == ["WARNING"]  # one line, and no traceback
+            assert "is not the file its note describes" in caplog.text
+    path.write_bytes(saved)  # the bytes that were saved are read
+    monkeypatch.setattr(Store, "_rebuild", lambda *a: pytest.fail("the saved file should have been used"))
+    s3 = _open(tmp_path / "idx", backend)
+    assert _same_as_brute_force(s3) and _in_sync(s3)
+    s3.close()
 
 
 def test_another_process_writes_and_this_one_catches_up(tmp_path, backend):

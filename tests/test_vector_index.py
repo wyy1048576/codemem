@@ -1,10 +1,11 @@
 """What every search index shares (docs/architecture.md §5): where each vector came from, how many
 vectors a search asks its index for, the hook that lets an index read stored vectors back, and
-the database a saved index belongs to."""
+the database and the bytes a saved index belongs to."""
 
 import json
 import shutil
 import sqlite3
+import zlib
 from contextlib import closing
 
 import numpy as np
@@ -243,9 +244,11 @@ def _count_rebuilds(monkeypatch):
     return rebuilds
 
 
-@pytest.mark.parametrize("backend, options", [
-    ("faiss", {}), ("compact", {"rescore": 2}), (f"{__name__}:SavedPlugin", {}),
-])
+# Every kind of saved index. The compact one scores 2 candidates, so that its codes choose them.
+SAVED = [("faiss", {}), ("compact", {"rescore": 2}), (f"{__name__}:SavedPlugin", {})]
+
+
+@pytest.mark.parametrize("backend, options", SAVED)
 def test_a_saved_index_is_never_read_into_another_database(tmp_path, monkeypatch, backend, options):
     """`index.db` deleted by hand, its saved search index left beside it, then a rebuild: the new
     database numbers its vectors from 1 again, so the old file would match them by id."""
@@ -277,15 +280,41 @@ def test_a_saved_index_is_never_read_into_another_database(tmp_path, monkeypatch
     again.close()
 
 
-def test_a_saved_index_whose_note_names_no_database_is_rebuilt_once(tmp_path, monkeypatch):
+@pytest.mark.parametrize("backend, options", SAVED)
+def test_another_index_s_file_under_this_index_s_note_is_not_read(tmp_path, monkeypatch, backend, options):
+    """Two indexes of the same shape, and the saved file of one copied over the other's: by vector
+    id it matches every row. The note beside it holds the checksum of other bytes."""
+    vecs = {}
+    for name, seed in (("a", 0), ("b", 9)):
+        s = Store(tmp_path / name, vector_backend=backend, vector_options=options)
+        ids = _add_chunks(s, 40)
+        vecs[name] = _vecs(40, seed=seed)
+        s.put_vectors("code", EMBEDDER, [VectorRow(c, 0, 1, 0, 1, f"h{c}") for c in ids], vecs[name])
+        s.save_vectors()
+        s.close()
+    (saved,) = [p for p in (tmp_path / "a").glob("vec_code.*") if p.suffix != ".json"]
+    shutil.copy(tmp_path / "b" / saved.name, saved)
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    a = Store(tmp_path / "a", vector_backend=backend, vector_options=options)
+    for i in range(0, 40, 4):
+        hit = a.vector_search("code", vecs["a"][i], 1)[0]
+        assert hit.chunk_id == ids[i] and hit.score == pytest.approx(1.0, abs=1e-3)
+    assert len(rebuilds) == 1
+    a.close()
+
+
+@pytest.mark.parametrize("field", ["database", "crc32"])
+def test_a_saved_index_whose_note_lacks_what_a_start_checks_is_rebuilt_once(tmp_path, monkeypatch, field):
     idx = tmp_path / "idx"
     s = Store(idx, vector_backend="faiss")
     ids = _seed(s, 5)
     s.save_vectors()
     s.close()
     note = json.loads((idx / "vec_code.json").read_text())
-    assert len(note.pop("database")) == 32
-    (idx / "vec_code.json").write_text(json.dumps(note))  # as an index saved before notes named their database
+    assert len(note["database"]) == 32 and note["crc32"] == zlib.crc32((idx / "vec_code.faiss").read_bytes())
+    del note[field]
+    (idx / "vec_code.json").write_text(json.dumps(note))  # as an index saved before notes held it
 
     rebuilds = _count_rebuilds(monkeypatch)
     s = Store(idx, vector_backend="faiss")
@@ -294,7 +323,8 @@ def test_a_saved_index_whose_note_names_no_database_is_rebuilt_once(tmp_path, mo
     s.close()
     s = Store(idx, vector_backend="faiss")
     assert s.vector_search("code", _vecs(5)[2], 1)[0].chunk_id == ids[2] and len(rebuilds) == 1
-    assert json.loads((idx / "vec_code.json").read_text())["database"] == s.database_id()
+    again = json.loads((idx / "vec_code.json").read_text())
+    assert again["database"] == s.database_id() and again["crc32"] == zlib.crc32((idx / "vec_code.faiss").read_bytes())
     s.close()
 
 

@@ -1128,9 +1128,10 @@ than 1.15.1 when the index is opened.
 **Loading a search index.** A search index is saved beside `index.db` and read back at the next
 start: 0.9 s for the exact index of 200,000 vectors, 0.5 s for the compact one. It is rebuilt
 from the stored vectors instead when the saved copy cannot be used: there is none, it is another
-backend's (the rule picks the other index, or the config names another), or its note names no
-database. That last case is every index built before saved copies named their database: the
-first start on one rebuilds its search index, once. On an M1 that was running other jobs, an
+backend's (the rule picks the other index, or the config names another), its bytes are not the
+bytes that were saved, or its note lacks the database or the checksum that a start checks. That
+last case is every copy saved by a codemem that did not write them: the first start on such an
+index rebuilds its search index, once. On an M1 that was running other jobs, an
 exact index took 0.5 to 1.5 s to rebuild at 50,000 vectors and 2.5 to 5 s at 200,000. A compact
 index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000, with FAISS on
 one thread.
@@ -1175,6 +1176,14 @@ A saved copy is read only into the database it was saved from. Each `index.db` c
 `database_id` in `meta`, and the copy's note names it. A copy whose note names another database,
 or none, is rebuilt from the rows. Vector ids start again at 1 in a new `index.db`, so without the
 name the copy of a deleted one would be matched, id by id, against vectors it was not made from.
+
+A saved copy is read only if its bytes are the bytes that were saved. Its note holds a checksum
+of the file (CRC-32), and a start compares the two before the index is given the file. A file
+that differs is rebuilt from the rows, with one warning in the log: a damaged file, one that
+was cut short, and the file of another index under this one's note. FAISS itself reads an exact
+index with a flipped bit as it is. In a test with 2,500 vectors the damaged vector then scored
+up to 2,427 (a similarity cannot pass 1), and a flipped bit in a size field made the start
+allocate past 500 MB for a file of 0.3 MB.
 
 **The vector cache** maps (embedder key, text hash) to a vector: 2 bytes per number, at the
 model's full length. It is one SQLite file for the whole machine, and every codemem process

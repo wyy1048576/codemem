@@ -394,8 +394,10 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
   index.db                           SQLite (WAL): meta, files, chunks, fts (word lists only, + fts_vocab), calls, edges, vectors,
                                      dirty_texts (the queue)
   vec_code.faiss, vec_code.json      a saved copy of the search index + a note {epoch, dim, count, embedder,
-  vec_usage.faiss, vec_usage.json    database, backend, file}; another backend saves vec_<type><suffix>, or nothing.
+  vec_usage.faiss, vec_usage.json    database, backend, file, crc32}; another backend saves vec_<type><suffix>,
+                                     or nothing.
                                      `database` is the `database_id` of the index.db the copy was saved from.
+                                     `crc32` is the checksum of the copy's file, whatever the backend.
                                      `backend` is the search index the file holds (`faiss`, `compact` or a
                                      plugin's name), whether a configuration named it or `auto` picked it.
                                      FAISS files hold an IndexIDMap2 over an fp16 IndexScalarQuantizer
@@ -471,7 +473,7 @@ it doesn't own.
 
 - **SQLite is the source of truth.** A vector row is committed in the same transaction as its
   bookkeeping.
-- **The search index is derived. It is kept correct by three rules:**
+- **The search index is derived. It is kept correct by these rules:**
   1. every transaction that changes a vector type's rows bumps `vec.<type>.epoch`;
   2. the in-memory index is patched only after the commit, and its epoch is set last;
   3. an index that is behind catches up by vector id: vector rows never change in place (a new
@@ -483,6 +485,10 @@ it doesn't own.
      database's `database_id`; a note that names another, or none, means a rebuild from the rows.
      Vector ids start again at 1 in a new `index.db`, so the copy of a deleted one would match
      other vectors by id.
+  5. a saved copy is read only if its bytes are the bytes that were saved. Its note holds their
+     CRC-32, which is compared before the backend is given the file. A file that differs (damaged,
+     cut short, or another index's file under this note), or a note without a checksum, means a
+     rebuild from the rows. A file that differs is also a warning in the log.
 - **Which search index** (`vector_backend`): the one a configuration names, or for `auto` the
   exact index while the exact indexes of every vector type fit the budget together
   (`vector_memory_mb`), and the compact one for every type when they do not (architecture.md §5).
@@ -492,7 +498,7 @@ it doesn't own.
   - where the installed FAISS cannot make the compact index, `auto` picks the exact one.
 - **Loading the search index:**
   - a vector type's index is read from its saved copy, or rebuilt from the rows when the copy
-    cannot be used (rule 3 and rule 4, or no copy);
+    cannot be used (rules 3 to 5, or no copy);
   - loading holds no lock. One thread loads a type; the others that need it wait for that thread.
     Rows written meanwhile are applied when the index is installed, by vector id;
   - a write to a type whose index is not in memory does not load it: the index is loaded at its
