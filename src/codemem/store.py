@@ -353,6 +353,8 @@ class CompactVectorStore(VectorStore):
 
     The codes are RaBitQ's, from FAISS, of the first `dim` numbers of the vector (0 = all of
     them, at most COMPACT_MAX_DIM; `code_dim` once resolved), scaled to length 1 and rotated.
+    An index of longer vectors is coded on their first COMPACT_MAX_DIM numbers, and logs a
+    warning when it is made: its searches can miss what only the other numbers tell apart.
     Every vector has a coarse code, 1 bit per number plus 8 bytes: that is what a search scans.
     With `bits` above 1 it also has a fine code of `bits` bits per number, and the scan's best
     (4,000 or more: `_candidates`) are ranked again by their fine estimates. The best of that, at
@@ -385,6 +387,15 @@ class CompactVectorStore(VectorStore):
         self._fine = _rabitq(self.code_dim, bits) if bits > 1 else None
         self._ids = np.empty(0, dtype=np.int64)
         self._fetch: Fetch | None = None
+        if not dim and self.code_dim < index_dim:
+            # Asked to code every number, and the longest code is shorter: said once, here, where
+            # the index is made. Vectors that differ only past the code are told apart by no code.
+            log.warning(
+                "the compact search index codes the first %d numbers of each vector, and these vectors have %d: it "
+                'can miss results that only the other numbers tell apart. The exact index (vector_backend = "faiss") '
+                "compares every number, and embedding_dim = %d or less cuts the vectors themselves",
+                self.code_dim, index_dim, self.code_dim,
+            )
 
     @staticmethod
     def _code_dim(index_dim: int, bits: int, dim: int, rescore: int) -> int:

@@ -760,12 +760,44 @@ def test_the_code_covers_the_first_numbers_of_any_length(dim, code_dim, expect):
     assert len(hits) == 3 and hits[0][1] == pytest.approx(max(float(s) for s in v @ v[7]), abs=1e-6)
 
 
-def test_an_index_wider_than_the_longest_code_is_coded_on_its_first_numbers(monkeypatch):
+def test_an_index_wider_than_the_longest_code_is_coded_on_its_first_numbers(monkeypatch, caplog):
     monkeypatch.setattr("codemem.store.COMPACT_MAX_DIM", 16)
-    vs = CompactVectorStore(40)
-    assert (vs.dim, vs.code_dim, vs._coarse.d, vs._fine.d) == (40, 16, 16, 16)
+    with caplog.at_level(logging.WARNING, logger="codemem.store"):
+        vs = CompactVectorStore(40)
+        assert (vs.dim, vs.code_dim, vs._coarse.d, vs._fine.d) == (40, 16, 16, 16)
+        said = [r.getMessage() for r in caplog.records]  # in the log, once, when the index is made
+        assert len(said) == 1 and "codes the first 16 numbers of each vector, and these vectors have 40" in said[0]
+        caplog.clear()
+        v = for_index(_vecs(60, dim=40), 40)
+        _bound(vs, range(1, 61), v)
+        assert all(len(vs.search(q, 3)) == 3 for q in v[:5]) and len(vs.to_bytes()) > 0
+        assert CompactVectorStore.bytes_per_vector(40) == vs.code_bytes + 8 + 32
+        for whole_or_asked_for in (CompactVectorStore(16), CompactVectorStore(12), CompactVectorStore(40, dim=8),
+                                   CompactVectorStore(40, dim=16)):
+            assert whole_or_asked_for.code_dim <= 16
+        assert caplog.records == []  # not by a search, a save or a status, and not for a code length that was asked for
+        assert CompactVectorStore.from_bytes(vs.to_bytes()).code_dim == 16 and len(caplog.records) == 1  # made again
     with pytest.raises(ValueError, match="dim 0 to 16"):
         CompactVectorStore(40, dim=17)
+
+
+def test_the_store_warns_once_for_each_index_of_vectors_longer_than_a_code(tmp_path, monkeypatch, caplog):
+    monkeypatch.setattr("codemem.store.COMPACT_MAX_DIM", 16)
+    said = lambda: [r.getMessage() for r in caplog.records if "codes the first 16 numbers" in r.getMessage()]  # noqa: E731
+    with caplog.at_level(logging.WARNING, logger="codemem.store"):
+        s = _open(tmp_path / "idx", "compact")
+        _seed(s, 100, dim=40)  # few enough for every one to be scored exactly, whatever the codes cover
+        assert len(said()) == 1 and _same_as_brute_force(s, dim=40) and s.search_index_status()["index"] == "compact"
+        s.save_vectors()
+        s.close()
+        assert len(said()) == 1
+        s = _open(tmp_path / "idx", "compact")  # another start: its index is made from the saved file
+        assert _same_as_brute_force(s, dim=40) and len(said()) == 2
+        s.close()
+        exact = _open(tmp_path / "exact", "faiss")
+        _seed(exact, 100, dim=40)
+        assert _same_as_brute_force(exact, dim=40) and len(said()) == 2  # the exact index holds every number
+        exact.close()
 
 
 def test_vectors_and_queries_of_the_wrong_shape_raise_before_faiss():

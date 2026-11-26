@@ -740,7 +740,7 @@ A change to any of these must be made together with the eval:
   | Key | Default | Range | Meaning |
   |---|---|---|---|
   | `bits` | 4 | 1 to 8 | bits per number of the fine code, which ranks the candidates. Every vector also has a 1-bit code, which a search scans; at `bits = 1` that is the only code, and the index is at its smallest |
-  | `dim` | 0 | 0 to 4,096 | how many numbers of each vector the codes cover (the first N); 0 = as many as the index uses, which is `embedding_dim` or the model's length. A code never covers more than 4,096 |
+  | `dim` | 0 | 0 to 4,096 | how many numbers of each vector the codes cover (the first N); 0 = as many as the index uses, which is `embedding_dim` or the model's length. A code never covers more than 4,096: at 0, an index of longer vectors codes their first 4,096 and logs a warning when it is made |
   | `rescore` | 200 | 1 or more | candidates scored exactly from the stored vectors: at least this many, and at least 4 for each result asked for |
 
   Those that differ from their defaults are in `index_settings()` as `compact`, for the same

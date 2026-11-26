@@ -1055,6 +1055,13 @@ loses results that no count of candidates brings back. Share of searches with th
 A fine code does not make up for the missing numbers: 256 numbers with a 4-bit code kept the top
 10 in 91% of question searches at 200 candidates, and 512 numbers in 99.3%.
 
+A code covers at most 4,096 numbers. Vectors longer than that are coded on their first 4,096,
+and the index logs a warning when it is made, once: its searches can miss what only the other
+numbers tell apart. With 2,100 vectors of 8,192 numbers whose first half was noise, none of 12
+searches returned what the exact index returned; with vectors alike over their whole length,
+all 12 did. The exact index compares every number, and `embedding_dim` cuts the vectors
+themselves.
+
 **What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50),
 with FAISS on one thread:
 
