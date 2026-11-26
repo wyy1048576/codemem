@@ -42,6 +42,11 @@ fails after it or changes its result between runs, and no test run passes its ti
 A task image and a validation record have a fingerprint: a short hash of the recipe fields and the
 task fields that made them. An image, a record or a test list with another fingerprint is not
 used. Docker is called through its command line. Output is kept under CMEVAL_HOME/generate/.
+
+Each image that a task gets is added to the task's image-builds.json: its id, creation time, size,
+fingerprint, and the digest of the recipe's base image. A task image can be removed after its
+validation and built again later (rebuild_task) without a new validation. The saved test lists
+are then checked on the new image, test by test, by `cmeval e2e grader-check`.
 """
 
 from __future__ import annotations
@@ -89,6 +94,8 @@ VALIDATION_VERSION = 1
 
 # Tasks are built side by side, and git cannot change one clone from two threads at once.
 _CLONE_LOCK = threading.Lock()
+# The first tasks of a batch must not build the repo's base image side by side.
+_BASE_LOCK = threading.Lock()
 
 
 class GenerateError(RuntimeError):
@@ -384,6 +391,11 @@ def base_tag(recipe: Recipe) -> str:
 
 def build_base(recipe: Recipe) -> str:
     """The image that all tasks of the repo start from. Built once."""
+    with _BASE_LOCK:
+        return _build_base(recipe)
+
+
+def _build_base(recipe: Recipe) -> str:
     tag = base_tag(recipe)
     if image_exists(tag):
         return tag
@@ -517,6 +529,94 @@ def build_task_image(recipe: Recipe, task: Task, force: bool = False) -> tuple[s
     finally:
         shutil.rmtree(context / "src", ignore_errors=True)  # the image holds it now
     return tag, time.monotonic() - start
+
+
+# ---- the history of a task image
+
+def builds_path(recipe: Recipe, task: Task) -> Path:
+    """What each image of the task was made of: a list of entries, oldest first (see record_image).
+    Not image.json: the clean-up script of the run machine writes the full inspect output there."""
+    return task_dir(recipe, task) / "image-builds.json"
+
+
+def _inspect_facts(data: dict) -> dict:
+    """The facts of an image that the history keeps, from one object of `docker image inspect`."""
+    labels = (data.get("Config") or {}).get("Labels") or {}
+    return {"image_id": data.get("Id"), "created": data.get("Created"), "size": data.get("Size"),
+            "fingerprint": labels.get(FINGERPRINT_LABEL) if isinstance(labels, dict) else None}
+
+
+def image_facts(tag: str) -> dict | None:
+    """Id, creation time, size in bytes and fingerprint label of an image. None when it does not exist."""
+    proc = _run(["docker", "image", "inspect", "--format", "{{json .}}", tag])
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout or "null")
+    except ValueError:
+        return None
+    return _inspect_facts(data) if isinstance(data, dict) else None
+
+
+def image_id(tag: str) -> str | None:
+    facts = image_facts(tag)
+    return facts["image_id"] if facts else None
+
+
+def repo_digest(image: str) -> str:
+    """The registry digest of a local image ("name@sha256:..."). Empty when it has none, for
+    example an image that was built here and never pushed or pulled."""
+    proc = _run(["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", image])
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def read_builds(recipe: Recipe, task: Task) -> list[dict]:
+    """The history of the task's images. When it does not exist yet and the clean-up script saved
+    the inspect output of the validated image (image.json), that image is the first entry."""
+    path = builds_path(recipe, task)
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    old = task_dir(recipe, task) / "image.json"
+    try:
+        data = json.loads(old.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    data = data[0] if isinstance(data, list) and data else data
+    if not isinstance(data, dict) or not data.get("Id"):
+        return []
+    return [{"step": "validate", "event": "found", "source": "image.json", **_inspect_facts(data)}]
+
+
+def record_image(recipe: Recipe, task: Task, tag: str, *, step: str, event: str,
+                 build_s: float | None = None) -> dict | None:
+    """Add the image that has the tag now to the task's history, and return its entry. `step` is
+    what used the image: validate, reuse (a saved validation was used again), or rebuild. `event`
+    is built or found. A found image that is the last entry already adds nothing. None when the
+    image does not exist."""
+    facts = image_facts(tag)
+    if facts is None:
+        return None
+    builds = read_builds(recipe, task)
+    if event == "found" and builds and builds[-1].get("image_id") == facts["image_id"]:
+        return builds[-1]
+    base = base_tag(recipe)
+    entry = {"step": step, "event": event,
+             "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+             "build_s": round(build_s, 1) if build_s is not None else None, **facts,
+             # The digest of the base image as it is now. A found image can be older than that.
+             "base_image": recipe.base_image, "base_digest": repo_digest(recipe.base_image),
+             "repo_base": base, "repo_base_id": image_id(base)}
+    builds.append(entry)
+    path = builds_path(recipe, task)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(builds, indent=2) + "\n", encoding="utf-8")
+    return entry
+
+
+def build_number(recipe: Recipe, task: Task, image: str | None) -> int | None:
+    """The place (1, 2, ...) of the image in the task's history. None when it is not there."""
+    ids = [entry.get("image_id") for entry in read_builds(recipe, task)]
+    return len(ids) - ids[::-1].index(image) if image and image in ids else None
 
 
 # ---- validation
@@ -749,6 +849,8 @@ def generate_task(recipe: Recipe, task: Task, repeats: int = DEFAULT_REPEATS, cp
         record = json.loads(saved.read_text(encoding="utf-8"))
         if record.get("fingerprint") == fingerprint and (
                 not record.get("valid") or image_label(task_tag(recipe, task)) == image_fingerprint(recipe, task)):
+            if record.get("valid"):
+                record_image(recipe, task, task_tag(recipe, task), step="reuse", event="found")
             return record
     # The old record and test lists must not stay when this attempt fails.
     saved.unlink(missing_ok=True)
@@ -758,7 +860,10 @@ def generate_task(recipe: Recipe, task: Task, repeats: int = DEFAULT_REPEATS, cp
                     "difficulty": difficulty(task.patch), "recipe": recipe.name, "valid": False}
     try:
         tag, build_s = build_task_image(recipe, task, force=force)
-        record.update(image=tag, build_s=round(build_s, 1))
+        # build_task_image gives 0 s when the image with the current fingerprint exists.
+        entry = record_image(recipe, task, tag, step="validate", event="built" if build_s else "found",
+                             build_s=build_s or None)
+        record.update(image=tag, build_s=round(build_s, 1), image_id=entry["image_id"] if entry else None)
         record.update(validate_task(recipe, task, tag, repeats=repeats, cpus=cpus))
     except (GenerateError, repos.RepoError, subprocess.TimeoutExpired) as exc:
         # Not saved: a build that failed is tried again by the next call.
@@ -788,6 +893,66 @@ def format_record(record: dict) -> str:
     return (f"{mark} {record['id']} {record['difficulty']:<6} build {record.get('build_s', '-')} s, "
             f"slowest suite run {record.get('slowest_test_run_s', '-')} s, fail-to-pass {f2p}, "
             f"pass-to-pass {record.get('n_pass_to_pass', '-')}: {record.get('reason', '')}")
+
+
+# ---- build again after validation
+
+def rebuild_task(recipe: Recipe, task: Task) -> dict:
+    """Build the image of a valid task again when it is missing, and do not validate again. The
+    saved test lists stay; `cmeval e2e grader-check` then checks them on the new image. A task
+    without a valid record is skipped. A task whose saved record or tests.json has another
+    fingerprint than the recipe and the task give now is refused. Returns a short record with the
+    status: built, exists, skipped, refused, or failed."""
+    record: dict = {"id": task.id, "status": "skipped", "reason": "", "build_s": None, "image_id": None}
+    saved = task_dir(recipe, task) / "result.json"
+    if not saved.exists():
+        return {**record, "reason": "no saved record"}
+    result = json.loads(saved.read_text(encoding="utf-8"))
+    if not result.get("valid"):
+        return {**record, "reason": "not valid"}
+    if result.get("fingerprint") != validation_fingerprint(recipe, task, result.get("repeats")):
+        return {**record, "status": "refused",
+                "reason": "the saved record has another fingerprint than the recipe and the task give now"}
+    tests = tests_path(recipe, task)
+    if not tests.exists():
+        return {**record, "status": "refused", "reason": "the valid record has no tests.json"}
+    lists = json.loads(tests.read_text(encoding="utf-8"))
+    if lists.get("fingerprint") != validation_fingerprint(recipe, task, lists.get("repeats")):
+        return {**record, "status": "refused",
+                "reason": "tests.json has another fingerprint than the recipe and the task give now"}
+    tag = task_tag(recipe, task)
+    if image_label(tag) == image_fingerprint(recipe, task):
+        entry = record_image(recipe, task, tag, step="rebuild", event="found")
+        return {**record, "status": "exists", "reason": "the image exists", "image_id": entry and entry["image_id"]}
+    try:
+        # Not forced: the image is missing or has another label, so it is built in any case.
+        tag, build_s = build_task_image(recipe, task)
+    except (GenerateError, repos.RepoError, subprocess.TimeoutExpired) as exc:
+        return {**record, "status": "failed", "reason": f"error: {exc}"}
+    entry = record_image(recipe, task, tag, step="rebuild", event="built", build_s=build_s)
+    return {**record, "status": "built", "reason": "built again; check it with cmeval e2e grader-check",
+            "build_s": round(build_s, 1), "image_id": entry and entry["image_id"],
+            "build": build_number(recipe, task, entry and entry["image_id"])}
+
+
+def rebuild(recipe: Recipe, tasks: list[Task], *, jobs: int = 2,
+            progress: Callable[[str], None] = lambda message: None) -> list[dict]:
+    """rebuild_task for each task, `jobs` at a time. Records come back in the order of `tasks`."""
+    def one(task: Task) -> dict:
+        record = rebuild_task(recipe, task)
+        if record["status"] != "skipped":
+            progress(format_rebuild(record))
+        return record
+
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        return list(pool.map(one, tasks))
+
+
+def format_rebuild(record: dict) -> str:
+    if record["status"] == "built":
+        return (f"built   {record['id']} in {record['build_s']} s, image {(record['image_id'] or '-')[:19]}, "
+                f"build {record.get('build') or '-'} in its history")
+    return f"{record['status']:<7} {record['id']}: {record['reason']}"
 
 
 def admission(recipe: Recipe, records: list[dict]) -> dict:

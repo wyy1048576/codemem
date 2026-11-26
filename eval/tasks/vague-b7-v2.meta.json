@@ -1,0 +1,80 @@
+{
+ "name": "vague-b7-v2",
+ "created": "2026-11-26",
+ "tasks": 45,
+ "rows": 90,
+ "levels": [
+  "L1",
+  "L2"
+ ],
+ "task_files": [
+  "tasks/e2e/pandas.jsonl",
+  "tasks/e2e/playwright.jsonl"
+ ],
+ "task_choice": "every pandas and playwright task that the screen of tasks/screen/b7.jsonl calls fair (two reads, a third read for six tasks): 45 of 141 valid tasks",
+ "rules": "tasks/vague-rules-v2.md",
+ "rules_sha256": "e0190687a7f246317eddfa4da2a6e45130b2e66b016a7b4bf1cd50578be008d2",
+ "writer": "8 tasks keep their texts of vague-pilot18-v2 (microsoft__playwright-41850, microsoft__playwright-42503, microsoft__playwright-42919, microsoft__playwright-43146, microsoft__playwright-43148, pandas-dev__pandas-68090, pandas-dev__pandas-68195, pandas-dev__pandas-68945). 37 tasks were written on 2026-11-26 by four claude-opus-5-5 sessions, each with the rules, the issue, the real fix and the hidden tests of its batch",
+ "from_vague_pilot18_v2": [
+  "microsoft__playwright-41850",
+  "microsoft__playwright-42503",
+  "microsoft__playwright-42919",
+  "microsoft__playwright-43146",
+  "microsoft__playwright-43148",
+  "pandas-dev__pandas-68090",
+  "pandas-dev__pandas-68195",
+  "pandas-dev__pandas-68945"
+ ],
+ "written_2026_11_26": [
+  "microsoft__playwright-41682",
+  "microsoft__playwright-41913",
+  "microsoft__playwright-41942",
+  "microsoft__playwright-41988",
+  "microsoft__playwright-42042",
+  "microsoft__playwright-42204",
+  "microsoft__playwright-42260",
+  "microsoft__playwright-42433",
+  "microsoft__playwright-42707",
+  "microsoft__playwright-42780",
+  "microsoft__playwright-42792",
+  "microsoft__playwright-42838",
+  "microsoft__playwright-42864",
+  "microsoft__playwright-43012",
+  "microsoft__playwright-43071",
+  "microsoft__playwright-43170",
+  "microsoft__playwright-43172",
+  "microsoft__playwright-43174",
+  "microsoft__playwright-43305",
+  "microsoft__playwright-43316",
+  "microsoft__playwright-43400",
+  "microsoft__playwright-43429",
+  "microsoft__playwright-43488",
+  "pandas-dev__pandas-66352",
+  "pandas-dev__pandas-67025",
+  "pandas-dev__pandas-67897",
+  "pandas-dev__pandas-68278",
+  "pandas-dev__pandas-69015",
+  "pandas-dev__pandas-69779",
+  "pandas-dev__pandas-69924",
+  "pandas-dev__pandas-70205",
+  "pandas-dev__pandas-70734",
+  "pandas-dev__pandas-70828",
+  "pandas-dev__pandas-70966",
+  "pandas-dev__pandas-71129",
+  "pandas-dev__pandas-71232",
+  "pandas-dev__pandas-71248"
+ ],
+ "with_done_when": [
+  "microsoft__playwright-42792"
+ ],
+ "left_the_set": {
+  "microsoft__playwright-42672": "unfair in both reads of the screen of 2026-11-26",
+  "pandas-dev__pandas-70742": "unfair in both reads of the screen of 2026-11-26 (reopened with the pandas 2.3.3 fact)"
+ },
+ "checks": {
+  "leak": "each writer searched its texts for the names it removed and for the changed names of the real fix. Then one more claude-opus-5-5 session reviewed the 37 new tasks against the issue, the real fix and the hidden tests: 30 ok, 7 with a near copy of an error or log string of the repo's code; its corrected texts are used (8 rows: playwright-42042 L1, playwright-42780 L1, playwright-43012 L1, playwright-43400 L1, playwright-43400 L2, pandas-67897 L1, pandas-70205 L1, pandas-71129 L1). It found no lost or changed fact",
+  "solvable": "not done (plan section 9, check 2)",
+  "human": "not done (plan section 9, check 3)"
+ },
+ "sha256": "1f51b8e699aa3576dec7d83060d8e58df7b9179c68312a09a33c2ab2230d7e44"
+}

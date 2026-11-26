@@ -78,8 +78,8 @@ from pathlib import Path, PurePosixPath
 from typing import Callable
 
 from .e2e import grade, patch_files
-from .e2e_index import codemem_bin, codemem_checkout, codemem_commit, codemem_python_root, hf_cache, index_root, \
-    index_state, read_index_meta
+from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_python_root, hf_cache, \
+    index_root, index_state, read_index_meta
 from .e2e_steps import TurnCounter, count_steps, parse_stream
 from .files import write_json
 from .generate import GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
@@ -373,9 +373,11 @@ def codemem_mcp_config(codemem: dict, settings: RunSettings) -> dict:
     # Python in a container sees all processors of the host, also with --cpus.
     threads = str(max(1, int(settings.cpus)))
     # The model stays in memory for the whole run: an idle unload is for a user's machine, and a run
-    # must not differ by whether one fell into it.
+    # must not differ by whether one fell into it. The search index is the one the build saved
+    # (CODEMEM_ENV): under the container's memory limit codemem would pick another for a large index,
+    # and rebuild it while the agent's first searches are answered from keywords.
     env = {"HF_HOME": HF_MOUNT, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-           "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0",
+           "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0", **CODEMEM_ENV,
            "OMP_NUM_THREADS": threads, "MKL_NUM_THREADS": threads}
     if steering := os.environ.get(STEERING_ENV):
         if steering not in STEERING_LEVELS:
@@ -880,13 +882,14 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
 # ---- counting the steps again
 
 def _recount_values(steps: dict) -> tuple:
-    """Content searches, files viewed, gold opened and first edit turn, from steps of any version."""
+    """Content searches, files viewed, gold opened, first edit turn, first gold surfaced turn and the steps
+    version, from steps of any version."""
     if "searches" in steps:
         return (steps["searches"]["content"], len(steps["views"]["files_viewed"]), steps["gold_opened"],
-                steps["first_edit_turn"])
+                steps["first_edit_turn"], steps.get("first_gold_surfaced_turn"), steps.get("steps_version"))
     before = steps.get("turns_before_first_edit")  # version 1
     return (None, len(steps.get("files_read") or []), steps.get("gold_file_read"),
-            before + 1 if before is not None else None)
+            before + 1 if before is not None else None, None, steps.get("steps_version"))
 
 
 def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str], None] = print) -> int:
@@ -915,7 +918,8 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
         record["steps"] = steps
         write_json(path, record)
         done += 1
-        names = ("content searches", "files viewed", "gold opened", "first edit turn")
+        names = ("content searches", "files viewed", "gold opened", "first edit turn", "first gold surfaced turn",
+                 "steps version")
         pairs = zip(names, _recount_values(old), _recount_values(steps))
         progress(f"{where}: " + ", ".join(f"{name} {'-' if a is None else a} -> {'-' if b is None else b}"
                                           for name, a, b in pairs))

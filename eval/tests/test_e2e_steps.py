@@ -190,14 +190,14 @@ def test_split_never_raises():
     ("perl -pi -e 's/a/b/' x.py", ("edit", "perl -i", ["x.py"])),
     ("echo x >> notes.md", ("edit", "echo", ["notes.md"])),
     ("tee pandas/a.py", ("edit", "tee", ["pandas/a.py"])),
-    ("git checkout -- pandas/core/indexing.py", ("edit", "git checkout", ["pandas/core/indexing.py"])),
-    ("git restore pandas/a.py", ("edit", "git restore", ["pandas/a.py"])),
+    ("git checkout -- pandas/core/indexing.py", ("revert", "git checkout", ["pandas/core/indexing.py"])),
+    ("git restore pandas/a.py", ("revert", "git restore", ["pandas/a.py"])),
     ("git apply /tmp/fix.diff", ("edit", "git apply", [])),
     ("patch -p1 < /tmp/fix.diff", ("edit", "patch", [])),
-    ("cp pandas/a.py /tmp/a.bak", ("edit", "cp", ["/tmp/a.bak"])),
+    ("cp pandas/a.py /tmp/a.bak", ("write_outside", "cp", ["/tmp/a.bak"])),
     ("cp /tmp/a.py pandas/core/", ("edit", "cp", ["pandas/core/a.py"])),
     ("mv a.py b.py", ("edit", "mv", ["a.py", "b.py"])),
-    ("rm -f /tmp/repro.py", ("edit", "rm", ["/tmp/repro.py"])),
+    ("rm -f /tmp/repro.py", ("write_outside", "rm", ["/tmp/repro.py"])),
     ("mkdir -p pandas/new", ("edit", "mkdir", ["pandas/new"])),
     ("python -c \"open('pandas/a.py', 'w').write('x')\"", ("edit_script", "python", ["pandas/a.py"])),
     ("node -e \"require('fs').writeFileSync('src/a.js', s)\"", ("edit_script", "node", ["src/a.js"])),
@@ -283,7 +283,7 @@ def test_paths_are_relative_to_the_repo():
 
 def test_redirections_make_edits():
     a = _one("cat > /tmp/repro.py <<'EOF'\nprint(1)\nEOF")
-    assert (a.kind, a.paths, a.outside) == ("edit", (), ("/tmp/repro.py",))
+    assert (a.kind, a.paths, a.outside) == ("write_outside", (), ("/tmp/repro.py",))
     a = _one("cat >> pandas/tests/test_a.py <<'EOF'\ndef test(): pass\nEOF")
     assert (a.kind, a.paths) == ("edit", ("pandas/tests/test_a.py",))
     # A test or a search keeps its kind; the written file is in `writes`.
@@ -328,7 +328,7 @@ TRANSCRIPT = [
      'print(f"{tracemalloc.get_traced_memory()[0] / 2**20:.0f} MiB")\n'
      'EOF\n'
      'timeout 600 python -I /tmp/repro.py 2>&1 | tail -5',
-     [('edit', 'cat', ['/tmp/repro.py']),
+     [('write_outside', 'cat', ['/tmp/repro.py']),
       ('run', 'python', ['/tmp/repro.py']),
       ('filter', 'tail', [])]),
     ('sed -n 1199,1240p pandas/core/indexing.py && echo ---- && sed -n 1790,1870p '
@@ -655,9 +655,10 @@ def test_gold_surfaced_without_opened():
     assert steps["gold_surfaced"] and not steps["gold_opened"] and steps["gold_opened_share"] == 0.0
 
 
-def test_gold_opened_without_surfaced():
+def test_gold_opened_is_also_surfaced():
+    # sed -n prints the lines without the path. Version 2 left surfaced empty here.
     events = _stream([_bash("echo start")], [_bash("sed -n 1,5p pandas/core/indexing.py", "import numpy")])
-    assert _gold(events) == {"surfaced": None, "opened": 2, "edited": None, "named_by_agent": 2}
+    assert _gold(events) == {"surfaced": 2, "opened": 2, "edited": None, "named_by_agent": 2}
 
 
 def test_gold_path_inside_a_longer_path_does_not_match():
@@ -707,7 +708,7 @@ def test_turn_marks_and_edits():
     assert (steps["first_test_turn"], steps["first_mcp_turn"], steps["first_codemem_turn"]) == (2, 3, 3)
     assert steps["codemem_calls"] == 1 and steps["mcp_tools"] == {"mcp__codemem__search": 1}
     assert steps["actions"]["mcp"] == 1 and steps["tests_run"] == 1
-    assert steps["edits"] == {"tool": 1, "shell": 1, "script": 0, "outside": 1,
+    assert steps["edits"] == {"tool": 1, "shell": 1, "script": 0, "outside": 1, "reverts": 0,
                               "files_edited": ["pandas/core/indexing.py", "pandas/new.py"], "files_edited_guess": []}
     assert steps["gold"][GOLD[0]] == {"surfaced": 3, "opened": None, "edited": 4, "named_by_agent": 4}
 
@@ -739,12 +740,14 @@ def test_counts_of_the_70742_run():
     assert steps["views"] == {"count": 11, "lines_viewed": 320, "whole_file_views": 0, "lines_unknown": 1,
                               "files_viewed": ["pandas/core/indexing.py", "pandas/core/generic.py",
                                                "pandas/tests/indexing/test_indexing.py"]}
-    assert steps["edits"] == {"tool": 2, "shell": 1, "script": 2, "outside": 1, "files_edited_guess": [],
+    assert steps["edits"] == {"tool": 2, "shell": 1, "script": 2, "outside": 1, "reverts": 0,
+                              "files_edited_guess": [],
                               "files_edited": ["pandas/core/indexing.py", "pandas/tests/indexing/test_indexing.py"]}
     assert (steps["actions"]["other"], steps["actions"]["unparsed"], steps["tests_run"]) == (7, 0, 6)
-    # Checked by hand against the stream. Turn 1 greps the file, turn 2 views it with sed -n, the Edit of turn 7
-    # fails (the text did not match), turn 8 reads it, the Edit of turn 9 works and its result shows the path.
-    assert steps["gold"]["pandas/core/indexing.py"] == {"surfaced": 9, "opened": 2, "edited": 7, "named_by_agent": 1}
+    # Checked by hand against the stream. Turn 1 greps the file by name (grep prints no path for one file, so
+    # version 2 said surfaced 9), turn 2 views it with sed -n, the Edit of turn 7 fails (the text did not match),
+    # turn 8 reads it, the Edit of turn 9 works and its result shows the path.
+    assert steps["gold"]["pandas/core/indexing.py"] == {"surfaced": 1, "opened": 2, "edited": 7, "named_by_agent": 1}
     assert (steps["first_edit_turn"], steps["turns_before_first_edit"], steps["first_test_turn"]) == (7, 6, 11)
     assert steps["gold_file_read"] and steps["first_gold_read_turn"] == 2
 
@@ -758,11 +761,167 @@ def test_counts_of_the_66227_run():
                                               "pandas/tests/series/test_reductions.py"]
     assert (steps["views"]["count"], steps["views"]["lines_viewed"]) == (5, 139)
     assert (steps["edits"]["tool"], steps["edits"]["shell"], steps["edits"]["script"]) == (3, 3, 0)
-    # Checked by hand: turn 1 greps the file, turn 2 views it with sed -n, the traceback of turn 5 shows its
-    # path, and the first Edit is at turn 10.
-    assert steps["gold"]["pandas/core/arrays/timedeltas.py"] == {"surfaced": 5, "opened": 2, "edited": 10,
+    # Checked by hand: turn 1 greps the file by name, turn 2 views it with sed -n, the traceback of turn 5 shows
+    # its path (version 2 said surfaced 5), and the first Edit is at turn 10.
+    assert steps["gold"]["pandas/core/arrays/timedeltas.py"] == {"surfaced": 1, "opened": 2, "edited": 10,
                                                                  "named_by_agent": 1}
     assert (steps["first_edit_turn"], steps["first_test_turn"]) == (10, 13)
+
+
+# ---- faults of version 2, from commands of the Haiku runs of 2026-11-25 (pandas 70742, playwright 42503)
+
+GOLD_42503 = ["packages/playwright/src/mcp/test/browserBackend.ts"]
+TASK_OUTPUT = "/tmp/claude-1000/-testbed/e0c84efe-d5ed-4bfa-bede-ed0bbcc9ea46/tasks/bfn569r0d.output"
+
+
+def test_grep_in_the_gold_file_surfaces_it():
+    # pilot-haiku-1, pandas 70742, tool, turn 1. grep on one file prints no path. Version 2: surfaced 16, opened 2.
+    command = ('git status --short | head && python -c "\nimport numpy as np, pandas as pd\nn=100_000\n'
+               'df = pd.DataFrame({c: np.zeros(n) for c in \'abcd\'})\nres = df.loc[0, [\'a\',\'b\',\'d\']]\n'
+               'print(getattr(res.values.base,\'shape\',None), pd.__version__)\nres = df.iloc[0, [0,1,3]]\n'
+               'print(getattr(res.values.base,\'shape\',None))\n" 2>&1 | tail -3; grep -n "_multi_take\\\\|'
+               'def _getitem_tuple_same_dim\\\\|def _getitem_lowerdim\\\\|def _handle_lowerdim_multi_index_axis0" '
+               'pandas/core/indexing.py | head -30')
+    result = ("(3, 100000) 3.2.0.dev0\n(3, 100000)\n1171:    def _getitem_tuple_same_dim(self, tup: tuple[Any, ...]):\n"
+              "1199:    def _getitem_lowerdim(self, tup: tuple[Any, ...]):\n")
+    events = _stream([_bash(command, result)], [_bash("sed -n 1199,1260p pandas/core/indexing.py", "    def x")])
+    assert _gold(events) == {"surfaced": 1, "opened": 2, "edited": None, "named_by_agent": 1}
+    # A grep through a folder that holds the file does not surface it when the file is not in the result.
+    events = _stream([_bash('grep -rn "fast_xs" pandas --include=*.py | head -20', "pandas/core/apply.py:1546: x")])
+    assert _gold(events)["surfaced"] is None
+
+
+def test_read_surfaces_the_file():
+    # vague-l2-1, pandas 70742, tool, turn 3: the Read result has numbered lines and no path. Version 2: surfaced
+    # 4, opened 3.
+    events = _stream([_bash("git status --short | head")],
+                     [_bash("cat > /tmp/repro.py <<'EOF'\nprint(1)\nEOF\npython /tmp/repro.py")],
+                     [("Read", {"file_path": "/testbed/pandas/core/indexing.py", "offset": 1199, "limit": 70},
+                       "  1199\t    def _getitem_lowerdim(self, tup):")])
+    assert _gold(events)["surfaced"] == 3 and _gold(events)["opened"] == 3
+
+
+def test_listing_of_the_folder_surfaces_the_file():
+    # vague2-l2-1, playwright 42503, tool, turns 3 and 4. ls prints the bare name; after the cd, cat names it
+    # relative to the folder. Version 2: surfaced 5, opened 4.
+    turn3 = "cat packages/playwright/src/mcp/test/testTools.ts; ls packages/playwright/src/mcp/test/"
+    turn4 = ('cd packages/playwright/src/mcp/test; cat browserBackend.ts; grep -rn "pause\\\\|Pause" '
+             '../../../../playwright/src/mcp/test/testContext.ts ../../../../playwright/src/mcp/test/testBackend.ts '
+             '| head -40')
+    listing = "/**\n * Copyright (c) Microsoft Corporation.\n */\nbrowserBackend.ts\ntestBackend.ts\ntestContext.ts\n"
+    events = _stream([_bash(turn3, listing)], [_bash(turn4, "/**\n * Copyright")])
+    assert _gold(events, GOLD_42503) == {"surfaced": 1, "opened": 2, "edited": None, "named_by_agent": 2}
+    # The same name in a listing of another folder is not the gold file.
+    events = _stream([_bash("ls packages/playwright/src/mcp/browser", "browserBackend.ts\n")])
+    assert _gold(events, GOLD_42503)["surfaced"] is None
+    # grep -rn after a cd prints paths relative to the folder.
+    events = _stream([_bash("cd packages/playwright/src/mcp && grep -rn pause .",
+                            "./test/browserBackend.ts:12:  pause()")])
+    assert _gold(events, GOLD_42503)["surfaced"] == 1 and _gold(events, GOLD_42503)["opened"] is None
+
+
+def test_grep_in_a_log_in_tmp_is_not_a_code_search():
+    # pilot-haiku-1, pandas 70742, tool, turns 46 and 47.
+    assert _summary("timeout 110 bash -c 'until grep -q \"^EXIT\" /tmp/wide_tests.log; do sleep 5; done' ; "
+                    "tail -3 /tmp/wide_tests.log") == [
+        ("read_outside", "grep", ["/tmp/wide_tests.log"]), ("other", "sleep", []),
+        ("read_outside", "tail", ["/tmp/wide_tests.log"])]
+    assert _summary('grep -E "passed|failed|EXIT|^FAILED" /tmp/wide_tests.log | tail -8') == [
+        ("read_outside", "grep", ["/tmp/wide_tests.log"]), ("filter", "tail", [])]
+    # vague-l2-1, playwright 42503, tool, turn 28: a cache folder outside the repo.
+    assert _summary("ls ~/.cache/ms-playwright 2>/dev/null") == [("read_outside", "ls", ["~/.cache/ms-playwright"])]
+    # A search that holds the repo, or a search in a repo file and a log, is still a code search.
+    assert _summary("find / -name indexing.py")[0][0] == "search_files"
+    assert _summary("grep -n x pandas/a.py /tmp/log")[0][0] == "search_content"
+    assert _summary("cd /tmp && grep -rn EXIT")[1] == ("read_outside", "grep", [])
+    steps = count_steps(_stream([_bash('grep -E "passed|failed" /tmp/wide_tests.log | tail -8')]), GOLD)
+    assert steps["searches"]["content"] == 0 and steps["actions"]["read_outside"] == 1
+
+
+def test_blocked_call_is_not_done():
+    # pilot-haiku-1, pandas 70742, tool, turn 35: Claude Code blocked the call; turn 36 runs the tail alone.
+    blocked = ("<tool_use_error>Blocked: sleep 100 followed by: tail -c 400 " + TASK_OUTPUT + ". To wait for a "
+               "condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`).</tool_use_error>")
+    events = _stream([_bash("sleep 100; tail -c 400 " + TASK_OUTPUT, blocked)],
+                     [_bash("tail -c 400 " + TASK_OUTPUT, "2 failed in 0.11s")])
+    steps = count_steps(events, GOLD)
+    assert (steps["bash_calls"], steps["blocked_calls"]) == (2, 1)
+    assert steps["actions"]["read_outside"] == 1 and steps["actions"]["other"] == 0
+    assert steps["commands"][0]["blocked"] and "blocked" not in steps["commands"][1]
+    # Nothing of a blocked call counts: not its test, its edit, its cd, nor the path that its error text repeats.
+    edit = "sed -i 's/a/b/' pandas/core/indexing.py && python -m pytest pandas/tests/indexing"
+    events = _stream([_bash("cd pandas", "<tool_use_error>Blocked: cd</tool_use_error>")],
+                     [_bash(edit, "<tool_use_error>Blocked: " + edit + "</tool_use_error>")],
+                     [_bash("cat core/indexing.py")])
+    steps = count_steps(events, GOLD)
+    assert (steps["first_edit_turn"], steps["first_test_turn"], steps["tests_run"]) == (None, None, 0)
+    assert steps["gold"][GOLD[0]] == {"surfaced": None, "opened": None, "edited": None, "named_by_agent": 2}
+    # An Edit whose old text is not found is not blocked: it counts as an edit, as in version 2.
+    failed = ("Edit", {"file_path": "/testbed/pandas/core/indexing.py", "old_string": "x", "new_string": "y"},
+              "<tool_use_error>String to replace not found in file.\nString: x</tool_use_error>")
+    steps = count_steps(_stream([failed]), GOLD)
+    assert steps["first_edit_turn"] == 1 and steps["blocked_calls"] == 0
+    denied = ("Write", {"file_path": "/testbed/a.py", "content": "x"},
+              "<tool_use_error>Permission to use Write has been denied.</tool_use_error>")
+    assert count_steps(_stream([denied]), GOLD)["blocked_calls"] == 1
+
+
+def test_dev_null_and_task_output_are_not_views():
+    # vague-l1-1, pandas 70742, tool, turn 2 (the last line of the call).
+    assert _summary('python /tmp/repro.py; grep -n "" /dev/null; ls pandas/core/indexing.py') == [
+        ("run", "python", ["/tmp/repro.py"]), ("other", "grep", []),
+        ("search_files", "ls", ["pandas/core/indexing.py"])]
+    # pandas 68090 (transcript note 1); not in the 14 runs of 70742 and 42503.
+    assert _summary("sed -n 1,5p /dev/null")[0][0] == "other"
+    # grep FILE /dev/null makes grep print the file name: the repo file stays.
+    assert _summary("grep -n foo pandas/a.py /dev/null") == [("search_content", "grep", ["pandas/a.py"])]
+    # pilot-haiku-1, pandas 70742, tool, turn 36: the output file of a command in the background.
+    a = _one("tail -c 400 " + TASK_OUTPUT)
+    assert (a.kind, a.outside, a.lines) == ("read_outside", (TASK_OUTPUT,), None)
+    # pilot-haiku-1, playwright 42503, tool, turn 24: a log of the agent.
+    assert _summary("cat /tmp/dbg.log") == [("read_outside", "cat", ["/tmp/dbg.log"])]
+    # Claude Code tells the agent to Read the output file; not seen in the 14 runs.
+    steps = count_steps(_stream([("Read", {"file_path": TASK_OUTPUT}, "1\t2 failed")]), GOLD)
+    assert steps["views"]["count"] == 0 and steps["actions"]["read_outside"] == 1
+
+
+def test_writes_outside_the_repo_and_reverts_are_not_edits():
+    # vague-l1-1, pandas 70742, tool, turn 2: a script in /tmp.
+    assert _summary("cat > /tmp/repro.py <<'EOF'\nimport numpy as np, pandas as pd\nEOF\npython /tmp/repro.py") == [
+        ("write_outside", "cat", ["/tmp/repro.py"]), ("run", "python", ["/tmp/repro.py"])]
+    # pilot-haiku-1, pandas 70742, tool, turn 41: echo >> to a log.
+    command = ("(timeout 1500 python -m pytest pandas/tests/groupby pandas/tests/reshape pandas/tests/window "
+               "pandas/tests/io/pytables -q -p no:cacheprovider -n 8 > /tmp/wide_tests.log 2>&1; echo EXIT $? >> "
+               "/tmp/wide_tests.log) &\necho started")
+    kinds = [k for k, _, _ in _summary(command)]
+    assert kinds == ["test", "write_outside", "other"]
+    # pilot-haiku-1, pandas 70742, tool, turn 14: git checkout reverts a file.
+    assert _summary("git checkout pandas/core/internals/managers.py && sed -n 1260,1275p pandas/core/indexing.py") \
+        == [("revert", "git checkout", ["pandas/core/internals/managers.py"]),
+            ("view", "sed -n", ["pandas/core/indexing.py"])]
+    # vague-l0-1, playwright 42503, tool, turn 11: a backup in /tmp, a revert, a test, and the fix copied back.
+    command = ("cp packages/playwright/src/mcp/test/browserBackend.ts /tmp/fixed.ts && git checkout -- "
+               "packages/playwright/src/mcp/test/browserBackend.ts && timeout 300 npx playwright test "
+               "tests/mcp/cli-test.spec.ts -g \"multiple browser contexts\" --reporter=line 2>&1 | grep -m3 "
+               "\"already started\\\\|passed\\\\|failed\"; cp /tmp/fixed.ts packages/playwright/src/mcp/test/"
+               "browserBackend.ts && git status --short")
+    assert [k for k, _, _ in _summary(command)] == ["write_outside", "revert", "test", "filter", "edit", "git"]
+    # vague2-l1-1, pandas 70742, tool, turn 20: git show HEAD:PATH > PATH puts the old version back.
+    command = ("git status --short && cp pandas/core/indexing.py /tmp/indexing_fixed.py && git show "
+               "HEAD:pandas/core/indexing.py > pandas/core/indexing.py && timeout 300 python -m pytest "
+               "pandas/tests/indexing/test_loc.py -q -p no:cacheprovider -k temporary 2>&1 | tail -1")
+    assert [k for k, _, _ in _summary(command)][:3] == ["git", "write_outside", "revert"]
+    assert _one("git show HEAD:pandas/core/indexing.py > /tmp/orig.py").kind == "write_outside"
+    # A write to a repo file stays an edit.
+    assert _one("echo x >> pandas/a.py").kind == "edit"
+    # In a run: the revert of the gold file and the scratch files are not edits; the later edit is.
+    events = _stream([_bash("cat > /tmp/repro.py <<'EOF'\nprint(1)\nEOF\npython /tmp/repro.py")],
+                     [_bash("git checkout -- pandas/core/indexing.py", "Updated 1 path from the index")],
+                     [_bash("cat >> pandas/core/indexing.py <<'EOF'\n# x\nEOF")])
+    steps = count_steps(events, GOLD)
+    assert steps["first_edit_turn"] == 3 and steps["gold"][GOLD[0]]["edited"] == 3
+    assert (steps["edits"]["shell"], steps["edits"]["outside"], steps["edits"]["reverts"]) == (1, 1, 1)
+    assert steps["actions"]["edit"] == 1 and steps["edits"]["files_edited"] == ["pandas/core/indexing.py"]
 
 
 # ---- recount and score
@@ -789,12 +948,18 @@ def test_recount_changes_only_steps(tmp_path, capsys):
     assert main(["e2e", "recount", "rc1"]) == 0
     out = capsys.readouterr().out
     assert ("pandas-dev__pandas-70742 grep rep 1: content searches - -> 8, files viewed 1 -> 3, gold opened True "
-            "-> True, first edit turn 7 -> 7") in out
+            "-> True, first edit turn 7 -> 7, first gold surfaced turn - -> 1, steps version - -> 3") in out
     new = json.loads(path.read_text())
     assert new["steps"]["steps_version"] == e2e_steps.STEPS_VERSION and new["steps"]["first_gold_read_turn"] == 2
     assert new["steps"]["num_turns_result"] == 18
     # Everything but steps is the same, byte for byte.
     assert json.dumps({**new, "steps": record["steps"]}, indent=2, ensure_ascii=False) + "\n" == before
+    # A second recount of a version 2 record moves it to version 3.
+    old_steps = {**new["steps"], "steps_version": 2, "first_gold_surfaced_turn": 9}
+    write_json(path, {**new, "steps": old_steps})
+    assert main(["e2e", "recount", "rc1"]) == 0
+    assert "first gold surfaced turn 9 -> 1, steps version 2 -> 3" in capsys.readouterr().out
+    assert json.loads(path.read_text())["steps"]["steps_version"] == 3
 
 
 def test_recount_takes_gold_files_from_the_task_file(make_task, tmp_path, capsys):

@@ -125,7 +125,7 @@ first catches up on your latest saves, so an agent finds the code it just wrote
 
 `~/.codemem/config.toml`, overridden per repo by `<repo>/.codemem.toml`, then by environment
 variables (`CODEMEM_HOME`, `CODEMEM_DEVICE`, `CODEMEM_MODEL`, `CODEMEM_STEERING`,
-`CODEMEM_VECTOR_CACHE`, `CODEMEM_MODEL_IDLE_MINUTES`). The defaults, and why they have their values, are in
+`CODEMEM_VECTOR_CACHE`, `CODEMEM_VECTOR_BACKEND`, `CODEMEM_MODEL_IDLE_MINUTES`). The defaults, and why they have their values, are in
 [decisions.md §3](docs/decisions.md); what each change redoes is in §5 there.
 
 ```toml

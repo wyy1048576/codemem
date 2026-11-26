@@ -7,14 +7,16 @@ takes 96 bytes a vector (FaissVectorStore.bytes_per_vector).
 
 import json
 import logging
+import shutil
 
 import faiss
 import numpy as np
 import pytest
 
 import codemem.config as config_module
-from codemem.config import Config, config_from_dict, physical_memory, vector_memory_budget
+from codemem.config import Config, config_from_dict, load_config, physical_memory, vector_memory_budget
 from codemem.embedder import l2_normalize
+from codemem.indexer import IndexStats
 from codemem.render import format_status
 from codemem.schema import Chunk, text_hash
 from codemem.service import CodememService
@@ -346,3 +348,76 @@ def test_the_mcp_status_tool_carries_the_search_index(sample_repo, tmp_path, mon
         assert data["search_index"]["index"] in ("faiss", "compact") and "types" in data["search_index"]
     finally:
         svc.close()
+
+
+# ---------------------------------------------------------------- one search index for a build and its runs
+
+
+def test_the_environment_names_the_search_index(sample_repo, monkeypatch):
+    """Without a config file: what the eval sets for the build of an index and for every run of it."""
+    assert load_config().vector_backend == Config().vector_backend  # not set: the default stays
+    for name in ("faiss", "compact", "auto"):
+        monkeypatch.setenv("CODEMEM_VECTOR_BACKEND", name)
+        assert load_config().vector_backend == name
+    monkeypatch.setenv("CODEMEM_VECTOR_BACKEND", "faiss")
+    (sample_repo / ".codemem.toml").write_text('vector_backend = "compact"\n')
+    assert load_config(sample_repo).vector_backend == "faiss"  # the environment wins over a config file
+    monkeypatch.setenv("CODEMEM_VECTOR_BACKEND", "exact")
+    with pytest.raises(ValueError, match="vector_backend must be auto, faiss, compact"):
+        load_config()
+
+
+def test_a_run_with_less_memory_than_its_build_reads_the_saved_index_when_one_is_named(sample_repo, tmp_path, monkeypatch):
+    """`auto` picks by the memory of the place it runs in. A build with all of a machine's memory
+    saves the exact index; a run of it under a container's memory limit picks the compact one and
+    rebuilds it from the rows at its start, while its first searches are answered from keywords.
+    With the exact index named in the environment of both, the run reads what the build saved."""
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+    (sample_repo / ".codemem.toml").write_text('vector_backend = "auto"\n')
+    host, container = 10**9, 1  # the budget of a place the index fits, and of one it does not
+    rebuilds = []
+    rebuild = Store._rebuild
+    monkeypatch.setattr(Store, "_rebuild", lambda self, *a: rebuilds.append(a[0]) or rebuild(self, *a))
+
+    def build(path, budget):
+        _budget(monkeypatch, budget)
+        svc = CodememService(sample_repo, index_dir=path)
+        try:
+            assert svc.update() is not None
+        finally:
+            svc.close()
+        return _saved(path)
+
+    def start(built, budget):
+        """A run's start on a private copy of a built index: the search index it loads, and the
+        vector types it had to rebuild from the rows. Nothing is chunked or embedded again."""
+        _budget(monkeypatch, budget)
+        copy = tmp_path / f"copy-{len(list(tmp_path.glob('copy-*')))}"
+        shutil.copytree(built, copy)
+        del rebuilds[:]
+        svc = CodememService(sample_repo, index_dir=copy)
+        try:
+            stats = IndexStats()
+            svc.indexer.structure(stats)  # the full check a start makes
+            assert (stats.files_changed, stats.chunks_added, stats.chunks_deleted, svc.store.dirty_count()) == (0, 0, 0, 0)
+            svc.store.load_vectors()  # and its load of the search indexes
+            return svc.store.search_index_status()["index"], sorted(rebuilds)
+        finally:
+            svc.close()
+
+    by_auto = tmp_path / "built-by-auto"
+    assert build(by_auto, host) == ["vec_code.faiss", "vec_usage.faiss"]
+    assert start(by_auto, host) == ("faiss", [])  # the same memory: the saved index is read
+    assert start(by_auto, container) == ("compact", ["code", "usage"])  # less memory: every type is rebuilt
+
+    monkeypatch.setenv("CODEMEM_VECTOR_BACKEND", "faiss")
+    assert start(by_auto, container) == ("faiss", [])  # named: what the build saved is read, and nothing is redone
+    named = tmp_path / "built-with-the-name"
+    assert build(named, container) == ["vec_code.faiss", "vec_usage.faiss"]  # a build saves it whatever its own memory
+    assert start(named, container) == ("faiss", []) and start(named, host) == ("faiss", [])
+    # An index that a build left compact is rebuilt as the exact one by a run that names it: from the rows.
+    monkeypatch.delenv("CODEMEM_VECTOR_BACKEND")
+    compact = tmp_path / "built-compact"
+    assert build(compact, container) == ["vec_code.rabitq", "vec_usage.rabitq"]
+    monkeypatch.setenv("CODEMEM_VECTOR_BACKEND", "faiss")
+    assert start(compact, container) == ("faiss", ["code", "usage"])

@@ -608,7 +608,7 @@ def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
         "command": program, "args": ["mcp", "/testbed", "--index-dir", "/cmindex"],
         "env": {"HF_HOME": "/hf", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
                 "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0",
-                "OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
+                "CODEMEM_VECTOR_BACKEND": "faiss", "OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
         "alwaysLoad": True}}}
     assert e2e_run.codemem_mounts(codemem, Path("/runs/x/cmindex")) == [
         "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",
@@ -773,6 +773,7 @@ def test_cli_dry_run_shows_the_index(make_task, tmp_path, monkeypatch, capsys):
 
 FAKE_CODEMEM = """#!/bin/sh
 echo "$@" >> "{calls}"
+echo "$CODEMEM_VECTOR_BACKEND $CODEMEM_HOME" >> "{calls}.env"
 test -f "$2/app.py" || exit 3
 mkdir -p "$4"
 echo data > "$4/index.sqlite"
@@ -810,6 +811,9 @@ def test_cli_index(remote, make_task, tmp_path, monkeypatch, capsys):
     calls = tmp_path / "calls.txt"
     _shim(checkout / ".venv" / "bin", "codemem", FAKE_CODEMEM.format(calls=calls))
     monkeypatch.setenv("CMEVAL_CODEMEM_BIN", str(checkout / ".venv" / "bin" / "codemem"))
+    # What the shell of the build has: its codemem home, where the vector cache is, and a search index of its own.
+    monkeypatch.setenv("CODEMEM_HOME", str(tmp_path / "codemem-home"))
+    monkeypatch.setenv("CODEMEM_VECTOR_BACKEND", "compact")
 
     assert main(args) == 0
     err = capsys.readouterr().err
@@ -821,6 +825,9 @@ def test_cli_index(remote, make_task, tmp_path, monkeypatch, capsys):
     assert (root / "src" / "app.py").read_text() == "VERSION = 1\n" and (root / "index" / "index.sqlite").exists()
     assert "1 tasks have no tests.json" in err and f"acme__demo-42: {meta['seconds']} s, indexed 1 files" in err
     assert calls.read_text().split() == ["index", str(root / "src"), "--index-dir", str(root / "index")]
+    # The build names the search index that a run names (test_codemem_mcp_config), whatever the shell says,
+    # and gets the rest of the shell's environment as it is.
+    assert Path(f"{calls}.env").read_text().split() == ["faiss", str(tmp_path / "codemem-home")]
     assert e2e_index.index_state(recipe, tasks[0]) == "ok"
 
     # The same commits: skipped. --force builds again. A change in codemem's src/ builds again.
