@@ -1,0 +1,338 @@
+{
+ "name": "vague-b7-v3",
+ "created": "2026-11-26",
+ "tasks": 45,
+ "rows": 90,
+ "levels": [
+  "L1",
+  "L2"
+ ],
+ "task_files": [
+  "tasks/e2e/pandas.jsonl",
+  "tasks/e2e/playwright.jsonl"
+ ],
+ "task_choice": "every pandas and playwright task that the screen of tasks/screen/b7.jsonl calls fair (two reads, a third read for six tasks): 45 of 141 valid tasks",
+ "rules": "tasks/vague-rules-v3.md",
+ "rules_sha256": "8c3396a4eacfeee714112ca420224189708f8109aad0827e05cba426779c3011",
+ "based_on": {
+  "file": "tasks/vague-b7-v2.jsonl",
+  "sha256": "1f51b8e699aa3576dec7d83060d8e58df7b9179c68312a09a33c2ab2230d7e44",
+  "rules": "tasks/vague-rules-v2.md",
+  "rules_sha256": "e0190687a7f246317eddfa4da2a6e45130b2e66b016a7b4bf1cd50578be008d2"
+ },
+ "review": "proposed by Andre's review of 2026-11-26 (branch andre/vague-prompts-v3, commit 5a7c2a2): 13 rows of vague-b7-v2 to correct, and four sentences for the rules. Track A reviewed each row against the rules and the issue, the real fix and the hidden tests of its task. Track A's own review found four more rows with the same kinds of fault and corrected them under rules version 3 (found_in_our_review)",
+ "changed_rows": 17,
+ "changed_as_proposed": [
+  [
+   "microsoft__playwright-41942",
+   "L2"
+  ],
+  [
+   "microsoft__playwright-42204",
+   "L2"
+  ],
+  [
+   "microsoft__playwright-42792",
+   "L1"
+  ],
+  [
+   "microsoft__playwright-42838",
+   "L1"
+  ],
+  [
+   "microsoft__playwright-42864",
+   "L1"
+  ],
+  [
+   "microsoft__playwright-43071",
+   "L2"
+  ],
+  [
+   "microsoft__playwright-43146",
+   "L1"
+  ],
+  [
+   "pandas-dev__pandas-68090",
+   "L2"
+  ],
+  [
+   "pandas-dev__pandas-69924",
+   "L2"
+  ],
+  [
+   "pandas-dev__pandas-70205",
+   "L1"
+  ],
+  [
+   "pandas-dev__pandas-70966",
+   "L1"
+  ],
+  [
+   "pandas-dev__pandas-71129",
+   "L1"
+  ]
+ ],
+ "changed_with_a_change": {
+  "microsoft__playwright-43172 L1": "Andre's text, and also: 'The parser turns' becomes 'Playwright does this for', and 'throws an error that says the locator method is unsupported' becomes 'throws an error' (a near copy of the repo's own error text)"
+ },
+ "proposed_not_taken": [],
+ "unchanged_rows": "73 rows are byte-equal to vague-b7-v2.jsonl",
+ "with_done_when": [
+  "microsoft__playwright-42792"
+ ],
+ "left_the_set": {
+  "microsoft__playwright-42672": "unfair in both reads of the screen of 2026-11-26",
+  "pandas-dev__pandas-70742": "unfair in both reads of the screen of 2026-11-26 (reopened with the pandas 2.3.3 fact)"
+ },
+ "l2_words_in_gold_paths": {
+  "rule": "a word of the task's L2 text (the full text, with any Done-when line; split at every character that is not a letter or digit), case-insensitive, of 4 characters or more, that is a whole word or a camel-case part of the path of one of the task's gold files (gold.files of the task file; the path is split at every character that is not a letter or digit, and each part also at its camel-case boundaries). The repo names pandas, playwright and microsoft do not count: every gold path holds them",
+  "use": "results can be shown with and without the tasks that have a word here. Many words are common (test, server, browser, locator, storage); 'paths' shows which file each word matches",
+  "tasks_with_a_word": 24,
+  "words": {
+   "microsoft__playwright-41682": [
+    "match"
+   ],
+   "microsoft__playwright-41850": [],
+   "microsoft__playwright-41913": [],
+   "microsoft__playwright-41942": [],
+   "microsoft__playwright-41988": [
+    "snapshot"
+   ],
+   "microsoft__playwright-42042": [],
+   "microsoft__playwright-42204": [],
+   "microsoft__playwright-42260": [
+    "storage"
+   ],
+   "microsoft__playwright-42433": [],
+   "microsoft__playwright-42503": [
+    "browser",
+    "test"
+   ],
+   "microsoft__playwright-42707": [
+    "storage"
+   ],
+   "microsoft__playwright-42780": [
+    "locator"
+   ],
+   "microsoft__playwright-42792": [
+    "test"
+   ],
+   "microsoft__playwright-42838": [
+    "clock"
+   ],
+   "microsoft__playwright-42864": [],
+   "microsoft__playwright-42919": [
+    "tracing"
+   ],
+   "microsoft__playwright-43012": [],
+   "microsoft__playwright-43071": [],
+   "microsoft__playwright-43146": [
+    "cookie"
+   ],
+   "microsoft__playwright-43148": [
+    "cookie"
+   ],
+   "microsoft__playwright-43170": [
+    "locator"
+   ],
+   "microsoft__playwright-43172": [
+    "locator"
+   ],
+   "microsoft__playwright-43174": [
+    "server"
+   ],
+   "microsoft__playwright-43305": [
+    "loader",
+    "transform"
+   ],
+   "microsoft__playwright-43316": [
+    "cookies"
+   ],
+   "microsoft__playwright-43400": [],
+   "microsoft__playwright-43429": [
+    "storage"
+   ],
+   "microsoft__playwright-43488": [
+    "chromium"
+   ],
+   "pandas-dev__pandas-66352": [],
+   "pandas-dev__pandas-67025": [
+    "arrow"
+   ],
+   "pandas-dev__pandas-67897": [],
+   "pandas-dev__pandas-68090": [
+    "sorting"
+   ],
+   "pandas-dev__pandas-68195": [
+    "merge"
+   ],
+   "pandas-dev__pandas-68278": [],
+   "pandas-dev__pandas-68945": [],
+   "pandas-dev__pandas-69015": [],
+   "pandas-dev__pandas-69779": [],
+   "pandas-dev__pandas-69924": [],
+   "pandas-dev__pandas-70205": [
+    "excel"
+   ],
+   "pandas-dev__pandas-70734": [
+    "sas7bdat"
+   ],
+   "pandas-dev__pandas-70828": [
+    "json"
+   ],
+   "pandas-dev__pandas-70966": [],
+   "pandas-dev__pandas-71129": [],
+   "pandas-dev__pandas-71232": [],
+   "pandas-dev__pandas-71248": []
+  },
+  "paths": {
+   "microsoft__playwright-41682": {
+    "match": [
+     "packages/isomorphic/urlMatch.ts"
+    ]
+   },
+   "microsoft__playwright-41988": {
+    "snapshot": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "microsoft__playwright-42260": {
+    "storage": [
+     "packages/injected/src/storageScript.ts"
+    ]
+   },
+   "microsoft__playwright-42503": {
+    "browser": [
+     "packages/playwright/src/mcp/test/browserBackend.ts"
+    ],
+    "test": [
+     "packages/playwright/src/mcp/test/browserBackend.ts"
+    ]
+   },
+   "microsoft__playwright-42707": {
+    "storage": [
+     "packages/injected/src/storageScript.ts"
+    ]
+   },
+   "microsoft__playwright-42780": {
+    "locator": [
+     "packages/isomorphic/locatorGenerators.ts"
+    ]
+   },
+   "microsoft__playwright-42792": {
+    "test": [
+     "packages/playwright/src/common/testType.ts",
+     "packages/playwright/types/test.d.ts",
+     "utils/generate_types/overrides-test.d.ts"
+    ]
+   },
+   "microsoft__playwright-42838": {
+    "clock": [
+     "packages/injected/src/clock.ts"
+    ]
+   },
+   "microsoft__playwright-42919": {
+    "tracing": [
+     "packages/playwright-core/src/server/trace/recorder/tracing.ts"
+    ]
+   },
+   "microsoft__playwright-43146": {
+    "cookie": [
+     "packages/playwright-core/src/server/cookieStore.ts"
+    ]
+   },
+   "microsoft__playwright-43148": {
+    "cookie": [
+     "packages/playwright-core/src/server/cookieStore.ts"
+    ]
+   },
+   "microsoft__playwright-43170": {
+    "locator": [
+     "packages/isomorphic/locatorParser.ts"
+    ]
+   },
+   "microsoft__playwright-43172": {
+    "locator": [
+     "packages/isomorphic/locatorParser.ts"
+    ]
+   },
+   "microsoft__playwright-43174": {
+    "server": [
+     "packages/playwright-core/src/tools/utils/mcp/server.ts"
+    ]
+   },
+   "microsoft__playwright-43305": {
+    "loader": [
+     "packages/playwright/src/transform/esmLoader.ts",
+     "packages/playwright/src/transform/esmLoaderSync.ts"
+    ],
+    "transform": [
+     "packages/playwright/src/transform/esmLoader.ts",
+     "packages/playwright/src/transform/esmLoaderSync.ts",
+     "packages/playwright/src/transform/transform.ts"
+    ]
+   },
+   "microsoft__playwright-43316": {
+    "cookies": [
+     "packages/playwright-core/src/tools/backend/cookies.ts"
+    ]
+   },
+   "microsoft__playwright-43429": {
+    "storage": [
+     "packages/injected/src/storageScript.ts"
+    ]
+   },
+   "microsoft__playwright-43488": {
+    "chromium": [
+     "packages/playwright-core/src/server/chromium/crPage.ts"
+    ]
+   },
+   "pandas-dev__pandas-67025": {
+    "arrow": [
+     "pandas/core/arrays/arrow/array.py"
+    ]
+   },
+   "pandas-dev__pandas-68090": {
+    "sorting": [
+     "pandas/core/sorting.py"
+    ]
+   },
+   "pandas-dev__pandas-68195": {
+    "merge": [
+     "pandas/core/reshape/merge.py"
+    ]
+   },
+   "pandas-dev__pandas-70205": {
+    "excel": [
+     "pandas/io/excel/_base.py"
+    ]
+   },
+   "pandas-dev__pandas-70734": {
+    "sas7bdat": [
+     "pandas/io/sas/sas7bdat.py"
+    ]
+   },
+   "pandas-dev__pandas-70828": {
+    "json": [
+     "pandas/io/json/_json.py"
+    ]
+   }
+  }
+ },
+ "checks": {
+  "loader": "cmeval.e2e_run.load_prompts reads 45 L1 texts and 45 L2 texts",
+  "l2_length": "every L2 has 17 to 29 words without the Done-when line (rule: 10 to 30)",
+  "unchanged": "73 rows byte-equal to vague-b7-v2.jsonl; the ids and levels are in the same order",
+  "review": "each of the 13 proposed rows, and the 4 rows found in our review, was checked against the rules version 2 and version 3 and against the issue, the real fix, the hidden tests and the screen reads (tasks/screen/b7.jsonl) of its task: is the finding right, is the new text within the rules, and does it keep the request the same. vague-b7-v3.changes.md gives the reason for each row",
+  "leak": "each writer searched its texts for the names it removed and for the changed names of the real fix. Then one more claude-opus-5-5 session reviewed the 37 new tasks against the issue, the real fix and the hidden tests: 30 ok, 7 with a near copy of an error or log string of the repo's code; its corrected texts are used (8 rows: playwright-42042 L1, playwright-42780 L1, playwright-43012 L1, playwright-43400 L1, playwright-43400 L2, pandas-67897 L1, pandas-70205 L1, pandas-71129 L1). It found no lost or changed fact (for vague-b7-v2; the 17 new rows were read again for code names, file paths and the repo's error text)",
+  "solvable": "not done (plan section 9, check 2)",
+  "human": "not done (plan section 9, check 3)"
+ },
+ "sha256": "1797ae6317aedfa9d96078e5b3bcd7fb844233cc073b18cb53ddc20d74857736",
+ "found_in_our_review": {
+  "microsoft__playwright-41942 L1": "the repo's error text 'Unsupported platform' in other words, twice",
+  "pandas-dev__pandas-69015 L1": "a retold stack trace ('from the low-level element comparison')",
+  "pandas-dev__pandas-71232 L1": "a place in the code ('the shared fill code')",
+  "microsoft__playwright-43316 L2": "the tool name browser_cookie_list split into words ('cookie list')"
+ }
+}
