@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -475,6 +476,67 @@ def cmd_e2e_grader_check(args) -> int:
     return 0 if passed == len(records) else 3
 
 
+PATCH_SUFFIXES = (".patch", ".diff")
+
+
+def _saved_patches(patch: Path, ids: list[str] | None) -> list[tuple[str, str, Path]]:
+    """The changes that `e2e grade` grades: (task id, label, file). A file needs one --id. A folder holds
+    <task id>.patch files, or folders <task id>/ with one or more <label>.patch files; .diff works as well."""
+    if patch.is_file():
+        if not ids or len(ids) != 1:
+            raise TaskError("a patch file needs exactly one --id: the task it is for")
+        return [(ids[0], patch.stem, patch)]
+    if not patch.is_dir():
+        raise FileNotFoundError(f"{patch}: no such file or folder")
+    found = [(p.stem, p.stem, p) for p in patch.iterdir() if p.is_file() and p.suffix in PATCH_SUFFIXES]
+    found += [(d.name, p.stem, p) for d in patch.iterdir() if d.is_dir()
+              for p in d.iterdir() if p.is_file() and p.suffix in PATCH_SUFFIXES]
+    if ids:
+        found = [item for item in found if item[0] in set(ids)]
+    if not found:
+        raise FileNotFoundError(f"{patch}: no <task id>.patch file and no <task id>/<label>.patch file"
+                                + (" for the given --id" if ids else ""))
+    return sorted(found, key=lambda item: (item[0], item[1]))
+
+
+def cmd_e2e_grade(args) -> int:
+    from . import e2e
+    from . import generate as gen
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = {t.id: t for t in load_tasks(args.tasks)}
+        items = _saved_patches(args.patch, args.id)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e grade: {exc}", file=sys.stderr)
+        return 1
+    root = args.out or e2e.grades_dir() / recipe.name
+    records, errors, other_repo = [], 0, []
+    for task_id, label, path in items:
+        task = tasks.get(task_id)
+        if task is not None and task.repo != recipe.repo:
+            other_repo.append(task_id)
+            continue
+        try:
+            if task is None:
+                raise gen.GenerateError(f"no task {task_id} in {args.tasks}")
+            record = e2e.grade_saved(recipe, task, path, root / task_id / label, cpus=args.cpus)
+        except (gen.GenerateError, subprocess.TimeoutExpired, OSError) as exc:
+            errors += 1
+            print(f"{task_id} {label}: error: {exc}", flush=True)
+            continue
+        records.append(record)
+        print(e2e.format_grade(task_id, label, record), flush=True)
+    if other_repo:
+        say(f"note: {len(other_repo)} changes skipped: their task is not of {recipe.repo}: {' '.join(other_repo)}")
+    completed = sum(1 for r in records if r["completed"])
+    print(f"{recipe.name}: {completed} of {len(records)} graded changes completed, {errors} errors; records in {root}")
+    if errors or not records:
+        return 1
+    return 0 if completed == len(records) else 3
+
+
 def cmd_e2e_run(args) -> int:
     from . import e2e_run
     from . import generate as gen
@@ -842,6 +904,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jobs", type=int, default=1, help="tasks checked at the same time (default 1)")
     p.add_argument("--cpus", type=int, default=8, help="processors for one grading container (default 8)")
     p.set_defaults(func=cmd_e2e_grader_check)
+    p = e2e_sub.add_parser(
+        "grade", help="grade saved changes (git diffs) of tasks with the hidden tests, in a fresh container of each "
+                      "task's image",
+        description="Grade a change that was made outside `cmeval e2e run`, with the grader of the runs. The change is "
+                    "a git diff against the task's base commit, with the default a/ and b/ prefixes (git diff, not "
+                    "git diff --no-prefix), as UTF-8 text. Files that the hidden test change touches are dropped from "
+                    "it before it is applied, as for an agent's change. The task needs a valid saved validation "
+                    "(tests.json from cmeval generate) and its image; build a removed image again with cmeval "
+                    "generate RECIPE --tasks FILE --id TASK --rebuild. Exit code 0 when every change completed its "
+                    "task, 3 when one did not, 1 for an error.")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the tasks")
+    p.add_argument("--patch", type=Path, required=True,
+                   help="a diff file (give --id), or a folder of <task id>.patch files or of <task id>/<label>.patch "
+                        "files (.diff works as well)")
+    p.add_argument("--id", action="append", help="the task of a diff file; with a folder: only this task "
+                                                 "(can be given more than once)")
+    p.add_argument("--out", type=Path, help="folder of the records: <out>/<task id>/<patch name>/ "
+                                            "(default CMEVAL_HOME/e2e/grades/<recipe>)")
+    p.add_argument("--cpus", type=int, default=8, help="processors for one grading container (default 8)")
+    p.set_defaults(func=cmd_e2e_grade)
     p = e2e_sub.add_parser("run", help="run Claude Code on each valid task in its container, record it, and grade it")
     p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
     p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
