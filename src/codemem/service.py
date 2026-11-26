@@ -703,11 +703,16 @@ class CodememService:
     def start_watcher(self) -> RepoWatcher:
         self._ensure_worker()
         try:
-            self._watcher = RepoWatcher(
+            watcher = RepoWatcher(
                 self.repo_root, self.notify, debounce_ms=self.config.debounce_ms,
                 max_wait_ms=self.config.debounce_max_wait_ms, skip=[self.index_dir],
             )
-            self._watcher.start()
+            # Started before the writer can see it. A start takes a while (on Linux it adds a watch
+            # to every folder before its thread runs), and the writer takes a watcher that is not
+            # alive for one that stopped: it would scan the whole repo every POLL_EVERY seconds
+            # from then on. A file event of these moments arrives all the same, through `notify`.
+            watcher.start()
+            self._watcher = watcher
         except Exception:
             log.exception("the file watcher could not start; scanning the repo every %.0f s instead", POLL_EVERY)
             self._polling = True

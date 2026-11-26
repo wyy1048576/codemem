@@ -89,6 +89,31 @@ def test_watcher_reindexes_after_save(service, sample_repo):
     assert hits[0].qualname == "record_audit_event"
 
 
+def test_a_watcher_that_is_still_starting_is_not_taken_for_one_that_stopped(service, monkeypatch):
+    """Fixed bug: the service handed the watcher to the writer before it started it. A start takes
+    a while (on Linux it adds a watch to every folder before its thread runs). A writer that had
+    a quiet moment in between saw a watcher that was not alive, took it for one that had stopped,
+    and scanned the whole repo every few seconds for the rest of the session."""
+    from codemem.watcher import RepoWatcher
+
+    service.update()
+    real_start = RepoWatcher.start
+    during_start = []
+
+    def slow_start(watcher):
+        for _ in range(5):  # the writer's quiet moments while the watcher starts
+            service._step()
+        during_start.append(service._polling)
+        real_start(watcher)
+
+    monkeypatch.setattr(RepoWatcher, "start", slow_start)
+    service.start_watcher()
+    for _ in range(5):
+        service._step()
+    assert during_start == [False] and not service._polling
+    assert service.status(check_staleness=False)["watching"] is True
+
+
 def test_watcher_ignores_non_code_and_skip_dirs(service, sample_repo):
     service.update()
     calls = []
