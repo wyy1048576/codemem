@@ -102,6 +102,11 @@ def format_status(info: dict[str, Any]) -> str:
         lines.append(
             f"embeddings: remote, {emb.get('model')} at {emb.get('host')}{space} (code is sent there to be embedded)"
         )
+    if info.get("models_loaded") is not None:
+        lines.append(
+            "embedding model: in memory" if info["models_loaded"]
+            else "embedding model: not in this process's memory (it loads when a search or an update next needs it)"
+        )
     lines.append(f"indexed commit: {info['indexed_commit'] or '-'}")
     if "age_seconds" in info:
         lines.append(f"last indexed: {info['age_seconds']:.0f}s ago")

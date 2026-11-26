@@ -268,11 +268,63 @@ shape it, and a new name re-embeds that set only. For a model kept in a local fo
 includes a hash of the folder's files, so a fine-tuned model saved over the old one is re-embedded,
 never served from the cache.
 
-**One model for several codemem processes.** A codemem that runs the local model holds about
-2.2 GB of it in memory. Several of them on one machine (one per git worktree, or one per container
-of an eval) would each hold a copy, and a container has no GPU to run it on. So the local model
-can be served: `codemem serve-embeddings` (`embedserver.py`) puts it behind the same OpenAI-style
-endpoint that an embedding API has, and the other processes embed through it with
+**The model in memory.** The local model is the largest block of memory codemem holds, and it is
+needed only while a text is embedded: a search's query, and the texts of code that changed. On an
+M1, with the default model on the GPU, the process takes 0.4 GB with PyTorch imported, 1.7 GB with
+the model in memory, and 2.8 to 2.95 GB while it embeds a batch of code texts (measurements:
+[decisions.md](decisions.md) §3).
+
+```
+                        every embedding restarts the idle time
+                                      ┌──────┐
+                                      ▼      │
+ not in memory ──► loading, in a ──► in memory ──► nothing embedded for ──► freed
+       ▲           thread of its own                `model_idle_minutes`      │
+       │           (2 to 6 s on an M1)              (0, the default: never)   │
+       └──────────────── the next search or save loads it again ◄─────────────┘
+```
+
+- **It loads in a thread of its own,** when the server starts and again at the first search or
+  save after it was freed, so nothing that can go on without the model waits behind the load. The
+  writer keeps applying saves (stage A) and embeds the queue once the model is in memory. A search
+  waits for the model within its 4 s; if it is not there by then, the search answers from keywords
+  alone and says so (§4.5). The CLI and the eval answer only when complete, so they load the model
+  where they need it.
+- **It runs in the precision its key names.** The key of a set of vectors names the precision and
+  the device of the model that made them: float16 on a GPU, float32 on a CPU
+  ([decisions.md](decisions.md) §5). A model is loaded as its file stores it, and the default
+  model's file stores bfloat16, so the weights are converted when the model is loaded. For the
+  Apple GPU that happens on the CPU, before the move. Converted on that GPU, the blocks of the
+  file's format stay in the GPU's allocator for as long as the model lives: it holds 2.16 GB for
+  1.01 GB of weights, against 1.09 GB this way. The vectors are the same bit for bit (checked on 4
+  queries and 32 code texts). Measured side by side, a load took about 2 s either way.
+- **What a burst of calls needed goes back when the burst is over.** A model call needs memory
+  beside the weights for its intermediate results: up to 1.2 GB for 16 code texts of about 1,000
+  characters. PyTorch's GPU allocator keeps it for the next call, so one batch would leave the
+  process at 2.8 GB or more for as long as it runs. Once the model has made no call for 5 s, the
+  writer has that cache emptied, with the model kept, and the process is 1.2 GB smaller a second
+  later. That happens once after each burst, in a step where the writer has nothing queued, and
+  never under a running call: calls less than 5 s apart are one burst. Emptying takes 0.1 s, and
+  the batch after it was no slower. The writer's own calls hold at most 3,000 characters and need
+  under 20 MB; the 1.2 GB comes from the calls of 16 texts that a build or `refresh_index` makes.
+- **It can leave when idle.** With `model_idle_minutes` set, the writer frees the model once
+  nothing has been embedded for that long: it drops the model, collects what reference cycles kept
+  of it, and empties the GPU allocator's cache. The process is back at 0.5 to 0.7 GB within a
+  second. The next search or save pays the load again, which is why the model stays by default
+  ([decisions.md](decisions.md) §3).
+- **Giving memory back is safe against a use that starts at the same moment.** Each embedder
+  counts the calls in progress and remembers when the last one ended. It gives memory back only
+  when no call is running and the last use is older than the idle time asked for: 5 s for the
+  working memory, `model_idle_minutes` for the model. A search counts as a use before it checks
+  for the model, so the model cannot leave between that check and the query's embedding. Callers
+  that need the model at once load it once. Vector types on the same model share one embedder, so
+  they are one model to free.
+
+**One model for several codemem processes.** A codemem that runs the local model holds 1.3 GB of
+it in memory on an M1's GPU. Several of them on one machine (one per git worktree, or one per
+container of an eval) would each hold a copy, and a container has no GPU to run it on. So the
+local model can be served: `codemem serve-embeddings` (`embedserver.py`) puts it behind the same
+OpenAI-style endpoint that an embedding API has, and the other processes embed through it with
 `[embedding] provider = "openai"`. They never import PyTorch, so a container's codemem also runs
 in an environment built without it (README).
 
@@ -305,7 +357,10 @@ Three choices shape it:
   precision, and nothing guards a model call against a second thread. So requests queue, and the
   model takes at most `batch_size` texts at a time. Between calls the request with the fewest
   texts left goes first, so a search's one query waits for a single batch of another process's
-  build, not for the build.
+  build, not for the build. While no request waits, the same thread gives the model the quiet
+  moments the writer gives it: what its calls needed goes back after each burst, and with
+  `model_idle_minutes` set the model is freed after that long without a request. The next request
+  loads it again and waits for the load.
 
 The server holds no index and no state. When it is down, its clients behave as with any API that
 is down (decisions.md §2).
@@ -391,7 +446,8 @@ is what makes the split safe:
 - **In an agent session** (the MCP server), the background writer (§4.3) runs both: stage A for
   each batch of saved paths, and stage B in between, 64 queued chunks at a time, in slices of at
   most 5 s. It pauses at its next model call whenever a search wants the model or a new save
-  arrives. A search runs stage B itself for the newest queued chunks during its catch-up (§4.2).
+  arrives, and runs stage A alone while the model is loading (§3.5). A search runs stage B itself
+  for the newest queued chunks during its catch-up (§4.2).
 - **In the CLI and the eval,** `update()` runs stage A and then all of stage B before it returns
   (batches of 512 chunks; model calls of 256 texts, longest first), and writes the search index to
   disk, so the index is complete when it returns.
@@ -426,7 +482,8 @@ The agent saves `auth/sessions.py` and searches 0.2 s later:
 - **③ Stage B for the newest edits.** The writer pauses at its next model call, and the search
   embeds the queue itself, newest edits first, until its 4 s are up. Each model call is sized to
   finish in time: at most 3,000 characters, and none is started if the measured model speed says
-  it would end past the limit.
+  it would end past the limit. A model that is still loading (§3.5) is waited for within the same
+  4 s; the search does not load it itself.
 - **④ Answer with what the index has, and say what is missing.** The search always returns
   results. If something didn't make it, the last line names it, so the agent can search again or
   grep those files:
@@ -463,7 +520,14 @@ never race. Besides running the two stages (§4.1), it:
   not on every save (on a large repo that would block searches for seconds);
 - runs a full check every 5 minutes, in case an event was missed (every 10 s, and before each
   search, when file events don't work);
-- retries a failed stage A, and shows its error in `index_status`.
+- tries a failed step again (stage A, stage B, a model's load) after 1 s, then after twice as long
+  each time, up to a minute, and a failed stage A at once when a new save or search arrives. The
+  error is logged with its traceback once and stays in `index_status` until the step works. A
+  step that cannot work, such as a local model whose packages are not installed, is thus not
+  tried every second for as long as the server runs;
+- gives each model a quiet moment in a step where nothing is queued: what its calls needed besides
+  it goes back 5 s after the last call, and the model itself is freed after `model_idle_minutes`
+  without embedding (§3.5).
 
 ### 4.4 How stage A touches only what changed
 
@@ -512,7 +576,9 @@ and reports any difference.
 | a change too big to embed in 4 s (a branch switch, a formatter run) | searches answer at once with what the index has, and a note naming the files still being embedded, so the agent can grep them; the writer embeds them in the background, newest first |
 | two agent sessions on one repo | one writes at a time (a lock file); each picks up the other's vectors without re-embedding |
 | OS file events don't work (network drives, WSL) | a warning, a full check every 10 s, and a full check before each search (0.5 s on vLLM) |
-| a search while the model is still loading (about 7 s at startup) | it waits within its 4 s, then answers from keywords alone and says so |
+| a search while the model is loading (when the server starts, or after the model was freed for being idle) | it waits within its 4 s, then answers from keywords alone and says so |
+| a save while the model is loading | it is applied at once (stage A); its vectors follow when the model is in memory |
+| the model can't be loaded (a wrong name, no network for its first download) | saves are still applied and searches answer from keywords, at once: a search does not wait for a load that has failed. The load is tried again after 1 s, then after twice as long each time, up to a minute, and `index_status` shows the error until it works |
 | the embedding API or the `serve-embeddings` server is down | a search waits for its retries, about 31 s, then fails; edits stay queued and are embedded when it is back (decisions.md §2) |
 
 ---
@@ -624,7 +690,7 @@ repo against the index (or builds it the first time), starts the watcher and loa
 |---|---|
 | `search_code(query, k, path_prefix, kinds, tests)` | catches up (§4.2), then returns up to `k` cards (10 by default, 50 at most), with a note if something is still pending |
 | `get_chunk(ref)` | the full code of a chunk, by id, `path:line` or `path::qualname`, with its callers and callees |
-| `index_status()` | what is indexed, what is pending or skipped and why, which model, and any error |
+| `index_status()` | what is indexed, what is pending or skipped and why, which model and whether it is in memory, and any error |
 | `refresh_index()` | a full check now, for changes the watcher can't see |
 
 All the wording an agent reads (tool descriptions, server instructions) lives in `prompts.py`, at
@@ -688,6 +754,10 @@ they show codemem's own work; the real model adds about 0.1 s per changed text.
 | a search of 10 words / 250 words (vLLM) | 0.12 s / 0.63 s |
 | a save then a search, through MCP, real model (sample repo) | 0.13–0.4 s, the edit included |
 | a full build of vLLM, fake model | 72 s |
+| loading the real model on the GPU, PyTorch already imported | about 2 s at a load average of 3 to 5 (8 cores), 3 to 5 s at 6 to 7, 5.5 s at 8 to 11 |
+| the first search after the model was freed, real model (sample repo) | 3.5 s with every signal at a load average of 5; 4.1 s from keywords at 8 to 11 (the model was back 7.0 s after the search began). A search that waits for the model: 2.2 s and 3.8 s |
+| giving a batch's working memory back, real model on the GPU | the call takes 0.1 s; 256 code texts took 84 s right after it and 87 s with nothing given back, and batches of 32 took 10.0 s and 10.4 s (four of each, in turn) |
+| the real model on the CPU, in float32 | 20 short queries in 3.7 s and 32 code texts of about 1,000 characters in 36 s, against 1.9 s and 9.1 s on the GPU |
 
 **Building is almost all embedding.** The local model embeds about 8.5 texts a second on the M1,
 so the first build of a large repo (vLLM: 145k texts, about 5 hours) wants a CUDA GPU or an
@@ -740,6 +810,12 @@ embedding API. After that, updates are small.
 - `get_chunk` ─► `CodememService.get_chunk()`: the catch-up without stage B, then the chunk with its
   callers and callees. `index_status` ─► `CodememService.status()`. `refresh_index` ─►
   `CodememService.refresh()`.
+- The model's life (§3.5): `CodememService.prewarm()` loads it, in a thread that `start()` or
+  `_models_ready()` starts; `_models_ready()` is what a search and the writer ask before they
+  embed, and it marks the model as used (`Embedder.touch()`). `embedder.release_idle()`, called
+  for each embedder in the writer's quiet step and by the embedding server's queue, asks it to
+  `unload()` or to `trim()`, which the embedder's count of calls in progress (`embedder._Uses`)
+  allows only while none is running. `service._Retry` spaces out the writer's tries after a failure.
 - The CLI (`cli.py main()`): `codemem index` runs `Indexer.update()`, which is stage A, then all of
   stage B, then writing the search index to disk; `--verify` runs `Indexer.verify()`. `codemem
   init` registers the server with agents (`agents.py`, `launch_command()`).

@@ -142,6 +142,8 @@ steering = "light"           # none | light | strong: how strongly agents are to
 debounce_ms = 500            # the index updates once saves stop for this long,
 debounce_max_wait_ms = 2000  # or at the latest this long after the first save
 catchup_budget_ms = 4000     # how long a search may spend catching up on recent saves
+model_idle_minutes = 0       # free the local model after this many minutes without a search or an
+                             # edit (1.3 GB on an M1); the next one loads it again. 0 keeps it
 
 [vectors.code]
 model = "jinaai/jina-code-embeddings-0.5b"   # a Hugging Face name, or a local model folder
@@ -199,8 +201,8 @@ codemem cannot check that. Use it when a provider moves to a new host, when a se
 serves the same model, and when one server is reached at different addresses (next section).
 
 **One model for several codemem processes.** Each codemem that runs the local model keeps it in
-memory, about 2.2 GB. With several git worktrees, or several containers, run the model once and
-let every codemem embed through it:
+memory, 1.3 GB on an M1's GPU. With several git worktrees, or several containers, run the model
+once and let every codemem embed through it:
 
 ```bash
 codemem serve-embeddings            # on 127.0.0.1:8791

@@ -38,13 +38,14 @@ from .config import SERVE_HOST as DEFAULT_HOST
 from .config import SERVE_KEY_ENV as KEY_ENV  # the environment variable that holds the shared key, when there is one
 from .config import SERVE_PORT as DEFAULT_PORT
 from .config import Config
-from .embedder import Embedder, FakeEmbedder, SentenceTransformerEmbedder, l2_normalize, make_embedder
+from .embedder import Embedder, FakeEmbedder, SentenceTransformerEmbedder, l2_normalize, make_embedder, release_idle
 
 log = logging.getLogger(__name__)
 
 MAX_BODY_BYTES = 16 * 1024 * 1024  # a request body; codemem's own requests are about 0.2 MB
 MAX_INPUTS = 2048  # texts in one request
 IDLE_TIMEOUT_S = 60.0  # a connection that sends nothing for this long is closed
+QUIET_CHECK_S = 1.0  # with no request for this long, the queue gives the model a quiet moment
 # At start, a text embedded as "prefix + text" must agree at least this well (cosine) with the same
 # text embedded in process as a query or a document. For jina-code-embeddings-0.5b in float16 on an
 # Apple GPU the two are the same numbers; a text embedded alone and in a batch agree to 0.999998
@@ -141,11 +142,14 @@ class ModelQueue:
     """Gives one model to many request threads. One thread makes every model call, a batch of at
     most `batch_size` texts at a time. Between batches the request with the fewest texts left goes
     first, so a search's single query waits for one batch of another client's build, not for the
-    build. Texts of several requests can share a batch."""
+    build. Texts of several requests can share a batch. While no request waits, the same thread
+    gives back what the model's calls needed besides it, and frees the model after `idle_minutes`
+    without a request (0 keeps it); the next request then loads it again."""
 
-    def __init__(self, embedder: Embedder, batch_size: int):
+    def __init__(self, embedder: Embedder, batch_size: int, idle_minutes: float = 0.0):
         self._embedder = embedder
         self._batch_size = max(1, batch_size)
+        self._idle_minutes = idle_minutes
         self._cond = threading.Condition()
         self._waiting: list[_Job] = []
         self._closed = False
@@ -172,10 +176,12 @@ class ModelQueue:
         self._thread.join(timeout=60)
 
     def _take(self) -> list[tuple[_Job, int, int]] | None:
-        """The next batch as (job, first text, count) parts; None when the queue is closed."""
+        """The next batch as (job, first text, count) parts; None when the queue is closed, and
+        an empty batch when no request came for `QUIET_CHECK_S`."""
         with self._cond:
             while not self._waiting and not self._closed:
-                self._cond.wait()
+                if not self._cond.wait(timeout=QUIET_CHECK_S) and not self._waiting and not self._closed:
+                    return []
             if self._closed:
                 for job in self._waiting:
                     job.error = QueueClosed("the embedding server is stopping")
@@ -195,6 +201,9 @@ class ModelQueue:
 
     def _run(self) -> None:
         while (batch := self._take()) is not None:
+            if not batch:  # no request: only this thread calls the model, so none is running
+                release_idle(self._embedder, self._idle_minutes)
+                continue
             texts = [t for job, start, count in batch for t in job.texts[start : start + count]]
             try:
                 vecs = self._embedder.embed_texts(texts)
@@ -244,7 +253,7 @@ class EmbeddingServer:
 
     def __init__(
         self, embedder: Embedder, *, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, key: str | None = None,
-        batch_size: int = 16,
+        batch_size: int = 16, idle_minutes: float = 0.0,
     ):
         self._key = (key or "").strip() or None
         self.started = int(time.time())
@@ -254,7 +263,7 @@ class EmbeddingServer:
         except BaseException:
             self.httpd.server_close()
             raise
-        self.queue = ModelQueue(embedder, batch_size)
+        self.queue = ModelQueue(embedder, batch_size, idle_minutes)
         self._thread: threading.Thread | None = None
 
     @property
@@ -435,7 +444,9 @@ class _Handler(BaseHTTPRequestHandler):
 
 def serve(config: Config, *, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> EmbeddingServer:
     """A server for the config's local model, ready to `serve_forever()`. The shared key, if any,
-    is read from the environment variable `CODEMEM_SERVE_KEY`."""
+    is read from the environment variable `CODEMEM_SERVE_KEY`. The model stays in memory unless
+    the config's `model_idle_minutes` says how long it may sit idle."""
     return EmbeddingServer(
         local_embedder(config), host=host, port=port, key=os.environ.get(KEY_ENV), batch_size=config.batch_size,
+        idle_minutes=config.model_idle_minutes,
     )

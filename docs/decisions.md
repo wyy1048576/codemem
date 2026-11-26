@@ -43,8 +43,8 @@ against 887 MB for the environment `uv sync` builds (Apple Silicon, Python 3.11,
 
 | Dependency | Why this one | If it's missing or down | How you'd notice | Backup |
 |---|---|---|---|---|
-| **The embedding model**, `jinaai/jina-code-embeddings-0.5b`, from Hugging Face | trained for code search; small enough for a laptop (0.5B); free and private | Before the first download (no network, Hugging Face down, wrong name): searches answer from keywords only, each after a wait of about 4 s, and new edits wait in the queue. Once downloaded, it loads with no network | `index_status` shows the load error. Search notes say the model is "still loading" (a known gap, §8) | Keyword search keeps working. Copy the model cache (`HF_HOME`) from another machine, point `vectors.code.model` at a local folder, or use an API |
-| **sentence-transformers + PyTorch** | run the model on CUDA, Apple GPUs (MPS) or the CPU | They are imported only when the local model is used. In an environment built without them, for a client of an API or of a served model, the local model can't run: `codemem index` and `search` stop with one sentence that names what is missing, what to install and what to set instead. Under the MCP server, an update fails before it changes the index: an existing index keeps its chunks and vectors and answers from keywords, each search after a wait of about 4 s (§8), and a repo with no index gets none | the sentence, on the command line and as the error in `index_status` | `pip install torch sentence-transformers`, or an embedding API, or a `serve-embeddings` server |
+| **The embedding model**, `jinaai/jina-code-embeddings-0.5b`, from Hugging Face | trained for code search; small enough for a laptop (0.5B); free and private | Before the first download (no network, Hugging Face down, wrong name): searches answer from keywords only, and new edits are applied and wait in the queue for their vectors. The load is tried again after 1 s, then after twice as long each time, up to a minute. Once downloaded, it loads with no network | `index_status` shows the load error. Search notes say the model is "still loading" (a known gap, §8) | Keyword search keeps working. Copy the model cache (`HF_HOME`) from another machine, point `vectors.code.model` at a local folder, or use an API |
+| **sentence-transformers + PyTorch** | run the model on CUDA, Apple GPUs (MPS) or the CPU | They are imported only when the local model is used. In an environment built without them, for a client of an API or of a served model, the local model can't run: `codemem index` and `search` stop with one sentence that names what is missing, what to install and what to set instead. Under the MCP server, an update fails before it changes the index: an existing index keeps its chunks and vectors and answers from keywords, and a repo with no index gets none. The update is tried again after 1 s, then after twice as long each time, up to a minute, and its traceback is logged once | the sentence, on the command line and as the error in `index_status` | `pip install torch sentence-transformers`, or an embedding API, or a `serve-embeddings` server |
 | **FAISS** (`faiss-cpu`) | exact vector search in memory, fast, no server, wheels for every platform | codemem doesn't start | an import error | none: required |
 | **SQLite with FTS5** | ships with Python; transactions; built-in BM25 | without FTS5 (rare custom Python builds) no index can be created | an error on the first index | a standard Python build (python.org, Homebrew, uv) |
 | **tree-sitter + grammars** (versions pinned) | one parser and official grammar for each of the nine languages | a language whose grammar fails can't be chunked; a file that fails to parse is indexed from what was recovered | `index_status` lists files with parse errors | none needed per file |
@@ -52,7 +52,7 @@ against 887 MB for the environment `uv sync` builds (Apple Silicon, Python 3.11,
 | **git** (optional) | the indexed commit (for `index_status` and the eval), commit messages in usage texts if `include_commits` | no commit shown, no commit messages; everything else works | `indexed commit: -` in `index_status` | none needed |
 | **MCP SDK** (`mcp` 2.x, pinned below 3) | the standard MCP server over stdio | the MCP server can't start; the CLI still works | agents can't connect | the CLI |
 | **An embedding API** (optional: Nebius, OpenAI, a self-hosted server) | faster first builds of large repos, bigger models | a search waits about 31 s for retries, then fails (a known gap, §8); new edits wait in the queue and are retried | the search error names the provider; `index_status` doesn't flag it yet | none quick: another model means re-embedding everything, since vectors of different models can't mix. The same model at another address keeps the index if the config names the vectors with `space` (§5) |
-| **A `codemem serve-embeddings` server** (optional) | one copy of the local model in memory (about 2.2 GB) for several codemem processes: one per git worktree, one per container. Its clients need no PyTorch and no GPU | The same as an API that is down: a search waits about 31 s for retries, then fails; new edits wait in the queue and are retried; `codemem index` stops with the error. Nothing is lost: the server holds no index and no state | the error names the address, `embedding request to 127.0.0.1:8791 failed`; `GET /health` on the server answers `{"status":"ok"}` when it is up | start it again, on any address: an index is tied to its `space`, not to the address. It takes its port first and then loads the model, so requests that arrive meanwhile wait for the model, not for a retry |
+| **A `codemem serve-embeddings` server** (optional) | one copy of the local model in memory (1.3 GB on an M1's GPU) for several codemem processes: one per git worktree, one per container. Its clients need no PyTorch and no GPU | The same as an API that is down: a search waits about 31 s for retries, then fails; new edits wait in the queue and are retried; `codemem index` stops with the error. Nothing is lost: the server holds no index and no state | the error names the address, `embedding request to 127.0.0.1:8791 failed`; `GET /health` on the server answers `{"status":"ok"}` when it is up | start it again, on any address: an index is tied to its `space`, not to the address. It takes its port first and then loads the model, so requests that arrive meanwhile wait for the model, not for a retry |
 
 ---
 
@@ -64,7 +64,9 @@ The values codemem runs with, and why each was picked. All of these are settings
 | Choice | Value | Why | Change with |
 |---|---|---|---|
 | **where embeddings come from** | the local model | private, free, works offline; an API is opt-in, for speed or bigger models | `[embedding] provider`, `vectors.*.model` |
-| **device and precision** | CUDA, else the Apple GPU, else CPU; float16 on a GPU | float16 halves memory and time and keeps the same top 10 (cosine ≥ 0.9997); a row that overflows is redone in float32 | `device`, `dtype` |
+| **device and precision** | CUDA, else the Apple GPU, else CPU; float16 on a GPU, float32 on a CPU | float16 halves memory and time on a GPU and keeps the same top 10 (cosine ≥ 0.9997); a row that overflows is redone in float32. The model runs in this precision whatever its file stores. The default model's file stores bfloat16, which an M1's CPU runs 15 times slower than float32 on code texts (below) | `device`, `dtype` |
+| **the model in memory** | kept for as long as codemem runs | On an M1 the model is 1.3 GB of the process (table below). Freeing it after some idle minutes gives that back, and the next search or save then starts a load: 2 to 6 s, longer the busier the machine. Meanwhile a search waits at most its 4 s and then answers from keywords, and an edit is found by keywords only. It stays by default so that no search pays that. A machine short of memory, or one with several agent sessions open, sets a number of minutes | `model_idle_minutes` (0 = keep) |
+| **what a batch needed beside the model** | given back 5 s after the last model call | Up to 1.2 GB on an M1's GPU, which PyTorch keeps for the next batch otherwise. Giving it back takes 0.1 s and cost the next batch nothing that could be measured, so it needs no setting. 5 s keeps the calls of one batch, and a search's catch-up after a save, in one burst | constant (`TRIM_AFTER_IDLE`) |
 | **how long a search may catch up** | 4 s | Chosen on Oct 25 (Andre). A one-function edit takes 0.1–0.5 s, and 4 s covers about 30 average texts at the M1's 8.5 texts a second. A `git pull` or a formatter run is what hits the cap; then the search returns what the index has and its note names the files still pending, so the agent can search again or grep them. A wasted grep turn costs an agent more than the wait | `catchup_budget_ms` |
 | **when a search doesn't wait at all** | more than 1,000 queued chunks, or a first build | that is minutes of embedding; answering at once with a note beats a 4 s wait that changes little | constant |
 | **grouping saves** | 0.5 s after the last save, at most 2 s after the first | one editor action writes several files; the maximum stops a long burst from postponing indexing | `debounce_ms`, `debounce_max_wait_ms` |
@@ -80,6 +82,50 @@ The values codemem runs with, and why each was picked. All of these are settings
 | **the embedding server's model calls** | one at a time, at most `batch_size` (16) texts each; between calls the request with the fewest texts left goes first | nothing guards a call of the local model against a second thread, so one thread makes them all. A search's single query then waits for one batch of another client's build, not for the build. Texts of several requests may share a call | `batch_size` in the server's config |
 | **what one server costs a client** | 2 to 4 ms a query; 1.2 to 2.1 ms a text in a build | measured with a model that takes no time, for vectors of 896 numbers, on an M1 that other jobs kept busy (load average 13 to 21; `scripts/check_served_vectors.py --overhead`). Almost all of it is writing and reading the numbers as JSON text, 5.1 MB for 256 vectors. The model itself takes about 118 ms a text on the M1 (architecture.md §10) | not a setting |
 | **agent-facing wording** | `light` | the middle of the agent study's three strengths | `steering` |
+
+**What the model costs in memory.** Measured on Nov 25, 2026 on an M1 (16 GB, macOS 26.6,
+PyTorch 2.14.1, sentence-transformers 6.1.0, transformers 5.20.2) with
+`jinaai/jina-code-embeddings-0.5b` on the GPU in half precision, 16 texts per model call. The
+footprint is what Activity Monitor shows for the process. The machine was busy with other work
+(a load average of 5 to 11 on its 8 cores), so the times are upper bounds.
+
+| The process, after... | Footprint | Of it, held by the GPU's allocator |
+|---|---|---|
+| importing codemem | 0.08 GB | |
+| importing PyTorch and sentence-transformers | 0.41 GB | |
+| loading the model and embedding a query | 1.71 GB | 1.09 GB, for 1.01 GB of weights |
+| embedding 256 code texts of about 1,000 characters | 2.80 to 2.95 GB | 2.29 GB |
+| giving the batch's working memory back, the model kept | 1.59 to 1.74 GB | 1.09 GB |
+| freeing the model | 0.52 GB | none |
+| loading it again and embedding a query | 1.71 GB | 1.09 GB |
+
+- **The weights are 1.0 GB** (494 million numbers of 2 bytes). **A call of 16 code texts needs up
+  to 1.2 GB more** for its intermediate results. PyTorch keeps that for the next call, and codemem
+  has it given back once the model has made no call for 5 s. The call that gives it back takes
+  0.1 s. The batch after it was no slower: 256 code texts took 84 s right after it and 87 s with
+  nothing given back, and batches of 32 took 10.0 s and 10.4 s (four of each, in turn). Between
+  runs the part of the footprint outside the GPU's allocator differed by up to 0.15 GB, hence the
+  two ranges in the table.
+- **Through the MCP server's own path** (the sample repo with 64 functions of about 1,000
+  characters added). The writer embeds saved code in calls of at most 3,000 characters, which
+  need under 20 MB beside the model: after 32 functions the process was at 1.75 GB. `refresh()`
+  embeds 16 texts a call: after 32 more functions the process was at 2.84 GB, and at 1.76 GB 6 s
+  later. With `model_idle_minutes` at 3 s it went from 1.76 GB to 0.65 GB within a second of the
+  writer freeing the model. The system gives GPU memory back 0.2 to 0.8 s after PyTorch releases
+  it (30 trials with 1 GB of tensors), not at the moment of the call.
+- **Times.** Importing PyTorch 19 s, the first load 5.4 s, freeing 1.3 s, loading again 5.5 s, at
+  a load average of 8 to 11 (8 cores). A load follows the machine's load: the same day it took
+  about 2 s at a load average of 3 to 5 and 3 to 5 s at 6 to 7. The first search after the model
+  was freed took 3.5 s and had every signal at a load average of 5; at 8 to 11 it took 4.1 s and
+  answered from keywords, and the model was back 7.0 s after that search began. A search that
+  waits for the model (the CLI) took 2.2 s and 3.8 s.
+- **On the CPU** the model runs in float32, and the process takes 2.4 GB with it loaded: the
+  weights are 2.0 GB there. Freeing the model brings it to 0.7 GB. 20 short queries, one at a
+  time, took 3.7 s, and 32 code texts of about 1,000 characters, four a call, took 36 s (on the
+  GPU: 1.9 s and 9.1 s). Left in the bfloat16 that its file stores, the same model took 18 s and
+  533 s: 5 and 15 times as long. The two were measured in turn in one process, so that the
+  machine's other work slowed both alike. In bfloat16 the process takes 0.4 GB, because the
+  weights stay mapped from the file.
 
 ---
 
@@ -106,6 +152,9 @@ Values in the code, not in the config.
 | `MAX_BODY_BYTES`, `MAX_INPUTS` | 16 MB, 2,048 texts | `embedserver.py` | the largest request the embedding server reads; a larger one gets HTTP 413 unread. codemem's own requests are 64 texts, about 0.2 MB |
 | `IDLE_TIMEOUT_S` | 60 s | `embedserver.py` | the embedding server closes a connection that sends nothing for this long |
 | `SAME_VECTOR` | cosine 0.9999 | `embedserver.py` | at start the embedding server embeds two texts as a query and as a document, in process and as prefix plus text; below this agreement it refuses to serve the model |
+| `RETRY_FIRST`, `RETRY_MAX` | 1 s, 60 s | `service.py` | the writer tries a failed step again (an update, embedding, a model's load) after 1 s, then after twice as long each time, up to a minute |
+| `TRIM_AFTER_IDLE` | 5 s | `embedder.py` | a model that has made no call for this long gives back what its calls needed beside it; calls closer together are one burst |
+| `QUIET_CHECK_S` | 1 s | `embedserver.py` | with no request for this long, the embedding server's queue gives its model a quiet moment |
 | barrier wait | 0.25 s | `service.py` | how long a search waits for its marker file's event |
 | git wait | 10 s | `service.py` | how long an update waits for a running git command |
 | write lock wait | 30 s | `store.py` | how long a second writer process waits before giving up |
@@ -132,9 +181,18 @@ Three identities decide whether codemem can reuse what it has:
 - **The weights hash** is computed for a model in a local folder: a hash of the folder's files, so
   new weights saved over old ones get a new key. A model named on Hugging Face has none (its name
   names its weights). `vectors.<type>.version` sets a label instead.
+- **The precision and the device in the local key are the ones the model runs in.** The weights
+  are converted to that precision when the model is loaded, whatever the model's file stores:
+  `auto` is float16 on a GPU and float32 on a CPU. Equal keys promise the same model and weights,
+  the same longest text, the same arithmetic and the same kind of device.
 - **The device is part of the local key,** because GPU and CPU results differ slightly. Moving an
   index between a GPU machine and a CPU machine re-embeds it, and the vector cache of one doesn't
-  serve the other.
+  serve the other. How slightly, for 20 short queries and 32 code texts on an M1: the CPU's
+  float32 vectors and the GPU's float16 vectors have a cosine of at least 0.999996, no score (a
+  query's cosine with a text) differs by more than 0.0007, and every query has the same ten best
+  of the 32 texts, 19 of 20 in the same order. bfloat16 on the CPU is further from both: a cosine
+  of at least 0.9998, scores within 0.0055, the same best text for every query and the same ten
+  best for 18 of 20.
 - **An API's vectors are named by its address, or by `[embedding] space` when that is set.** With
   the address in the key, the same server reached as `127.0.0.1` on the host and as
   `host.docker.internal` in a container is two embedders, and so is a provider after it changes
@@ -169,7 +227,7 @@ Three identities decide whether codemem can reuse what it has:
 | text settings (`max_seq_length`, `code_header`, `window_chars`, `window_overlap_lines`, `max_usage_items`, `include_commits`) | every text is rebuilt; only changed ones are re-embedded | depends on how many change |
 | `max_defs_per_name` | every call is relinked | seconds; usage texts that change are re-embedded |
 | file selection or chunking (`ignore`, `languages`, `max_file_size`, `use_default_ignore`, `skip_generated`, `max_block_lines`), BM25 tokenization | the index is rebuilt | the structure (vLLM: about 70 s), vectors from the cache |
-| search settings (weights, filters, `rrf`, `candidates`, `catchup_budget_ms`, `steering`) | nothing | none |
+| search settings (weights, filters, `rrf`, `candidates`, `catchup_budget_ms`, `steering`), `model_idle_minutes` | nothing | none |
 
 **Version stamps.** Upgrading codemem can redo work too: `SCHEMA_VERSION` (4, `store.py`) changes
 the tables or the keyword tokens, and an older index is wiped and rebuilt (a newer one is refused); `CHUNKER_VERSION` (2)
@@ -220,7 +278,8 @@ whoever can reach that address; `CODEMEM_SERVE_KEY` asks for a key then (§3).
 | Gap | Effect | Fix |
 |---|---|---|
 | an API outage | each search waits about 31 s, then fails; `index_status` shows no error | fall back to keywords at once, with a note, and show the error in `index_status` |
-| the model fails to load | each search waits about 4 s (the first took 7.5 s in a test), and the note says the model is "still loading" | say it failed, and stop waiting for it |
+| the model fails to load | each search answers from keywords at once, and its note says the model is "still loading" | say that it failed |
+| the loading note speaks of start-up only | after the model was freed for being idle, a search that answers from keywords still says "the first search after codemem starts" | reword the note in `prompts.py` |
 | the vector cache only grows | about 4.5 KB per vector, forever | a "last used" date per entry, and a size cap |
 | PyTorch is always installed | about 0.8 GB, even for a codemem that only embeds through an API or a `serve-embeddings` server | make the local model an optional install; needs a one-line change in the eval's dependencies. Such a client's environment can be built without the two packages by hand (README, "One model for several codemem processes") |
 | the local embedder gives jina's two prompts to every model | a model without jina's prompt names (`nl2code_query`, `nl2code_document`) is embedded with jina's prompt texts in front, which it was not trained with. `serve-embeddings` prints the same two texts as its clients' prefixes, so a served model matches the model in process | the model's own `query` and `document` prompts, else `query_prefix` and `document_prefix`. The key of those models then has to change, and the document prefix becomes an index-time setting of local indexes |
