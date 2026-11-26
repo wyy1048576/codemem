@@ -427,9 +427,19 @@ def _container(before, after, codes=None, times_extra="", bad_xml=()):
     return write
 
 
-def _fake_docker(monkeypatch, container=None, labels=None, raise_on_run=None):
-    """Replace _run. `container(work)` writes the outputs of a docker run. `labels` maps a tag to its label."""
+def _inspect(tag, label, n=1):
+    """The `docker image inspect` object of an image with this label: build n of the tag."""
+    return {"Id": f"sha256:{n}{tag}", "Created": f"2026-11-26T0{n}:00:00Z", "Size": 1000 * n,
+            "Config": {"Labels": {gen.FINGERPRINT_LABEL: label} if label else None}}
+
+
+def _fake_docker(monkeypatch, container=None, labels=None, raise_on_run=None, images=None, digests=None):
+    """Replace _run. `container(work)` writes the outputs of a docker run. `labels` maps a tag to its label.
+    `images` maps a tag to its inspect object (default: made from its label), `digests` an image to its
+    repo digest. A docker build makes the tag's image: the next build number, with the build's label."""
     calls = []
+    images = dict(images or {})
+    labels = dict(labels or {})
 
     def fake_run(cmd, **kwargs):
         calls.append((cmd, kwargs))
@@ -438,8 +448,18 @@ def _fake_docker(monkeypatch, container=None, labels=None, raise_on_run=None):
                 raise raise_on_run
             if container:
                 container(Path(cmd[cmd.index("-v") + 1].rsplit(":", 1)[0]))
+        if cmd[:2] == ["docker", "build"]:
+            tag, label = cmd[cmd.index("-t") + 1], cmd[cmd.index("--label") + 1].split("=", 1)[1]
+            n = int(images[tag]["Id"][7]) + 1 if tag in images else 1
+            images[tag], labels[tag] = _inspect(tag, label, n), label
+        if cmd[:3] == ["docker", "image", "inspect"] and "{{json .}}" in cmd:
+            data = images.get(cmd[-1]) or (_inspect(cmd[-1], labels[cmd[-1]]) if labels.get(cmd[-1]) else None)
+            return subprocess.CompletedProcess(cmd, 0 if data else 1, json.dumps(data) + "\n" if data else "", "")
+        if cmd[:3] == ["docker", "image", "inspect"] and "{{index .RepoDigests 0}}" in cmd:
+            digest = (digests or {}).get(cmd[-1])
+            return subprocess.CompletedProcess(cmd, 0 if digest else 1, f"{digest}\n" if digest else "", "")
         if cmd[:3] == ["docker", "image", "inspect"]:
-            label = (labels or {}).get(cmd[-1])
+            label = labels.get(cmd[-1])
             if label is None:
                 return subprocess.CompletedProcess(cmd, 0, "null\n", "")
             return subprocess.CompletedProcess(cmd, 0, json.dumps({gen.FINGERPRINT_LABEL: label}) + "\n", "")
@@ -602,6 +622,7 @@ def test_docker_build_has_a_limit(make_task, monkeypatch, no_source):
 def test_generate_task_uses_a_saved_record_only_with_its_fingerprint(make_task, monkeypatch):
     recipe, task = _recipe(), make_task(test_patch=_patch("pkg/tests/test_a.py"))
     seen = []
+    _fake_docker(monkeypatch)
     monkeypatch.setattr(gen, "build_task_image", lambda recipe, task, force=False: ("tag", 1.0))
 
     def fake_validate(recipe, task, tag, repeats, cpus):
@@ -641,3 +662,166 @@ def test_generate_task_checks_the_image_of_a_valid_record(make_task, monkeypatch
     record = gen.generate_task(recipe, task)
     assert record["reason"] == "error: no docker"
     assert not saved.exists() and not gen.tests_path(recipe, task).exists()
+
+
+# ---- the history of a task image, and builds without a new validation
+
+def test_record_image_keeps_a_history(make_task, monkeypatch):
+    recipe, task = _recipe(base_image="python:3.12"), make_task()
+    tag, fingerprint = gen.task_tag(recipe, task), gen.image_fingerprint(recipe, task)
+    _fake_docker(monkeypatch, labels={tag: fingerprint}, digests={"python:3.12": "python@sha256:abc"})
+    assert gen.record_image(recipe, task, "cmeval-env/r:missing", step="validate", event="found") is None
+    first = gen.record_image(recipe, task, tag, step="validate", event="built", build_s=12.34)
+    assert first["image_id"] == f"sha256:1{tag}" and first["size"] == 1000 and first["fingerprint"] == fingerprint
+    assert first["created"] == "2026-11-26T01:00:00Z" and first["build_s"] == 12.3
+    assert first["base_image"] == "python:3.12" and first["base_digest"] == "python@sha256:abc"
+    assert first["repo_base"] == gen.base_tag(recipe) and first["repo_base_id"] is None
+    # The same image found again adds nothing.
+    assert gen.record_image(recipe, task, tag, step="reuse", event="found") == first
+    assert len(gen.read_builds(recipe, task)) == 1
+    # A new image is added, newest last. A build always adds an entry, also with the same id.
+    _fake_docker(monkeypatch, images={tag: _inspect(tag, fingerprint, 2)})
+    second = gen.record_image(recipe, task, tag, step="rebuild", event="found")
+    assert second["base_digest"] == ""  # no repo digest
+    gen.record_image(recipe, task, tag, step="rebuild", event="built", build_s=1.0)
+    history = json.loads(gen.builds_path(recipe, task).read_text())
+    assert [e["step"] for e in history] == ["validate", "rebuild", "rebuild"]
+    assert gen.build_number(recipe, task, f"sha256:2{tag}") == 3 and gen.build_number(recipe, task, "x") is None
+
+
+def test_history_starts_from_the_saved_inspect_output(make_task, monkeypatch):
+    recipe, task = _recipe(), make_task()
+    tag = gen.task_tag(recipe, task)
+    folder = gen.task_dir(recipe, task)
+    folder.mkdir(parents=True)
+    (folder / "image.json").write_text(json.dumps([_inspect(tag, "f" * 16)]))
+    assert gen.read_builds(recipe, task) == [{"step": "validate", "event": "found", "source": "image.json",
+                                              "image_id": f"sha256:1{tag}", "created": "2026-11-26T01:00:00Z",
+                                              "size": 1000, "fingerprint": "f" * 16}]
+    _fake_docker(monkeypatch, images={tag: _inspect(tag, "f" * 16, 2)})
+    gen.record_image(recipe, task, tag, step="rebuild", event="built", build_s=5.0)
+    assert [e["image_id"] for e in gen.read_builds(recipe, task)] == [f"sha256:1{tag}", f"sha256:2{tag}"]
+    (folder / "image.json").write_text("not json")
+    gen.builds_path(recipe, task).unlink()
+    assert gen.read_builds(recipe, task) == []
+
+
+def _validated(recipe, task, monkeypatch):
+    """generate_task with a stand-in validation: a valid record, tests.json, and a built image."""
+    def fake_validate(recipe, task, tag, repeats, cpus):
+        gen.tests_path(recipe, task).write_text(json.dumps({
+            "fingerprint": gen.validation_fingerprint(recipe, task, repeats), "repeats": repeats,
+            "fail_to_pass": ["t::new"], "pass_to_pass": []}))
+        return {"valid": True, "reason": "ok", "repeats": repeats,
+                "fingerprint": gen.validation_fingerprint(recipe, task, repeats),
+                "image_fingerprint": gen.image_fingerprint(recipe, task)}
+
+    monkeypatch.setattr(gen, "validate_task", fake_validate)
+    return gen.generate_task(recipe, task)
+
+
+def test_generate_task_records_the_image_it_validated(make_task, monkeypatch, no_source):
+    recipe, task = _recipe(), make_task(test_patch=_patch("pkg/tests/test_a.py"))
+    tag = gen.task_tag(recipe, task)
+    _fake_docker(monkeypatch)
+    record = _validated(recipe, task, monkeypatch)
+    assert record["valid"] and record["image_id"] == f"sha256:1{tag}"
+    [entry] = gen.read_builds(recipe, task)
+    assert (entry["step"], entry["event"]) == ("validate", "built") and entry["build_s"] is not None
+    # A saved record used again: the image is found, and it is the last entry already.
+    assert gen.generate_task(recipe, task) == record
+    assert len(gen.read_builds(recipe, task)) == 1
+
+
+def test_rebuild_builds_a_missing_image_and_does_not_validate(make_task, monkeypatch, no_source):
+    recipe, task = _recipe(), make_task(test_patch=_patch("pkg/tests/test_a.py"))
+    tag = gen.task_tag(recipe, task)
+    calls = _fake_docker(monkeypatch)
+    _validated(recipe, task, monkeypatch)
+    saved = (gen.task_dir(recipe, task) / "result.json").read_text()
+    tests = gen.tests_path(recipe, task).read_text()
+    # The image exists: nothing to build.
+    assert gen.rebuild_task(recipe, task)["status"] == "exists"
+    # The image is removed.
+    calls = _fake_docker(monkeypatch, images={})
+    monkeypatch.setattr(gen, "validate_task", lambda *a, **k: pytest.fail("no validation"))
+    record = gen.rebuild_task(recipe, task)
+    assert record["status"] == "built" and record["build"] == 2 and record["image_id"] == f"sha256:1{tag}"
+    [build] = [c for c, _ in calls if c[:2] == ["docker", "build"]]
+    assert "--no-cache" not in build
+    assert (gen.task_dir(recipe, task) / "result.json").read_text() == saved
+    assert gen.tests_path(recipe, task).read_text() == tests
+    assert [(e["step"], e["event"]) for e in gen.read_builds(recipe, task)] == [("validate", "built"),
+                                                                               ("rebuild", "built")]
+    assert gen.format_rebuild(record).startswith(f"built   {task.id} in ")
+    # An image with another label counts as missing.
+    _fake_docker(monkeypatch, labels={tag: "0" * 16})
+    assert gen.rebuild_task(recipe, task)["status"] == "built"
+
+
+def test_rebuild_skips_and_refuses(make_task, monkeypatch, no_source):
+    recipe, task = _recipe(), make_task(test_patch=_patch("pkg/tests/test_a.py"))
+    calls = _fake_docker(monkeypatch, images={})
+    assert gen.rebuild_task(recipe, task) == {"id": task.id, "status": "skipped", "reason": "no saved record",
+                                              "build_s": None, "image_id": None}
+    folder = gen.task_dir(recipe, task)
+    folder.mkdir(parents=True)
+    (folder / "result.json").write_text(json.dumps({"valid": False}))
+    assert gen.rebuild_task(recipe, task)["reason"] == "not valid"
+    _validated(recipe, task, monkeypatch)
+    calls.clear()
+    # The recipe changed after the validation: in the image, or in the tests.
+    for changed in (replace(recipe, build=("make",)), replace(recipe, refresh=("make",))):
+        record = gen.rebuild_task(changed, task)
+        assert record["status"] == "refused" and "another fingerprint" in record["reason"]
+    # The task changed.
+    record = gen.rebuild_task(recipe, replace(task, patch=task.patch + "\n"))
+    assert record["status"] == "refused"
+    # tests.json from another validation, or none.
+    tests = gen.tests_path(recipe, task)
+    tests.write_text(json.dumps({"fingerprint": "x", "repeats": 3}))
+    assert "tests.json has another" in gen.rebuild_task(recipe, task)["reason"]
+    tests.unlink()
+    assert gen.rebuild_task(recipe, task)["reason"] == "the valid record has no tests.json"
+    assert not [c for c, _ in calls if c[:2] == ["docker", "build"]]
+
+
+def test_rebuild_reports_a_failed_build(make_task, monkeypatch, no_source):
+    recipe, task = _recipe(), make_task(test_patch=_patch("pkg/tests/test_a.py"))
+    _fake_docker(monkeypatch)
+    _validated(recipe, task, monkeypatch)
+    _fake_docker(monkeypatch, images={})
+
+    def no_build(recipe, task, force=False):
+        raise gen.GenerateError("docker build failed")
+
+    monkeypatch.setattr(gen, "build_task_image", no_build)
+    record = gen.rebuild_task(recipe, task)
+    assert record["status"] == "failed" and record["reason"] == "error: docker build failed"
+    assert gen.format_rebuild(record) == f"failed  {task.id}: error: docker build failed"
+
+
+def test_cli_rebuild(make_task, tmp_path, monkeypatch, capsys):
+    from cmeval.cli import main
+    from cmeval.tasks import save_tasks
+
+    recipe = gen.load_recipe("pandas")
+    fix = make_task().fix
+    tasks = [make_task(id=f"pandas-dev__pandas-{n}", repo=recipe.repo, test_patch=_patch("pandas/tests/test_a.py"),
+                       fix=replace(fix, pr_number=n)) for n in (1, 2)]
+    path = tmp_path / "tasks.jsonl"
+    save_tasks(path, tasks)
+    assert main(["generate", "pandas", "--tasks", str(path), "--rebuild", "--force"]) == 1
+    seen = {}
+
+    def fake_rebuild(recipe, tasks, jobs, progress):
+        seen.update(ids=[t.id for t in tasks], jobs=jobs)
+        return [{"id": tasks[0].id, "status": "built", "build_s": 90.0},
+                {"id": tasks[1].id, "status": "refused", "build_s": None}]
+
+    monkeypatch.setattr(gen, "rebuild", fake_rebuild)
+    monkeypatch.setattr(gen, "generate", lambda *a, **k: pytest.fail("no validation"))
+    assert main(["generate", "pandas", "--tasks", str(path), "--rebuild", "--jobs", "3"]) == 3
+    assert seen == {"ids": [t.id for t in tasks], "jobs": 3}
+    out = capsys.readouterr().out
+    assert "1 built (1.5 min of builds), 0 exist, 0 skipped (no valid record), 1 refused, 0 failed" in out

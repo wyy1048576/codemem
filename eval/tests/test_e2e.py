@@ -261,7 +261,16 @@ def test_cli_grader_check(make_task, tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert seen == {"ids": ["pandas-dev__pandas-1"], "jobs": 2, "cpus": 4}
     assert "1 tasks have no tests.json" in captured.err
-    assert captured.out.strip() == "pandas: 0 of 1 tasks pass the grader check"
+    assert captured.out.strip() == "pandas: 0 of 1 tasks pass the grader check; 0 differ from tests.json, 0 errors"
+
+    # A task whose tests differ is counted, and the exit code is not 0.
+    def differs(recipe, tasks, jobs, cpus, progress):
+        return [{"id": t.id, "passed": False, "problem": "1 tests differ from tests.json",
+                 "tests": {"equal": False}} for t in tasks]
+
+    monkeypatch.setattr(e2e, "grader_check", differs)
+    assert main(["e2e", "grader-check", "pandas", "--tasks", str(path)]) == 3
+    assert "0 of 1 tasks pass the grader check; 1 differ from tests.json" in capsys.readouterr().out
 
 
 # The test command of the local grading tests. It checks that the hidden test file is in place,
@@ -416,6 +425,87 @@ def test_grader_check_locally(make_task, tmp_path, monkeypatch):
     assert records[0]["passed"] and records[0]["problem"] == "ok"
     assert records[0]["gold"]["reason"] == "ok" and records[0]["empty"]["reason"] == "empty change"
     assert (e2e.grader_check_dir(recipe, task) / "gold" / "grade.json").exists()
-    assert seen[0].startswith(f"{task.id}  ok  gold: ok  empty: empty change")
+    assert seen[0].startswith(f"{task.id}  ok  gold: ok  empty: empty change  tests: equal (2 checked)")
+    saved = json.loads((e2e.grader_check_dir(recipe, task) / "check.json").read_text())
+    assert saved == records[0] and saved["tests"]["equal"] and saved["tests"]["differences"] == []
     # A task without tests.json is left out.
     assert e2e.grader_check(recipe, [make_task(id="acme__auth-7")]) == []
+
+
+def test_compare_tests():
+    gold = {"t::new": PASS, "t::old1": FAIL}
+    assert e2e.compare_tests(gold, TESTS, empty=False) == [
+        {"test": "t::old1", "list": "pass_to_pass", "saved": PASS, "new": FAIL},
+        {"test": "t::old2", "list": "pass_to_pass", "saved": PASS, "new": "missing"}]
+    assert e2e.compare_tests({"t::new": PASS, "t::old1": PASS, "t::old2": PASS}, TESTS, empty=False) == []
+    # The empty change: only a fail-to-pass test that passes differs. Pass-to-pass tests are not checked.
+    assert e2e.compare_tests({"t::new": SKIP, "t::old1": FAIL}, TESTS, empty=True) == []
+    assert e2e.compare_tests({"t::new": PASS}, TESTS, empty=True) == [
+        {"test": "t::new", "list": "fail_to_pass", "saved": "not pass", "new": PASS}]
+
+
+def _fake_grades(monkeypatch, gold_results, empty_results):
+    """grade() writes the JUnit file of its results and judges them; no container starts."""
+    monkeypatch.setattr(gen, "_run", lambda cmd, **kwargs: subprocess.CompletedProcess(cmd, 1, "", ""))
+
+    def fake_grade(recipe, task, patch, out, cpus=8):
+        results = gold_results if patch else empty_results
+        out.mkdir(parents=True, exist_ok=True)
+        cases = ""
+        for test_id, result in results.items():
+            classname, name = test_id.split("::")
+            child = "" if result == PASS else "<failure/>"
+            cases += f'<testcase classname="{classname}" name="{name}">{child}</testcase>'
+
+        (out / "grade.0.xml").write_text(f"<testsuite>{cases}</testsuite>")
+        return e2e.verdict(results, e2e.load_tests(recipe, task), empty=not patch)
+
+    monkeypatch.setattr(e2e, "grade", fake_grade)
+
+
+def test_check_task_shows_the_tests_that_differ(make_task, monkeypatch):
+    recipe, task = _recipe(), make_task(patch=MODIFY, test_patch=TEST_PATCH)
+    f2p = ["t::new1", "t::new2", "t::new3"]
+    _write_tests(recipe, task, f2p, ["t::old"])
+    # The real fix completes the task. With the empty change one fail-to-pass test passes now: the
+    # old check passed this task, because not every test passed.
+    _fake_grades(monkeypatch, {t: PASS for t in f2p + ["t::old"]}, {"t::new1": PASS, "t::new2": FAIL, "t::old": PASS})
+    record = e2e.check_task(recipe, task)
+    assert record["gold"]["completed"] and not record["empty"]["passes_without_change"]
+    assert not record["passed"] and record["problem"] == "1 tests differ from tests.json"
+    assert record["tests"] == {"equal": False, "checked": 7, "differ": 1, "real_fix_differ": 0, "empty_differ": 1,
+                               "differences": [{"change": "empty", "test": "t::new1", "list": "fail_to_pass",
+                                                "saved": "not pass", "new": PASS}]}
+    assert record["image_id"] is None and record["image_build"] is None
+    line = e2e.format_check(record)
+    assert "tests: 1 differ (real fix 0, empty 1): t::new1 (empty) not pass -> pass  " in line
+    assert json.loads((e2e.grader_check_dir(recipe, task) / "check.json").read_text()) == record
+
+
+def test_check_task_cuts_a_long_list(make_task, monkeypatch):
+    recipe, task = _recipe(), make_task(patch=MODIFY, test_patch=TEST_PATCH)
+    p2p = [f"t::old{i}" for i in range(60)]
+    _write_tests(recipe, task, ["t::new"], p2p)
+    # The pass-to-pass tests fail on this image with the real fix.
+    _fake_grades(monkeypatch, {"t::new": PASS}, {})
+    record = e2e.check_task(recipe, task)
+    assert record["problem"] == "the real fix does not complete the task; 60 tests differ from tests.json"
+    assert record["tests"]["differ"] == 60 and len(record["tests"]["differences"]) == e2e.MAX_FAILED_SHOWN
+    assert record["tests"]["differences"][0]["new"] == "missing"
+    assert e2e.format_check(record).endswith(", and 57 more  " + f"{record['seconds']} s")
+
+
+def test_check_task_names_the_build_of_the_image(make_task, monkeypatch):
+    recipe, task = _recipe(), make_task(patch=MODIFY, test_patch=TEST_PATCH)
+    _write_tests(recipe, task, ["t::new"])
+    _fake_grades(monkeypatch, {"t::new": PASS}, {"t::new": FAIL})
+    gen.builds_path(recipe, task).write_text(json.dumps([{"image_id": "sha256:a"}, {"image_id": "sha256:b"}]))
+    monkeypatch.setattr(e2e, "image_id", lambda tag: "sha256:b")
+    record = e2e.check_task(recipe, task)
+    assert record["passed"] and record["image_id"] == "sha256:b" and record["image_build"] == 2
+    # An error is saved too.
+    monkeypatch.setattr(e2e, "grade", lambda *a, **k: (_ for _ in ()).throw(gen.GenerateError("no image")))
+    record = e2e.check_task(recipe, task)
+    assert record["error"] and "tests" not in record
+    assert json.loads((e2e.grader_check_dir(recipe, task) / "check.json").read_text())["problem"] == "error: no image"
+    assert "tests: -" in e2e.format_check(record)
