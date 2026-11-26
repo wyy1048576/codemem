@@ -62,6 +62,7 @@ KINDS = {
     "other-behaviour": "the tests expect another behaviour or another error class than the issue asks for",
     "issue-case-works": "the issue's own case already works before the fix; the tests check something else",
     "extra-cases": "the tests cover cases or code paths that the issue does not mention or imply",
+    "environment": "the tests need a dependency, service or network access that the task image does not have",
     "fix-only-tests": "the real fix changes only test files; there is nothing to fix from the issue",
     "other": "another reason; the reason field says which",
 }
