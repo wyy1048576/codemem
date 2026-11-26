@@ -158,5 +158,5 @@ any order. Every packet of the batch must have exactly one object.
 | `reason` | Why, in one to three sentences. Not empty. Name the narrowest reasonable fix that you considered, and say whether it passes each deciding assertion |
 | `confidence` | `high`, `medium` or `low` |
 
-Use no other fields. The orchestrator adds the read number, your reader label, the date and the
-rules version when it stores your verdicts (`cmeval e2e screen-add`).
+Use no other fields. The pipeline adds the read number, your reader label, the date and the
+rules version when your verdicts are stored (`cmeval e2e screen-add`).

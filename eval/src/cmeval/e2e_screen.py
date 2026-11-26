@@ -1,7 +1,7 @@
 """The screen for unfair hidden tests (batch B13).
 
 A valid task can still be unfair: a correct, general fix made from the issue alone does not pass all of
-its hidden tests. A reader (a model session that the orchestrator starts) answers that question for each
+its hidden tests. A reader answers that question for each
 task, under the rules in tasks/screen-rules-v1.md. Each task gets two independent reads. This module calls
 no model. It has four parts:
 
