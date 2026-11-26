@@ -4,8 +4,6 @@
 which of them, in what order, and about how long that takes. Track A runs it. The reasons for the
 study's design are in [track-a-evals.md](track-a-evals.md); this page is the list to work from.
 
-*Proposed on Nov 26. Not confirmed yet: Andre confirms it in the work log.*
-
 ---
 
 ## 1. The five words
