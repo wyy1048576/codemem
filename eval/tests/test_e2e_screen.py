@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +11,8 @@ from cmeval import generate as gen
 from cmeval.cli import main
 from cmeval.e2e_screen import ScreenError
 from cmeval.tasks import save_tasks
+
+PILOT18 = Path(__file__).resolve().parents[1] / "tasks" / "screen" / "pilot18.jsonl"
 
 TEST_PATCH = """\
 diff --git a/pandas/tests/io/test_core.py b/pandas/tests/io/test_core.py
@@ -333,6 +336,17 @@ def test_parse_need_level():
         e2e_screen.parse_need_level("tiny=2")
     with pytest.raises(ScreenError, match="LEVEL=N"):
         e2e_screen.parse_need_level("easy=x")
+
+
+def test_pilot18_screen_in_the_repo():
+    """The two reads of 2026-11-25: they agree on all 18 tasks, 9 fair and 9 not."""
+    rows = e2e_screen.load_screen(PILOT18)
+    assert len(rows) == 36 and {r["read"] for r in rows} == {1, 2}
+    result = e2e_screen.table(e2e_screen.merge(rows))
+    by = {(r["repo"], r["level"]): r for r in result["rows"]}
+    assert (result["total"]["kept"], result["total"]["removed"], result["total"]["disagree"]) == (9, 9, 0)
+    assert (by[("pandas-dev/pandas", "all")]["valid"], by[("pandas-dev/pandas", "all")]["kept"]) == (10, 4)
+    assert (by[("microsoft/playwright", "all")]["valid"], by[("microsoft/playwright", "all")]["kept"]) == (8, 5)
 
 
 # ---- command line
