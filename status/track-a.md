@@ -1,13 +1,13 @@
 # Track A, evaluation: status
 
 **Owner:** Andrew. **Plan:** `docs/plan/track-a-evals.md` on `main`.
-**Updated:** 2026-11-26 13:20 UTC, by Andrew (with Claude Code).
+**Updated:** 2026-11-26 19:00 UTC, by Andrew (with Claude Code).
 
 | | |
 |---|---|
-| Now | Recipes for all ten repos are on `main` (`0567907`). pandas: 92 valid, 17 fair. playwright: 49 valid, 28 fair. duckdb is admitted (9 of 10). On the PC: admission checks for ruff, then kubernetes, home-assistant, airflow, vscode, vllm, trino; and Haiku runs of the `grep` arm on the 10 vague tasks. The screen is a pipeline step (`cmeval e2e screen-pack`, `screen-add`, `screen-table`, `score --screen`). The arms with the agent note and the hooks are on hold until Wilson names a ready commit |
+| Now | All entries up to 16:11 UTC are read. `uv sync` works on the PC (FAISS 1.16.0). Admitted: pandas, playwright, duckdb, kubernetes, ruff. Fair: pandas 17, playwright 28, each with L1 and L2. On the PC: validation of 60 for duckdb and kubernetes; then Andre's runs 3 and 4 and the replay; then ruff 60 and the other admission checks. In work: the second collection for the hard tier, the review of the 13 prompt corrections, `cmeval e2e grade` and `cmeval e2e turns` |
 | Done | **Both setups run end to end.** On `main`: `cmeval generate` (#20), the grader (#21), the proxy (#22), review fixes and ripgrep (#23), the runner with step counts and score (#24), the `tool` setup with codemem in the container (#25, `77c6aa8`). Images rebuilt and validated again under the corrected rules. Decisions on the prompt frame, the tools and ripgrep are made. **The pilot batch is done (2026-11-25): 36 runs on both repos and both setups, 0 discarded, token counts equal on all; 5 of 6 pass conditions of §2.2 met; 0 of 18 `tool` runs called codemem at `light`, 4 of 5 at `strong`** |
-| Behind | pandas has 17 fair tasks against 20, and 3 hard ones against 6. No Sonnet run yet: they wait for the lock of codemem's design |
+| Behind | pandas: 3 fair tasks in the medium tier (label `hard`) against 4. No run with the codemem commit `09c4ef0` yet; no check run yet |
 | Next | 1. Admission check, then 60 candidates, for each new repo: ruff, duckdb, kubernetes, then home-assistant, airflow, vscode, vllm, then a Java or JavaScript repo. 2. Screen of all new valid tasks, two reads; the table per repo and difficulty goes to the log. 3. The `grep` arm on the 10 vague tasks at L1 and L2 (Haiku). 4. Arms `tool-note` and `tool-hooks` when track B is ready. 5. Sonnet, 3 repetitions, when codemem is locked |
 | Machines | pandas and playwright: the PC. The Mac builds nothing at present: its Docker cannot pull images. Free disk on the PC: 867 GB of the virtual disk, 454 GB real |
 | Blocked on | nothing |
