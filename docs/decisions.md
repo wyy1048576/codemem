@@ -183,6 +183,7 @@ Values in the code, not in the config.
 | barrier wait | 0.25 s | `service.py` | how long a search waits for its marker file's event |
 | git wait | 10 s | `service.py` | how long an update waits for a running git command |
 | write lock wait | 30 s | `store.py` | how long a second writer process waits before giving up |
+| `_REPLACE_TRIES`, `_REPLACE_WAIT` | 6 tries, 0.02 s | `store.py` | a rename of a save that is refused with a permission error is tried again after 0.02 s, then after twice as long each time: 0.62 s in all. Windows refuses a rename while another handle holds the file open; the numbers are not measured on Windows |
 | `COPY_LOCK_WAIT` | 300 s | `worktrees.py` | how long a start waits for another process that is copying an index into the same folder |
 | `_PAGE_SIZE` | 32 KB | `vectorcache.py` | the vector cache's page size (architecture.md §5) |
 | `_TARGET` | 90% of the cap | `vectorcache.py` | where an eviction stops |

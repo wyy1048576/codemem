@@ -3,6 +3,7 @@ vectors a search asks its index for, the hook that lets an index read stored vec
 what a saved index belongs to: one database, a state of it, and the bytes that were saved."""
 
 import json
+import os
 import shutil
 import sqlite3
 import zlib
@@ -491,6 +492,87 @@ def test_two_processes_that_save_in_turn_each_leave_a_file_a_start_reads(tmp_pat
         assert all(_finds_each(start, *vectors) for vectors in held) and rebuilds == []
         start.close()
     a.close(), b.close()
+
+
+def _refuse_renames(monkeypatch, times):
+    """`os.replace` raises PermissionError the first `times[name]` times it is asked to move a file
+    over `name`, as Windows does while another handle holds the file open. The waits between two
+    tries are for a real handle to go away: here they take no time. Returns the renames refused."""
+    from codemem import store as store_module
+
+    refused, replace = [], os.replace
+
+    def held(src, dst):
+        name = os.path.basename(dst)
+        if refused.count(name) < times.get(name, 0):
+            refused.append(name)
+            raise PermissionError(13, "The process cannot access the file because it is being used by another process")
+        replace(src, dst)
+
+    monkeypatch.setattr(store_module.os, "replace", held)
+    monkeypatch.setattr(store_module, "_REPLACE_WAIT", 0.0)
+    return refused
+
+
+def test_a_rename_that_is_refused_for_a_moment_is_tried_again(tmp_path, monkeypatch):
+    """Fixed bug: on Windows a rename is refused with PermissionError while another handle holds
+    the file (a second codemem process that reads the saved index at its start, a virus scanner,
+    the search indexer), and one such moment failed the save, and the update that ended in it.
+    The handle is gone a moment later: both renames of a save are tried again."""
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend="faiss")
+    ids = _seed(s, 40)
+    s.save_vectors()
+    new, vecs = _more(s, 5, "new", seed=3)
+    with monkeypatch.context() as windows:
+        refused = _refuse_renames(windows, {"vec_code.faiss": 2, "vec_code.json": 1})
+        s.save_vectors()
+    assert refused == ["vec_code.faiss", "vec_code.faiss", "vec_code.json"]
+    note = json.loads((idx / "vec_code.json").read_text())
+    assert note["count"] == 45 and note["save_id"] == s.get_meta("vec.code.save_id")
+    assert note["crc32"] == zlib.crc32((idx / "vec_code.faiss").read_bytes())
+    assert sorted(p.name for p in idx.glob("vec_code*")) == ["vec_code.faiss", "vec_code.json"]  # no temporary file
+    s.close()
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend="faiss")
+    assert _finds_each(s, new, vecs) and _finds_each(s, ids, _vecs(40)) and rebuilds == []  # the new copy is read
+    s.close()
+
+
+@pytest.mark.parametrize("held, changed, rebuilt", [("vec_code.faiss", [], 0), ("vec_code.json", ["file"], 1)])
+def test_a_rename_that_stays_refused_fails_the_save_and_a_start_still_reads_right(tmp_path, monkeypatch, held, changed, rebuilt):
+    """A handle that does not go away: the save gives up after its tries and raises. Refused on
+    the file, the save leaves the earlier file, note and `save_id`, which agree. Refused on the
+    note, it leaves the new file under the earlier note and `save_id`, which a start refuses by
+    the checksum. Either way the transaction is rolled back and no temporary file is left."""
+    from codemem import store as store_module
+
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend="faiss")
+    ids = _seed(s, 40)
+    s.save_vectors()
+    before = {p.name: p.read_bytes() for p in idx.glob("vec_code*")}
+    earlier = s.get_meta("vec.code.save_id")
+    new, vecs = _more(s, 5, "new", seed=3)
+    with monkeypatch.context() as windows:
+        refused = _refuse_renames(windows, {held: 1000})
+        with pytest.raises(PermissionError):
+            s.save_vectors()
+    assert refused == [held] * store_module._REPLACE_TRIES  # a handful of tries, not for ever
+    assert s.get_meta("vec.code.save_id") == earlier and not s.conn.in_transaction
+    s.close()
+    after = {p.name: p.read_bytes() for p in idx.glob("vec_code*")}
+    assert set(after) == set(before)  # and no temporary file is left
+    assert sorted("note" if name.endswith(".json") else "file" for name in after if after[name] != before[name]) == changed
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend="faiss")
+    assert _finds_each(s, new, vecs) and _finds_each(s, ids, _vecs(40)) and len(rebuilds) == rebuilt
+    s.save_vectors()
+    s.close()
+    s = Store(idx, vector_backend="faiss")
+    assert _finds_each(s, new, vecs) and len(rebuilds) == rebuilt  # a save that ends is read
+    s.close()
 
 
 # ---------------------------------------------------------------- the file a note names
