@@ -195,7 +195,8 @@ once. That is 24 runs, about an hour on three seats.
    the pilot it was 17 of 18. At L0 the number is reported and not required: with a name to
    grep for, an agent often greps;
 4. **every search is a search by meaning:** no `search_code` result holds `still loading` or
-   `codemem cannot embed right now`, and `index_status` in one container says `watching: true`;
+   `codemem cannot embed right now`, and `index_status` in one container has the line `watching
+   for changes`, not `not watching (scanning on a timer or on request)`;
 5. a person has read two `tool` transcripts: the search's result reaches the agent, and the
    agent uses it.
 
