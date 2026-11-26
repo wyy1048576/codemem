@@ -104,13 +104,15 @@ def task_file(repo: str, name: str | None) -> Path:
         if not path.is_file():
             sys.exit(f"no task file {name}: give a path, or the name of a file in {folder}")
         return path
-    counts = {}
-    for path in sorted(folder.glob("*.jsonl")):
-        counts[path] = sum(1 for line in path.read_text("utf-8").split("\n") if line.strip() and json.loads(line)["repo"] == repo)
+    # eval/tasks also holds files of other kinds (prompt texts for tasks, with no `repo`): a row
+    # without a repo is no question for any repo.
+    repos_of = {path: [json.loads(line).get("repo") for line in path.read_text("utf-8").split("\n") if line.strip()]
+                for path in sorted(folder.glob("*.jsonl"))}
+    counts = {path: repos.count(repo) for path, repos in repos_of.items()}
     best = max(counts, key=counts.get, default=None)
     if best is None or not counts[best]:
-        repos = sorted({json.loads(line)["repo"] for p in counts for line in p.read_text("utf-8").split("\n") if line.strip()})
-        sys.exit(f"no task in {folder} is for the repo {repo!r}. The task files know: {', '.join(repos)}")
+        known = sorted({r for repos in repos_of.values() for r in repos if r})
+        sys.exit(f"no task in {folder} is for the repo {repo!r}. The task files know: {', '.join(known)}")
     return best
 
 
@@ -122,7 +124,7 @@ def questions(path: Path, repo: str, limit: int) -> list[dict]:
         if not line.strip():
             continue
         task = json.loads(line)
-        if task["repo"] != repo:
+        if task.get("repo") != repo:
             continue
         split = task.get("split", "dev")
         if not limit or seen[split] < limit:
