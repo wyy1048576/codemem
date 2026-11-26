@@ -10,8 +10,11 @@ import time
 from pathlib import Path
 
 from . import __version__, agents
-from .config import find_repo_root, load_config
-from .render import format_results, format_status
+from .config import SERVE_HOST, SERVE_KEY_ENV, SERVE_PORT, find_repo_root, load_config
+
+# .render, .embedder and .embedserver (and through them the search stack: numpy, faiss) are
+# imported inside the commands that need them, so that `codemem hook`, which runs on every Grep
+# and Glob, starts fast.
 
 
 def _progress_printer(enabled: bool):
@@ -58,6 +61,8 @@ def cmd_index(args) -> int:
         svc.config.vector_cache = "off"
     try:
         print(f"indexing {svc.repo_root} -> {svc.index_dir}", file=sys.stderr)
+        if svc.copied_from is not None:
+            print(f"starting from a copy of {svc.copied_from}", file=sys.stderr)
         indexer = Indexer(svc.repo_root, svc.store, svc.config, progress=_progress_printer(not args.json))
         stats = indexer.update(full=args.full)
         print(file=sys.stderr)
@@ -80,7 +85,9 @@ def cmd_init(args) -> int:
     repo = find_repo_root(args.path)
     config = load_config(repo)
     names = [a.strip() for a in args.agents.split(",") if a.strip()] if args.agents else []
-    actions = agents.plan(repo, names, write_agent_notes=args.write_agent_notes, steering=config.steering)
+    actions = agents.plan(
+        repo, names, write_agent_notes=not args.no_agent_notes, write_hooks=args.write_hooks, steering=config.steering
+    )
     print(f"repo: {repo}")
     for a in actions:
         print(f"- {a.agent}: {a.description}")
@@ -143,6 +150,8 @@ def cmd_search(args) -> int:
         if args.json:
             print(json.dumps(resp.to_dict(), indent=2))
         else:
+            from .render import format_results
+
             print(format_results(resp, debug=args.debug, preview=not args.no_preview))
             if args.debug:
                 print(f"\n{json.dumps({k: round(v * 1000, 1) for k, v in resp.timings.items()})} (ms)", file=sys.stderr)
@@ -154,11 +163,38 @@ def cmd_search(args) -> int:
 def cmd_status(args) -> int:
     svc = _service(args)
     try:
+        if args.check_assist:
+            return _check_assist(svc, args.json)
         info = svc.status(check_staleness=True)
+        from .render import format_status
+
         print(json.dumps(info, indent=2, default=str) if args.json else format_status(info))
     finally:
         svc.close()
     return 0
+
+
+def _check_assist(svc, as_json: bool) -> int:
+    """`status --check-assist`: 0 when the endpoint can share a build's work, 1 when it cannot, 2
+    when the config names none."""
+    checker = logging.getLogger("codemem.assist")
+    level = checker.level
+    if checker.getEffectiveLevel() > logging.DEBUG:  # without -v: its warnings are what the report says
+        checker.setLevel(logging.ERROR)
+    try:
+        reports = svc.check_assist()
+    finally:
+        checker.setLevel(level)
+    if not reports:
+        print("error: no assist endpoint to check: the config has no `[embedding.assist]` section", file=sys.stderr)
+        return 2
+    if as_json:
+        print(json.dumps(reports, indent=2))
+    else:
+        from .render import format_assist_check
+
+        print("\n\n".join(format_assist_check(report) for report in reports))
+    return 0 if any(report["state"] == "sharing" for report in reports) else 1
 
 
 def cmd_watch(args) -> int:
@@ -199,6 +235,50 @@ def cmd_mcp(args) -> int:
     return 0
 
 
+def cmd_hook(args) -> int:
+    from .hook import run
+
+    return run(sys.stdin, sys.stdout)
+
+
+def cmd_serve_embeddings(args) -> int:
+    from .embedserver import serve
+
+    config = load_config(find_repo_root(args.path))
+    try:
+        server = serve(config, host=args.host, port=args.port)
+    except (OSError, ValueError) as e:  # the port is taken, or the model cannot be served
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    served = server.served
+    # All of stdout is TOML: the settings of a client, under comments that say where they go.
+    print(f"# codemem serve-embeddings: {served.model}, {served.dim} numbers per vector, at {server.url}")
+    print("# A codemem embeds through this server with the section below, in ~/.codemem/config.toml or in")
+    print("# <repo>/.codemem.toml. From a container or another machine, write the address this machine is")
+    print("# reached at in base_url: an index is tied to `space`, not to the address.")
+    if server.has_key:
+        print(f"# This server asks for a key: a client needs {SERVE_KEY_ENV} in its environment too.")
+    print(server.client_config(), flush=True)
+    print("# The section above is for a codemem that runs no model of its own: every vector comes from this server.")
+    print("# A codemem on another machine that runs this model itself can let this server embed a share of each")
+    print("# build instead, and keep its own model for the rest, for searches and for edits. For that, leave the")
+    print("# section above out and use these lines, with this machine's address in base_url:")
+    print("".join(f"# {line}\n" for line in server.assist_config().splitlines()), flush=True)
+    if not server.has_key and args.host not in ("127.0.0.1", "localhost", "::1"):
+        print(
+            f"warning: {args.host} is not the loopback address and no key is set: whoever can reach it can use "
+            f"the model. Set {SERVE_KEY_ENV} to ask for a key.", file=sys.stderr,
+        )
+    print("serving (Ctrl+C to stop)", file=sys.stderr)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.close()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="codemem", description="Local hybrid code search for coding agents.")
     p.add_argument("--version", action="version", version=f"codemem {__version__}")
@@ -214,7 +294,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp = common(sub.add_parser("init", help="register with agents and build the index"))
     sp.add_argument("--agents", default="claude", help="comma list of claude,cursor,codex (default: claude)")
     sp.add_argument("--no-index", action="store_true", help="don't build the index now")
-    sp.add_argument("--write-agent-notes", action="store_true", help="append a short note to CLAUDE.md / AGENTS.md")
+    sp.add_argument(
+        "--no-agent-notes", action="store_true",
+        help="don't append the short codemem note to CLAUDE.md / AGENTS.md (it is appended by default)",
+    )
+    # The note used to be opt-in. The old flag is still accepted, so that existing commands run.
+    sp.add_argument("--write-agent-notes", action="store_true", help=argparse.SUPPRESS)
+    sp.add_argument(
+        "--write-hooks", action="store_true",
+        help="Claude Code: add two hooks to .claude/settings.json that point the agent at search_code when it has no lead",
+    )
     sp.add_argument("--dry-run", action="store_true", help="show what would be written")
     sp.add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
     sp.set_defaults(func=cmd_init)
@@ -243,11 +332,29 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = common(sub.add_parser("status", help="counts, models, indexed commit, staleness"))
     sp.add_argument("--json", action="store_true")
+    sp.add_argument(
+        "--check-assist", action="store_true",
+        help="only compare the [embedding.assist] endpoint's vectors with the local model's, now and without a "
+        "build, and print each probe text's numbers and the verdict. Loads the local model unless its vectors for "
+        "the probe texts are remembered from an earlier check. Sends codemem's own probe texts, no code of the "
+        "repository. Exit status: 0 it can share a build's work, 1 it cannot, 2 no assist is set",
+    )
     sp.set_defaults(func=cmd_status)
+
+    sp = sub.add_parser(
+        "serve-embeddings", help="serve the local embedding model to other codemem processes (OpenAI-style HTTP)"
+    )
+    sp.add_argument("path", nargs="?", help="repository whose config selects the model (default: the current one)")
+    sp.add_argument("--host", default=SERVE_HOST, help=f"address to listen on (default: {SERVE_HOST})")
+    sp.add_argument("--port", type=int, default=SERVE_PORT, help=f"port to listen on (default: {SERVE_PORT})")
+    sp.set_defaults(func=cmd_serve_embeddings)
 
     common(sub.add_parser("watch", help="foreground watcher (re-index on save)")).set_defaults(func=cmd_watch)
     common(sub.add_parser("mcp", help="MCP server over stdio (what agents launch)")).set_defaults(func=cmd_mcp)
     sub.add_parser("languages", help="list supported languages and file extensions").set_defaults(func=cmd_languages)
+    sub.add_parser(
+        "hook", help="Claude Code hooks: point the agent at search_code when it has no lead (see the README)"
+    ).set_defaults(func=cmd_hook)
     return p
 
 
@@ -270,6 +377,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except TimeoutError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    except RuntimeError as e:
+        from .embedder import LocalModelUnavailable  # here, not at the top: see the note there
+
+        if not isinstance(e, LocalModelUnavailable):
+            raise
         print(f"error: {e}", file=sys.stderr)
         return 1
 

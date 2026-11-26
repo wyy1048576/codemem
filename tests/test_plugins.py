@@ -290,7 +290,7 @@ def test_retrained_weights_re_embed_and_never_come_from_the_vector_cache(plugins
     indexer = Indexer(sample_repo, store, fake_config)
     n = indexer.update().model_embedded["code"]
     key = store.get_meta("vec.code.embedder")
-    assert n > 0 and key.startswith(f"{model_dir}#{model_folder_hash(model_dir)}|plugin={EMBEDDER}|")
+    assert n > 0 and key == f"{model_dir}#{model_folder_hash(model_dir)}|plugin={EMBEDDER}|L1024|auto|auto"
     assert sum(indexer.update().model_embedded.values()) == 0  # nothing changed
     loaded = len(plugins.WrappedFake.instances)
 

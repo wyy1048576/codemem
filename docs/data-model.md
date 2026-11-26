@@ -5,8 +5,8 @@ agent:
 - what each stored record holds, and the rules for keys, line numbers and hashes (§1–§9);
 - the version stamps that must change when a format does (§10);
 - what can grow without breaking indexes (§11);
-- the interfaces other code relies on: the MCP tools, the eval adapter, the configuration and the
-  plugin classes (§12).
+- the interfaces other code relies on: the MCP tools, the eval adapter, the configuration, the
+  plugin classes and the embedding server (§12).
 
 How the system works, and why, is in [architecture.md](architecture.md).
 
@@ -16,6 +16,7 @@ How the system works, and why, is in [architecture.md](architecture.md).
 | how chunks are cut | `languages/` and `chunker.py` |
 | what gets embedded | `texts.py` |
 | storage | `store.py` (SQLite and the search index) and `vectorcache.py` |
+| the embedding server | `embedserver.py` |
 
 ---
 
@@ -322,13 +323,21 @@ re-embeds that vector type only.
 | Embedder | Key | Example |
 |---|---|---|
 | local | `model[#version] \| doc \| L<max_seq_length> \| <dtype> \| <device>` | `jinaai/jina-code-embeddings-0.5b\|doc\|L1024\|float16\|mps` |
-| API | `api:<host> \| <model> \| dims=<d> \| doc=<hash of the document prefix>` | `api:api.studio.nebius.com\|Qwen/Qwen3-Embedding-8B\|dims=1024\|doc=0` |
+| API, by its address | `api:<host> \| <model> \| dims=<d> \| doc=<hash of the document prefix>` | `api:api.studio.nebius.com\|Qwen/Qwen3-Embedding-8B\|dims=1024\|doc=0` |
+| API, by its `space` | `api:<space> \| <model> \| dims=<d> \| doc=<hash of the document prefix>` | `api:st-L1024-float16-mps\|jinaai/jina-code-embeddings-0.5b\|dims=full\|doc=861b2167` |
 | plugin | `model[#version] \| plugin=<module:Class> \| L<max_seq_length> \| <dtype> \| <device>` (dtype and device as configured) | `/models/enc#3fa2b1c9d0e1\|plugin=mypkg.embed:MyEmbedder\|L1024\|auto\|auto` |
 | fake (tests) | `fake:<dim> \| doc` | `fake:64\|doc` |
 
 - **The weights version** (`#version`) is `vectors.<type>.version` if set, else, for a model in a
   local folder, the first 12 hex characters of a sha256 over every file's relative path and
   content (dot files and folders skipped), else nothing. A model named on Hugging Face has none.
+- **An API's key holds who serves the vectors:** `[embedding] space` when it is set, else the host
+  and port of `base_url`. `<d>` is `dimensions`, or `full`; the document prefix is the first 8 hex
+  characters of its sha256, or `0` for none. With a `space`, the address is in no part of an
+  index's identity, so configurations that differ only in `base_url` use the same vectors.
+- **The precision and the device of a local key** are the ones the model runs in. The weights
+  are converted to `<dtype>` when the model is loaded, whatever the model's file stores; `auto`
+  gives float16 on a GPU and float32 on a CPU.
 - **Not part of the key:** `embedding_dim` (applied when the search index is built, so changing
   it re-embeds nothing), the query prefix (it only affects queries), and the API key.
 
@@ -336,8 +345,10 @@ re-embeds that vector type only.
 
 Before calling the model for a text, codemem looks for `(embedder key, text_hash)`:
 1. in this index (the same text elsewhere in the repo);
-2. in the shared **vector cache**, `$CODEMEM_HOME/cache/vectors.db`, which holds every text ever
-   embedded on this machine and only grows.
+2. in the shared **vector cache**, `$CODEMEM_HOME/cache/vector_cache.db` (§7), which holds the
+   vectors computed on this machine. Past its size cap the least recently used ones are deleted;
+   a text whose vector was deleted goes to the model again. A vector found there and a vector put
+   there both count as used.
 
 `IndexStats` reports `embedded` (vectors written for changed texts), `model_embedded` (of which the
 model computed), `reused` and `cache_hits`; and, for the structure, `chunks_added`,
@@ -400,9 +411,32 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
                                      names the rotation the codes were made after, and `crc32` is the
                                      checksum of everything after the first line
   write.lock                         one writer at a time (OS file lock)
-$CODEMEM_HOME/cache/vectors.db       shared vector cache: (embedder key, text_hash) -> float16 vector
+  worktree.json                      only in the default index folder of a linked git worktree:
+                                     {"worktree": its folder, "repository": the git folder its checkouts share};
+                                     the folder is deleted once that worktree is gone (decisions.md §6)
+$CODEMEM_HOME/cache/vector_cache.db  shared vector cache: (embedder key, text_hash) -> float16 vector (below)
 $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sha256], so it is read once
 ```
+
+**The vector cache file** is SQLite (WAL) with pages of 32 KB, `auto_vacuum = INCREMENTAL` and
+`user_version` 1. A file whose `user_version` differs is not read or written.
+
+| Table | Columns | Holds |
+|---|---|---|
+| `embedder` | `id`, `key` (unique), `dim` | one row per embedder key (§5.4), with the length of its vectors. A vector of another length is not stored under that key |
+| `entry` (no rowid) | `embedder`, `hash`, `slot`, `used`; primary key (`embedder`, `hash`); index `entry_used` on `used` | one row per cached vector: where it is, and when it was last used (Unix seconds) |
+| `vec_<embedder id>` | `slot` (the rowid), `hash`, `data` | the vectors of one embedder, each as `dim` float16 numbers, in slots 1..n without gaps |
+
+- **`hash`** is the text hash (§5.3) as bytes: its 20 hex characters become 10 bytes. A key that
+  is not lowercase hex in pairs is stored as the text it is.
+- **Slots stay 1..n.** When entries are deleted, the rows in the last slots are written into the
+  freed ones, and `entry.slot` follows in the same transaction. A slot number is therefore only
+  good inside one statement: readers go from key to vector in a single query.
+- **`used`** is set when the entry is put, and again when it is found or marked, at most once per
+  day (UTC).
+- A file `$CODEMEM_HOME/cache/vectors.db` with one table `cache(embedder, text_hash, dim, data)`
+  is imported when the cache is opened, and then deleted, unless rows were added to it during
+  the import.
 
 `meta` keys:
 - `schema_version` (3);
@@ -416,6 +450,15 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 - `dirty_seq`: the queue's sequence number, one per stage-A commit;
 - per vector type: `vec.<type>.embedder`, `vec.<type>.full_dim`, `vec.<type>.dim_setting`,
   `vec.<type>.epoch`.
+
+**An index that starts as a copy** of another checkout's (architecture.md §4.6) is that
+`index.db` as one SQLite backup, with every `files.mtime` set to 0 and without the `meta` rows
+`indexed_at`, `last_scan_at`, `last_update`, `coverage` and `repo_path`. `vec_*` files that an
+index deleted by hand left in the folder are removed first: a saved search index is matched to
+the vector rows by id, and the copy has another index's ids. An index without
+`indexed_at` has not been compared with its checkout's files yet: `codemem search` asks for
+`codemem index` first, and the MCP server answers from it with its note that the index is still
+being built.
 
 The eval harness writes its own marker files into the index folder. codemem never deletes files
 it doesn't own.
@@ -518,6 +561,7 @@ What stays the same when code changes, and what is recomputed:
 | `vector_backend` | config | another search index | in `index_settings()` only when it is not `auto`: an index built before there was a choice keeps its settings, and the eval keeps systems that name a backend apart; nothing is re-embedded |
 | `[compact]` (`bits`, `dim`, `rescore`) | config | other codes, or another number of candidates | in `index_settings()` as `compact`: only the options that differ from their defaults, and only when the backend is `auto` or `compact`; nothing is re-embedded |
 | `vector_memory_mb` | config | another budget for `auto` | search-time: not in `index_settings()`; the search index is picked again, and rebuilt if the pick changes |
+| the vector cache's `user_version` (1) | `vectorcache.py` | the cache file's tables or page size change | a cache file with another number is left untouched and counts as unavailable: vectors come from the model |
 
 `Config.index_settings()` lists every index-time setting. The eval adapter hashes it, with the
 codemem version and the device, into its `index_key`, so two systems share an index only when
@@ -558,7 +602,7 @@ The tool names stay stable, so other front-ends can be compared.
 |---|---|---|
 | `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding |
 | `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)` |
-| `index_status` | none | state and progress, counts, models, local or remote embeddings, the search index in use (exact or compact, why, and about how much memory each vector type takes), the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
+| `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the search index in use (exact or compact, why, and about how much memory each vector type takes), the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
 
 **A card:**
@@ -573,9 +617,9 @@ The tool names stay stable, so other front-ends can be compared.
 the signature (not for blocks), the first doc line, and up to 6 preview lines.
 
 **The freshness note.** `search_code` catches up first (architecture.md §4): the background writer
-applies every save the watcher has seen, then the search embeds the queue, newest edits first, all
-within `catchup_budget_ms` (4 s). If something is still missing, the results end with one line
-naming it, for example:
+applies every save the watcher has seen, then the search embeds the queue, its own keyword results
+first and then the newest edits, all within `catchup_budget_ms` (4 s). If something is still
+missing, the results end with one line naming it, for example:
 
 ```
 Note: 3 code chunks in 1 file (auth/sessions.py) are still being embedded: keyword matches for them
@@ -586,9 +630,18 @@ those files.
 The parts it can hold: files saved moments ago that are still being indexed; chunks still being
 embedded (with the files they are in); or that codemem could not confirm it has seen the latest
 saves. `get_chunk` waits for the structure only, so its code, lines and links are current. While
-the embedding model or a search index is still loading (at startup), a search waits within the
-same budget, then answers from keywords alone with a note; the CLI and the eval always wait for
-both.
+the embedding model is loading (when the server starts, or again after it was freed for being
+idle, §12.3) or a search index is still loading, a search waits within the same budget, then
+answers from keywords alone with a note; after a model load that failed it answers that way at
+once. The CLI and the eval always wait for both.
+
+**Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
+model of every enabled vector type is in the memory of the process that answers, false when one is
+not, null when embeddings come from an API. `codemem status --json` prints it, and `index_status`
+ends with one JSON line that holds it beside `state`, `progress`, `chunks`, `vectors` and `stale`.
+As text it is the line `embedding model: in memory`, or `embedding model: not in this process's
+memory (it loads when a search or an update next needs it)`. A `codemem status` command is a
+process of its own: its line tells nothing about the model of a running MCP server.
 
 **stdout carries only MCP messages;** logs go to stderr.
 
@@ -620,6 +673,7 @@ A change to any of these must be made together with the eval:
   counts its tokens.
 - `config_from_dict(dict)`, `Config.enabled_vec_types()`, `Config.model_id()`,
   `Config.index_settings()`, `embedder.resolve_device()`, `codemem.__version__`.
+  `resolve_device()` answers `cpu` in an environment without PyTorch, whatever it is asked.
 - `CODEMEM_MODEL`-style fake models: `fake` and `fake:16` work, and `fake:not-a-number` fails
   indexing.
 - `full=True` wipes in place and never deletes the folder, because the eval keeps its marker files
@@ -663,14 +717,61 @@ A change to any of these must be made together with the eval:
 
   Those that differ from their defaults are in `index_settings()` as `compact`, for the same
   reason as `vector_backend`.
-- **The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`,
+- **`vector_cache`:** `global` or `off`. **`vector_cache_max_gb`:** the cache file's size cap in
+  GB (10⁹ bytes), a number of 0 or more; 0 means no cap; the default is 8. Neither is index-time:
+  the cache changes where a vector comes from, never what an index stores.
+- **`model_idle_minutes`:** a number, 0 or more; 0, the default, keeps the local embedding model
+  in memory. Otherwise the model is freed after that many minutes in which nothing was embedded,
+  and the next search or save loads it again. It changes no index. A new value in `.codemem.toml`
+  applies from the next full check. `codemem serve-embeddings` reads it when it starts, for the
+  model it serves (§12.5).
+- **The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`, `space`,
   `api_key_env`, `dimensions`, `query_prefix`, `document_prefix`, `batch_size`, `max_concurrency`
   and `timeout_s`.
   - Index-time (in `index_settings()` as `embedding`, only for an API provider, so local indexes
-    keep their settings): provider, model, base URL, dimensions, document prefix.
+    keep their settings): provider, model, dimensions, document prefix, and who serves the vectors.
+    That is `space` when it is set, and then `base_url` is not among the settings; otherwise it is
+    `base_url`, and there is no `space` entry.
+  - `space` is a name of 1 to 64 characters with no whitespace and no `|`. It stands for the
+    address in the embedder key (§5.4) and in `index_settings()`. Whoever sets it states that
+    every address used under the name returns the same vector for the same text.
   - Search-time or operational: the key's variable name, the query prefix, `batch_size`,
     `max_concurrency`, `timeout_s`.
   - The key itself is read from the named environment variable at each request and is never stored.
+  - A reply is brought to the configured form before it is stored: with `dimensions`, vectors
+    longer than that are cut to their first numbers, and fewer numbers is an error; every vector is
+    normalized to length 1.
+- **The `[embedding.assist]` section** names an endpoint that embeds part of a build's document
+  texts beside the local model (architecture.md §3.5). It needs `provider = "local"`.
+  - `base_url`: the endpoint's OpenAI-style address. Empty means no assist, which also switches
+    off one that a config file read earlier set.
+  - `model`: the endpoint's name for the model. Required with `base_url`.
+  - `api_key_env`: the environment variable that holds the key; empty for none.
+  - `document_prefix`: put before each text. Left out, it is what the local model puts before a
+    document (its `prefixes`). `""` is for a provider that adds the model's prompt on its side.
+  - `request`: a table of more fields for the request body, the provider's own. `model` and
+    `input` cannot be among them.
+  - `batch_size` (32), `max_concurrency` (4), `timeout_s` (30): texts per request, requests in
+    flight, seconds per request.
+  - A reply's vectors are scaled to length 1 before they are compared or stored. A reply with a
+    vector that cannot be scaled, or with another number of numbers than the local model's,
+    ends the endpoint's part.
+  - The endpoint is sent only texts the local model reads whole (`Embedder.cut`, §12.4).
+  - `codemem status [PATH] --check-assist [--json]` compares the endpoint with each local model
+    now, without a build, and prints one report per model. It loads a local model unless that
+    model's vectors for the probe texts are remembered (decisions.md §6), and sends the probe
+    texts only. Exit status 0: the endpoint can share a build's work; 1: it cannot; 2: no assist
+    is set. With `--json` the output is a list of objects:
+    - `host`, `model`: the endpoint; `local_model`: the model it was compared with;
+    - `state`: `sharing`, `refused`, or `resting` when the endpoint could not be reached;
+    - `reason`: one sentence, null when it can share;
+    - `agreement`: the smallest cosine, null when nothing could be compared; `needed`: 0.99995;
+    - `local_vectors`: `"embedded now"` or `"remembered"`;
+    - `probes`: for each probe text `probe` (what it is), `characters`, `cosine`, `local_length`
+      and `endpoint_length`, the length of the endpoint's vector as it came.
+  - None of it is index-time: it is not in `index_settings()`, and the vectors carry the local
+    embedder's key (§5.4).
+  - An unknown key is refused.
 - Every setting and its default: README, "Configuration".
 
 ### 12.4 Plugin classes
@@ -682,8 +783,24 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
 - gives `dim` (a property), `embed_documents(texts)` and `embed_queries(texts)`, each returning a
   float32 array of shape `(len(texts), dim)`; `ready` (a property, default true) may say a model is
   still loading;
+- may define `unload(idle_seconds=0.0)`, which frees its model and returns true; the next call
+  then loads the model again, and `ready` says false meanwhile. The default does nothing. codemem
+  calls it only while no call of the embedder is running and none has ended within
+  `model_idle_minutes`, so the class needs no clock or lock for it and can ignore the argument;
+- may define `trim(idle_seconds=0.0)`, which gives back what its calls needed besides the model
+  (on a GPU, the allocator's cache), keeps the model, and returns true. The default does nothing.
+  codemem calls it under the same guard, once after each burst of calls, 5 s after the last one;
 - codemem wraps it: it normalizes the vectors, and names them by the plugin key (§5.4). A
   `fake:<dim>` model still wins over a plugin, so tests stay fast.
+- to be served by `codemem serve-embeddings` (§12.5) it also gives `embed_texts(texts)`, which
+  embeds each text exactly as given, and `prefixes` (a property), the pair of strings it puts
+  before a query and before a document. They must agree: `embed_texts([prefix + text])` equals
+  `embed_queries([text])` and `embed_documents([text])`. The server checks this at start.
+- with an assist endpoint (§12.3) its `prefixes` say what goes before the endpoint's texts, unless
+  `document_prefix` is set, and `cut(texts)` says, with one true or false per document text,
+  which texts it reads only in part: those are never sent to the endpoint. A class that reads
+  every text whole returns false for each. A plugin that does not define `cut`, or gives no
+  prefix by either way, gets no help from the endpoint, and `status` says so.
 
 **A search index** (`vector_backend`):
 - subclasses `codemem.store.VectorStore`, is built as `Class(dim: int)`, and keeps `dim`;
@@ -711,4 +828,62 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
 **Embedder factories.** `Indexer`, `search()` and `CodememService` take an `embedder_factory`
 called as `factory(spec: VectorConfig, config: Config) -> Embedder`, once per vector type (and
 once per distinct model for queries). `make_embedder` is the default, and also accepts a bare model
-name.
+name. `CodememService` also calls `touch()`, `unload(idle_seconds)` and `trim(idle_seconds)` on what
+its factory returns; `Embedder` gives each a default that does nothing.
+
+### 12.5 The embedding server (`codemem serve-embeddings`)
+
+`codemem serve-embeddings [PATH] [--host 127.0.0.1] [--port 8791]` serves one embedder over HTTP:
+the config's local model (`[vectors.*] model` with `device`, `dtype`, `max_seq_length` and
+`batch_size`; a `fake:<dim>` model; a plugin embedder that can be served, §12.4), whatever
+`[embedding] provider` says. Every enabled vector type must name the same model. `PATH` is the
+repository whose `.codemem.toml` is read, by default the one of the current directory.
+
+**At start** it prints to stdout, as TOML under comment lines, the `[embedding]` section of a
+client: `provider = "openai"`, `base_url`, `model`, `space`, `query_prefix`, `document_prefix`,
+and `api_key_env = "CODEMEM_SERVE_KEY"` when a key is set. After an empty line come comment lines
+only: when to use which section, and the `[embedding.assist]` section of a codemem that runs the
+same model itself (§12.3), with `base_url`, `model` and, when a key is set, `api_key_env`, each
+line behind `# `. So all of stdout parses as TOML and holds the `[embedding]` section alone.
+Everything else goes to stderr. Exit code 2 means the port is taken or the model cannot be
+served.
+
+**Routes.** Bodies are JSON in OpenAI's shapes.
+
+| Route | Request | Reply |
+|---|---|---|
+| `POST /v1/embeddings` | `model`: the served model's name. `input`: a string, or a list of 1 to 2,048 strings. `dimensions` (optional): a whole number from 1 to the model's length. `encoding_format` (optional): `float` or `base64` | `{"object": "list", "data": [{"object": "embedding", "index": i, "embedding": …}], "model": …, "usage": {"prompt_tokens": 0, "total_tokens": 0}}`, one entry per text, in order |
+| `GET /v1/models` | none | `{"object": "list", "data": [{"id": <model>, "object": "model", "created": …, "owned_by": "codemem", "codemem": {"space", "dimensions", "query_prefix", "document_prefix"}}]}`: the served model, and under `codemem` what a client sets beside it |
+| `GET /health` | none; no key needed | `{"status": "ok"}` once the server has loaded the model and takes requests |
+
+- **Each text is embedded exactly as given.** The server puts nothing before it. A client makes a
+  query or a document by sending the model's prefix and the text as one string, which is what
+  `query_prefix` and `document_prefix` do.
+- **`embedding`** is a list of numbers that carries each float32 exactly, or with `base64` the
+  little-endian float32 bytes in base64. Vectors have length 1. With `dimensions`, a vector is
+  cut to its first numbers and normalized again.
+- **`usage`** is always zero: the server does not count tokens.
+- **The key.** When `CODEMEM_SERVE_KEY` is set in the server's environment, every request but
+  `GET /health` needs the header `Authorization: Bearer <key>`.
+- **The model's memory.** After 5 s without a request the server gives back what its model calls
+  needed besides the model. With `model_idle_minutes` set in its config it also frees the model
+  after that many minutes without a request; the next request loads it again and is answered
+  when it is loaded. Without the setting the model stays in memory for as long as the server runs.
+
+**Errors** are `{"error": {"message", "type", "param": null, "code"}}`, with `type`
+`invalid_request_error` below 500 and `server_error` from 500.
+
+| Status | When |
+|---|---|
+| 400 | the body is not a JSON object; `input` is missing, empty or not text; `dimensions` or `encoding_format` has a value the server does not take |
+| 401 | the key is missing or wrong (`code`: `invalid_api_key`) |
+| 404 | an unknown route; or `model` is not the served model (`code`: `model_not_found`) |
+| 405 | a route's other method; `Allow` names the right one |
+| 411 | no `Content-Length` |
+| 413 | a body over 16 MB, or more than 2,048 texts. The body is not read and the connection is closed |
+| 500 | the model failed on a batch; the message carries the model's error. Every request with a text in that batch fails, and the server goes on |
+| 503 | the server is stopping |
+
+A codemem client retries 429, 500 and above, and dropped connections; it fails at once on the
+others, with the server's message.
+

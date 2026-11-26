@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import tomllib
@@ -44,7 +45,14 @@ DEFAULT_IGNORE = (
     "*.pb.h",
 )
 BM25_FIELDS = ("name", "path", "signature", "doc", "body")
+_SPACE = re.compile(r"[^\s|]{1,64}")  # `|` separates the parts of an embedder key
 DEVICES = ("auto", "cpu", "xpu", "cuda", "mps")
+# Where `codemem serve-embeddings` listens, and the environment variable that holds its shared key.
+# Here, not in embedserver.py: the command line reads them for its help, and must not import the
+# search stack to do so.
+SERVE_HOST = "127.0.0.1"
+SERVE_PORT = 8791
+SERVE_KEY_ENV = "CODEMEM_SERVE_KEY"
 DTYPES = ("auto", "float32", "float16", "bfloat16")
 # Search-time score multipliers, neutral by default (docs/architecture.md §6). Halving tests,
 # classes and blocks scores better on the eval only because its answers are never tests and rarely
@@ -66,16 +74,44 @@ class VectorConfig:
 
 
 @dataclass
+class AssistConfig:
+    """A second source of document vectors beside the local model (`[embedding.assist]`,
+    docs/architecture.md §3.5): an OpenAI-compatible endpoint that serves the same model. During a
+    build it embeds part of the texts while the local model embeds the rest, once a check has shown
+    that the two give the same vectors. The vectors are stored under the local model's key, so
+    none of this is an index-time setting. It sends code to the endpoint. No `base_url`: no assist."""
+
+    base_url: str = ""  # e.g. http://gpu-box:8791/v1 (a `codemem serve-embeddings` server), or a hosted API
+    model: str = ""  # the endpoint's name for the model
+    api_key_env: str = ""  # environment variable holding the key; empty = no key
+    # Put before each document text. None = what the local model puts there itself; "" for a provider
+    # that adds the model's prompt on its side (asked for through `request`).
+    document_prefix: str | None = None
+    batch_size: int = 32  # texts per request
+    max_concurrency: int = 4  # requests in flight
+    timeout_s: float = 30.0  # per request
+    request: dict[str, Any] = field(default_factory=dict)  # more fields for the request body, the provider's own
+
+    @property
+    def active(self) -> bool:
+        return bool(self.base_url)
+
+
+@dataclass
 class EmbeddingConfig:
     """Where embeddings come from (docs/decisions.md §2). `local` runs the model on this machine:
     the default, private, offline and free. `openai` calls any OpenAI-compatible `/embeddings` API
     (Nebius, OpenAI, Together, a self-hosted vLLM or TEI server, Ollama), with `model` for every
     vector type, for documents and queries alike. The API key is read from the environment
-    variable `api_key_env` names, never from a file; remote embedding sends code to the provider."""
+    variable `api_key_env` names, never from a file; remote embedding sends code to the provider.
+    `assist` lets such an endpoint share the local model's work in a build."""
 
     provider: str = "local"  # local | openai
     model: str = ""  # the API's model name (required for openai)
     base_url: str = ""  # e.g. https://api.studio.nebius.com/v1 (required for openai)
+    # A name for the vectors the endpoint serves. It stands for the address in the embedder key and
+    # in index_settings(), so an index is reused through any address that carries the same name.
+    space: str = ""
     api_key_env: str = ""  # environment variable holding the key; empty = no key (a local server)
     dimensions: int | None = None  # shorter vectors, for models trained for it (Qwen3-Embedding)
     query_prefix: str = ""  # an instruction before each query (instruction-tuned models want one)
@@ -83,15 +119,18 @@ class EmbeddingConfig:
     batch_size: int = 64  # texts per request
     max_concurrency: int = 4  # requests in flight
     timeout_s: float = 60.0  # per request
+    assist: AssistConfig = field(default_factory=AssistConfig)  # `[embedding.assist]`
 
     @property
     def remote(self) -> bool:
         return self.provider != "local"
 
     def index_settings(self) -> dict[str, Any]:
-        """What changes the stored vectors: not the key's variable, the query prefix or request sizes."""
+        """What changes the stored vectors: not the key's variable, the query prefix or request sizes.
+        Who serves them is the `space` when one is set, else the address."""
+        served_by = {"space": self.space} if self.space else {"base_url": self.base_url}
         return {
-            "provider": self.provider, "model": self.model, "base_url": self.base_url,
+            "provider": self.provider, "model": self.model, **served_by,
             "dimensions": self.dimensions, "document_prefix": self.document_prefix,
         }
 
@@ -148,6 +187,8 @@ class Config:
     window_overlap_lines: int = 3
     max_block_lines: int = 200
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
+    # The cache file's size cap, in GB (10^9 bytes); past it the least recently used vectors go. 0 = no cap.
+    vector_cache_max_gb: float = 8.0
     # The in-memory search index: auto (the exact one while it fits `vector_memory_mb`, the
     # compact one when it does not) | faiss (exact: every vector in memory) | compact (small
     # codes of each vector, exact scores from the stored vectors) | "module:Class" subclassing
@@ -169,6 +210,9 @@ class Config:
     debounce_ms: int = 500  # start an update once saves stop for this long ...
     debounce_max_wait_ms: int = 2000  # ... or at the latest this long after the first save
     catchup_budget_ms: int = 4000  # a search first applies and embeds pending edits for at most this long
+    # The local embedding model leaves memory after this many minutes without embedding, and the
+    # next search or edit loads it again; 0 keeps it in memory (docs/decisions.md §3)
+    model_idle_minutes: float = 0.0
 
     def enabled_vec_types(self) -> list[str]:
         return [name for name, v in self.vectors.items() if v.enabled]
@@ -424,9 +468,9 @@ def _env_overrides() -> dict[str, Any]:
 _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
-    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_backend", "vector_memory_mb", "kinds",
-    "test_weight",
-    "kind_weights", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms",
+    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb", "vector_backend",
+    "vector_memory_mb", "kinds", "test_weight", "kind_weights", "debounce_ms", "debounce_max_wait_ms",
+    "catchup_budget_ms", "model_idle_minutes",
 )
 
 
@@ -473,6 +517,11 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
+    if not isinstance(cfg.model_idle_minutes, (int, float)) or cfg.model_idle_minutes < 0:
+        raise ValueError(f"model_idle_minutes must be a number, 0 or more, got {cfg.model_idle_minutes!r}")
+    cap = cfg.vector_cache_max_gb
+    if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not 0 <= cap < float("inf"):
+        raise ValueError(f"vector_cache_max_gb must be a size in GB, or 0 for no cap, got {cap!r}")
     if cfg.vector_backend not in {"auto", "faiss", "compact"} and ":" not in cfg.vector_backend:
         raise ValueError(f"vector_backend must be auto, faiss, compact or 'module:Class', got {cfg.vector_backend!r}")
     if type(cfg.vector_memory_mb) is not int or cfg.vector_memory_mb < 0:
@@ -496,14 +545,23 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"vector types {unknown} have no text builder; choose from {sorted(TEXT_BUILDERS)}")
     cfg.bm25_weights5()  # validates the length
     emb = dict(raw.get("embedding") or {})
-    known = {f.name for f in fields(EmbeddingConfig)}
+    assist = emb.pop("assist", None) or {}
+    known = {f.name for f in fields(EmbeddingConfig)} - {"assist"}
     if unknown := sorted(set(emb) - known):
         raise ValueError(f"unknown [embedding] settings {unknown}; choose from {sorted(known)}")
-    cfg.embedding = EmbeddingConfig(**emb)
+    cfg.embedding = EmbeddingConfig(**emb, assist=_assist_from_dict(assist))
+    if cfg.embedding.assist.active and cfg.embedding.remote:
+        raise ValueError(
+            "[embedding.assist] shares the work of the local model: it needs [embedding] provider = \"local\""
+        )
     if cfg.embedding.provider not in {"local", "openai"}:
         raise ValueError(f"[embedding] provider must be local|openai, got {cfg.embedding.provider!r}")
     if cfg.embedding.remote and not (cfg.embedding.model and cfg.embedding.base_url):
         raise ValueError("[embedding] provider = openai needs model and base_url")
+    if cfg.embedding.space and not _SPACE.fullmatch(cfg.embedding.space):
+        raise ValueError(
+            f"[embedding] space must be 1 to 64 characters with no spaces and no '|', got {cfg.embedding.space!r}"
+        )
     if cfg.languages is not None:
         from .languages import supported_languages
 
@@ -517,6 +575,24 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         if unknown:
             raise ValueError(f"unknown kinds {unknown}; choose from {list(KINDS)}")
     return cfg
+
+
+def _assist_from_dict(raw: dict[str, Any]) -> AssistConfig:
+    known = {f.name for f in fields(AssistConfig)}
+    if not isinstance(raw, dict) or (unknown := sorted(set(raw) - known)):
+        raise ValueError(f"unknown [embedding.assist] settings {sorted(set(raw) - known)}; choose from {sorted(known)}")
+    assist = AssistConfig(**raw)
+    if not assist.active:
+        return assist
+    if not assist.model:
+        raise ValueError("[embedding.assist] needs model, the endpoint's name for the local model")
+    if assist.batch_size < 1 or assist.max_concurrency < 1 or assist.timeout_s <= 0:
+        raise ValueError("[embedding.assist] batch_size and max_concurrency must be 1 or more, and timeout_s above 0")
+    if not isinstance(assist.request, dict) or {"model", "input"} & set(assist.request):
+        raise ValueError(
+            "[embedding.assist] request is a table of more request fields; model and input are not among them"
+        )
+    return assist
 
 
 def load_config(repo_root: Path | None = None) -> Config:

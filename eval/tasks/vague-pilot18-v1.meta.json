@@ -1,0 +1,26 @@
+{
+  "name": "vague-pilot18-v1",
+  "created": "2026-11-25",
+  "tasks": 18,
+  "rows": 36,
+  "levels": [
+    "L1",
+    "L2"
+  ],
+  "task_files": [
+    "fresh-v1.jsonl",
+    "fresh-ts-v1.jsonl"
+  ],
+  "task_choice": "the 18 valid tasks of the admission samples of pandas and playwright",
+  "rules": "vague-rules-v1.md",
+  "rules_sha256": "8f6879a798a4a43022d823d15a6a521271794400315e5e7c1bd5ee2e3d4e1513",
+  "writer": "claude-opus-5-5, three sessions of six tasks; each read the issue, the real change and the hidden tests",
+  "with_done_when": 13,
+  "checks": {
+    "leak": "no identifier with an underscore or mixed case from the old lines of the real change, and no gold file or function name, is in a text outside its Done when line (automatic, 2026-11-25)",
+    "solvable": "not done (plan section 9, check 2)",
+    "human": "not done (plan section 9, check 3)"
+  },
+  "sha256": "25faef7d50ec191e6400bcdd4e6aa0488ee28922bd5bf647183d9597e35e94be",
+  "superseded_by": "vague-pilot18-v2 (2026-11-25): the Done when lines of version 1 state what the hidden tests check, so completion at L1 and L2 with this file is not comparable with L0"
+}

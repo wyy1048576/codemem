@@ -1,6 +1,10 @@
 import subprocess
 import sys
 
+import pytest
+
+pytest.importorskip("torch")  # an environment built without it has one OpenMP, and nothing to clash
+
 # Runs in a child process: an OpenMP clash aborts the whole interpreter.
 SCRIPT = """
 import codemem.store

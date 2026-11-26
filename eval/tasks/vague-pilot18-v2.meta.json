@@ -1,0 +1,97 @@
+{
+  "name": "vague-pilot18-v2",
+  "created": "2026-11-25",
+  "tasks": 10,
+  "rows": 20,
+  "levels": [
+    "L1",
+    "L2"
+  ],
+  "task_files": [
+    "fresh-v1.jsonl",
+    "fresh-ts-v1.jsonl"
+  ],
+  "task_choice": "the tasks of vague-pilot18-v1 that pass the screen of vague-rules-v2.md: 10 of 18",
+  "rules": "vague-rules-v2.md",
+  "rules_sha256": "e0190687a7f246317eddfa4da2a6e45130b2e66b016a7b4bf1cd50578be008d2",
+  "writer": "the texts of vague-pilot18-v1 without their Done when line; one task (playwright 42672) has a new narrow line",
+  "with_done_when": [
+    "microsoft__playwright-42672"
+  ],
+  "screen": {
+    "by": "claude-opus-5-5, one session; it read the issue, the real change and the hidden tests of each task; no test was run",
+    "kept": [
+      "microsoft__playwright-41850",
+      "microsoft__playwright-42503",
+      "microsoft__playwright-42672",
+      "microsoft__playwright-42919",
+      "microsoft__playwright-43146",
+      "microsoft__playwright-43148",
+      "pandas-dev__pandas-68090",
+      "pandas-dev__pandas-68195",
+      "pandas-dev__pandas-68945",
+      "pandas-dev__pandas-70742"
+    ],
+    "removed": {
+      "microsoft__playwright-42164": "The issue asks for a groups list on the test run, but the tests read t.annotations in preprocess and expect counts plain:0, serial:1, configure:1, nested:2 of type 'serial'. The changed test-modifiers test also expects each serial annotation to carry the suite location and to come BEFORE the inherited slow/fixme/skip annotations (toEqual on the full list). The annotation form, one per enclosing suite, its location and its order are several facts beyond one short naming line.",
+      "microsoft__playwright-43000": "The issue asks only that the main frame stays correct and offers a fix that skips nested frames. The CDP test needs the whole tree: dumpFrames equal to four nested URLs, evaluate in each frame returning its own URL, page.frames().length 4, and a three-level frameLocator reaching 'D'. A second test checks frame identity, exactly one framenavigated event and two frames after a local frame navigates cross-site, a case the issue never mentions.",
+      "pandas-dev__pandas-66225": "The issue's case (literal label 'nan' lost) already works at base: string indexes are read with nan_rep=None. All four tests check the other direction: a real NaN in a str Index must come back as missing, in fixed and table format, next to a literal 'nan', and for an all-NaN index (check_index_type=False). That is an unstated behaviour, not a new name, so no narrow line can carry it.",
+      "pandas-dev__pandas-66227": "The issue is about Series ops (x*2 should raise) and asks for OverflowError. The tests check DataFrame.sum over axis 0 and 1, skipna True and False, raising pd.errors.OutOfBoundsTimedelta (a ValueError subclass) with 'overflow in timedelta operation', plus all-NaT sums with skipna=False returning NaT for Series and DataFrame. Several unstated cases and an error class that contradicts the issue.",
+      "pandas-dev__pandas-67291": "The issue only says length-zero arithmetic is not tested. Besides the shared length-zero check, the tests need fixes in three unrelated array types: PeriodArray/Index/Series subtraction giving empty object dtype, string add and repeat keeping dtype incl. mixed storages, and pyarrow string plus an empty object ndarray. No single general fix covers these, and the text names none of them.",
+      "pandas-dev__pandas-67471": "Many test files use a new marker td.skip_if_not_english_lc_time (AttributeError without it), and test_clipboard adds a test that the Qt clipboard setup restores the process locale. The issue mentions neither the clipboard cause nor the marker; a new name plus an unstated behaviour is more than one narrow line.",
+      "pandas-dev__pandas-68587": "The tests cover both engines times three dtype_backends, nullable types (TypeError 'cannot safely cast non-equivalent int64 to uint8') and plain NumPy types (ValueError 'cannot safely convert passed user dtype of uint8'), float sources (300.0, 257.0) and a uint64-only value read as uint8 or int64, plus IntegerArray construction from a wider masked array and setitem ignoring values behind the mask. The issue shows one nullable case without a message.",
+      "pandas-dev__pandas-70713": "The test asserts that 8193 equally styled cells give rules with exactly [8192, 1] selectors, for cells and both header axes. The issue does not find the cause; the 8192 limit and the split format are internal values, not a new name, so no narrow line can carry them."
+    },
+    "fair_at_L0": {
+      "microsoft__playwright-41850": true,
+      "microsoft__playwright-42164": false,
+      "microsoft__playwright-42503": true,
+      "microsoft__playwright-42672": false,
+      "microsoft__playwright-42919": true,
+      "microsoft__playwright-43000": false,
+      "microsoft__playwright-43146": true,
+      "microsoft__playwright-43148": true,
+      "pandas-dev__pandas-66225": false,
+      "pandas-dev__pandas-66227": false,
+      "pandas-dev__pandas-67291": false,
+      "pandas-dev__pandas-67471": false,
+      "pandas-dev__pandas-68090": true,
+      "pandas-dev__pandas-68195": true,
+      "pandas-dev__pandas-68587": false,
+      "pandas-dev__pandas-68945": true,
+      "pandas-dev__pandas-70713": false,
+      "pandas-dev__pandas-70742": true
+    },
+    "notes_on_kept": {
+      "microsoft__playwright-43148": "L2 does not say that browser contexts are affected; a fix in the shared filter covers them anyway, but a fix only in the API request path would fail the browser-context test.",
+      "pandas-dev__pandas-68090": "L2 mentions only fetching a group, not the label-to-positions mapping; a fix that patches get_group by another route would fail the indices test. L1 states that both mappings must agree.",
+      "pandas-dev__pandas-70742": "Neither body mentions the row-slice case; a fix special-cased to a scalar row would fail two of four parametrized cases."
+    },
+    "confidence": {
+      "microsoft__playwright-41850": "high",
+      "microsoft__playwright-42164": "high",
+      "microsoft__playwright-42503": "medium",
+      "microsoft__playwright-42672": "high",
+      "microsoft__playwright-42919": "high",
+      "microsoft__playwright-43000": "high",
+      "microsoft__playwright-43146": "high",
+      "microsoft__playwright-43148": "medium",
+      "pandas-dev__pandas-66225": "high",
+      "pandas-dev__pandas-66227": "high",
+      "pandas-dev__pandas-67291": "medium",
+      "pandas-dev__pandas-67471": "high",
+      "pandas-dev__pandas-68090": "medium",
+      "pandas-dev__pandas-68195": "medium",
+      "pandas-dev__pandas-68587": "high",
+      "pandas-dev__pandas-68945": "low",
+      "pandas-dev__pandas-70713": "high",
+      "pandas-dev__pandas-70742": "medium"
+    }
+  },
+  "checks": {
+    "leak": "as version 1; the new line of playwright 42672 names no existing identifier",
+    "solvable": "not done (plan section 9, check 2)",
+    "human": "not done (plan section 9, check 3)"
+  },
+  "sha256": "489b0ef7feb8351bdf544e1f5866a592670d070139dd2836ad2910a862edc10e"
+}

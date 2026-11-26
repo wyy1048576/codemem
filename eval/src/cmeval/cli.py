@@ -416,6 +416,191 @@ def cmd_e2e_grader_check(args) -> int:
     return 0 if passed == len(records) else 3
 
 
+def cmd_e2e_run(args) -> int:
+    from . import e2e_run
+    from . import generate as gen
+    from .status import JobStatus
+
+    try:
+        e2e_run.check_model(args.model)
+        setups = list(dict.fromkeys(args.setup or ["grep"]))
+        for name in setups:
+            e2e_run.get_setup(name)
+        recipe = gen.load_recipe(args.recipe)
+        tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        prompts = None
+        if args.prompt_level != e2e_run.PROMPT_LEVEL:
+            if not args.prompts:
+                raise gen.GenerateError(f"--prompt-level {args.prompt_level} needs --prompts FILE")
+            prompts = e2e_run.load_prompts(args.prompts, args.prompt_level)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e run: {exc}", file=sys.stderr)
+        return 1
+    if args.id:
+        wanted = set(args.id)
+        tasks = [t for t in tasks if t.id in wanted]
+    ready = [t for t in tasks if gen.tests_path(recipe, t).exists()]
+    if prompts is not None:
+        missing = [t.id for t in ready if t.id not in prompts.texts]
+        if missing:
+            print(f"note: {len(missing)} valid tasks have no {prompts.level} prompt in {prompts.source}; skipped",
+                  file=sys.stderr)
+        ready = [t for t in ready if t.id in prompts.texts]
+    if len(ready) < len(tasks):
+        print(f"note: {len(tasks) - len(ready)} tasks have no tests.json (not valid or not generated); skipped",
+              file=sys.stderr)
+    ready = ready[: args.limit] if args.limit else ready
+    if not ready:
+        print(f"e2e run: no task of {recipe.repo} in {args.tasks} has tests.json; run cmeval generate first",
+              file=sys.stderr)
+        return 1
+    order = e2e_run.plan_runs(ready, setups, args.reps)
+    if args.dry_run:
+        states = Counter()
+        for task, setup, rep in order:
+            state = e2e_run.run_state(e2e_run.run_dir(args.run_id, task.id, setup, rep))
+            states[state] += 1
+            index = f" index {e2e_run.index_state(recipe, task)}" if e2e_run.SETUPS[setup].codemem else ""
+            print(f"{task.id} {setup} {rep} {state}{index}")
+        print(f"{len(order)} runs: {states['done']} done, {states['redo']} to do again, {states['todo']} to do")
+        return 0
+    with JobStatus("e2e-run", args.run_id) as status:
+        progress = _printer(status)
+        progress(f"{recipe.repo}: {len(ready)} tasks x {len(setups)} setups x {args.reps} reps = {len(order)} runs, "
+                 f"model {args.model}")
+        try:
+            batch = e2e_run.run_batch(recipe, ready, run_id=args.run_id, setups=setups, model=args.model,
+                                      reps=args.reps, settings=e2e_run.RunSettings(), progress=progress,
+                                      status=status, prompts=prompts)
+        except (gen.GenerateError, OSError) as exc:
+            print(f"e2e run: {exc}", file=sys.stderr)
+            status.fail(str(exc))
+            return 1
+        if batch.message:
+            print(f"e2e run: {batch.message}", file=sys.stderr)
+            status.fail(batch.message)
+        status.result(runs=batch.done, already_done=batch.skipped, discarded=batch.discarded)
+    print(f"run {args.run_id}: {batch.done} runs done, {batch.skipped} already done, {batch.discarded} discarded; "
+          f"files in {e2e_run.e2e_dir() / 'runs' / args.run_id}")
+    return batch.exit_code
+
+
+def cmd_e2e_index(args) -> int:
+    from . import e2e_index
+    from . import generate as gen
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        if args.id:
+            wanted = set(args.id)
+            tasks = [t for t in tasks if t.id in wanted]
+        ready = [t for t in tasks if gen.tests_path(recipe, t).exists()]
+        if len(ready) < len(tasks):
+            say(f"note: {len(tasks) - len(ready)} tasks have no tests.json (not valid or not generated); skipped")
+        if not ready:
+            print(f"e2e index: no task of {recipe.repo} in {args.tasks} has tests.json; run cmeval generate first",
+                  file=sys.stderr)
+            return 1
+        failed = e2e_index.index_tasks(recipe, ready, force=args.force, progress=say)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e index: {exc}", file=sys.stderr)
+        return 1
+    print(f"{recipe.name}: {len(ready) - failed} of {len(ready)} indexes ready in "
+          f"{e2e_index.e2e_dir() / 'indexes' / recipe.name}")
+    return 1 if failed else 0
+
+
+def cmd_e2e_score(args) -> int:
+    from .e2e_score import format_score, score
+    from .e2e_screen import ScreenError, completion_set, load_facts
+
+    try:
+        screen = None
+        if args.screen:
+            if not args.tasks:
+                # Without the tasks no hash can be checked, and a stale read would count.
+                raise ScreenError("--screen needs --tasks FILE (every task file of the run), so that a read of a "
+                                  "changed or reopened task is not counted")
+            tasks = [t for path in args.tasks for t in load_tasks(path)]
+            screen = completion_set(args.screen, tasks, load_facts(args.facts))
+        elif args.tasks or args.facts:
+            raise ScreenError("--tasks and --facts are used only with --screen")
+        summary = score(args.run_id, screen)
+    except (FileNotFoundError, ScreenError, TaskError) as exc:
+        print(f"e2e score: {exc}", file=sys.stderr)
+        return 1
+    print(format_score(summary))
+    return 0
+
+
+def cmd_e2e_screen_pack(args) -> int:
+    from . import e2e_screen
+    from . import generate as gen
+
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = load_tasks(args.tasks)
+        facts = e2e_screen.load_facts(args.facts)
+        entry = e2e_screen.pack(recipe, tasks, args.out, task_file=args.tasks.name, ids=args.id,
+                                n_batches=args.batches, facts=facts)
+    except (gen.GenerateError, e2e_screen.ScreenError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e screen-pack: {exc}", file=sys.stderr)
+        return 1
+    reasons = Counter(s["reason"].split(":")[0] for s in entry["skipped"])
+    if entry["not_validated"]:
+        reasons["not validated"] = entry["not_validated"]
+    for reason, n in sorted(reasons.items()):
+        print(f"note: {n} tasks skipped: {reason}", file=sys.stderr)
+    print(f"{recipe.name}: {entry['packets']} packets in {args.out}; batches: {', '.join(entry['batches']) or '-'}")
+    return 0 if entry["packets"] else 1
+
+
+def cmd_e2e_screen_add(args) -> int:
+    from .e2e_screen import ScreenError, add_read
+
+    try:
+        rows = add_read(args.output, args.packets, args.screen, read=args.read, reader=args.reader,
+                        batch=args.batch, date=args.date, note=args.note, rules=args.rules)
+    except (ScreenError, FileNotFoundError) as exc:
+        print(f"e2e screen-add: {exc}", file=sys.stderr)
+        return 1
+    fair = sum(1 for r in rows if r["fair"])
+    print(f"{args.screen}: read {args.read} of {len(rows)} tasks added ({fair} fair, {len(rows) - fair} unfair)")
+    return 0
+
+
+def cmd_e2e_screen_table(args) -> int:
+    from .e2e_screen import ScreenError, format_table, load_facts, parse_need_level, screen_table
+
+    try:
+        tasks = [t for path in args.tasks for t in load_tasks(path)] if args.tasks else None
+        result = screen_table(args.screen, args.packets or [], tasks=tasks, facts=load_facts(args.facts),
+                              need_repo=args.need_repo, need_level=parse_need_level(args.need_level or ""),
+                              early_factor=args.early_factor, floor_repo=args.floor_repo)
+    except (ScreenError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e screen-table: {exc}", file=sys.stderr)
+        return 1
+    if not args.tasks and not args.packets:
+        print("Note: no --tasks and no --packets, so stale reads (of a changed or reopened task) cannot be seen in "
+              "this table; they count as if they were current.")
+    print(format_table(result, [p.name for p in args.screen]))
+    return 0
+
+
+def cmd_e2e_recount(args) -> int:
+    from .e2e_run import recount
+
+    try:
+        done = recount(args.run_id, args.tasks)
+    except (FileNotFoundError, TaskError) as exc:
+        print(f"e2e recount: {exc}", file=sys.stderr)
+        return 1
+    print(f"run {args.run_id}: {done} runs counted again")
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
@@ -582,6 +767,71 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jobs", type=int, default=1, help="tasks checked at the same time (default 1)")
     p.add_argument("--cpus", type=int, default=8, help="processors for one grading container (default 8)")
     p.set_defaults(func=cmd_e2e_grader_check)
+    p = e2e_sub.add_parser("run", help="run Claude Code on each valid task in its container, record it, and grade it")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--run-id", required=True, help="name of the run folder in CMEVAL_HOME/e2e/runs")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--setup", action="append", help="setup; can be given more than once (default grep)")
+    p.add_argument("--model", default="claude-haiku-5-5", help="a full model id (default claude-haiku-5-5)")
+    p.add_argument("--reps", type=int, default=1, help="repetitions of each task and setup (default 1)")
+    p.add_argument("--limit", type=int, help="at most this number of tasks")
+    p.add_argument("--prompt-level", choices=("L0", "L1", "L2"), default="L0",
+                   help="L0: the issue as written (default). L1, L2: the rewrites in --prompts. One level per run id")
+    p.add_argument("--prompts", type=Path, help="file of rewritten prompts, one JSON object per line: id, level, prompt")
+    p.add_argument("--dry-run", action="store_true", help="print the runs and how many exist already; run nothing")
+    p.set_defaults(func=cmd_e2e_run)
+    p = e2e_sub.add_parser("index", help="build the codemem index of each valid task, for runs of the setup tool")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--force", action="store_true", help="build again, also when index.json is up to date")
+    p.set_defaults(func=cmd_e2e_index)
+    p = e2e_sub.add_parser("score", help="tables of an end-to-end run: completion, tokens, time, by setup")
+    p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
+    p.add_argument("--screen", type=Path, action="append",
+                   help="screen file (tasks/screen/*.jsonl): completion counts only fair tasks; can be given more than once")
+    p.add_argument("--tasks", type=Path, action="append",
+                   help="needed with --screen: every task file of the run, to check that each read is of the task "
+                        "as it is now")
+    p.add_argument("--facts", type=Path, help="with --tasks: facts file (default tasks/screen/facts.jsonl)")
+    p.set_defaults(func=cmd_e2e_score)
+    p = e2e_sub.add_parser("screen-pack", help="write the reading material of the unfair-test screen for each valid task")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--out", type=Path, required=True, help="folder of the packets and of index.json")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--batches", type=int, default=1, help="split the packets into this number of batch files (default 1)")
+    p.add_argument("--facts", type=Path, help="facts of checks run for tasks (default tasks/screen/facts.jsonl)")
+    p.set_defaults(func=cmd_e2e_screen_pack)
+    p = e2e_sub.add_parser("screen-add", help="check a reader's verdicts against the packets and append them as one read")
+    p.add_argument("output", type=Path, help="the reader's output: a JSON list of verdicts, or JSON lines")
+    p.add_argument("--packets", type=Path, required=True, help="the folder of screen-pack (its index.json)")
+    p.add_argument("--screen", type=Path, required=True, help="the screen file to append to (tasks/screen/<name>.jsonl)")
+    p.add_argument("--read", type=int, required=True, help="the read number: 1 for the first read, 2 for the second")
+    p.add_argument("--reader", required=True, help="a label of the reader session, for example 'opus-5-5 session 3'")
+    p.add_argument("--batch", type=Path, help="the batch file the reader got (default: every packet of the index)")
+    p.add_argument("--date", help="the day of the read, YYYY-MM-DD (default today, UTC)")
+    p.add_argument("--note", help="a note stored with each row")
+    p.add_argument("--rules", help="the rules version of the read, when the reader had other rules than the packets")
+    p.set_defaults(func=cmd_e2e_screen_add)
+    p = e2e_sub.add_parser("screen-table", help="merge the reads of the screen: kept and removed per repo and difficulty")
+    p.add_argument("--screen", type=Path, action="append", required=True, help="screen file; can be given more than once")
+    p.add_argument("--packets", type=Path, action="append",
+                   help="folder of screen-pack: its valid tasks, their hashes and the candidates left; can be repeated")
+    p.add_argument("--need-repo", type=int, default=20, help="kept tasks needed per repo (default 20, plan 3.3)")
+    p.add_argument("--need-level", help="kept tasks needed per level, for example easy=6,medium=8,hard=6 (the default)")
+    p.add_argument("--early-factor", type=float, default=1.25,
+                   help="early warning below this factor times the need (default 1.25)")
+    p.add_argument("--floor-repo", type=int, default=12, help="the plan's floor of kept tasks per repo (default 12)")
+    p.add_argument("--tasks", type=Path, action="append",
+                   help="without --packets: task file, to check that each read is of the task and facts as they are now")
+    p.add_argument("--facts", type=Path, help="with --tasks: facts file (default tasks/screen/facts.jsonl)")
+    p.set_defaults(func=cmd_e2e_screen_table)
+    p = e2e_sub.add_parser("recount", help="count the steps of each run again from its stream, with today's rules")
+    p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
+    p.add_argument("--tasks", type=Path, help="the task file, for records that do not hold their gold files")
+    p.set_defaults(func=cmd_e2e_recount)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
