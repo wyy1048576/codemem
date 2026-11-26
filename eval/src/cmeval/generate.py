@@ -24,10 +24,12 @@ A recipe is one TOML file for each repo, in eval/envs/. Its fields:
                 test_files and test. It replaces the two fields above
   parser        how results are read. Only "junit" exists
   timeout_min   the limit for one suite in one test run
-  test_paths    globs: files that are tests in this repo, in addition to the collector's rule
-                (patches.classify_path). Only `cmeval resplit` reads it (see resplit.py)
-  fix_paths     globs: files that are not code but that the fix needs to build (CMakeLists.txt,
-                for example). Only `cmeval resplit` reads it
+  test_paths    globs: files that are tests in this repo (test code, test data, snapshots), in
+                addition to the collector's rule. Default: made from the folders of test_files
+  leave_out     globs: files of a fix that go to neither patch (CI files, change logs)
+  dependency_paths  globs: files that name the repo's dependencies. A fix that changes one is
+                tagged, because the image has the dependencies of the base commit
+                The last three fields are read by `cmeval resplit` only (see resplit.py)
 
 A task is valid when at least one test does not pass in any run before the fix (it fails, it is
 skipped, or it is missing) and passes in every run after it, no test that passed before the fix
@@ -61,7 +63,7 @@ from pathlib import Path
 from typing import Callable, NamedTuple
 
 from . import repos
-from .patches import diff_sections, file_paths
+from .patches import classify_path, diff_sections, file_paths
 from .paths import cmeval_home
 from .tasks import Task
 
@@ -114,7 +116,8 @@ class Recipe:
     # Read by `cmeval resplit` only. They change the task data, not the image or the tests, so the
     # fingerprints leave them out: the task's patches are in the validation fingerprint.
     test_paths: tuple[str, ...] = ()
-    fix_paths: tuple[str, ...] = ()
+    leave_out: tuple[str, ...] | None = None
+    dependency_paths: tuple[str, ...] | None = None
 
     @property
     def suites(self) -> tuple[Suite, ...]:
@@ -177,9 +180,19 @@ def changed_lines(patch: str) -> int:
                if line[:1] in "+-" and not line.startswith(("+++", "---")))
 
 
+def code_part(patch: str) -> str:
+    """The diffs of the code files of a patch (patches.classify_path), as the collector keeps them."""
+    return "".join(section for section in diff_sections(patch)
+                   if (paths := file_paths(section)) != (None, None)
+                   and classify_path(paths[0] or paths[1])[0] == "code"
+                   and "\nGIT binary patch\n" not in section and "\nBinary files " not in section)
+
+
 def difficulty(patch: str) -> str:
     """Size class of the real fix: easy (1 file, at most 15 changed lines), medium (at most 2
-    files and 100 lines), or hard."""
+    files and 100 lines), or hard. Only code files count, so the class stays the same when
+    `cmeval resplit` adds data or build files to the fix."""
+    patch = code_part(patch)
     files, lines = len(changed_files(patch)), changed_lines(patch)
     if files == 1 and lines <= 15:
         return "easy"

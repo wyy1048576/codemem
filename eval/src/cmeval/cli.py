@@ -386,6 +386,29 @@ def cmd_generate(args) -> int:
     return 0
 
 
+def cmd_resplit(args) -> int:
+    from . import generate as gen
+    from .repos import RepoError
+    from .resplit import ResplitError, resplit_file
+
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        result = resplit_file(recipe, args.tasks, None if args.dry_run else args.out)
+    except (gen.GenerateError, ResplitError, RepoError, FileNotFoundError, TaskError) as exc:
+        print(f"resplit: {exc}", file=sys.stderr)
+        return 1
+    meta = result.meta
+    print(f"{result.out or '(dry run)'}: {meta['tasks']} tasks of {meta['repo']}, {meta['changed']} changed, "
+          f"{len(meta['not_split'])} not split")
+    print(f"  test files added: {meta['test_files_added']} in {meta['with_test_files_added']} tasks; "
+          f"fix files added: {meta['fix_files_added']} in {meta['with_fix_files_added']} tasks")
+    print(f"  tasks with a test change: {meta['with_test_patch_before']} before, {meta['with_test_patch_after']} after; "
+          f"with a changed dependency file: {meta['with_dependency_files']}")
+    for task_id, problem in meta["not_split"].items():
+        print(f"  not split: {task_id}: {problem}")
+    return 0
+
+
 def cmd_e2e_grader_check(args) -> int:
     from . import e2e
     from . import generate as gen
@@ -692,6 +715,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repeats", type=int, default=3, help="test runs before and after the fix (default 3)")
     p.add_argument("--force", action="store_true", help="build the image and validate again, also when a record is saved")
     p.set_defaults(func=cmd_generate)
+
+    p = sub.add_parser("resplit", help="split each task's change again, with the test paths of the repo's recipe")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example duckdb), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    group = p.add_mutually_exclusive_group(required=True)
+    group.add_argument("--out", type=Path, help="new task file (.jsonl) with the repo's tasks; a .meta.json is written next to it")
+    group.add_argument("--dry-run", action="store_true", help="only count what would change")
+    p.set_defaults(func=cmd_resplit)
 
     p = sub.add_parser("e2e", help="end-to-end runs of a coding agent on tasks with a test environment")
     e2e_sub = p.add_subparsers(dest="e2e_command", required=True)
