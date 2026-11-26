@@ -220,9 +220,11 @@ returns the same vectors for the same text: the same model and weights, at the s
 codemem cannot check that. Use it when a provider moves to a new host, when a second provider
 serves the same model, and when one server is reached at different addresses (next section).
 
-**One model for several codemem processes.** Each codemem that runs the local model keeps it in
-memory, 1.3 GB on an M1's GPU. With several git worktrees, or several containers, run the model
-once and let every codemem embed through it:
+**One model for several codemem processes.** Each codemem that runs the local model holds its
+own copy in memory, 1.3 GB on an M1's GPU: three agent sessions in three git worktrees hold three.
+A copy that embeds nothing for `model_idle_minutes` (60 by default) is freed, so the sessions
+nobody is using give theirs back. To hold one copy however many sessions are in use, with several
+git worktrees or several containers, run the model once and let every codemem embed through it:
 
 ```bash
 codemem serve-embeddings            # on 127.0.0.1:8791
