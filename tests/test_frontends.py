@@ -987,6 +987,41 @@ def test_mcp_tools_end_to_end(service):
     anyio.run(run)
 
 
+def test_mcp_tools_answer_in_plain_text(service):
+    """Every tool's answer reaches the client as its text alone. With structured output (the MCP
+    library's default for a tool that returns `str`) it also came as `{"result": "..."}`, and a
+    client that shows that to the model shows each line end as the two characters `\\n`."""
+    from mcp import Client
+
+    from codemem.render import format_chunk
+    from codemem.server import build_server
+
+    service.update()
+    server = build_server(service)
+
+    async def run():
+        async with Client(server) as client:
+            tools = (await client.list_tools()).tools
+            assert len(tools) == 4 and all(t.output_schema is None for t in tools)  # none announces structured output
+            calls = {
+                "search_code": {"query": "revoke session", "k": 3}, "get_chunk": {"ref": "auth/sessions.py:20"},
+                "index_status": {}, "refresh_index": {},
+            }
+            texts = {}
+            for name, args in calls.items():
+                res = await client.call_tool(name, args)
+                assert res.structured_content is None, name
+                assert [c.type for c in res.content] == ["text"], name
+                texts[name] = res.content[0].text
+                assert not texts[name].startswith("{"), name
+            assert texts["search_code"].startswith("1. auth/sessions.py:19-20  revoke_session  [id ")
+            assert "\n   def revoke_session(session_id):\n" in texts["search_code"]  # real line ends
+            assert texts["get_chunk"] == format_chunk(service.get_chunk("auth/sessions.py:20"))
+            assert texts["index_status"].startswith("state: ready")
+
+    anyio.run(run)
+
+
 def test_mcp_search_has_no_footer_without_steering(service):
     from mcp import Client
 
