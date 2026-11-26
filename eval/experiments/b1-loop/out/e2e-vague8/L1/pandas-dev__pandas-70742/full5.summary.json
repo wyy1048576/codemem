@@ -1,0 +1,129 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 5,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0096,
+ "task": "pandas-dev__pandas-70742",
+ "fixed": {
+  "round": 2,
+  "explanation": "The single-block path in `fast_xs` returned a 1D view of the block's row. When the frame was a temporary made by selecting non-adjacent columns, the row's numpy `.base` kept that whole temporary array alive. The edit copies the row whenever it is a view (`result.base is not None`) and drops the shared refs. The small Series then owns its data. Copy-on-write semantics are unchanged, because the copy is independent of the frame.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.092,
+ "seconds": 35,
+ "diff_stat": "pandas/core/internals/managers.py | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The row-selection path of DataFrame indexing (fast xs / _ixs for a single row on a multi-block or non-contiguous column selection) builds a Series from a row of a temporary 2D array created by taking columns (e.g. take/reindex of blocks, interleaved values). The Series is a view of that temporary array, so it keeps the whole array alive; the result should be copied or otherwise not reference the base temporary.",
+    "symptom": "Selecting a single row with a list of non-adjacent columns (via loc or iloc) returns a small Series whose data is a view on a large temporary (n_columns by n_rows) array, keeping lots of memory alive.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/apply.py",
+     1585,
+     1628
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2126,
+     2152
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     297,
+     310
+    ],
+    [
+     "pandas/core/base.py",
+     260,
+     273
+    ],
+    [
+     "pandas/core/indexing.py",
+     3545,
+     3562
+    ]
+   ],
+   "analysis": "Results are unrelated (apply, setitem helpers). The relevant code is BlockManager.fast_xs in internals/managers.py, which builds a result row from blocks, and DataFrame._ixs / xs in frame.py. When a single-block frame is column-selected through take, the 2D temp array is a view, and fast_xs returns a view of its row (blk.iget((slice(None), loc))). That view keeps the temp alive.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "BlockManager.fast_xs handling a single block: it returns a view of the block values row, and it needs to copy when the block is a temporary result of take, or it needs to avoid keeping the base alive.",
+    "symptom": "Selecting one row with non-adjacent columns returns a Series that is a view of a large temporary 2D array.",
+    "anchors": [
+     "fast_xs",
+     "iget",
+     "xs"
+    ],
+    "look_in": [
+     "pandas/core/internals/managers.py",
+     "pandas/core/frame.py"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/internals/managers.py",
+     2325,
+     2330
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1166,
+     1247
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1249,
+     1261
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2076,
+     2360
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1263,
+     1273
+    ]
+   ],
+   "analysis": "BlockManager.fast_xs has a single-block fast path. It returns a 1D view of the block's row, `iget((slice(None), loc))`, and passes the block's refs along. When the frame is the temporary 2D array produced by selecting non-adjacent columns with take, the Series keeps that whole temporary alive through its numpy `.base`. The fix belongs in this path: copy the row, or skip the view, when the block is not owned by a user-visible frame.",
+   "picked": [
+    "pandas/core/internals/managers.py:BlockManager.fast_xs"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/internals/managers.py lines 1166-1247 (BlockManager.fast_xs)"
+   ],
+   "fix_attempt": "applied: The single-block path in `fast_xs` returned a 1D view of the block's row. When the frame was a temporary made by selecting non-adjacent columns, the row's numpy `.base` kept that whole temporary array alive. The edit copies the row whenever it is a view (`result.base is not None`) and drops the shared refs. The small Series then owns its data. Copy-on-write semantics are unchanged, because the copy is independent of the frame."
+  }
+ ]
+}

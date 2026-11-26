@@ -1,0 +1,74 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  3
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0089,
+ "task": "pandas-dev__pandas-67897",
+ "fixed": {
+  "round": 1,
+  "explanation": "`IntervalArray.__arrow_array__` called `pyarrow.from_numpy_dtype` on a `DatetimeTZDtype` subtype, which raises. It now builds `pyarrow.timestamp(unit, tz=...)` for tz-aware subtypes. `ArrowIntervalType.__arrow_ext_deserialize__` rebuilt the subtype from its string alias, which drops the timezone. It now reads the subtype from the struct storage type, so the tz survives a parquet round-trip.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.048,
+ "seconds": 33,
+ "diff_stat": "pandas/core/arrays/arrow/extension_types.py | 3 ++-\n pandas/core/arrays/interval.py              | 8 +++++++-\n 2 files changed, 9 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Arrow extension type for IntervalDtype (ArrowIntervalType) and IntervalArray __arrow_array__ / __from_arrow__ conversion; subtype conversion to pyarrow must handle timezone-aware datetime64 subtypes, and restoring from arrow must rebuild the same IntervalDtype with tz.",
+    "symptom": "Converting an interval array with tz-aware datetime bounds to pyarrow raises an error, and parquet round trip does not preserve the dtype.",
+    "anchors": [
+     "pyarrow",
+     "parquet",
+     "intervals",
+     "timezone-aware"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/arrays/interval.py",
+     1608,
+     1658
+    ],
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     60,
+     109
+    ],
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     108,
+     109
+    ]
+   ],
+   "analysis": "IntervalArray.__arrow_array__ uses pyarrow.from_numpy_dtype(self.dtype.subtype), which fails for DatetimeTZDtype. ArrowIntervalType serializes subtype via str() and deserializes with type_for_alias, which loses the timezone. Both need to change to support tz-aware subtypes and round-trip.",
+   "picked": [
+    "pandas/core/arrays/interval.py:IntervalArray.__arrow_array__",
+    "pandas/core/arrays/arrow/extension_types.py:ArrowIntervalType"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/arrays/interval.py lines 1608-1658 (IntervalArray.__arrow_array__)",
+    "pandas/core/arrays/arrow/extension_types.py lines 60-109 (ArrowIntervalType)"
+   ],
+   "fix_attempt": "applied: `IntervalArray.__arrow_array__` called `pyarrow.from_numpy_dtype` on a `DatetimeTZDtype` subtype, which raises. It now builds `pyarrow.timestamp(unit, tz=...)` for tz-aware subtypes. `ArrowIntervalType.__arrow_ext_deserialize__` rebuilt the subtype from its string alias, which drops the timezone. It now reads the subtype from the struct storage type, so the tz survives a parquet round-trip."
+  }
+ ]
+}

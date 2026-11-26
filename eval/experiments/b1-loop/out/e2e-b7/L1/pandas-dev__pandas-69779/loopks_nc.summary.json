@@ -1,0 +1,81 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0088,
+ "task": "pandas-dev__pandas-69779",
+ "fixed": {
+  "round": 1,
+  "explanation": "sparsify_labels compared formatted strings, so distinct floats that print identically were treated as the same group and blanked. The fix passes the level codes as comparison keys, so sparsification depends on actual level values while the output still uses the formatted strings. Other callers still work, because keys defaults to the labels.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0494,
+ "seconds": 34,
+ "diff_stat": "pandas/core/indexes/multi.py | 26 +++++++++++++++++++++-----\n 1 file changed, 21 insertions(+), 5 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "MultiIndex string formatting for display sparsifies repeated labels by comparing formatted strings of level values rather than the underlying codes. It should sparsify based on the actual label codes/values so distinct values with identical formatted text are not collapsed.",
+    "symptom": "With a MultiIndex whose first level has distinct floats that format identically, the display shows the first-level label once with blanks below, merging distinct groups.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/indexes/multi.py",
+     1607,
+     1614
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     1591,
+     1610
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     709,
+     720
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     1654,
+     1713
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     5062,
+     5087
+    ]
+   ],
+   "analysis": "MultiIndex._format_multi turns each level into formatted strings, then passes them to sparsify_labels. That function compares the strings, so distinct floats with identical text (2.015000e+11) are treated as one group and blanked. The sparsification should use the underlying codes or values.",
+   "picked": [
+    "pandas/core/indexes/multi.py:MultiIndex._format_multi",
+    "pandas/core/indexes/multi.py:sparsify_labels"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/indexes/multi.py lines 1654-1713 (MultiIndex._format_multi)",
+    "pandas/core/indexes/multi.py lines 5062-5087 (sparsify_labels)"
+   ],
+   "fix_attempt": "applied: sparsify_labels compared formatted strings, so distinct floats that print identically were treated as the same group and blanked. The fix passes the level codes as comparison keys, so sparsification depends on actual level values while the output still uses the formatted strings. Other callers still work, because keys defaults to the labels."
+  }
+ ]
+}

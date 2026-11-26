@@ -1,0 +1,115 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 2,
+  "explanation": "test.describe.configure() is implemented in TestTypeImpl._configure, which only handles mode, retries and timeout. Suites already have a _locks array that _describe fills from details, so I added a lock option there that appends to the current suite's _locks. Nested groups and tests inherit it the same way they inherit describe-details locks.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.051,
+ "seconds": 32,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 12 +++++++++++-\n 1 file changed, 11 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "test.describe.configure(), which configures the currently loading suite (mode, retries, timeout), should also accept a `lock` option (string or string[]) like test details, applying it to the suite so all nested tests and groups inherit it. It must work inside a group-scoped fixture override (test.use/extend wrapper) by setting the lock on the current suite in the test type implementation.",
+    "symptom": "test.describe.configure() does not accept a lock option, so suite-level locks cannot be declared for a file or group without private internals.",
+    "anchors": [
+     "lock",
+     "configure",
+     "test details",
+     "fixture override",
+     "mode",
+     "timeout"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "tests/playwright-test/test-locks.spec.ts",
+     39,
+     45
+    ],
+    [
+     "packages/utils/third_party/lockfile.ts",
+     184,
+     261
+    ],
+    [
+     "packages/playwright/src/runner/testGroups.ts",
+     28,
+     142
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Results show locks are collected from test._locks in createTestGroups, but not the configure implementation. The describe.configure code is likely in testType.ts (_configure), where mode, retries and timeout are set on the current suite.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "TestTypePlaywright _configure method that handles describe.configure options mode, retries, timeout on the current suite, and where test details lock is applied to test._locks",
+    "symptom": "test.describe.configure() does not accept a lock option.",
+    "anchors": [
+     "_locks",
+     "_parallelMode",
+     "lock"
+    ],
+    "look_in": [
+     "packages/playwright/src/common/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/common/testType.ts",
+     192,
+     215
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     126,
+     178
+    ],
+    [
+     "packages/playwright/src/common/test.ts",
+     44,
+     266
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "test.describe.configure() is implemented in TestTypeImpl._configure, which only handles mode, retries and timeout. Suites already have a _locks array that _describe fills from details, so I added a lock option there that appends to the current suite's _locks. Nested groups and tests inherit it the same way they inherit describe-details locks.",
+   "picked": [
+    "packages/playwright/src/common/testType.ts:TestTypeImpl._configure"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

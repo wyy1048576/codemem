@@ -1,0 +1,200 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.008,
+ "task": "pandas-dev__pandas-68090",
+ "fixed": {
+  "round": 1,
+  "explanation": "With sort=False the grouping codes are in recoded (first-appearance) order, but result_index_and_ids calls set_categories(orig_cats) on the levels, which changes the category codes. _unob_index_and_ids then computed ids from the old codes and built the product index in the new category order, so the two disagreed. The patch maps the grouping codes through the level's codes and orders each categorical level by category code before building the product. Ids and index labels then line up.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1599,
+ "seconds": 43,
+ "diff_stat": "pandas/core/groupby/ops.py | 16 ++++++++++++++++\n 1 file changed, 16 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that computes group indices/result_index for groupby with multiple keys including a Categorical grouper when sort=False and observed=False; the unobserved categories' ordering/codes are mismatched with the group indices, so get_group / groups / indices map to the wrong rows.",
+    "symptom": "GroupBy.get_group on a multi-key groupby with a categorical key, sort=False and observed=False returns rows belonging to a different group.",
+    "anchors": [
+     "categorical"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/groupby/grouper.py",
+     418,
+     742
+    ],
+    [
+     "pandas/tests/groupby/test_groupby.py",
+     1773,
+     1791
+    ],
+    [
+     "pandas/core/groupby/categorical.py",
+     13,
+     81
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     14,
+     36
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     539,
+     590
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     1943,
+     1996
+    ],
+    [
+     "pandas/core/series.py",
+     2086,
+     2319
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     935,
+     973
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     1263,
+     1285
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     1407,
+     1442
+    ],
+    [
+     "pandas/core/sorting.py",
+     715,
+     743
+    ],
+    [
+     "pandas/tests/groupby/test_groupby.py",
+     1365,
+     1370
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     5830,
+     5912
+    ],
+    [
+     "pandas/tests/groupby/methods/test_value_counts.py",
+     595,
+     627
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     745,
+     959
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     756,
+     769
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     966,
+     1017
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     548,
+     644
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     635,
+     707
+    ],
+    [
+     "pandas/core/groupby/base.py",
+     14,
+     17
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     4573,
+     4654
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     631,
+     633
+    ],
+    [
+     "pandas/tests/groupby/test_groupby.py",
+     2439,
+     2457
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     975,
+     985
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     831,
+     920
+    ]
+   ],
+   "analysis": "With sort=False, recode_for_groupby reorders categories by first appearance, so the Grouping codes follow that recoded order. result_index_and_ids then calls set_categories(ping._orig_cats) on the levels, which restores the original category order. _unob_index_and_ids builds MultiIndex.from_product(levels) with ids computed from the recoded codes. The ids therefore no longer line up with the result_index labels, so get_group, groups and indices return another group's rows.",
+   "picked": [
+    "pandas/core/groupby/ops.py:BaseGrouper.result_index_and_ids",
+    "pandas/core/groupby/ops.py:BaseGrouper._unob_index_and_ids"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/groupby/ops.py lines 831-920 (BaseGrouper.result_index_and_ids)",
+    "pandas/core/groupby/ops.py lines 975-985 (BaseGrouper._unob_index_and_ids)"
+   ],
+   "fix_attempt": "applied: With sort=False the grouping codes are in recoded (first-appearance) order, but result_index_and_ids calls set_categories(orig_cats) on the levels, which changes the category codes. _unob_index_and_ids then computed ids from the old codes and built the product index in the new category order, so the two disagreed. The patch maps the grouping codes through the level's codes and orders each categorical level by category code before building the product. Ids and index labels then line up."
+  }
+ ]
+}

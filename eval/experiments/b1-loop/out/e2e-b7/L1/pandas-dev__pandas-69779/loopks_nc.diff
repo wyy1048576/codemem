@@ -1,0 +1,61 @@
+diff --git a/pandas/core/indexes/multi.py b/pandas/core/indexes/multi.py
+index a55ebbd..da94a75 100644
+--- a/pandas/core/indexes/multi.py
++++ b/pandas/core/indexes/multi.py
+@@ -1706,8 +1706,19 @@ class MultiIndex(Index):
+             if sparsify is lib.no_default:
+                 sentinel = sparsify
+             # little bit of a kludge job for #1217
++            # compare level codes rather than formatted strings so distinct
++            # values with identical text are not merged
++            keys = []
++            for level_codes in self.codes:
++                key = list(np.asarray(level_codes))
++                if include_names:
++                    key.insert(0, None)
++                keys.append(key)
+             result_levels = sparsify_labels(
+-                result_levels, start=int(include_names), sentinel=sentinel
++                result_levels,
++                start=int(include_names),
++                sentinel=sentinel,
++                keys=keys,
+             )
+ 
+         return result_levels
+@@ -5059,19 +5070,23 @@ def _lexsort_depth(codes: list[np.ndarray], nlevels: int) -> int:
+     return 0
+ 
+ 
+-def sparsify_labels(label_list, start: int = 0, sentinel: object = ""):
++def sparsify_labels(label_list, start: int = 0, sentinel: object = "", keys=None):
+     pivoted = list(zip(*label_list, strict=True))
++    if keys is None:
++        keys = label_list
++    pivoted_keys = list(zip(*keys, strict=True))
+     k = len(label_list)
+ 
+     result = pivoted[: start + 1]
+     prev = pivoted[start]
++    prev_key = pivoted_keys[start]
+ 
+-    for cur in pivoted[start + 1 :]:
++    for cur, cur_key in zip(pivoted[start + 1 :], pivoted_keys[start + 1 :]):
+         sparse_cur = []
+ 
+-        for i, (p, t) in enumerate(zip(prev, cur, strict=True)):
++        for i, (p, t) in enumerate(zip(prev_key, cur_key, strict=True)):
+             if i == k - 1:
+-                sparse_cur.append(t)
++                sparse_cur.append(cur[i])
+                 result.append(sparse_cur)  # type: ignore[arg-type]
+                 break
+ 
+@@ -5083,6 +5098,7 @@ def sparsify_labels(label_list, start: int = 0, sentinel: object = ""):
+                 break
+ 
+         prev = cur
++        prev_key = cur_key
+ 
+     return list(zip(*result, strict=True))
+ 

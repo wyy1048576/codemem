@@ -1,0 +1,50 @@
+diff --git a/packages/playwright-core/src/server/cookieStore.ts b/packages/playwright-core/src/server/cookieStore.ts
+index 2d13ecb..742c6a4 100644
+--- a/packages/playwright-core/src/server/cookieStore.ts
++++ b/packages/playwright-core/src/server/cookieStore.ts
+@@ -229,9 +229,7 @@ export function domainMatches(value: string, domain: string): boolean {
+ function pathMatches(value: string, path: string): boolean {
+   if (value === path)
+     return true;
+-  if (!value.endsWith('/'))
+-    value = value + '/';
+-  if (!path.endsWith('/'))
+-    path = path + '/';
+-  return value.startsWith(path);
++  if (!value.startsWith(path))
++    return false;
++  return path.endsWith('/') || value[path.length] === '/';
+ }
+diff --git a/packages/playwright-core/src/server/network.ts b/packages/playwright-core/src/server/network.ts
+index 7c7cad6..453ade6 100644
+--- a/packages/playwright-core/src/server/network.ts
++++ b/packages/playwright-core/src/server/network.ts
+@@ -39,13 +39,22 @@ export function filterCookies(cookies: channels.NetworkCookie[], urls: string[])
+     if (!parsedURLs.length)
+       return true;
+     for (const parsedURL of parsedURLs) {
+-      let domain = c.domain;
+-      if (!domain.startsWith('.'))
+-        domain = '.' + domain;
+-      if (!('.' + parsedURL.hostname).endsWith(domain))
+-        continue;
+-      if (!parsedURL.pathname.startsWith(c.path))
++      const hostname = parsedURL.hostname.toLowerCase();
++      const cookieDomain = c.domain.toLowerCase();
++      if (cookieDomain.startsWith('.')) {
++        if (hostname !== cookieDomain.substring(1) && !hostname.endsWith(cookieDomain))
++          continue;
++      } else if (hostname !== cookieDomain) {
+         continue;
++      }
++      const cookiePath = c.path || '/';
++      const requestPath = parsedURL.pathname || '/';
++      if (requestPath !== cookiePath) {
++        if (!requestPath.startsWith(cookiePath))
++          continue;
++        if (!cookiePath.endsWith('/') && requestPath[cookiePath.length] !== '/')
++          continue;
++      }
+       if (parsedURL.protocol !== 'https:' && !isLocalHostname(parsedURL.hostname) && c.secure)
+         continue;
+       return true;

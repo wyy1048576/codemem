@@ -1,0 +1,1214 @@
+[
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "grep",
+  "cost": 0.0335228,
+  "turns": 5,
+  "seconds": 11,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk",
+  "cost": 0.0818,
+  "turns": 2,
+  "seconds": 20,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk_nc",
+  "cost": 0.055,
+  "turns": 2,
+  "seconds": 36,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks",
+  "cost": 0.0737,
+  "turns": 2,
+  "seconds": 34,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks_nc",
+  "cost": 0.0676,
+  "turns": 2,
+  "seconds": 37,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "grep",
+  "cost": 0.1548351,
+  "turns": 14,
+  "seconds": 50,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk",
+  "cost": 0.425,
+  "turns": 11,
+  "seconds": 74,
+  "gold": 1,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk_nc",
+  "cost": 0.2879,
+  "turns": 8,
+  "seconds": 104,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks",
+  "cost": 0.3788,
+  "turns": 11,
+  "seconds": 86,
+  "gold": 1,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks_nc",
+  "cost": 0.3614,
+  "turns": 11,
+  "seconds": 126,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "grep",
+  "cost": 0.0652949,
+  "turns": 11,
+  "seconds": 28,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopk",
+  "cost": 0.0717,
+  "turns": 2,
+  "seconds": 27,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopk_nc",
+  "cost": 0.0358,
+  "turns": 1,
+  "seconds": 31,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopks",
+  "cost": 0.089,
+  "turns": 2,
+  "seconds": 39,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopks_nc",
+  "cost": 0.0494,
+  "turns": 1,
+  "seconds": 34,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "grep",
+  "cost": 0.052910200000000004,
+  "turns": 4,
+  "seconds": 18,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk",
+  "cost": 0.0572,
+  "turns": 2,
+  "seconds": 20,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk_nc",
+  "cost": 0.034,
+  "turns": 1,
+  "seconds": 31,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks",
+  "cost": 0.0694,
+  "turns": 2,
+  "seconds": 36,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks_nc",
+  "cost": 0.0418,
+  "turns": 1,
+  "seconds": 33,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "grep",
+  "cost": 0.058596699999999995,
+  "turns": 12,
+  "seconds": 20,
+  "gold": 4,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk",
+  "cost": 0.0412,
+  "turns": 1,
+  "seconds": 32,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk_nc",
+  "cost": 0.0351,
+  "turns": 1,
+  "seconds": 31,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks",
+  "cost": 0.0583,
+  "turns": 1,
+  "seconds": 34,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks_nc",
+  "cost": 0.0552,
+  "turns": 1,
+  "seconds": 36,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "grep",
+  "cost": 0.08015900000000001,
+  "turns": 15,
+  "seconds": 28,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk",
+  "cost": 0.0673,
+  "turns": 2,
+  "seconds": 19,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk_nc",
+  "cost": 0.051,
+  "turns": 2,
+  "seconds": 32,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks",
+  "cost": 0.3404,
+  "turns": 11,
+  "seconds": 85,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks_nc",
+  "cost": 0.0764,
+  "turns": 2,
+  "seconds": 35,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "grep",
+  "cost": 0.027085500000000002,
+  "turns": 5,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk",
+  "cost": 0.1013,
+  "turns": 2,
+  "seconds": 34,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk_nc",
+  "cost": 0.0686,
+  "turns": 2,
+  "seconds": 35,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks",
+  "cost": 0.1058,
+  "turns": 2,
+  "seconds": 37,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks_nc",
+  "cost": 0.0656,
+  "turns": 2,
+  "seconds": 33,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "grep",
+  "cost": 0.25696050000000004,
+  "turns": 18,
+  "seconds": 73,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk",
+  "cost": 0.2905,
+  "turns": 11,
+  "seconds": 78,
+  "gold": 1,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk_nc",
+  "cost": 0.2092,
+  "turns": 11,
+  "seconds": 74,
+  "gold": 1,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks",
+  "cost": 0.3385,
+  "turns": 8,
+  "seconds": 92,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks_nc",
+  "cost": 0.2881,
+  "turns": 11,
+  "seconds": 97,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "grep",
+  "cost": 0.0502567,
+  "turns": 8,
+  "seconds": 20,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopk",
+  "cost": 0.0818,
+  "turns": 2,
+  "seconds": 36,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopk_nc",
+  "cost": 0.0546,
+  "turns": 2,
+  "seconds": 36,
+  "gold": 3,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopks",
+  "cost": 0.0617,
+  "turns": 1,
+  "seconds": 36,
+  "gold": 3,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69779",
+  "arm": "loopks_nc",
+  "cost": 0.2499,
+  "turns": 11,
+  "seconds": 88,
+  "gold": 3,
+  "seen": 3,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "grep",
+  "cost": 0.1139427,
+  "turns": 12,
+  "seconds": 43,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk",
+  "cost": 0.1772,
+  "turns": 6,
+  "seconds": 56,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk_nc",
+  "cost": 0.1763,
+  "turns": 8,
+  "seconds": 72,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks",
+  "cost": 0.3365,
+  "turns": 11,
+  "seconds": 94,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks_nc",
+  "cost": 0.3205,
+  "turns": 11,
+  "seconds": 140,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "grep",
+  "cost": 0.0802889,
+  "turns": 14,
+  "seconds": 28,
+  "gold": 4,
+  "seen": 4,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk",
+  "cost": 0.0394,
+  "turns": 1,
+  "seconds": 34,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk_nc",
+  "cost": 0.0346,
+  "turns": 1,
+  "seconds": 33,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks",
+  "cost": 0.0615,
+  "turns": 1,
+  "seconds": 37,
+  "gold": 4,
+  "seen": 3,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks_nc",
+  "cost": 0.048,
+  "turns": 1,
+  "seconds": 33,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "grep",
+  "cost": 0.0526182,
+  "turns": 9,
+  "seconds": 17,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk",
+  "cost": 0.0824,
+  "turns": 3,
+  "seconds": 33,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk_nc",
+  "cost": 0.0589,
+  "turns": 2,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks",
+  "cost": 0.0853,
+  "turns": 2,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks_nc",
+  "cost": 0.0752,
+  "turns": 2,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true
+ }
+]

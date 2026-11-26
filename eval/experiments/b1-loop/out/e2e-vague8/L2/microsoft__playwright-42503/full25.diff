@@ -1,0 +1,45 @@
+diff --git a/packages/playwright/src/mcp/test/browserBackend.ts b/packages/playwright/src/mcp/test/browserBackend.ts
+index 001570c..a461b85 100644
+--- a/packages/playwright/src/mcp/test/browserBackend.ts
++++ b/packages/playwright/src/mcp/test/browserBackend.ts
+@@ -117,20 +117,31 @@ async function generatePausedMessage(tools: typeof import('playwright-core/lib/c
+   return lines.join('\n');
+ }
+ 
++const boundBrowsers = new WeakSet<playwright.Browser>();
++
+ export async function runDaemonForContext(testInfo: TestInfoImpl, context: playwright.BrowserContext) {
+   if (testInfo._configInternal.configCLIOverrides.debug !== 'cli')
+     return false;
+ 
+-  const sessionName = `tw-${crypto.randomBytes(3).toString('hex')}`;
+-  await context.browser()!.bind(sessionName, { workspaceDir: testInfo.project.testDir });
++  const browser = context.browser()!;
++  if (!boundBrowsers.has(browser)) {
++    boundBrowsers.add(browser);
++    const sessionName = `tw-${crypto.randomBytes(3).toString('hex')}`;
++    try {
++      await browser.bind(sessionName, { workspaceDir: testInfo.project.testDir });
++    } catch (e) {
++      boundBrowsers.delete(browser);
++      throw e;
++    }
+ 
+-  /* eslint-disable-next-line no-console */
+-  console.log([
+-    `### The test is currently paused at the start`,
+-    ``,
+-    `### Debugging Instructions`,
+-    `- Run "playwright-cli attach ${sessionName}" to attach to this test`,
+-  ].join('\n'));
++    /* eslint-disable-next-line no-console */
++    console.log([
++      `### The test is currently paused at the start`,
++      ``,
++      `### Debugging Instructions`,
++      `- Run "playwright-cli attach ${sessionName}" to attach to this test`,
++    ].join('\n'));
++  }
+ 
+   await context.debugger.requestPause();
+   return true;

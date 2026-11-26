@@ -1,0 +1,64 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 1,
+  "explanation": "pathMatches appends a trailing slash to both paths, so a cookie path of /foo/ matches the URL path /foo. RFC 6265 path-match needs the request path to start with the cookie path, and either the cookie path ends in '/' or the next request-path character is '/'. I rewrote the function to follow that rule. domainMatches already handles host-only cookies correctly, so the other symptoms may come from a caller I haven't seen.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0258,
+ "seconds": 19,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie URL matching logic in the browser context cookie store: filtering cookies by URL must check domain (host-only cookies must not match subdomains) and path with proper path-prefix semantics (cookie path /api must not match /apiv2; cookie path /foo/ should not match /foo per RFC 6265 path-match).",
+    "symptom": "Cookies are matched to URLs incorrectly: host-only cookies are returned for subdomains, /api cookies for /apiv2, and /foo/ cookies for /foo.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     229,
+     237
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     260,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     219,
+     227
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "pathMatches appends a trailing slash to both paths, so a cookie path of /foo/ matches the URL path /foo. RFC 6265 path-match needs the request path to start with the cookie path, and either the cookie path ends in '/' or the next request-path character is '/'. I rewrote the function to follow that rule. domainMatches already handles host-only cookies correctly, so the other symptoms may come from a caller I haven't seen.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:pathMatches"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

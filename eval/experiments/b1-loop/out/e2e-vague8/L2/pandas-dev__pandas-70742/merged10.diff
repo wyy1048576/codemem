@@ -1,0 +1,23 @@
+diff --git a/pandas/core/internals/managers.py b/pandas/core/internals/managers.py
+index 13ba2c3..2bd070b 100644
+--- a/pandas/core/internals/managers.py
++++ b/pandas/core/internals/managers.py
+@@ -1183,11 +1183,17 @@ class BlockManager(libinternals.BlockManager, BaseBlockManager):
+             )
+             # in the case of a single block, the new block is a view
+             bp = BlockPlacement(slice(0, len(result)))
++            refs = self.blocks[0].refs
++            if not refs.has_reference():
++                # Nothing else shares this block (e.g. a temporary from
++                #  selecting columns); copy so we don't keep the big array alive
++                result = result.copy()
++                refs = None
+             block = new_block(
+                 result,
+                 placement=bp,
+                 ndim=1,
+-                refs=self.blocks[0].refs,
++                refs=refs,
+             )
+             return SingleBlockManager(block, self.axes[0].view())
+ 

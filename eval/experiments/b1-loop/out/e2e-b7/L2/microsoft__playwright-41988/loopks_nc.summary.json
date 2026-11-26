@@ -1,0 +1,574 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  5,
+  5,
+  5,
+  3,
+  5,
+  5,
+  1,
+  5,
+  5,
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0082,
+ "task": "microsoft__playwright-41988",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 1
+ },
+ "sonnet_calls": 11,
+ "cost_usd": 0.2881,
+ "seconds": 97,
+ "diff_stat": "",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Accessibility name computation (accessible name from content) for button role, traversing child elements recursively; hidden children such as SVG icons with aria-hidden or display:none are handled wrongly, causing the name from nested spans to be lost. Also the AI aria snapshot generation that uses the computed name.",
+    "symptom": "Buttons with label in nested spans next to a hidden SVG icon get an empty name in the AI aria snapshot.",
+    "anchors": [
+     "AI accessibility snapshot",
+     "SVG",
+     "nested spans"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     668,
+     991
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1200,
+     1209
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     489,
+     498
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     220,
+     409
+    ],
+    [
+     "packages/injected/src/selectorUtils.ts",
+     115,
+     131
+    ]
+   ],
+   "analysis": "The name computation in roleUtils.ts already supports collecting contributing elements (collectElements). The AI snapshot appears to drop names that are redundant with printed descendants. That logic probably wrongly treats a button whose name comes from nested spans as redundant, because a hidden SVG sibling or a skipped generic leaf is mishandled. The fix is likely in ariaSnapshot.ts.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "AI aria snapshot generation that omits a node's name when it is redundant with printed descendant nodes, using the collected contributing elements of the accessible name, and handles collapsed generic wrappers and skipped leaf generics.",
+    "symptom": "Buttons with label in nested spans next to a hidden SVG icon get an empty name in the AI aria snapshot.",
+    "anchors": [
+     "collectElements",
+     "elements",
+     "getTextAlternativeInternal"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     237,
+     308
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     535,
+     537
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     166,
+     209
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     85,
+     220
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     59,
+     83
+    ]
+   ],
+   "analysis": "The results show toAriaNode and generateAriaTree, which record name.elements as nameSourceElements and resolve them to nameFromContentRefs. The bug is probably in how contributing elements are collected in roleUtils, or in the renderer that drops names covered by descendants. Neither has been seen yet. A hidden SVG sibling may stop the contributor set from being collected correctly for the nested spans.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Accessible name from content computation that collects contributing elements, recursing into child elements and skipping hidden ones. Also the renderer that omits a name when it is derived from descendant refs (nameFromContentRefs).",
+    "symptom": "Button with label in nested spans beside a hidden SVG icon gets an empty name in the AI aria snapshot.",
+    "anchors": [
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "getTextAlternativeInternal",
+     "getElementAccessibleName",
+     "elements",
+     "isElementHiddenForAria"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     513,
+     530
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     532,
+     540
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     542,
+     554
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     556,
+     586
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     993,
+     1043
+    ]
+   ],
+   "analysis": "The results show the name composite wrappers and innerAccumulatedElementText, which merges child contributor elements. The core getTextAlternativeInternal, which decides which elements contribute (including the hidden-element and text-node cases), has not been seen. The bug is likely there, or in how ariaSnapshot uses name.elements to drop names.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "getTextAlternativeInternal function: handles hidden elements, step 2f name from content, and records elements that contribute to the name (elements set); check how hidden svg or empty child results affect elements.",
+    "symptom": "Button with label in nested spans beside a hidden SVG icon gets an empty name in the AI aria snapshot.",
+    "anchors": [
+     "getTextAlternativeInternal",
+     "innerAccumulatedElementText",
+     "CompositeString",
+     "emptyCompositeString",
+     "collectElements",
+     "isElementHiddenForAria",
+     "embeddedInTargetElement"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     314,
+     335
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     627,
+     655
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     337,
+     363
+    ]
+   ],
+   "analysis": "These results show only hidden-ness helpers, which look correct. The core getTextAlternativeInternal and the AI snapshot renderer, which drops names covered by descendants, have not been seen. The bug is likely in the renderer's check for whether a name is redundant with its children. A hidden SVG or a nested span may break that check.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Renderer code in the AI aria snapshot that omits a node's name when it is already given by child content, using nameFromContentRefs and the rendered children.",
+    "symptom": "Button with label in nested spans beside a hidden SVG icon gets an empty name in the AI aria snapshot.",
+    "anchors": [
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "renderAriaTree",
+     "toAriaNode",
+     "generateAriaTree",
+     "getElementAccessibleName"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     487,
+     533
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     469,
+     584
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     479,
+     485
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     222,
+     235
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     99,
+     164
+    ]
+   ],
+   "analysis": "The renderer and createKey just print ariaNode.name, so they don't drop names. generateAriaTree.visit resolves name contributors into nameFromContentRefs, but the code that uses those refs to blank a name hasn't been seen. It is probably outside injected/ariaSnapshot.ts, in a server or tools file that post-processes the snapshot. It may wrongly treat a name as redundant when a hidden SVG sibling or nested spans are present.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Code that consumes nameFromContentRefs from the snapshot info to strip or omit a node's name when the name comes from descendant content, for the AI snapshot.",
+    "symptom": "Button with label in nested spans beside a hidden SVG icon gets an empty name in the AI aria snapshot.",
+    "anchors": [
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "snapshot.info",
+     "snapshot.refs",
+     "toAriaNode",
+     "generateAriaTree"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/injectedScript.ts",
+     321,
+     329
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     500,
+     511
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     105,
+     248
+    ],
+    [
+     "packages/isomorphic/ariaSnapshot.ts",
+     522,
+     569
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     101,
+     103
+    ]
+   ],
+   "analysis": "The AI snapshot distiller's removeRedundantNames plugin in ariaSnapshotDistiller.ts blanks a node's name when every contributing ref is no longer pending. Nested span wrappers and leaf-generic handling, with a hidden SVG sibling, likely make the button's contributors all look represented, so the name is dropped even though the text was lost or removed. The fix belongs in this plugin's enter/exit bookkeeping and in isLeafGeneric.",
+   "picked": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:<block>"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "fix_attempt": "could not fix: The `removeRedundantNames` bookkeeping in the shown code looks consistent. A leaf generic stays pending, so the button should keep its name, and `removeNameRepeatingChild` then removes the redundant span. I can't tell where the name is lost without `isLeafGeneric`. I also can't see the traversal that decides when `enter` and `exit` run, or how `nameFromContentRefs` is built in `generateAriaTree`. The hidden SVG is probably meant to be excluded from the contributors, but I can't check that. A guessed edit could drop names that should stay."
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Find `isLeafGeneric` and the distiller traversal in ariaSnapshotDistiller.ts. Also find where `nameFromContentRefs` is built in `generateAriaTree`, and how a hidden element's refs are collected as name contributors.",
+    "symptom": "A button whose label is in nested spans next to a hidden SVG icon gets an empty name in the AI accessibility snapshot.",
+    "anchors": [
+     "isLeafGeneric",
+     "pendingContentRefs",
+     "nameFromContentRefs",
+     "removeRedundantNames",
+     "removeNameRepeatingChild",
+     "inlineTextIntoGeneric",
+     "unwrapSingleChildGenerics",
+     "nameSourceElements",
+     "generateAriaTree",
+     "DistillerContext"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     56,
+     90
+    ]
+   ],
+   "analysis": "Only the generic traversal (runPlugins.traverse) was shown. It calls enter and exit on each plugin and handles remove and unwrap. The bug is more likely in a plugin, such as removeRedundantNames, isLeafGeneric or unwrapSingleChildGenerics, which decides when a name is dropped. It could also be in how nameFromContentRefs is built, since a hidden SVG may be counted as a contributor.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Find the distiller plugins and the isLeafGeneric helper in ariaSnapshotDistiller.ts. They track pending name-content refs and remove a button's name when its descendants are removed or unwrapped.",
+    "symptom": "A button whose label is in nested spans next to a hidden SVG icon gets an empty name in the AI snapshot.",
+    "anchors": [
+     "isLeafGeneric",
+     "removeRedundantNames",
+     "removeNameRepeatingChild",
+     "pendingContentRefs",
+     "nameFromContentRefs",
+     "unwrapSingleChildGenerics",
+     "inlineTextIntoGeneric",
+     "runPlugins"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     54,
+     98
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     58,
+     85
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     50,
+     52
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     1,
+     48
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     411,
+     584
+    ]
+   ],
+   "analysis": "Only the generic traversal and the header of ariaSnapshotDistiller.ts were shown. The plugins (aiPlugins, removeRedundantNames, isLeafGeneric, inlineTextIntoGeneric) sit between line 98 and the end of the file and haven't been seen. The bug is probably in a plugin there. A nested span wrapper is likely inlined or removed, and the name is then dropped while its contributing refs are still treated as represented.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "Distiller plugins in ariaSnapshotDistiller.ts: aiPlugins list, removeRedundantNames enter/exit, isLeafGeneric, inlineTextIntoGeneric, removeNameRepeatingChild, which manage pendingContentRefs and drop names.",
+    "symptom": "A button with its label in nested spans next to a hidden SVG icon gets an empty name in the AI snapshot.",
+    "anchors": [
+     "aiPlugins",
+     "removeRedundantNames",
+     "isLeafGeneric",
+     "pendingContentRefs",
+     "removeNameRepeatingChild",
+     "inlineTextIntoGeneric",
+     "unwrapSingleChildGenerics",
+     "normalizePlugins",
+     "nameFromContentRefs"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     759,
+     888
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     1,
+     57
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     26,
+     218
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     539,
+     575
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     649,
+     651
+    ]
+   ],
+   "analysis": "Round 9 returned only tests and ariaSnapshot.ts renderer code. The distiller plugins in ariaSnapshotDistiller.ts have still not been shown. The bug is probably in removeRedundantNames or isLeafGeneric, or in how nameFromContentRefs is built. A hidden SVG, or nested span generics that are not leaf generics, probably makes the button's name look redundant.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "Find the removeRedundantNames plugin and isLeafGeneric in ariaSnapshotDistiller.ts. They decide when a button's name is dropped because its content refs are represented by descendants.",
+    "symptom": "A button whose label is in nested spans next to a hidden SVG icon gets an empty name in the AI snapshot.",
+    "anchors": [
+     "removeRedundantNames",
+     "isLeafGeneric",
+     "pendingContentRefs",
+     "removeNameRepeatingChild",
+     "nameFromContentRefs",
+     "inlineTextIntoGeneric",
+     "unwrapSingleChildGenerics",
+     "distillAriaSnapshot"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/isomorphic/trace/snapshotRenderer.ts",
+     32,
+     34
+    ],
+    [
+     "tests/playwright-test/update-aria-snapshot.spec.ts",
+     226,
+     423
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     306,
+     308
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1152,
+     1156
+    ],
+    [
+     "tests/playwright-test/ui-mode-fixtures.ts",
+     47,
+     70
+    ]
+   ],
+   "analysis": "Round 10 returned only unrelated results: tests, a trace snapshot helper and generic role utilities. The distiller plugins in ariaSnapshotDistiller.ts have still not been shown. The earlier round 6 pick, removeRedundantNames, may be the right place. The bug may also be in how nameFromContentRefs is built from name elements, for example a hidden SVG counted as a contributor or nested span generics mishandled.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 11,
+   "query": {
+    "intent": "Find the removeRedundantNames plugin and isLeafGeneric in the AI snapshot distiller. They track pending name content refs and drop a button's name when its descendants represent it.",
+    "symptom": "A button whose label is in nested spans next to a hidden SVG icon gets an empty name in the AI accessibility snapshot.",
+    "anchors": [
+     "removeRedundantNames",
+     "isLeafGeneric",
+     "pendingContentRefs",
+     "nameFromContentRefs",
+     "removeNameRepeatingChild",
+     "inlineTextIntoGeneric",
+     "unwrapSingleChildGenerics"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   }
+  }
+ ]
+}

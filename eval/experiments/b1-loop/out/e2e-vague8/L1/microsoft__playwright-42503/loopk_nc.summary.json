@@ -1,0 +1,173 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 3,
+  "explanation": "runDaemonForContext calls browser.bind on every context creation, so the second context throws that a server is already running. Track bound browsers in a WeakSet and skip the bind, message and pause for browsers already exposed.",
+  "edits": 2
+ },
+ "rounds": 3,
+ "ks": [
+  5,
+  5,
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 3,
+  "loopk": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0753,
+ "seconds": 47,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Playwright Test's debug integration hooks browser context creation (onDidCreateBrowserContext) and each time calls a function that starts a browser server / exposes the browser to the CLI (e.g. browser.bind). It must expose the browser only once, guarding against repeated binding, so multiple contexts work.",
+    "symptom": "With the debug mode that hands a paused test to the CLI, creating a second browser context throws an error that a browser server is already running.",
+    "anchors": [
+     "browser server is already running"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     118,
+     126
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     376,
+     390
+    ],
+    [
+     "packages/playwright-core/src/server/browser.ts",
+     130,
+     140
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/browserDispatcher.ts",
+     62,
+     78
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     63,
+     65
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Results shown are generic context creation code, not the debug integration. The debug hook is likely in Playwright Test's runner code (e.g. packages/playwright/src/index.ts, onDidCreateBrowserContext) that calls browser.bind on every context creation.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Playwright Test hook onDidCreateBrowserContext that calls browser.bind to expose the browser to the CLI debug session, invoked on every context creation.",
+    "symptom": "Creating a second browser context in the CLI-attach debug mode throws that a browser server is already running.",
+    "anchors": [
+     "_setupBrowserContext",
+     "already running"
+    ],
+    "look_in": [
+     "packages/playwright/src/"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     108,
+     116
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     97,
+     106
+    ],
+    [
+     "packages/playwright/src/mcp/test/testContext.ts",
+     204,
+     206
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     1,
+     76
+    ],
+    [
+     "packages/playwright/src/mcp/test/testContext.ts",
+     279,
+     292
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "index.ts imports runDaemonForContext from mcp/test/browserBackend, likely called on each context creation and binding the browser. I need to see that function and its call site to guard against binding twice.",
+   "picked": [
+    "packages/playwright/src/index.ts:<block>"
+   ]
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "runDaemonForContext in browserBackend that binds the browser (browser.bind) for the CLI session; make it bind only once per browser.",
+    "symptom": "Second browser context creation in CLI-attach debug mode throws that a browser server is already running.",
+    "anchors": [
+     "runDaemonForContext",
+     "createCustomMessageHandler",
+     "browserBackend"
+    ],
+    "look_in": [
+     "packages/playwright/src/mcp/test/browserBackend.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright/src/mcp/test/browserBackend.ts",
+     120,
+     137
+    ],
+    [
+     "packages/playwright/src/mcp/test/browserBackend.ts",
+     38,
+     75
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/playwright/src/index.ts lines 1-76 (<block>)"
+   ],
+   "action": "edit",
+   "analysis": "runDaemonForContext calls browser.bind on every context creation, so the second context throws that a server is already running. Track bound browsers in a WeakSet and skip the bind, message and pause for browsers already exposed.",
+   "picked": [
+    "packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

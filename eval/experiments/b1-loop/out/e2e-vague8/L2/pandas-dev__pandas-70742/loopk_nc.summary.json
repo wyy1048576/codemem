@@ -1,0 +1,119 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-70742",
+ "fixed": {
+  "round": 2,
+  "explanation": "In the single-block case, BlockManager.fast_xs returns a view of one row of the 2D block values. When df.loc[row, cols] first takes the columns (creating a large temporary array), the tiny row Series holds a reference to that whole temporary. Copying the row in fast_xs makes the result independent and releases the large base.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  5,
+  3
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0426,
+ "seconds": 32,
+ "diff_stat": "pandas/core/internals/managers.py | 5 +++--\n 1 file changed, 3 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "DataFrame.loc/iloc row selection with a list of columns on a single row builds a Series from a block's 2D values as a view (e.g. fast_xs / _ixs / BlockManager.fast_xs), so the resulting small Series references the large parent array. It should copy or avoid holding the base array when taking a row cross-section.",
+    "symptom": "Selecting a single row with a list of columns returns a small Series that is a view keeping the large underlying array alive, causing memory growth (regression in pandas 3.0).",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "pandas/core/apply.py",
+     1585,
+     1628
+    ],
+    [
+     "pandas/core/apply.py",
+     1622,
+     1626
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     703,
+     721
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2126,
+     2152
+    ],
+    [
+     "pandas/core/indexing.py",
+     3545,
+     3562
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Results shown are unrelated to row cross-section. The likely location is BlockManager.fast_xs in pandas/core/internals/managers.py, or DataFrame._ixs / _getitem_lowerdim in indexing.py, where a single row is taken with a column list (via take/reindex on columns).",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "BlockManager.fast_xs building a row Series from a single block, returning a view of the block values for a single-row selection",
+    "symptom": "Selecting a single row with a list of columns returns a small Series that is a view keeping the large base array alive.",
+    "anchors": [
+     "fast_xs",
+     "iget",
+     "xs"
+    ],
+    "look_in": [
+     "pandas/core/internals/managers.py"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/internals/managers.py",
+     2325,
+     2330
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1166,
+     1247
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1249,
+     1261
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In the single-block case, BlockManager.fast_xs returns a view of one row of the 2D block values. When df.loc[row, cols] first takes the columns (creating a large temporary array), the tiny row Series holds a reference to that whole temporary. Copying the row in fast_xs makes the result independent and releases the large base.",
+   "picked": [
+    "pandas/core/internals/managers.py:BlockManager.fast_xs"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

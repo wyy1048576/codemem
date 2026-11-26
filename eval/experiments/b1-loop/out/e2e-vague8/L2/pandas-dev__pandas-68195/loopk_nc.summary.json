@@ -1,0 +1,62 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "The message \"tolerance must be positive\" is raised for negative tolerance only, so zero is allowed. Change the message to \"tolerance must be non-negative\" in all three branches and update the test.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0248,
+ "seconds": 25,
+ "diff_stat": "pandas/core/reshape/merge.py                  | 6 +++---\n pandas/tests/reshape/merge/test_merge_asof.py | 2 +-\n 2 files changed, 4 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The merge_asof validation in pandas/core/reshape/merge.py (_AsOfMerge._validate_tolerance or similar) raises a MergeError when tolerance is negative; its message says \"tolerance must be positive\" and should say non-negative.",
+    "symptom": "The error message for a negative tolerance in merge_asof says it must be positive although zero is accepted.",
+    "anchors": [
+     "as-of merge",
+     "positive"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "pandas/core/reshape/merge.py",
+     2599,
+     2634
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2001,
+     2008
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "The message \"tolerance must be positive\" is raised for negative tolerance only, so zero is allowed. Change the message to \"tolerance must be non-negative\" in all three branches and update the test.",
+   "picked": [
+    "pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance",
+    "pandas/tests/reshape/merge/test_merge_asof.py:TestAsOfMerge.test_tolerance_negative_one_nanosecond"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

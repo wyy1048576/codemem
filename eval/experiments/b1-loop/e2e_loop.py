@@ -14,6 +14,7 @@ from __future__ import annotations
 import collections as C
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -32,6 +33,11 @@ MAX_COST = 3.0
 MAX_FIX_CHUNKS = 8
 MAX_CODE_CHARS = 60000
 SHOWN = int(os.environ.get("LOOP_N", LOOP_SHOWN))  # results shown per round (default 50)
+# LOOP_CHOOSE_K=1 (with LOOP_FULL): Sonnet picks how many results each round shows, from 1, 2, 3, 5, 10: the first query
+# comes from the same call as loop-k (oneshot_k) and the judge returns next_k (system_loop_k.txt). Judge and fix stay
+# separate calls; after a fix that fails, the next round uses the judge's next_k.
+CHOOSE_K = os.environ.get("LOOP_CHOOSE_K") == "1"
+KS = (1, 2, 3, 5, 10)
 TAG = os.environ.get("LOOP_TAG", "loop")  # output file prefix
 # LOOP_FULL=1: the judge sees each result's raw code from the index (header line + chunk source), not a
 # 500-character preview. A chunk longer than CODE_CAP characters is cut; a class that long is shown as its
@@ -39,10 +45,15 @@ TAG = os.environ.get("LOOP_TAG", "loop")  # output file prefix
 FULL = os.environ.get("LOOP_FULL") == "1"
 CODE_CAP = 20000
 ROUND_CAP = 200000  # characters of code per round; past it, the remaining results get 500-character previews
+# LOOP_CONDENSE_TESTS=1 (with LOOP_FULL): a result the index flags as a test is shown in about 500 characters
+# instead of whole, unless the issue mentions tests. The index and the search itself are unchanged.
+TEST_CAP = 500
+TEST_MAX_CALLEES = 5  # "tests:" line only when the test calls at most this many non-test chunks
 
 tasks_file, task_id, repo_arg, out_dir = sys.argv[1:5]
 task = next(t for t in (json.loads(x) for x in Path(tasks_file).read_text(encoding="utf8").split("\n") if x.strip())
             if t["id"] == task_id)
+CONDENSE_TESTS = os.environ.get("LOOP_CONDENSE_TESTS") == "1" and not re.search(r"\btests?\b", task["query"], re.I)
 repo = Path(repo_arg).resolve()
 out = Path(out_dir).resolve()
 out.mkdir(parents=True, exist_ok=True)
@@ -72,8 +83,23 @@ def code_for(chunk_ids: list[int]) -> str:
     return "\n\n".join(parts)
 
 
-def show_full(cards) -> tuple[str, list[bool]]:
-    """Numbered results with each chunk's raw code from the index; also, per result, whether it was shown whole."""
+def condensed_test(chunk, head: str, words: list[str]) -> str:
+    """A test result in a few lines: the header, what it tests (when the call edges say so clearly), and up to 3 code
+    lines that contain a query word, with their line numbers. About 500 characters."""
+    lines = [head, "[test, condensed: the fix step sees it whole if you pick it]"]
+    callees = [c for c in store.callees_of(chunk.chunk_id) if not c.is_test]
+    if 0 < len(callees) <= TEST_MAX_CALLEES:
+        lines.append("tests: " + ", ".join(dict.fromkeys(c.qualname for c in callees)))
+    low = [w.lower() for w in words if w]
+    hits = [f"L{chunk.start_line + n}: {line.strip()[:120]}" for n, line in enumerate(chunk.code.split("\n"))
+            if any(w in line.lower() for w in low)]
+    lines += hits[:3]
+    return "\n".join(lines)[:TEST_CAP]
+
+
+def show_full(cards, words: list[str] | None = None) -> tuple[str, list[bool]]:
+    """Numbered results with each chunk's raw code from the index; also, per result, whether it was shown whole.
+    With CONDENSE_TESTS, a test chunk is shown condensed (condensed_test) and counts as not shown whole."""
     chunks = store.get_chunks([c.chunk_id for c in cards])
     parts, whole, total = [], [], 0
     for i, card in enumerate(cards, start=1):
@@ -81,6 +107,10 @@ def show_full(cards) -> tuple[str, list[bool]]:
         text = f"{i}." + text[2:] if text.startswith("1.") else text
         head = text.split("\n", 1)[0]
         chunk = chunks.get(card.chunk_id)
+        if CONDENSE_TESTS and chunk is not None and chunk.is_test:
+            parts.append(condensed_test(chunk, head, words or []))
+            whole.append(False)
+            continue
         if total > ROUND_CAP:
             parts.append(text[:500])
             whole.append(False)
@@ -123,10 +153,12 @@ def verbatim(values, source: str) -> list[str]:
 
 
 start = time.time()
-first_record = llm.extract("oneshot", llm.oneshot_input(task["repo"], task["query"]))
+first_record = llm.extract("oneshot_k" if CHOOSE_K else "oneshot", llm.oneshot_input(task["repo"], task["query"]))
+k = (first_record["output"].get("k") if first_record["output"].get("k") in KS else 10) if CHOOSE_K else SHOWN
+ks = []
 oneshot_cost = first_record.get("cost_usd") or 0.0  # the query-writing call; counted in cost_usd
 first = llm.clean(first_record["output"], task["query"])
-cards, _ = searcher._retrieve(store, task["query"], first, False, SHOWN)
+cards, _ = searcher._retrieve(store, task["query"], first, False, k)
 query = {key: first[key] for key in ("intent", "symptom", "anchors")} | {"look_in": []}
 history = [{"round": 1, "query": query}]
 seen: set[int] = set()
@@ -134,20 +166,21 @@ seen_text, picks, cost, calls, fixed = "", [], oneshot_cost, C.Counter(), None
 for round_no in range(1, MAX_ROUNDS + 1):
     if round_no > 1:
         fused = searcher._round_fused(store, query)
-        fresh = _pick_top([item for item in fused if item[0] not in seen], SHOWN, store.get_chunks)
+        fresh = _pick_top([item for item in fused if item[0] not in seen], k, store.get_chunks)
         cards = [make_card(chunk, score, service.config) for chunk, score in fresh]
     calls["codemem_rounds"] += 1
     if not cards:
         break
     if FULL:
-        shown, whole = show_full(cards)
+        shown, whole = show_full(cards, query.get("anchors") or [w for w in re.findall(r"[A-Za-z_][\w.-]{3,}", task["query"])])
         history[-1]["shown_whole"] = whole
     else:
         shown = searcher._show(cards)
     seen.update(c.chunk_id for c in cards)
     history[-1]["shown"] = [[c.path, c.start_line, c.end_line] for c in cards]
     seen_text += "\n" + shown
-    record = llm.extract("loop_full" if FULL else "loop", llm.loop_input(task["repo"], task["query"], history, round_no, shown))
+    ks.append(k)
+    record = llm.extract(("loop_full_k" if CHOOSE_K else "loop_full") if FULL else "loop", llm.loop_input(task["repo"], task["query"], history, round_no, shown))
     cost += record.get("cost_usd") or 0.0
     calls["judge"] += 1
     judged = llm.clean_loop(record["output"], task["query"], seen_text, len(cards))
@@ -155,7 +188,9 @@ for round_no in range(1, MAX_ROUNDS + 1):
     round_picks = [c.chunk_id for c in picked]
     picks += [c for c in round_picks if c not in picks]
     history[-1].update(analysis=judged["analysis"], picked=[f"{c.path}:{c.qualname}" for c in picked], found=judged["found"])
-    nxt = {k: judged[k] for k in ("intent", "symptom", "anchors", "look_in")}
+    nxt = {key: judged[key] for key in ("intent", "symptom", "anchors", "look_in")}
+    if CHOOSE_K:
+        k = record["output"].get("next_k") if record["output"].get("next_k") in KS else 10
     if judged["found"] and picks:
         code = code_for(round_picks + [c for c in picks if c not in round_picks])
         seen_text += "\n" + code
@@ -184,7 +219,7 @@ for round_no in range(1, MAX_ROUNDS + 1):
 service.close()
 patch = subprocess.run(["git", "diff"], cwd=repo, capture_output=True, text=True, encoding="utf8").stdout
 (out / f"{TAG}.diff").write_text(patch, encoding="utf8")
-summary = {"arm": "codemem-loop", "shown_per_round": SHOWN, "judge_sees": "raw code" if FULL else "500-character previews",
+summary = {"arm": "codemem-loop", "shown_per_round": "chosen" if CHOOSE_K else SHOWN, "ks": ks, "judge_sees": "raw code" if FULL else "500-character previews",
            "oneshot_cost_usd": round(oneshot_cost, 4), "task": task_id, "fixed": fixed, "rounds": len(history), "calls": dict(calls),
            "sonnet_calls": calls["judge"] + calls["fix"], "cost_usd": round(cost, 4), "seconds": round(time.time() - start),
            "diff_stat": subprocess.run(["git", "diff", "--stat"], cwd=repo, capture_output=True, text=True).stdout.strip(),

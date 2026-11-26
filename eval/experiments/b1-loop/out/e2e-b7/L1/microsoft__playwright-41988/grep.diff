@@ -1,0 +1,15 @@
+diff --git a/packages/injected/src/ariaSnapshotDistiller.ts b/packages/injected/src/ariaSnapshotDistiller.ts
+index 3481b06..5e1e5d6 100644
+--- a/packages/injected/src/ariaSnapshotDistiller.ts
++++ b/packages/injected/src/ariaSnapshotDistiller.ts
+@@ -179,6 +179,10 @@ const removeRedundantNames: DistillerPlugin = {
+   exit(node: aria.AriaNode, ctx: DistillerContext) {
+     if (!node.ref)
+       return;
++    // On enter the node still had its (e.g. aria-hidden icon) children, so it was not seen as a leaf
++    // generic. Now that they are removed it only supplies text, so it does not represent the name.
++    if (isLeafGeneric(node))
++      ctx.pendingContentRefs.add(node.ref);
+     const nameFromContentRefs = ctx.snapshot.info.get(node.ref)?.nameFromContentRefs;
+     if (!nameFromContentRefs?.length)
+       return;

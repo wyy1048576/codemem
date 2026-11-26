@@ -4,7 +4,12 @@ Track B experiments on Wilson's laptop (Windows, Intel Arc 140V GPU through `arc
 The scripts were written against a local copy of `main` at `7c24558` (`analysis/codemem-7c24558`) and use
 absolute Windows paths in places; they are here to be read and rerun, not yet cleaned up for other machines.
 
-**Start with [`loop_vs_grep.md`](loop_vs_grep.md):** Track B's current focus (loop vs grep), the algorithms, the
+**The chosen loop is in [`loop_k.md`](loop_k.md) (2026-11-26):** loop-k (`e2e_loopk.py`), where Sonnet picks how many
+results to read (k = 1 to 10), one call per round judges and edits, and the prompt cache is off. On 14 vague-prompt tasks
+it costs about what the grep agent costs and edits a gold function in the same number of tasks. Its write-up has the
+algorithm, how to run it, how to grade the saved diffs with `cmeval e2e grade`, and why each choice was made.
+
+**Earlier work: [`loop_vs_grep.md`](loop_vs_grep.md):** Track B's current focus (loop vs grep), the algorithms, the
 21-task results, the n = 10 / 25 / 50 sweep, the duckdb-25101 case study and the grep "memory" test.
 
 **Nothing in this folder builds the repo or runs tests.** An arm "edits a gold function" when its final diff

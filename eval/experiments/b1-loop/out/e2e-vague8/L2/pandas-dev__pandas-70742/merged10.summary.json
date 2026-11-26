@@ -1,0 +1,194 @@
+{
+ "arm": "codemem-loop-merged",
+ "fixed_k": 10,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-70742",
+ "fixed": {
+  "round": 2,
+  "explanation": "In the single-block case, fast_xs returns a strided view of the 2D block, keeping the entire (possibly temporary) array alive. When the block isn't shared with others (e.g., temporary from taking columns), copy the row and drop refs so the big array can be freed.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  10,
+  10
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.085,
+ "seconds": 33,
+ "diff_stat": "pandas/core/internals/managers.py | 8 +++++++-\n 1 file changed, 7 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Row selection with a list of columns (e.g. df.loc[row, [cols]] or iloc) on a DataFrame returns a Series that is a view of a large temporary 2D block array rather than a copy, keeping the whole base array alive. The fix is in the fast path that builds a row Series from a block (fast_xs / _ixs / _get_value / loc getitem), which should copy or avoid referencing the big parent array.",
+    "symptom": "Selecting a single row with a list of columns returns a small Series whose base references a huge temporary array, so memory isn't freed and grows since pandas 3.0.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 10,
+   "shown": [
+    [
+     "pandas/core/apply.py",
+     1585,
+     1628
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     703,
+     721
+    ],
+    [
+     "pandas/core/apply.py",
+     1622,
+     1626
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2126,
+     2152
+    ],
+    [
+     "pandas/core/methods/select.py",
+     80,
+     85
+    ],
+    [
+     "pandas/core/indexing.py",
+     3545,
+     3562
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2325,
+     2330
+    ],
+    [
+     "pandas/core/frame.py",
+     4245,
+     4266
+    ],
+    [
+     "pandas/core/series.py",
+     1171,
+     1173
+    ],
+    [
+     "pandas/core/series.py",
+     1081,
+     1089
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The results shown don't contain the code that creates the row Series from a 2D block. DataFrame._ixs calls mgr.fast_xs, which is likely where the view of a large array is returned. The .loc path with a list of columns probably goes through a take or _getitem_tuple and then fast_xs in BlockManager.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "BlockManager.fast_xs, which builds a single row cross-section from blocks and may return a view of a temporary 2D array (for example after taking columns).",
+    "symptom": "Selecting one row with a list of columns returns a small Series that is a view of a huge temporary array, so memory is not freed.",
+    "anchors": [
+     "fast_xs",
+     "_ixs",
+     "BlockManager",
+     "_mgr.fast_xs",
+     "iget"
+    ],
+    "look_in": [
+     "pandas/core/internals/managers.py"
+    ]
+   },
+   "k": 10,
+   "shown": [
+    [
+     "pandas/core/internals/managers.py",
+     1166,
+     1247
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1249,
+     1261
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2076,
+     2360
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1111,
+     2073
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2126,
+     2135
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1263,
+     1273
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1156,
+     1161
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2101,
+     2112
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2393,
+     2417
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1941,
+     2004
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In the single-block case, fast_xs returns a strided view of the 2D block, keeping the entire (possibly temporary) array alive. When the block isn't shared with others (e.g., temporary from taking columns), copy the row and drop refs so the big array can be freed.",
+   "picked": [
+    "pandas/core/internals/managers.py:BlockManager.fast_xs"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

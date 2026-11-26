@@ -1,0 +1,16 @@
+diff --git a/packages/playwright-core/src/server/fetch.ts b/packages/playwright-core/src/server/fetch.ts
+index e9c1fbc..a2b16aa 100644
+--- a/packages/playwright-core/src/server/fetch.ts
++++ b/packages/playwright-core/src/server/fetch.ts
+@@ -476,8 +476,9 @@ export abstract class APIRequestContext extends SdkObject {
+               return;
+             }
+ 
+-            if (headers['host'])
+-              headers['host'] = locationURL.host;
++            const hostKey = Object.keys(headers).find(k => k.toLowerCase() === 'host');
++            if (hostKey && headers[hostKey])
++              headers[hostKey] = locationURL.host;
+ 
+             // Drop credentials scoped to the original origin on cross-origin redirects.
+             if (locationURL.origin !== url.origin)

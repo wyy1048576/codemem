@@ -1,0 +1,34 @@
+{
+ "arm": "codemem-loop-merged",
+ "fixed_k": 10,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "parseRawCookie processes attributes in order, so a later Expires overrides an earlier Max-Age. Also parseInt accepts values like \"12abc\". Fix: collect expires and max-age separately, validate Max-Age with /^-?\\d+$/, and apply Max-Age after the loop so it wins.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  10
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0688,
+ "seconds": 15,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 13 +++++++------\n 1 file changed, 7 insertions(+), 6 deletions(-)"
+}
+round 1: k=10 action=edit picked=['packages/playwright-core/src/server/cookieStore.ts:parseRawCookie'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  10%|█         | 30/290 [00:00<00:00, 297.32it/s]
+Loading weights:  21%|██▏       | 62/290 [00:00<00:00, 305.12it/s]
+Loading weights:  33%|███▎      | 95/290 [00:00<00:00, 313.75it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 810.25it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

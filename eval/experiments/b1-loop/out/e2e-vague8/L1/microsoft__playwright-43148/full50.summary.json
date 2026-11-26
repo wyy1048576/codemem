@@ -1,0 +1,354 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0103,
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 1,
+  "explanation": "filterCookies prefixed a dot to every cookie domain and used a plain startsWith for paths, so host-only cookies matched subdomains and /api matched /apiv2. It now matches host-only domains exactly, matches dotted domains on the host or its subdomains, and matches paths per RFC 6265 5.1.4. pathMatches no longer appends a slash to the request path, which made /foo match /foo/. It uses the same RFC rule.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.2433,
+ "seconds": 25,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 17 ++++++++++++-----\n 2 files changed, 15 insertions(+), 10 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The cookie URL filter (filterCookies) used for listing cookies prepends a dot to every cookie domain and compares paths with plain string prefix. It should implement RFC 6265 domain-match (host-only cookies match only the exact host) and path-match (exact or slash boundary). Also the path check used when sending cookies (domainMatches/pathMatches in network cookie store) appends a slash to the request path, making /foo match /foo/.",
+    "symptom": "Listing cookies for URLs returns host-only cookies for subdomains and for path prefixes like /apiv2, and a cookie with path /foo/ is sent to /foo.",
+    "anchors": [
+     "host-only",
+     "path-match",
+     "domain-match",
+     "cookies",
+     "API request context"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     260,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     35,
+     55
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/crBrowser.ts",
+     385,
+     408
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     142,
+     160
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     219,
+     227
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     229,
+     237
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/networkDispatchers.ts",
+     253,
+     262
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     129,
+     140
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     42,
+     46
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     46,
+     236
+    ],
+    [
+     "tests/library/browsercontext-cookies.spec.ts",
+     177,
+     361
+    ],
+    [
+     "packages/playwright-core/src/server/webkit/webview/wvBrowser.ts",
+     314,
+     332
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     21,
+     61
+    ],
+    [
+     "packages/playwright-core/src/server/webkit/wkBrowser.ts",
+     252,
+     270
+    ],
+    [
+     "tests/library/defaultbrowsercontext-1.spec.ts",
+     22,
+     26
+    ],
+    [
+     "packages/playwright-core/src/server/bidi/bidiBrowser.ts",
+     284,
+     300
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/protocol.d.ts",
+     13041,
+     13240
+    ],
+    [
+     "packages/playwright-core/types/protocol.d.ts",
+     13041,
+     13240
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     1349,
+     1534
+    ],
+    [
+     "tests/library/browsercontext-cookies-third-party.spec.ts",
+     79,
+     104
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     125,
+     127
+    ],
+    [
+     "tests/library/browsercontext-add-cookies.spec.ts",
+     1,
+     179
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     32,
+     40
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     307,
+     311
+    ],
+    [
+     "packages/playwright-core/src/server/firefox/ffBrowser.ts",
+     242,
+     257
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     287,
+     299
+    ],
+    [
+     "tests/library/browsercontext-cookies-third-party.spec.ts",
+     106,
+     110
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     217
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     794,
+     804
+    ],
+    [
+     "tests/library/browsercontext-clearcookies.spec.ts",
+     1,
+     166
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     205,
+     390
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     835,
+     851
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     806,
+     808
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     63,
+     120
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     392,
+     591
+    ],
+    [
+     "tests/library/browsercontext-cookies.spec.ts",
+     1,
+     175
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/crBrowser.ts",
+     411,
+     432
+    ],
+    [
+     "tests/library/browsercontext-add-cookies.spec.ts",
+     375,
+     466
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     428,
+     605
+    ],
+    [
+     "tests/library/browsercontext-cookies-third-party.spec.ts",
+     569,
+     603
+    ],
+    [
+     "tests/library/browsercontext-proxy.spec.ts",
+     1,
+     195
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     58,
+     60
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     130,
+     138
+    ],
+    [
+     "packages/playwright-client/types/types.d.ts",
+     19701,
+     20695
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     78,
+     87
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     76,
+     88
+    ],
+    [
+     "packages/playwright-core/src/client/fetch.ts",
+     131,
+     137
+    ],
+    [
+     "packages/playwright-core/types/types.d.ts",
+     19701,
+     20695
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     27,
+     29
+    ],
+    [
+     "packages/playwright-core/src/server/webkit/protocol.d.ts",
+     8813,
+     8957
+    ]
+   ],
+   "analysis": "filterCookies in network.ts prepends a dot to every cookie domain, so host-only cookies match subdomains. It also compares paths with a plain startsWith, so /api matches /apiv2. pathMatches in cookieStore.ts appends a slash to the request path, so /foo matches /foo/. Both functions are in the results and need to change. Browser contexts call filterCookies too, so fixing it there also covers them.",
+   "picked": [
+    "packages/playwright-core/src/server/network.ts:filterCookies",
+    "packages/playwright-core/src/server/cookieStore.ts:pathMatches"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/network.ts lines 35-55 (filterCookies)",
+    "packages/playwright-core/src/server/cookieStore.ts lines 229-237 (pathMatches)"
+   ],
+   "fix_attempt": "applied: filterCookies prefixed a dot to every cookie domain and used a plain startsWith for paths, so host-only cookies matched subdomains and /api matched /apiv2. It now matches host-only domains exactly, matches dotted domains on the host or its subdomains, and matches paths per RFC 6265 5.1.4. pathMatches no longer appends a slash to the request path, which made /foo match /foo/. It uses the same RFC rule."
+  }
+ ]
+}

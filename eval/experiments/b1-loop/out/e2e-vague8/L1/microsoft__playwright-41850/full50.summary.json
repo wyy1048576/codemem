@@ -1,0 +1,351 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0089,
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 1,
+  "explanation": "The redirect branch looked up and set `headers['host']` with a case-sensitive key, so a header named `Host` was never updated. The fix checks for the header with the case-insensitive `getHeader`. It then removes any casing variant with `removeHeader` and sets the lowercase `host` to the redirect target's host. I assumed `removeHeader` matches names case-insensitively, as the notes say the other helpers do, and I didn't see its source.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.2956,
+ "seconds": 19,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The APIRequestContext fetch logic that follows HTTP redirects rewrites the request headers for the new URL. It sets the 'host' header only when the key is exactly lowercase 'host'. It should find the Host header with a case-insensitive lookup and update it, as the other header helpers do.",
+    "symptom": "After a redirect, the Host header keeps the original host if it was set with non-lowercase casing such as \"Host\", so the redirected request goes out with the wrong host.",
+    "anchors": [
+     "Host",
+     "host",
+     "headers",
+     "redirect"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     278,
+     290
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     862,
+     870
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     590,
+     789
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     320,
+     639
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     177,
+     187
+    ],
+    [
+     "packages/utils/httpServer.ts",
+     317,
+     324
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     319,
+     321
+    ],
+    [
+     "tests/page/page-request-continue.spec.ts",
+     938,
+     1012
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     390,
+     588
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     883,
+     899
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     241,
+     243
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     280,
+     283
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     89,
+     109
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     795,
+     808
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     1353,
+     1534
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     285,
+     287
+    ],
+    [
+     "tests/page/page-network-request.spec.ts",
+     387,
+     571
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     111,
+     115
+    ],
+    [
+     "packages/playwright/src/plugins/cacheProxy/server.ts",
+     295,
+     300
+    ],
+    [
+     "tests/page/page-request-continue.spec.ts",
+     568,
+     757
+    ],
+    [
+     "packages/playwright/src/plugins/cacheProxy/server.ts",
+     320,
+     327
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     368,
+     383
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     233,
+     250
+    ],
+    [
+     "packages/playwright-core/src/server/harBackend.ts",
+     118,
+     192
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     954,
+     960
+    ],
+    [
+     "tests/page/page-request-continue.spec.ts",
+     375,
+     566
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     205,
+     388
+    ],
+    [
+     "packages/playwright-core/src/server/bidi/bidiNetworkManager.ts",
+     59,
+     122
+    ],
+    [
+     "packages/playwright-client/types/types.d.ts",
+     18983,
+     19836
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     103,
+     646
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     962,
+     965
+    ],
+    [
+     "tests/page/page-request-continue.spec.ts",
+     759,
+     936
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     879,
+     881
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     711,
+     817
+    ],
+    [
+     "packages/playwright-core/src/client/fetch.ts",
+     93,
+     277
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     838,
+     858
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     232,
+     234
+    ],
+    [
+     "tests/page/page-goto.spec.ts",
+     589,
+     785
+    ],
+    [
+     "packages/playwright-core/src/client/harRouter.ts",
+     50,
+     113
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     274,
+     277
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     104,
+     183
+    ],
+    [
+     "packages/playwright-core/types/protocol.d.ts",
+     8157,
+     8316
+    ],
+    [
+     "tests/page/page-route.spec.ts",
+     555,
+     737
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/protocol.d.ts",
+     8157,
+     8316
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     153,
+     155
+    ],
+    [
+     "packages/playwright-core/src/client/fetch.ts",
+     176,
+     267
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     193,
+     195
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     57,
+     59
+    ],
+    [
+     "packages/playwright-core/types/types.d.ts",
+     18983,
+     19836
+    ],
+    [
+     "tests/library/global-fetch.spec.ts",
+     385,
+     567
+    ]
+   ],
+   "analysis": "In APIRequestContext._sendRequest in fetch.ts, the redirect branch does `if (headers['host']) headers['host'] = locationURL.host;`, which is a case-sensitive lookup. The other header operations use the case-insensitive getHeader and setHeader helpers (results 25 and 31). Replacing this with `setHeader(headers, 'host', locationURL.host)` guarded by `getHeader(headers, 'host')` fixes it.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 320-639 (APIRequestContext._sendRequest)"
+   ],
+   "fix_attempt": "applied: The redirect branch looked up and set `headers['host']` with a case-sensitive key, so a header named `Host` was never updated. The fix checks for the header with the case-insensitive `getHeader`. It then removes any casing variant with `removeHeader` and sets the lowercase `host` to the redirect target's host. I assumed `removeHeader` matches names case-insensitively, as the notes say the other helpers do, and I didn't see its source."
+  }
+ ]
+}

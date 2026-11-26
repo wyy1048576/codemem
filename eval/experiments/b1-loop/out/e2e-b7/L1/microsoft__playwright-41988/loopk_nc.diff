@@ -1,0 +1,13 @@
+diff --git a/packages/injected/src/ariaSnapshotDistiller.ts b/packages/injected/src/ariaSnapshotDistiller.ts
+index 3481b06..b3af34c 100644
+--- a/packages/injected/src/ariaSnapshotDistiller.ts
++++ b/packages/injected/src/ariaSnapshotDistiller.ts
+@@ -182,7 +182,7 @@ const removeRedundantNames: DistillerPlugin = {
+     const nameFromContentRefs = ctx.snapshot.info.get(node.ref)?.nameFromContentRefs;
+     if (!nameFromContentRefs?.length)
+       return;
+-    if (nameFromContentRefs.every(ref => !ctx.pendingContentRefs.has(ref))) {
++    if (node.children.length && nameFromContentRefs.every(ref => !ctx.pendingContentRefs.has(ref))) {
+       node.name = '';
+     } else {
+       for (const ref of nameFromContentRefs)

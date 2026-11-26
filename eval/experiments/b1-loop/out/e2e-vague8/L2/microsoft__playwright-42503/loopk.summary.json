@@ -1,0 +1,186 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 3,
+  "explanation": "runDaemonForContext calls browser.bind() with a fresh session name for every context. A second context on the same browser, such as one from a worker-scoped fixture, tries to bind the browser again and crashes. The fix remembers which browsers are already bound and skips bind and the instructions on later contexts, but still pauses the new context.",
+  "edits": 2
+ },
+ "rounds": 3,
+ "ks": [
+  5,
+  5,
+  5
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 3,
+  "loopk": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0772,
+ "seconds": 31,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 26 +++++++++++++---------\n 1 file changed, 16 insertions(+), 10 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code in the Playwright CLI debug/test-run path that attaches to or tracks a browser context (e.g. the debugger/recorder/CLI session wiring, or browser context creation hooks in the test runner) assumes a single context and fails when a second context is created, e.g. by a worker-scoped fixture. Make it handle multiple contexts.",
+    "symptom": "Running a test in debug mode via the Playwright CLI crashes when the test creates a second browser context (e.g. in a worker-scoped fixture).",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     376,
+     390
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     118,
+     126
+    ],
+    [
+     "packages/playwright-core/src/client/playwright.ts",
+     77,
+     79
+    ],
+    [
+     "packages/playwright-core/src/server/browser.ts",
+     105,
+     128
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     63,
+     65
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Results show generic context creation, not the CLI debug wiring. The crash likely comes from the CLI/test debug code that attaches to the browser via a single-context assumption (e.g. a CLI session or the testing-side 'debug' attach in tools/cli-daemon or backend/browserBackend).",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Playwright CLI daemon/session code that attaches to a browser for debugging a test and gets the single browser context, throwing when there are multiple contexts.",
+    "symptom": "CLI debugging of a test crashes when a second browser context is created.",
+    "anchors": [
+     "_initializeBrowserContext",
+     "_rawBrowserContext",
+     "_onPageCreated"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/tools/"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     369,
+     374
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     98,
+     419
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     124,
+     131
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     155,
+     157
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     299,
+     305
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Context wraps a single raw browser context; the crash likely comes from the code that creates a Context/backend for a context when the test runner debugs with the CLI, and it fails on the second context. I need to find the caller that constructs Context on the browser context 'context' event.",
+   "picked": []
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Code that, when debugging a test via CLI, hooks browser context creation (onBrowserContextCreated / _setupBrowserContext) and creates a tools backend Context or BrowserBackend for it, assuming only one context.",
+    "symptom": "CLI debugging of a test crashes when a second browser context is created.",
+    "anchors": [
+     "debugger()",
+     "ensureBrowserContext"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/tools/",
+     "packages/playwright/src/"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     189,
+     202
+    ],
+    [
+     "packages/playwright/src/mcp/test/browserBackend.ts",
+     120,
+     137
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     173,
+     178
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     750,
+     753
+    ],
+    [
+     "packages/playwright/src/mcp/test/testBackend.ts",
+     77,
+     91
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "runDaemonForContext calls browser.bind() with a fresh session name for every context. A second context on the same browser, such as one from a worker-scoped fixture, tries to bind the browser again and crashes. The fix remembers which browsers are already bound and skips bind and the instructions on later contexts, but still pauses the new context.",
+   "picked": [
+    "packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

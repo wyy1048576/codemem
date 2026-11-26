@@ -1,0 +1,81 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0079,
+ "task": "pandas-dev__pandas-69779",
+ "fixed": {
+  "round": 1,
+  "explanation": "`_format_multi` stringified each level and then sparsified the strings, so distinct values that print the same (such as large floats shown as 2.015000e+11) were treated as repeats and blanked. The fix compares the integer level codes instead. A row's label at level i is blanked only if levels 0 through i all match the previous row, and the last level is never blanked. This mirrors what `sparsify_labels` does, but it can't mistake different values for the same one.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0617,
+ "seconds": 36,
+ "diff_stat": "pandas/core/indexes/multi.py | 17 ++++++++++++++---\n 1 file changed, 14 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that renders a MultiIndex row index in a DataFrame's HTML/string/LaTeX output, sparsifying repeated labels. It likely compares formatted label strings instead of the underlying values, so distinct values that format identically get merged. It should compare the actual level values/codes when deciding to sparsify.",
+    "symptom": "With a two-level row MultiIndex, distinct float labels that print the same (like 2.015000e+11) are shown as a single merged group because sparsification treats them as equal.",
+    "anchors": [
+     "2.015000e+11"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/io/formats/excel.py",
+     776,
+     861
+    ],
+    [
+     "pandas/io/formats/html.py",
+     482,
+     608
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     1654,
+     1713
+    ],
+    [
+     "pandas/io/formats/format.py",
+     1115,
+     1125
+    ],
+    [
+     "pandas/io/formats/html.py",
+     436,
+     480
+    ]
+   ],
+   "analysis": "MultiIndex._format_multi formats each level to strings, then passes the string lists to sparsify_labels. Distinct floats that format identically (2.015000e+11) are therefore treated as repeats and merged. The fix is to sparsify using the level codes or actual values, not the formatted strings.",
+   "picked": [
+    "pandas/core/indexes/multi.py:MultiIndex._format_multi"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/indexes/multi.py lines 1654-1713 (MultiIndex._format_multi)"
+   ],
+   "fix_attempt": "applied: `_format_multi` stringified each level and then sparsified the strings, so distinct values that print the same (such as large floats shown as 2.015000e+11) were treated as repeats and blanked. The fix compares the integer level codes instead. A row's label at level i is blanked only if levels 0 through i all match the previous row, and the last level is never blanked. This mirrors what `sparsify_labels` does, but it can't mistake different values for the same one."
+  }
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 2,
+  "explanation": "test.describe.configure ignores a lock option. Suites already hold _locks, which describe() fills from validated details. The fix validates the lock option the same way and pushes it onto the current suite. The public types file was not seen, so it is not updated.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0673,
+ "seconds": 19,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)"
+}
+round 1: k=3 action=search picked=[] 
+round 2: k=3 action=edit picked=['packages/playwright/src/common/testType.ts:TestTypeImpl'] applied
+
+parse errors in browser_patches/webkit/embedder/Playwright/win/WinMain.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  22%|██▏       | 64/290 [00:00<00:00, 602.18it/s]
+Loading weights:  43%|████▎     | 125/290 [00:00<00:00, 588.64it/s]
+Loading weights:  63%|██████▎   | 184/290 [00:00<00:00, 526.91it/s]
+Loading weights:  82%|████████▏ | 238/290 [00:00<00:00, 500.52it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 580.77it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  20%|██        | 58/290 [00:00<00:00, 510.95it/s]
+Loading weights:  42%|████▏     | 123/290 [00:00<00:00, 538.40it/s]
+Loading weights:  62%|██████▏   | 179/290 [00:00<00:00, 510.21it/s]
+Loading weights:  80%|███████▉  | 231/290 [00:00<00:00, 495.08it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 557.72it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

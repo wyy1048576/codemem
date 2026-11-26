@@ -1,0 +1,642 @@
+[
+ {
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full5",
+  "summary_cost": 0.1377,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 183,
+    "cost": 0.0071,
+    "code": 0,
+    "tokens": 1950
+   },
+   {
+    "kind": "loop_full",
+    "chars": 3697,
+    "cost": 0.0137141,
+    "code": 2490,
+    "out": 736,
+    "tokens": 3686
+   },
+   {
+    "kind": "fix",
+    "chars": 2605,
+    "cost": 0.018152,
+    "code": 2053,
+    "out": 1468,
+    "tokens": 3091
+   },
+   {
+    "kind": "loop_full",
+    "chars": 35506,
+    "cost": 0.0587361,
+    "code": 33200,
+    "out": 880,
+    "tokens": 15709
+   },
+   {
+    "kind": "fix",
+    "chars": 15890,
+    "cost": 0.039970000000000006,
+    "code": 14598,
+    "out": 1707,
+    "tokens": 8113
+   }
+  ]
+ },
+ {
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full10",
+  "summary_cost": 0.0493,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 183,
+    "cost": 0.0071,
+    "code": 0,
+    "tokens": 1950
+   },
+   {
+    "kind": "loop_full",
+    "chars": 7116,
+    "cost": 0.0196521,
+    "code": 5434,
+    "out": 869,
+    "tokens": 4978
+   },
+   {
+    "kind": "fix",
+    "chars": 4135,
+    "cost": 0.022528,
+    "code": 3535,
+    "out": 1755,
+    "tokens": 3670
+   }
+  ]
+ },
+ {
+  "task": "pandas-dev__pandas-70742",
+  "arm": "full5",
+  "summary_cost": 0.0957,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 205,
+    "cost": 0.0079,
+    "code": 0,
+    "tokens": 1959
+   },
+   {
+    "kind": "loop_full",
+    "chars": 5833,
+    "cost": 0.0189661,
+    "code": 4413,
+    "out": 1157,
+    "tokens": 4493
+   },
+   {
+    "kind": "loop_full",
+    "chars": 24114,
+    "cost": 0.0470501,
+    "code": 21737,
+    "out": 969,
+    "tokens": 11403
+   },
+   {
+    "kind": "fix",
+    "chars": 4578,
+    "cost": 0.021808,
+    "code": 3515,
+    "out": 1606,
+    "tokens": 3837
+   }
+  ]
+ },
+ {
+  "task": "pandas-dev__pandas-70742",
+  "arm": "full10",
+  "summary_cost": 0.0992,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 205,
+    "cost": 0.0079,
+    "code": 0,
+    "tokens": 1959
+   },
+   {
+    "kind": "loop_full",
+    "chars": 8690,
+    "cost": 0.0231781,
+    "code": 6795,
+    "out": 1116,
+    "tokens": 5573
+   },
+   {
+    "kind": "loop_full",
+    "chars": 21993,
+    "cost": 0.0446941,
+    "code": 19053,
+    "out": 1029,
+    "tokens": 10602
+   },
+   {
+    "kind": "fix",
+    "chars": 4719,
+    "cost": 0.023458,
+    "code": 3515,
+    "out": 1595,
+    "tokens": 3891
+   }
+  ]
+ },
+ {
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full5",
+  "summary_cost": 0.3203,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 226,
+    "cost": 0.008,
+    "code": 0,
+    "tokens": 1967
+   },
+   {
+    "kind": "loop_full",
+    "chars": 19781,
+    "cost": 0.038944099999999995,
+    "code": 18445,
+    "out": 1101,
+    "tokens": 9765
+   },
+   {
+    "kind": "loop_full",
+    "chars": 11050,
+    "cost": 0.0294741,
+    "code": 8637,
+    "out": 995,
+    "tokens": 6465
+   },
+   {
+    "kind": "fix",
+    "chars": 2469,
+    "cost": 0.021094,
+    "code": 1236,
+    "out": 1163,
+    "tokens": 3040
+   },
+   {
+    "kind": "loop_full",
+    "chars": 10135,
+    "cost": 0.0298901,
+    "code": 5938,
+    "out": 1244,
+    "tokens": 6119
+   },
+   {
+    "kind": "loop_full",
+    "chars": 7386,
+    "cost": 0.0225881,
+    "code": 2061,
+    "out": 1160,
+    "tokens": 5080
+   },
+   {
+    "kind": "loop_full",
+    "chars": 14471,
+    "cost": 0.0326801,
+    "code": 8098,
+    "out": 1246,
+    "tokens": 7758
+   },
+   {
+    "kind": "loop_full",
+    "chars": 10322,
+    "cost": 0.0314281,
+    "code": 2857,
+    "out": 1444,
+    "tokens": 6190
+   },
+   {
+    "kind": "loop_full",
+    "chars": 20088,
+    "cost": 0.0393921,
+    "code": 11346,
+    "out": 1095,
+    "tokens": 9881
+   },
+   {
+    "kind": "loop_full",
+    "chars": 16398,
+    "cost": 0.0361661,
+    "code": 6668,
+    "out": 964,
+    "tokens": 8487
+   },
+   {
+    "kind": "fix",
+    "chars": 6016,
+    "cost": 0.03061,
+    "code": 1589,
+    "out": 1934,
+    "tokens": 4381
+   }
+  ]
+ },
+ {
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full10",
+  "summary_cost": 0.1397,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 226,
+    "cost": 0.008,
+    "code": 0,
+    "tokens": 1967
+   },
+   {
+    "kind": "loop_full",
+    "chars": 34771,
+    "cost": 0.0676501,
+    "code": 32960,
+    "out": 1325,
+    "tokens": 15432
+   },
+   {
+    "kind": "loop_full",
+    "chars": 13689,
+    "cost": 0.0352121,
+    "code": 10660,
+    "out": 1021,
+    "tokens": 7463
+   },
+   {
+    "kind": "fix",
+    "chars": 6719,
+    "cost": 0.028834,
+    "code": 5346,
+    "out": 1666,
+    "tokens": 4647
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-41850",
+  "arm": "full5",
+  "summary_cost": 0.1057,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 203,
+    "cost": 0.0079,
+    "code": 0,
+    "tokens": 1958
+   },
+   {
+    "kind": "loop_full",
+    "chars": 3442,
+    "cost": 0.0142761,
+    "code": 2135,
+    "out": 908,
+    "tokens": 3589
+   },
+   {
+    "kind": "loop_full",
+    "chars": 29636,
+    "cost": 0.0526581,
+    "code": 27493,
+    "out": 807,
+    "tokens": 13491
+   },
+   {
+    "kind": "fix",
+    "chars": 14987,
+    "cost": 0.030884,
+    "code": 14060,
+    "out": 844,
+    "tokens": 7772
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-41850",
+  "arm": "full10",
+  "summary_cost": 0.1111,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 203,
+    "cost": 0.0079,
+    "code": 0,
+    "tokens": 1958
+   },
+   {
+    "kind": "loop_full",
+    "chars": 5110,
+    "cost": 0.0173961,
+    "code": 3328,
+    "out": 980,
+    "tokens": 4220
+   },
+   {
+    "kind": "loop_full",
+    "chars": 29785,
+    "cost": 0.0539761,
+    "code": 27142,
+    "out": 750,
+    "tokens": 13547
+   },
+   {
+    "kind": "fix",
+    "chars": 14964,
+    "cost": 0.031802,
+    "code": 14060,
+    "out": 977,
+    "tokens": 7763
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-42503",
+  "arm": "full5",
+  "summary_cost": 0.0969,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 225,
+    "cost": 0.0077,
+    "code": 0,
+    "tokens": 1966
+   },
+   {
+    "kind": "loop_full",
+    "chars": 4187,
+    "cost": 0.0153761,
+    "code": 2858,
+    "out": 1090,
+    "tokens": 3871
+   },
+   {
+    "kind": "loop_full",
+    "chars": 14546,
+    "cost": 0.031570100000000004,
+    "code": 12238,
+    "out": 1126,
+    "tokens": 7787
+   },
+   {
+    "kind": "loop_full",
+    "chars": 10304,
+    "cost": 0.0252441,
+    "code": 6968,
+    "out": 806,
+    "tokens": 6183
+   },
+   {
+    "kind": "fix",
+    "chars": 2270,
+    "cost": 0.016994000000000002,
+    "code": 746,
+    "out": 1500,
+    "tokens": 2965
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-42503",
+  "arm": "full10",
+  "summary_cost": 0.1677,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 225,
+    "cost": 0.0077,
+    "code": 0,
+    "tokens": 1966
+   },
+   {
+    "kind": "loop_full",
+    "chars": 11011,
+    "cost": 0.0254521,
+    "code": 9207,
+    "out": 1019,
+    "tokens": 6450
+   },
+   {
+    "kind": "loop_full",
+    "chars": 28959,
+    "cost": 0.0547881,
+    "code": 26243,
+    "out": 1201,
+    "tokens": 13235
+   },
+   {
+    "kind": "loop_full",
+    "chars": 32663,
+    "cost": 0.0616241,
+    "code": 28851,
+    "out": 814,
+    "tokens": 14635
+   },
+   {
+    "kind": "fix",
+    "chars": 2141,
+    "cost": 0.01815,
+    "code": 746,
+    "out": 2004,
+    "tokens": 2916
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-42919",
+  "arm": "full5",
+  "summary_cost": 0.1127,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 200,
+    "cost": 0.0087,
+    "code": 0,
+    "tokens": 1957
+   },
+   {
+    "kind": "loop_full",
+    "chars": 31728,
+    "cost": 0.0616041,
+    "code": 30287,
+    "out": 1133,
+    "tokens": 14281
+   },
+   {
+    "kind": "loop_full",
+    "chars": 11510,
+    "cost": 0.027870100000000002,
+    "code": 9244,
+    "out": 1063,
+    "tokens": 6639
+   },
+   {
+    "kind": "fix",
+    "chars": 3580,
+    "cost": 0.014572000000000002,
+    "code": 2562,
+    "out": 1021,
+    "tokens": 3460
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-42919",
+  "arm": "full10",
+  "summary_cost": 0.1019,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 200,
+    "cost": 0.0087,
+    "code": 0,
+    "tokens": 1957
+   },
+   {
+    "kind": "loop_full",
+    "chars": 43028,
+    "cost": 0.0805301,
+    "code": 41112,
+    "out": 1001,
+    "tokens": 18553
+   },
+   {
+    "kind": "fix",
+    "chars": 1653,
+    "cost": 0.012648,
+    "code": 970,
+    "out": 886,
+    "tokens": 2732
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-43146",
+  "arm": "full5",
+  "summary_cost": 0.0573,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 215,
+    "cost": 0.0077,
+    "code": 0,
+    "tokens": 1962
+   },
+   {
+    "kind": "loop_full",
+    "chars": 13754,
+    "cost": 0.0322481,
+    "code": 12416,
+    "out": 830,
+    "tokens": 7487
+   },
+   {
+    "kind": "fix",
+    "chars": 3229,
+    "cost": 0.01733,
+    "code": 2625,
+    "out": 1651,
+    "tokens": 3327
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-43146",
+  "arm": "full10",
+  "summary_cost": 0.082,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 215,
+    "cost": 0.0077,
+    "code": 0,
+    "tokens": 1962
+   },
+   {
+    "kind": "loop_full",
+    "chars": 26371,
+    "cost": 0.0549721,
+    "code": 24558,
+    "out": 907,
+    "tokens": 12256
+   },
+   {
+    "kind": "fix",
+    "chars": 3263,
+    "cost": 0.019344,
+    "code": 2625,
+    "out": 2070,
+    "tokens": 3340
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-43148",
+  "arm": "full5",
+  "summary_cost": 0.0448,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 207,
+    "cost": 0.0079,
+    "code": 0,
+    "tokens": 1959
+   },
+   {
+    "kind": "loop_full",
+    "chars": 4957,
+    "cost": 0.0180021,
+    "code": 3593,
+    "out": 896,
+    "tokens": 4162
+   },
+   {
+    "kind": "fix",
+    "chars": 1803,
+    "cost": 0.018972000000000003,
+    "code": 1142,
+    "out": 1930,
+    "tokens": 2788
+   }
+  ]
+ },
+ {
+  "task": "microsoft__playwright-43148",
+  "arm": "full10",
+  "summary_cost": 0.0495,
+  "calls": [
+   {
+    "kind": "oneshot",
+    "chars": 207,
+    "cost": 0.0079,
+    "code": 0,
+    "tokens": 1959
+   },
+   {
+    "kind": "loop_full",
+    "chars": 8686,
+    "cost": 0.0230081,
+    "code": 6847,
+    "out": 795,
+    "tokens": 5572
+   },
+   {
+    "kind": "fix",
+    "chars": 1747,
+    "cost": 0.018606,
+    "code": 1142,
+    "out": 1825,
+    "tokens": 2767
+   }
+  ]
+ }
+]

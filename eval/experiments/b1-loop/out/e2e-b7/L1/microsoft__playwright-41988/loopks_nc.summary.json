@@ -1,0 +1,606 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  5,
+  3,
+  5,
+  3,
+  5,
+  5,
+  3,
+  5,
+  5,
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0094,
+ "task": "microsoft__playwright-41988",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 2
+ },
+ "sonnet_calls": 12,
+ "cost_usd": 0.3614,
+ "seconds": 126,
+ "diff_stat": "",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The AI aria snapshot generator builds the YAML tree from DOM nodes and computes accessible names for roles like button. It likely skips or drops name text when a child subtree contains an aria-hidden element next to text in nested spans, or the name is computed differently from getByRole's accessible name computation (roleUtils getElementAccessibleName).",
+    "symptom": "Aria snapshot for AI shows a button without its accessible name \"Add New Item\" when its nested spans include an aria-hidden SVG icon sibling, although getByRole with that name works.",
+    "anchors": [
+     "aria-hidden",
+     "focusable",
+     "tabindex",
+     "button",
+     "snapshot",
+     "ref",
+     "cursor"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     220,
+     409
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     411,
+     584
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     85,
+     220
+    ],
+    [
+     "tests/library/role-utils.spec.ts",
+     407,
+     597
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     586,
+     757
+    ]
+   ],
+   "analysis": "generateAriaTree records nameFromContentRefs and then calls distillAriaSnapshot, which drops names that merely repeat printed descendants. The tests show nested-span name redundancy removal. The button's name is probably dropped as redundant even though the inner text node/generic is itself collapsed or removed, leaving no printed text. The distill code has not been seen yet.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Code that distills the AI aria snapshot, removing a node's name when it is redundant because it repeats printed descendant nodes (nameFromContentRefs), and collapsing generic wrappers.",
+    "symptom": "Button name \"Add New Item\" is dropped from the AI snapshot when nested spans contain an aria-hidden svg icon sibling.",
+    "anchors": [
+     "distillAriaSnapshot",
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "generateAriaTree",
+     "toAriaNode",
+     "AriaSnapshot"
+    ],
+    "look_in": [
+     "packages/injected/src/"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     237,
+     308
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     166,
+     209
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     50,
+     52
+    ]
+   ],
+   "analysis": "Only the entry point of distillAriaSnapshot was shown, plus toAriaNode and processElement. The plugins that actually remove redundant names and collapse generics in AI mode (aiPlugins) have not been seen. The button name is probably dropped there, as redundant with a descendant that is later collapsed or removed.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "AI-mode distiller plugins that drop a node's name when it duplicates its printed text children, and that collapse or remove generic wrappers and hidden-icon siblings.",
+    "symptom": "Button accessible name \"Add New Item\" is missing from the AI snapshot when nested spans include an aria-hidden svg sibling.",
+    "anchors": [
+     "distillAriaSnapshot",
+     "runPlugins",
+     "aiPlugins",
+     "normalizePlugins",
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "AriaSnapshot"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     56,
+     90
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     105,
+     248
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     54,
+     98
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     1,
+     48
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     58,
+     85
+    ]
+   ],
+   "analysis": "The AI distiller plugins in ariaSnapshotDistiller.ts drop a node's name when every contributing ref is considered represented. removeRedundantNames clears refs on enter, and inlineTextIntoGeneric and removeNameRepeatingChild can later remove or inline the text-bearing generic. With an aria-hidden icon sibling inside nested spans, the button's name is dropped even though the text is not left printed. This is the likely bug, but I have not confirmed it against the tree builder.",
+   "picked": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:<block>"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "fix_attempt": "could not fix: Tracing the shown plugins for button > generic > [empty icon generic, text generic] keeps the name, because the leaf text generic stays pending. So the bug is not visible in this code. I would need isLeafGeneric, the DistillerContext traversal, and the tree builder code that fills nameFromContentRefs, especially how aria-hidden children and generic refs are handled."
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "Find where nameFromContentRefs is populated when building the aria tree (generateAriaTree / toAriaNode / processElement), and the isLeafGeneric helper and distillAriaSnapshot traversal, to see how aria-hidden icon siblings affect name-from-content refs.",
+    "symptom": "Button with nested spans (aria-hidden SVG icon span plus text span) appears in the AI snapshot without its accessible name \"Add New Item\".",
+    "anchors": [
+     "nameFromContentRefs",
+     "pendingContentRefs",
+     "isLeafGeneric",
+     "removeRedundantNames",
+     "distillAriaSnapshot",
+     "generateAriaTree",
+     "toAriaNode",
+     "processElement",
+     "inlineTextIntoGeneric"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts",
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     535,
+     537
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     222,
+     235
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     487,
+     533
+    ]
+   ],
+   "analysis": "Round 4 results only show rendering helpers (createKey, computeAriaRef, getSingleTextChild), not the code that populates nameFromContentRefs or the distiller traversal. Tracing the plugins earlier did not reproduce the bug, so the cause is probably in the tree builder. A likely cause is how aria-hidden children and generic refs are handled when contributing refs are recorded.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Code in the aria tree builder that visits child elements and records which elements contribute to a node's name from content, including how aria-hidden children and nested generic spans are handled.",
+    "symptom": "Button name \"Add New Item\" is missing from the AI snapshot when nested spans contain an aria-hidden svg icon sibling.",
+    "anchors": [
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "generateAriaTree",
+     "toAriaNode",
+     "processElement",
+     "visit",
+     "isLeafGeneric",
+     "removeRedundantNames",
+     "inlineTextIntoGeneric",
+     "removeNameRepeatingChild",
+     "distillAriaSnapshot"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts",
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     469,
+     584
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     99,
+     164
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     479,
+     485
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     101,
+     103
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     539,
+     575
+    ]
+   ],
+   "analysis": "generateAriaTree.visit resolves nameSourceElements contributors into nameFromContentRefs after the subtree is processed. The renderer and isLeafGeneric look fine. I have not seen where nameSourceElements is filled (toAriaNode and the accessible-name computation in roleUtils). I have also not seen the full removeRedundantNames logic. The name is probably dropped because a contributor is recorded wrongly, for example an aria-hidden or skipped element, or the text-holding generic.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Find where nameSourceElements is populated while computing the accessible name for a node (toAriaNode and getElementAccessibleName), and the removeRedundantNames plugin that uses nameFromContentRefs.",
+    "symptom": "Button name \"Add New Item\" is dropped from the AI snapshot when its nested spans include an aria-hidden svg icon sibling.",
+    "anchors": [
+     "nameSourceElements",
+     "nameFromContentRefs",
+     "toAriaNode",
+     "removeRedundantNames",
+     "getElementAccessibleName",
+     "isLeafGeneric",
+     "inlineTextIntoGeneric",
+     "removeNameRepeatingChild"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     513,
+     530
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     532,
+     540
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     668,
+     991
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     993,
+     1043
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     542,
+     554
+    ]
+   ],
+   "analysis": "getTextAlternativeInternal collects contributor elements for name-from-content. At step 2f it adds every element whose accumulated text is non-empty, including the intermediate generic spans, to `elements`. The outer span that wraps the aria-hidden icon is therefore recorded as a contributor. The distiller drops the button name when all contributors count as represented, so a collapsed wrapper generic can make the name look redundant. I could not confirm this against the distiller, so the fix may also need a change there.",
+   "picked": [
+    "packages/injected/src/roleUtils.ts:getTextAlternativeInternal"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "fix_attempt": "could not fix: Tracing the shown AI distiller plugins for button > generic > [hidden icon, text generic] keeps the button name, because the leaf text generic's ref stays pending until the button exits. So the bug is not in the shown roleUtils or distiller code. The cause is likely in how generateAriaTree builds nameFromContentRefs and assigns refs, and in isLeafGeneric. None of that was shown."
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Find generateAriaTree and where nameSourceElements are mapped to nameFromContentRefs, how refs are assigned to generic nodes, and the isLeafGeneric definition and DistillerContext traversal that uses pendingContentRefs.",
+    "symptom": "The AI aria snapshot shows a button without its accessible name \"Add New Item\" when its content is nested spans with an aria-hidden SVG icon span next to the text span.",
+    "anchors": [
+     "nameFromContentRefs",
+     "pendingContentRefs",
+     "isLeafGeneric",
+     "nameSourceElements",
+     "removeRedundantNames",
+     "inlineTextIntoGeneric",
+     "removeNameRepeatingChild",
+     "distillAriaSnapshot",
+     "generateAriaTree",
+     "collectElements"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts",
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     59,
+     83
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     372,
+     376
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     1,
+     57
+    ]
+   ],
+   "analysis": "Round 7 only showed options and imports of ariaSnapshot.ts, not generateAriaTree's visit logic. The bug is likely in how nameFromContentRefs gets populated or in the distiller's removeRedundantNames/isLeafGeneric. Need the generateAriaTree body and the distiller's traversal.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Body of generateAriaTree's visit function that handles aria-hidden children, assigns refs to generic elements, and resolves nameSourceElements to nameFromContentRefs.",
+    "symptom": "Button name \"Add New Item\" is missing from the AI snapshot when nested spans include an aria-hidden svg icon sibling.",
+    "anchors": [
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "generateAriaTree",
+     "toAriaNode",
+     "isLeafGeneric",
+     "removeRedundantNames",
+     "pendingContentRefs",
+     "distillAriaSnapshot",
+     "computeAriaRef"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     649,
+     651
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     645,
+     647
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     360,
+     370
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     426,
+     442
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     446,
+     460
+    ]
+   ],
+   "analysis": "Round 8 showed only matcher helpers and element symbol accessors in ariaSnapshot.ts, not generateAriaTree's visit body. Earlier rounds traced the distiller plugins and found they keep the name for this layout. The cause is probably in the tree builder, where nameFromContentRefs is resolved, or in how the name-from-content traversal treats aria-hidden children. It could also be in roleUtils, where the text alternative is computed and contributors are collected.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "Find generateAriaTree's visit function, where a node's name is computed and nameSourceElements are mapped to nameFromContentRefs, including how a node's ref and name are handled for generic children and aria-hidden elements.",
+    "symptom": "Button name \"Add New Item\" is missing from the AI snapshot when nested spans include an aria-hidden svg icon sibling.",
+    "anchors": [
+     "generateAriaTree",
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "toAriaNode",
+     "visit",
+     "processElement",
+     "computeAriaRef",
+     "ariaNodeElement",
+     "setAriaNodeElement",
+     "getElementAccessibleName"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     653,
+     656
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     444,
+     463
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     378,
+     414
+    ],
+    [
+     "packages/injected/src/injectedScript.ts",
+     321,
+     329
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     465,
+     467
+    ]
+   ],
+   "analysis": "Round 9 showed only matcher helpers and the injectedScript wrapper. The generateAriaTree body has not been seen, and the distiller plugins traced earlier seem to keep the name. The cause is likely in roleUtils getTextAlternativeInternal, which collects name-source elements and may handle hidden children or intermediate spans wrongly. It could also be in the distiller's removeRedundantNames.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "Name-from-content computation that collects contributing elements (nameSourceElements) while recursing through child spans and skipping aria-hidden children, and the logic that decides the name is redundant.",
+    "symptom": "Button name \"Add New Item\" is missing from the AI snapshot when nested spans include an aria-hidden svg icon sibling.",
+    "anchors": [
+     "nameSourceElements",
+     "nameFromContentRefs",
+     "getTextAlternativeInternal",
+     "getElementAccessibleName",
+     "removeRedundantNames",
+     "isLeafGeneric",
+     "generateAriaTree",
+     "pendingContentRefs"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     1200,
+     1209
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     556,
+     586
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     489,
+     498
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     314,
+     335
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     500,
+     511
+    ]
+   ],
+   "analysis": "Round 10 results show only helper functions in roleUtils.ts (labels, description, hidden checks), not the name-from-content recursion that collects contributor elements. The distiller plugins traced earlier keep the name, so the bug likely lies in getTextAlternativeInternal's collectElements handling, or in how generateAriaTree resolves nameSourceElements into refs. The aria-hidden sibling probably causes a wrong contributor to be recorded.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 11,
+   "query": {
+    "intent": "Body of getTextAlternativeInternal's name-from-content step (2F) that recurses into child nodes and pushes elements to collectElements, plus the final name computation with collectElements.",
+    "symptom": "Button name \"Add New Item\" is missing from the AI snapshot when nested spans include an aria-hidden svg icon sibling.",
+    "anchors": [
+     "collectElements",
+     "getTextAlternativeInternal",
+     "nameSourceElements",
+     "nameFromContentRefs",
+     "joinCompositeString",
+     "allowsNameFromContent",
+     "embeddedInTargetElement",
+     "getElementAccessibleName"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 94c092a..b382243 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -676,6 +676,21 @@ class BaseGrouper:
+         if len(self.groupings) == 1 and isinstance(self.result_index, CategoricalIndex):
+             # This shows unused categories in indices GH#38642
+             result = self.groupings[0].indices
++        elif len(self.groupings) > 1:
++            # Use ids/result_index so labels and positions are consistent
++            # regardless of sort/observed (the groupings' codes may be in a
++            # different order than result_index.levels)
++            ids = ensure_platform_int(self.ids)
++            sorter = np.argsort(ids, kind="mergesort")
++            sorted_ids = ids[sorter]
++            ngroups = len(self.result_index)
++            bounds = np.searchsorted(sorted_ids, np.arange(ngroups + 1), side="left")
++            keys = self.result_index
++            result = {
++                keys[i]: sorter[bounds[i] : bounds[i + 1]]
++                for i in range(ngroups)
++                if bounds[i + 1] > bounds[i]
++            }
+         else:
+             codes_list = [ping.codes for ping in self.groupings]
+             result = get_indexer_dict(codes_list, self.levels)

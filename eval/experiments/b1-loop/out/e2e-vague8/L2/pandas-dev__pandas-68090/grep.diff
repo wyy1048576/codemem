@@ -1,0 +1,20 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 94c092a..1f0d019 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -678,7 +678,14 @@ class BaseGrouper:
+             result = self.groupings[0].indices
+         else:
+             codes_list = [ping.codes for ping in self.groupings]
+-            result = get_indexer_dict(codes_list, self.levels)
++            # Use the groupings' own uniques rather than result_index.levels:
++            # the latter can be re-ordered (e.g. by MultiIndex.from_product for
++            # unobserved categoricals with sort=False) and then no longer line up
++            # with ping.codes.
++            levels = [
++                Index._with_infer(ping.uniques, copy=False) for ping in self.groupings
++            ]
++            result = get_indexer_dict(codes_list, levels)
+         if not self.dropna:
+             has_mi = isinstance(self.result_index, MultiIndex)
+             if not has_mi and self.result_index.hasnans:

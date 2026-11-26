@@ -1,0 +1,50 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41988",
+ "fixed": null,
+ "rounds": 11,
+ "ks": [
+  5,
+  3,
+  5,
+  3,
+  3,
+  5,
+  3,
+  5,
+  5,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 10,
+  "loopk": 10
+ },
+ "sonnet_calls": 11,
+ "cost_usd": 0.2905,
+ "seconds": 78,
+ "diff_stat": ""
+}
+round 1: k=5 action=search picked=[] 
+round 2: k=3 action=search picked=[] 
+round 3: k=5 action=search picked=[] 
+round 4: k=3 action=search picked=[] 
+round 5: k=3 action=search picked=[] 
+round 6: k=5 action=search picked=[] 
+round 7: k=3 action=search picked=[] 
+round 8: k=5 action=search picked=[] 
+round 9: k=5 action=search picked=[] 
+round 10: k=3 action=search picked=[] 
+round 11: k=5 action=None picked=None 
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  14%|█▍        | 40/290 [00:00<00:00, 372.50it/s]
+Loading weights:  37%|███▋      | 106/290 [00:00<00:00, 534.20it/s]
+Loading weights:  55%|█████▌    | 160/290 [00:00<00:00, 521.36it/s]
+Loading weights:  73%|███████▎  | 213/290 [00:00<00:00, 516.80it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 559.12it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

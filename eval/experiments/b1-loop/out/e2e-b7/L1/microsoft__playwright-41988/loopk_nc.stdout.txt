@@ -1,0 +1,48 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41988",
+ "fixed": {
+  "round": 8,
+  "explanation": "removeRedundantNames clears the name when all contributor refs were cleared on enter. A wrapper span (cleared on enter) is later removed by removeNameRepeatingChild since its text equals the parent name, so both the text and the name are lost. Only drop the name when the node still has children that represent the content.",
+  "edits": 1
+ },
+ "rounds": 8,
+ "ks": [
+  5,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 8,
+  "loopk": 8
+ },
+ "sonnet_calls": 9,
+ "cost_usd": 0.2879,
+ "seconds": 104,
+ "diff_stat": "packages/injected/src/ariaSnapshotDistiller.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+}
+round 1: k=5 action=search picked=['packages/injected/src/ariaSnapshot.ts:generateAriaTree'] 
+round 2: k=3 action=search picked=['packages/injected/src/ariaSnapshotDistiller.ts:distillAriaSnapshot'] 
+round 3: k=3 action=search picked=[] 
+round 4: k=3 action=search picked=['packages/injected/src/ariaSnapshotDistiller.ts:<block>'] 
+round 5: k=3 action=search picked=[] 
+round 6: k=3 action=search picked=[] 
+round 7: k=3 action=search picked=[] 
+round 8: k=5 action=edit picked=[] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  18%|█▊        | 51/290 [00:00<00:00, 490.99it/s]
+Loading weights:  45%|████▍     | 130/290 [00:00<00:00, 612.37it/s]
+Loading weights:  67%|██████▋   | 195/290 [00:00<00:00, 550.62it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 641.89it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

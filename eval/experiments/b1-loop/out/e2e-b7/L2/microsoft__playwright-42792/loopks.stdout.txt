@@ -1,0 +1,40 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  3,
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.008,
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 2,
+  "explanation": "TestTypeImpl._configure ignored any lock option. It now accepts `lock` as a string or string[], checks the values, and pushes them into the current suite's existing `_locks` array, the same array `_describe` fills. I couldn't see the public type declarations (e.g. test.d.ts), so they will also need a `lock?: string | string[]` entry in the describe.configure options.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0853,
+ "seconds": 31,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 11 ++++++++++-\n 1 file changed, 10 insertions(+), 1 deletion(-)"
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=True picked=['packages/playwright/src/common/testType.ts:TestTypeImpl._configure']
+  fix: applied: TestTypeImpl._configure ignored any lock option. It now accepts `lock` as a string or string[], checks the values, and pushes them into the current suite's existing `_locks` array, the same array `_describe` fills. I couldn't see the public type declarations (e.g. test.d.ts), so they will also need a `lock?: string | string[]` entry in the describe.configure options.
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  18%|█▊        | 53/290 [00:00<00:00, 511.78it/s]
+Loading weights:  39%|███▉      | 113/290 [00:00<00:00, 535.80it/s]
+Loading weights:  58%|█████▊    | 168/290 [00:00<00:00, 517.32it/s]
+Loading weights:  79%|███████▉  | 230/290 [00:00<00:00, 521.83it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 583.26it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

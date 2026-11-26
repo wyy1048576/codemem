@@ -1,0 +1,67 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "In parseRawCookie, Expires and Max-Age both overwrite cookie.expires in order of appearance, so a later past Expires overrides an earlier Max-Age. Also parseInt accepts lenient values like \"10abc\". Fix: track Max-Age separately, apply it after the loop, and require a strict integer regex.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0288,
+ "seconds": 20,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 12 ++++++++----\n 1 file changed, 8 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie parsing and expiry computation for APIRequestContext (Set-Cookie handling): when both Max-Age and Expires attributes are present, Max-Age must take precedence regardless of order; a non-integer Max-Age value must be ignored rather than parsed leniently.",
+    "symptom": "A cookie is dropped when Max-Age appears before a past Expires in Set-Cookie, and non-integer Max-Age values are not ignored.",
+    "anchors": [
+     "Max-Age",
+     "Expires"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     211
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     56,
+     60
+    ],
+    [
+     "packages/playwright-core/src/server/har/harTracer.ts",
+     776,
+     818
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In parseRawCookie, Expires and Max-Age both overwrite cookie.expires in order of appearance, so a later past Expires overrides an earlier Max-Age. Also parseInt accepts lenient values like \"10abc\". Fix: track Max-Age separately, apply it after the loop, and require a strict integer regex.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

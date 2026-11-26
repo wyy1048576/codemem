@@ -1,0 +1,62 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  5,
+  3,
+  5,
+  3,
+  5,
+  5,
+  3,
+  5,
+  5,
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0094,
+ "task": "microsoft__playwright-41988",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 2
+ },
+ "sonnet_calls": 12,
+ "cost_usd": 0.3614,
+ "seconds": 126,
+ "diff_stat": ""
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=False picked=[]
+  fix: -
+round 3: found=True picked=['packages/injected/src/ariaSnapshotDistiller.ts:<block>']
+  fix: could not fix: Tracing the shown plugins for button > generic > [empty icon generic, text generic] keeps the name, because the leaf text generic stays pending. So the bug is not visible in this code. I would need isLeafGeneric, the DistillerContext traversal, and the tree builder code that fills nameFromContentRefs, especially how aria-hidden children and generic refs are handled.
+round 4: found=False picked=[]
+  fix: -
+round 5: found=False picked=[]
+  fix: -
+round 6: found=True picked=['packages/injected/src/roleUtils.ts:getTextAlternativeInternal']
+  fix: could not fix: Tracing the shown AI distiller plugins for button > generic > [hidden icon, text generic] keeps the button name, because the leaf text generic's ref stays pending until the button exits. So the bug is not in the shown roleUtils or distiller code. The cause is likely in how generateAriaTree builds nameFromContentRefs and assigns refs, and in isLeafGeneric. None of that was shown.
+round 7: found=False picked=[]
+  fix: -
+round 8: found=False picked=[]
+  fix: -
+round 9: found=False picked=[]
+  fix: -
+round 10: found=False picked=[]
+  fix: -
+round 11: found=None picked=None
+  fix: -
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  20%|██        | 59/290 [00:00<00:00, 545.29it/s]
+Loading weights:  44%|████▍     | 129/290 [00:00<00:00, 591.83it/s]
+Loading weights:  65%|██████▌   | 189/290 [00:00<00:00, 562.23it/s]
+Loading weights:  85%|████████▍ | 246/290 [00:00<00:00, 466.47it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 582.75it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

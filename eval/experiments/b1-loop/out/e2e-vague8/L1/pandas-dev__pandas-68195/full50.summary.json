@@ -1,0 +1,348 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0087,
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "`_validate_tolerance` only rejects tolerances below zero in the timedelta, integer and float branches, but each raised \"tolerance must be positive\", which wrongly implies zero is invalid. I changed all three messages to \"tolerance must be non-negative\". The checks are unchanged, so zero is still accepted.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.2084,
+ "seconds": 25,
+ "diff_stat": "pandas/core/reshape/merge.py | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The as-of merge validation of the tolerance argument (in _get_merge_keys / _validate_tolerance style checks for timedelta, integer and float keys) raises a MergeError whose message says tolerance must be positive; the message should say it must be non-negative, while the check (reject only values < 0) stays unchanged.",
+    "symptom": "Passing a negative tolerance to merge_asof raises a MergeError saying the tolerance must be positive, which wrongly implies zero is invalid, though zero is accepted.",
+    "anchors": [
+     "positive"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/reshape/merge.py",
+     2599,
+     2634
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     1072,
+     1074
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     646,
+     930
+    ],
+    [
+     "pandas/_libs/tslibs/timedeltas.pyi",
+     65,
+     65
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     1972,
+     2049
+    ],
+    [
+     "pandas/core/indexes/datetimelike.py",
+     442,
+     444
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     4059,
+     4077
+    ],
+    [
+     "pandas/core/indexes/period.py",
+     624,
+     635
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2776,
+     2794
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     13,
+     3365
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     1989,
+     1992
+    ],
+    [
+     "pandas/_libs/algos.pyi",
+     62,
+     62
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     1994,
+     1997
+    ],
+    [
+     "pandas/core/missing.py",
+     285,
+     297
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2421,
+     2667
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     1945,
+     1951
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge.py",
+     3391,
+     3436
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2001,
+     2008
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     1953,
+     1999
+    ],
+    [
+     "pandas/tests/io/sas/test_sas7bdat.py",
+     470,
+     484
+    ],
+    [
+     "pandas/_libs/tslibs/period.pyi",
+     76,
+     76
+    ],
+    [
+     "pandas/core/indexes/period.py",
+     772,
+     851
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     87,
+     341
+    ],
+    [
+     "pandas/core/missing.py",
+     300,
+     311
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     1695,
+     1888
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2756,
+     2774
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2420,
+     2769
+    ],
+    [
+     "pandas/io/formats/style.py",
+     3473,
+     3602
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2554,
+     2597
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2559,
+     2581
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     3249,
+     3289
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     343,
+     597
+    ],
+    [
+     "pandas/_libs/tslibs/offsets.pyi",
+     128,
+     128
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     4182,
+     4191
+    ],
+    [
+     "pandas/_libs/interval.pyi",
+     52,
+     52
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2148,
+     2389
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2423,
+     2472
+    ],
+    [
+     "pandas/tests/series/methods/test_interpolate.py",
+     329,
+     335
+    ],
+    [
+     "pandas/tests/window/test_rolling.py",
+     1846,
+     1848
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     4329,
+     4445
+    ],
+    [
+     "pandas/tests/arrays/categorical/test_take.py",
+     24,
+     27
+    ],
+    [
+     "pandas/core/config_init.py",
+     472,
+     477
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3821,
+     3963
+    ],
+    [
+     "pandas/core/indexing.py",
+     1149,
+     1159
+    ],
+    [
+     "pandas/io/formats/style.py",
+     3774,
+     3891
+    ],
+    [
+     "pandas/tests/frame/methods/test_fillna.py",
+     438,
+     446
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2033,
+     2043
+    ],
+    [
+     "pandas/tests/plotting/test_boxplot_method.py",
+     532,
+     537
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2045,
+     2056
+    ],
+    [
+     "pandas/tests/frame/methods/test_sample.py",
+     86,
+     96
+    ]
+   ],
+   "analysis": "_AsOfMerge._validate_tolerance in pandas/core/reshape/merge.py raises MergeError(\"tolerance must be positive\") in three branches (timedelta, integer, float), all of which reject only values below zero. The message text is the only thing that has to change, to \"tolerance must be non-negative\". Existing tests that match \"tolerance must be positive\" will need the same update.",
+   "picked": [
+    "pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/reshape/merge.py lines 2599-2634 (_AsOfMerge._validate_tolerance)"
+   ],
+   "fix_attempt": "applied: `_validate_tolerance` only rejects tolerances below zero in the timedelta, integer and float branches, but each raised \"tolerance must be positive\", which wrongly implies zero is invalid. I changed all three messages to \"tolerance must be non-negative\". The checks are unchanged, so zero is still accepted."
+  }
+ ]
+}

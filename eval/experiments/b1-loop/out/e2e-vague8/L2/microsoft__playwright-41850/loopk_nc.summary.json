@@ -1,0 +1,103 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 2,
+  "explanation": "The redirect code checks and sets headers['host'] using a case-sensitive key, so a 'Host' header is left with the old host (and a duplicate lowercase key isn't created only if present). Use getHeader/removeHeader/setHeader to handle it case-insensitively.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  2,
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0426,
+ "seconds": 22,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 4 ++--\n 1 file changed, 2 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Redirect handling in the Node-side APIRequestContext fetch code builds headers for the redirected request; it deletes/overwrites the 'host' header with a case-sensitive key, so a differently cased 'Host' header persists. Make header removal/update case-insensitive when following redirects.",
+    "symptom": "After following a redirect in the request API, a header named with uppercase letters like 'Host' retains the original host rather than the redirect target's host.",
+    "anchors": [
+     "Host",
+     "redirect",
+     "request API"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     862,
+     870
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     278,
+     290
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "fetch.ts has getHeader/setHeader helpers, but the redirect code that rewrites the host header isn't visible yet. It likely lives in _sendRequest's redirect handling in the same file, where it probably deletes or sets 'host' with a case-sensitive key.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._updateRequestCookieHeader"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Redirect handling in _sendRequest in fetch.ts that follows the Location header and updates or removes the 'host' header on the redirected request.",
+    "symptom": "After a redirect, a header named 'Host' keeps the old host instead of the new redirect target's host.",
+    "anchors": [
+     "getHeader",
+     "setHeader",
+     "location"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/server/fetch.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     320,
+     639
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     962,
+     965
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 278-290 (APIRequestContext._updateRequestCookieHeader)"
+   ],
+   "action": "edit",
+   "analysis": "The redirect code checks and sets headers['host'] using a case-sensitive key, so a 'Host' header is left with the old host (and a duplicate lowercase key isn't created only if present). Use getHeader/removeHeader/setHeader to handle it case-insensitively.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

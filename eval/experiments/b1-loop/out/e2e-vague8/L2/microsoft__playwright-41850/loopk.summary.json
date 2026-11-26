@@ -1,0 +1,68 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 1,
+  "explanation": "On redirect, the code checks headers['host'] with an exact lowercase key, so a 'Host' header is not updated. Using the case-insensitive getHeader and setHeader helpers fixes it. I assume setHeader overwrites an existing header whatever its case.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.042,
+ "seconds": 19,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code in the APIRequestContext fetch implementation that follows HTTP redirects (3xx) rebuilds request headers for the new URL; it must remove or overwrite the existing Host header using a case-insensitive comparison of header names, so the new host is used.",
+    "symptom": "After a redirect, a Host header with uppercase letters (e.g. \"Host\") is not updated and keeps the old host value.",
+    "anchors": [
+     "Host",
+     "redirect",
+     "request API"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     862,
+     870
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     278,
+     290
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     320,
+     639
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "On redirect, the code checks headers['host'] with an exact lowercase key, so a 'Host' header is not updated. Using the case-insensitive getHeader and setHeader helpers fixes it. I assume setHeader overwrites an existing header whatever its case.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

@@ -1,0 +1,191 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0079,
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 2,
+  "explanation": "The redirect branch checked `headers['host']` with an exact lowercase key, so a header named `Host` was skipped and kept the old host. The fix finds the header case-insensitively with `getHeader`. It removes every casing with `removeHeader`, then sets a single `host` entry to the redirect target's host.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.1111,
+ "seconds": 23,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The APIRequestContext redirect-handling code builds new request headers for the redirected URL. It should delete or replace the Host header case-insensitively, so a header named with uppercase letters like \"Host\" is updated to the new host instead of being kept.",
+    "symptom": "After following an HTTP redirect in the request API, a Host header with uppercase letters keeps the old host value instead of being updated to the new host.",
+    "anchors": [
+     "Host"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/utils/httpServer.ts",
+     317,
+     324
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     278,
+     290
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     862,
+     870
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     319,
+     321
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     368,
+     383
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     241,
+     243
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     383,
+     388
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     177,
+     187
+    ],
+    [
+     "packages/playwright/src/plugins/cacheProxy/server.ts",
+     295,
+     300
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     280,
+     283
+    ]
+   ],
+   "analysis": "Results show only helper functions in fetch.ts (cookie header) and unrelated code. The redirect handling in APIRequestContext._sendRequest (fetch.ts) likely does something like `delete headers['host']` or filters by exact name, which is case-sensitive. That code was not shown.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Code in the fetch request send path that handles an HTTP redirect status (301/302/303/307/308): builds redirectOptions headers, removes content headers and sets the new host header.",
+    "symptom": "After following a redirect, a Host header with uppercase letters keeps the old host instead of the new host.",
+    "anchors": [
+     "_updateRequestCookieHeader",
+     "getHeader",
+     "setHeader",
+     "HeadersObject"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/server/fetch.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     176,
+     249
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     320,
+     639
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     962,
+     965
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     711,
+     817
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     153,
+     155
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     686,
+     697
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     887,
+     904
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     1,
+     101
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     978,
+     982
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     860,
+     862
+    ]
+   ],
+   "analysis": "In APIRequestContext._sendRequest, the redirect branch does `if (headers['host']) headers['host'] = locationURL.host;`. This lookup is case-sensitive, so a header named \"Host\" is skipped and keeps the old host. It should use the case-insensitive getHeader, removeHeader and setHeader helpers instead.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 320-639 (APIRequestContext._sendRequest)"
+   ],
+   "fix_attempt": "applied: The redirect branch checked `headers['host']` with an exact lowercase key, so a header named `Host` was skipped and kept the old host. The fix finds the header case-insensitively with `getHeader`. It removes every casing with `removeHeader`, then sets a single `host` entry to the redirect target's host."
+  }
+ ]
+}

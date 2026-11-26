@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-41988",
+ "exit": 0,
+ "seconds": 50,
+ "cost_usd": 0.1548351,
+ "turns": 14,
+ "usage": {
+  "input_tokens": 24,
+  "cache_creation_input_tokens": 22494,
+  "cache_read_input_tokens": 162611,
+  "output_tokens": 4855,
+  "output_tokens_details": {
+   "thinking_tokens": 2350
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 22494,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 460,
+    "cache_read_input_tokens": 24024,
+    "cache_creation_input_tokens": 2277,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2277
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 5,
+  "Read": 7,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/injected/src/ariaSnapshotDistiller.ts | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "final": "I changed the AI snapshot distiller so the button keeps its \"Add New Item\" name. Nothing was built or run, so the fix is untested. The root cause comes from reading the code, not from reproducing the bug.\n\n**Cause:** The name computation was fine. The distiller's `removeRedundantNames` pass, in `packages/injected/src/ariaSnapshotDistiller.ts`, drops a name when every element that contributed to it is still represented in the output.\n\n- The outer span contributes the text, so it counts as a name source.\n- When the pass entered the outer span, it still had the icon-wrapper span as a child. That kept the outer span from being treated as a \"leaf generic\", which only supplies text. The pass therefore marked it as represented.\n- The icon child is removed later in the same traversal. By then the button's name had already been judged redundant and cleared.\n- The text was removed too, so the button ended up with only its role, ref and cursor hint.\n\n**Fix:** In the `exit` handler of `removeRedundantNames`, I re-check `isLeafGeneric(node)` after the children have been cleaned up. If the node now only supplies text, it goes back into `pendingContentRefs`. The button's name is then kept, and the outer span's duplicate text is removed as intended.\n\nI didn't add a test. A regression test would need the button markup from the issue (outer span, then an `aria-hidden` icon span and a text span).",
+ "stderr": ""
+}

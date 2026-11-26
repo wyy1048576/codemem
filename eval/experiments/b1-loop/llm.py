@@ -44,11 +44,35 @@ PROMPTS = {"oneshot": (SYSTEM["oneshot"], SCHEMA, PROMPT_SHA, CACHE), "revise": 
            "fix": (SYSTEM_FIX, SCHEMA_FIX, PROMPT_SHA_FIX, CACHE_FIX),
            # same prompt as "loop", but the judge sees each result's full code: its own cache folder
            "loop_full": (SYSTEM_LOOP, SCHEMA_LOOP, PROMPT_SHA_LOOP, HERE / "out" / "cache" / ("loopfull-" + PROMPT_SHA_LOOP[:12]))}
+
+
+def _kind(name: str, system_file: str, schema_file: str) -> None:
+    """Register a prompt kind with its own hash and cache folder."""
+    system, schema = (HERE / system_file).read_text(encoding="utf8"), (HERE / schema_file).read_text(encoding="utf8")
+    sha = hashlib.sha256(json.dumps([system, schema, MODEL, EFFORT], sort_keys=True).encode("utf8")).hexdigest()
+    PROMPTS[name] = (system, schema, sha, HERE / "out" / "cache" / f"{name}-{sha[:12]}")
+
+
+# loop-k: the first query also picks k (results shown), and each round is one call that edits or searches again
+_kind("oneshot_k", "system_oneshot_k.txt", "schema_oneshot_k.json")
+_kind("loopk", "system_loopk.txt", "schema_loopk.json")
+# loop-k with a separate judge and fix call: the judge prompt of the full-code loop plus next_k
+_kind("loop_full_k", "system_loop_k.txt", "schema_loop_k.json")
 MAX_SUSPECTS = 5
 MAX_LOOK_IN = 3
 MAX_ANCHORS = 20
 MAX_GUESSES = 5
 _empty = Path(tempfile.gettempdir()) / "codemem-llm-empty"
+# LLM_NO_PROMPT_CACHE=1: the CLI sends no cache markers (DISABLE_PROMPT_CACHING), so the input is billed at the plain
+# input rate instead of the cache-write rate. Each call is a new conversation, so nothing it caches is read again.
+NO_PROMPT_CACHE = os.environ.get("LLM_NO_PROMPT_CACHE") == "1"
+
+
+def _cli_env() -> dict:
+    env = os.environ.copy()
+    if NO_PROMPT_CACHE:
+        env["DISABLE_PROMPT_CACHING"] = "1"
+    return env
 _lock = threading.Lock()
 
 
@@ -99,6 +123,22 @@ def clean_loop(output: dict, issue: str, seen_text: str, shown: int) -> dict:
             "dropped_anchors": len(anchors) - len(kept), "dropped_picks": len(output["picks"]) - len(picks)}
 
 
+def loopk_input(repo: str, issue: str, history: list[dict], round_no: int, picked_code: str, cards: str) -> str:
+    """One loop-k round: the issue, earlier queries with notes and edit attempts, earlier picks' code, new results."""
+    past = []
+    for h in history:
+        entry = {"round": h["round"], "query": {k: h["query"][k] for k in ("intent", "symptom", "anchors", "look_in") if k in h["query"]},
+                 "k": h["k"]}
+        for key, name in (("analysis", "your_notes"), ("picked", "your_picks"), ("edit_attempt", "edit_attempt")):
+            if key in h:
+                entry[name] = h[key]
+        past.append(entry)
+    return (f"Repository: {repo}\n\n<issue>\n{issue}\n</issue>\n\n"
+            f"<earlier_rounds>\n{json.dumps(past, ensure_ascii=False, indent=1)}\n</earlier_rounds>\n\n"
+            f"<picked_earlier>\n{picked_code}\n</picked_earlier>\n\n"
+            f"<search_results round=\"{round_no}\">\n{cards}\n</search_results>")
+
+
 def fix_input(repo: str, issue: str, history: list[dict], code: str) -> str:
     notes = [{"round": h["round"], "notes": h.get("analysis", ""), **({"fix_attempt": h["fix_attempt"]} if "fix_attempt" in h else {})}
              for h in history]
@@ -116,7 +156,7 @@ def _call(kind: str, text: str) -> dict:
     last = ""
     for attempt in range(3):
         done = subprocess.run(command, input=text, capture_output=True, text=True, encoding="utf8",
-                              errors="replace", cwd=_empty, timeout=420, env=os.environ.copy())
+                              errors="replace", cwd=_empty, timeout=420, env=_cli_env())
         try:
             reply = json.loads(done.stdout)
             if done.returncode == 0 and not reply.get("is_error") and isinstance(reply.get("structured_output"), dict):
@@ -124,7 +164,8 @@ def _call(kind: str, text: str) -> dict:
                 if set(used) != {MODEL}:
                     raise LLMError(f"answered by {sorted(used)}, not {MODEL}")
                 return {"output": reply["structured_output"], "models": sorted(used),
-                        "cost_usd": reply.get("total_cost_usd"), "stop_reason": reply.get("stop_reason")}
+                        "cost_usd": reply.get("total_cost_usd"), "stop_reason": reply.get("stop_reason"),
+                        "usage": reply.get("usage"), "duration_ms": reply.get("duration_ms")}
             last = f"exit {done.returncode}, stop {reply.get('stop_reason')}, error {reply.get('is_error')}, subtype {reply.get('subtype')}"
             (HERE / "out" / "last_error.json").write_text(json.dumps({"kind": kind, "reply": reply, "stderr": done.stderr[-2000:],
                                                                        "input": text}, ensure_ascii=False, indent=1), encoding="utf8")
@@ -138,16 +179,37 @@ def extract(kind: str, text: str) -> dict:
     """The cached answer for this exact input, or a new call. Returns the raw record."""
     key = hashlib.sha256(f"{kind}\0{text}".encode("utf8")).hexdigest()
     _, _, prompt_sha, cache = PROMPTS[kind]
+    if NO_PROMPT_CACHE:  # answers made without prompt caching are kept apart, so a rerun really calls the model
+        cache = cache.with_name(cache.name + "-nocache")
     path = cache / f"{kind}-{key[:24]}.json"
     if path.exists():
-        return json.loads(path.read_text(encoding="utf8"))
+        record = json.loads(path.read_text(encoding="utf8"))
+        _log(kind, text, record, cached=True)
+        return record
+    if os.environ.get("LLM_CACHE_ONLY") == "1":
+        raise LLMError(f"{kind}: not in the cache and LLM_CACHE_ONLY=1")
     record = {"kind": kind, "prompt_sha": prompt_sha, "model": MODEL, "effort": EFFORT, "input_sha": key, **_call(kind, text)}
     with _lock:
         cache.mkdir(parents=True, exist_ok=True)
         temp = path.with_suffix(".tmp")
         temp.write_text(json.dumps(record, ensure_ascii=False, indent=1), encoding="utf8")
         os.replace(temp, path)
+    _log(kind, text, record, cached=False)
     return record
+
+
+def _log(kind: str, text: str, record: dict, cached: bool) -> None:
+    """LLM_LOG=path: one JSON line per call with the sizes of what was sent and returned."""
+    if not os.environ.get("LLM_LOG"):
+        return
+    system, schema = PROMPTS[kind][:2]
+    line = {"kind": kind, "cached": cached, "input_chars": len(text), "system_chars": len(system),
+            "schema_chars": len(schema), "output_chars": len(json.dumps(record["output"], ensure_ascii=False)),
+            "cost_usd": record.get("cost_usd"), "usage": record.get("usage")}
+    if os.environ.get("LLM_LOG_TEXT") == "1":
+        line["text"] = text
+    with _lock, open(os.environ["LLM_LOG"], "a", encoding="utf8") as f:
+        f.write(json.dumps(line) + "\n")
 
 
 def clean(output: dict, issue: str, cards: str = "") -> dict:

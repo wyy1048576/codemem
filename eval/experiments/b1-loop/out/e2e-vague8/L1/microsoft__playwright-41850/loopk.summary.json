@@ -1,0 +1,105 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 2,
+  "explanation": "The redirect code checks and sets only the lowercase 'host' key on the headers object. Other helpers compare names case-insensitively. The edit finds the actual Host key with any casing and updates it.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0555,
+ "seconds": 23,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "In the APIRequestContext fetch implementation, the redirect-following code sets the 'host' header to the new redirect URL's host by checking for a lowercase 'host' key only. It should find the Host header case-insensitively (like other header helpers) and update it.",
+    "symptom": "After a redirect, a Host header set with non-lowercase casing (e.g. \"Host\") keeps the original host instead of being updated to the redirect target's host.",
+    "anchors": [
+     "Host",
+     "host",
+     "headers"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     278,
+     290
+    ],
+    [
+     "packages/utils/httpServer.ts",
+     317,
+     324
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     883,
+     899
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "fetch.ts uses getHeader/setHeader helpers, but the redirect code that sets 'host' isn't shown yet. It's likely in _sendRequest/_sendRequestWithRetries in fetch.ts, in the redirect handling branch.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Redirect handling in APIRequestContext _sendRequest which sets redirectOptions.headers host to the new URL host, with statusCode 301/302/303/307/308 and location header.",
+    "symptom": "After a redirect, the Host header with non-lowercase casing keeps the original host.",
+    "anchors": [
+     "getHeader",
+     "setHeader",
+     "HeadersObject"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/server/fetch.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     320,
+     639
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     962,
+     965
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "The redirect code checks and sets only the lowercase 'host' key on the headers object. Other helpers compare names case-insensitively. The edit finds the actual Host key with any casing and updates it.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

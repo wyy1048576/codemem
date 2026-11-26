@@ -1,0 +1,113 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 2,
+  "explanation": "pathMatches appends '/' to both the request path and the cookie path before comparing. That makes a cookie with path /foo/ match the request path /foo. It also makes /api match /apiv2 through a prefix check on strings that were not normalised. The edit follows RFC 6265 section 5.1.4: the paths are equal, or the cookie path is a prefix of the request path and either ends with '/' or is followed by '/' in the request path. I did not see the browser-level cookie filter, so the host-only subdomain part of the issue may still need a change elsewhere.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0391,
+ "seconds": 25,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie matching logic that filters stored cookies by request URL: domain matching (host-only vs domain cookies) and path matching per RFC 6265 (path must equal or be a prefix ending at a '/' boundary). Fix the domain and path matching functions used by the browser context cookie jar.",
+    "symptom": "Cookies for a URL wrongly include host-only cookies on subdomains and /api cookies for /apiv2, and a /foo/ cookie is sent for /foo.",
+    "anchors": [
+     "cookies",
+     "host-only",
+     "/api",
+     "/apiv2",
+     "/foo/",
+     "/foo"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     260,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     287,
+     299
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     142,
+     160
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "fetch.ts uses Cookie.matches(url) and domainMatches, but the matching logic itself is defined elsewhere, likely in cookieStore.ts. The domain and path matching there needs to be fixed.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._updateRequestCookieHeader"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Cookie class with matches(url) method, domainMatches and pathMatches functions in the cookie store.",
+    "symptom": "Cookie URL matching returns host-only cookies on subdomains, /api cookies for /apiv2, and /foo/ cookies for /foo.",
+    "anchors": [
+     "Cookie",
+     "matches",
+     "domainMatches",
+     "_parseSetCookieHeader"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/server/cookieStore.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     219,
+     227
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     229,
+     237
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 287-299 (APIRequestContext._updateRequestCookieHeader)"
+   ],
+   "action": "edit",
+   "analysis": "pathMatches appends '/' to both the request path and the cookie path before comparing. That makes a cookie with path /foo/ match the request path /foo. It also makes /api match /apiv2 through a prefix check on strings that were not normalised. The edit follows RFC 6265 section 5.1.4: the paths are equal, or the cookie path is a prefix of the request path and either ends with '/' or is followed by '/' in the request path. I did not see the browser-level cookie filter, so the host-only subdomain part of the issue may still need a change elsewhere.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:pathMatches"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

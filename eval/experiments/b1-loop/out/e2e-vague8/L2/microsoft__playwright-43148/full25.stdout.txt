@@ -1,0 +1,32 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0079,
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 1,
+  "explanation": "`filterCookies` forced a leading '.' onto host-only cookie domains, so they matched subdomains. It also used a plain `startsWith` for paths, so `/api` matched `/apiv2`. I replaced both with RFC 6265 matching: host-only cookies need an exact host match, and a path matches only on equality, or when the cookie path ends with '/', or when the next request-path character is '/'. `pathMatches` in `cookieStore.ts` appended '/' to both sides, so a `/foo/` cookie matched `/foo`. It now uses the same path rule. I inlined the matching in `network.ts` because I couldn't see its imports and wanted to avoid a possible circular import with `cookieStore.ts`.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1402,
+ "seconds": 26,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 14 +++++++++-----\n 2 files changed, 12 insertions(+), 10 deletions(-)"
+}
+round 1: found=True picked=['packages/playwright-core/src/server/network.ts:filterCookies', 'packages/playwright-core/src/server/cookieStore.ts:pathMatches', 'packages/playwright-core/src/server/cookieStore.ts:domainMatches']
+  fix: applied: `filterCookies` forced a leading '.' onto host-only cookie domains, so they matched subdomains. It also used a plain `startsWith` for paths, so `/api` matched `/apiv2`. I replaced both with RFC 6265 matching: host-only cookies need an exact host match, and a path matches only on equality, or when the cookie path ends with '/', or when the next request-path character is '/'. `pathMatches` 
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   6%|▌         | 17/290 [00:00<00:01, 150.72it/s]
+Loading weights:  13%|█▎        | 38/290 [00:00<00:01, 132.39it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 837.35it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

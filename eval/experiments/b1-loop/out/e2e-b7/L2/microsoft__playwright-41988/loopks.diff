@@ -1,0 +1,15 @@
+diff --git a/packages/injected/src/ariaSnapshotDistiller.ts b/packages/injected/src/ariaSnapshotDistiller.ts
+index 3481b06..78ec9bb 100644
+--- a/packages/injected/src/ariaSnapshotDistiller.ts
++++ b/packages/injected/src/ariaSnapshotDistiller.ts
+@@ -184,7 +184,9 @@ const removeRedundantNames: DistillerPlugin = {
+       return;
+     if (nameFromContentRefs.every(ref => !ctx.pendingContentRefs.has(ref))) {
+       node.name = '';
+-    } else {
++    } else if (node.role !== 'generic') {
++      // A generic that keeps its name is later dropped by `removeNameRepeatingChild`,
++      // so it must not mark its contributors as represented for the ancestors.
+       for (const ref of nameFromContentRefs)
+         ctx.pendingContentRefs.delete(ref);
+     }

@@ -1,0 +1,199 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0092,
+ "task": "pandas-dev__pandas-68090",
+ "fixed": {
+  "round": 1,
+  "explanation": "BaseGrouper.indices paired each Grouping's raw codes (first-appearance order when sort=False, observed=False) with self.levels (original category order), so labels pointed at other groups' rows. The fix builds the dict from result_index_and_ids, the same source used by groups, so labels and row positions are consistent. Only non-empty groups are included, as before.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1293,
+ "seconds": 28,
+ "diff_stat": "pandas/core/groupby/ops.py | 20 ++++++++++++++++++--\n 1 file changed, 18 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The groupby `indices` computation for multiple keys with a categorical key, when sort=False and observed=False, builds result group labels in category order but pairs them with row positions in first-appearance order. The code that computes the result index / group index ordering (codes and uniques) must be made consistent so `indices` and `get_group` map each label to its own rows.",
+    "symptom": "With sort=False and observed=False on multiple keys including a categorical, GroupBy.indices (and thus get_group) pairs labels with the wrong rows' positions, disagreeing with GroupBy.groups.",
+    "anchors": [
+     "groups",
+     "categorical"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/groupby/grouper.py",
+     418,
+     742
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     756,
+     769
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     935,
+     973
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     14,
+     36
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     975,
+     985
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     709,
+     720
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     379,
+     428
+    ],
+    [
+     "pandas/core/frame.py",
+     13549,
+     13783
+    ],
+    [
+     "pandas/core/groupby/categorical.py",
+     13,
+     81
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     6799,
+     6824
+    ],
+    [
+     "pandas/core/sorting.py",
+     715,
+     743
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     618,
+     625
+    ],
+    [
+     "pandas/core/groupby/generic.py",
+     2089,
+     4234
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     308,
+     377
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     673,
+     696
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     5830,
+     5912
+    ],
+    [
+     "pandas/core/sorting.py",
+     672,
+     712
+    ],
+    [
+     "pandas/core/reshape/reshape.py",
+     182,
+     202
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     402,
+     435
+    ],
+    [
+     "pandas/tests/groupby/test_groupby.py",
+     2439,
+     2457
+    ],
+    [
+     "pandas/core/sorting.py",
+     639,
+     665
+    ],
+    [
+     "pandas/tests/groupby/test_categorical.py",
+     438,
+     454
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     831,
+     920
+    ],
+    [
+     "pandas/core/sorting.py",
+     272,
+     306
+    ],
+    [
+     "pandas/_libs/algos.pyi",
+     31,
+     37
+    ]
+   ],
+   "analysis": "BaseGrouper.indices builds its dict from each Grouping's codes plus self.levels. With sort=False and observed=False, recode_for_groupby gives codes in first-appearance order. The levels have categories reset to the original category order, via set_categories(_orig_cats) in result_index_and_ids. So labels and positions are paired inconsistently. BaseGrouper.groups uses result_index_and_ids, which is consistent. The fix belongs in BaseGrouper.indices in ops.py, which should compute from the consistent result_index and ids, or use matching levels and codes.",
+   "picked": [
+    "pandas/core/groupby/ops.py:BaseGrouper.indices"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/groupby/ops.py lines 673-696 (BaseGrouper.indices)"
+   ],
+   "fix_attempt": "applied: BaseGrouper.indices paired each Grouping's raw codes (first-appearance order when sort=False, observed=False) with self.levels (original category order), so labels pointed at other groups' rows. The fix builds the dict from result_index_and_ids, the same source used by groups, so labels and row positions are consistent. Only non-empty groups are included, as before."
+  }
+ ]
+}

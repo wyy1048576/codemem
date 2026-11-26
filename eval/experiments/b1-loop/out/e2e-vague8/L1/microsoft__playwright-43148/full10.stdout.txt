@@ -1,0 +1,33 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0103,
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 1,
+  "explanation": "filterCookies prefixed a dot to every cookie domain, so host-only cookies matched subdomains. It also used a plain string prefix for paths. It now matches host-only cookies by exact hostname, matches dotted domains by exact name or suffix, and matches paths per RFC 6265 5.1.4 (exact, or a prefix ending at a slash boundary). pathMatches in cookieStore.ts no longer appends a slash to the request path, so cookie path /foo/ no longer matches request /foo. It still matches /apiv2 against /api only on a slash boundary.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.073,
+ "seconds": 25,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 21 +++++++++++++++------\n 2 files changed, 18 insertions(+), 11 deletions(-)"
+}
+round 1: found=True picked=['packages/playwright-core/src/server/network.ts:filterCookies', 'packages/playwright-core/src/server/cookieStore.ts:pathMatches']
+  fix: applied: filterCookies prefixed a dot to every cookie domain, so host-only cookies matched subdomains. It also used a plain string prefix for paths. It now matches host-only cookies by exact hostname, matches dotted domains by exact name or suffix, and matches paths per RFC 6265 5.1.4 (exact, or a prefix ending at a slash boundary). pathMatches in cookieStore.ts no longer appends a slash to the re
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  19%|█▉        | 55/290 [00:00<00:00, 421.75it/s]
+Loading weights:  35%|███▍      | 101/290 [00:00<00:00, 426.49it/s]
+Loading weights:  50%|████▉     | 144/290 [00:00<00:00, 343.37it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 724.43it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,83 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 5,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0102,
+ "task": "microsoft__playwright-42919",
+ "fixed": {
+  "round": 1,
+  "explanation": "_captureSnapshot awaited the snapshotter's captureSnapshot directly, so when the page main thread is busy the wait never ends and the progress budget can't cut it off. Wrapping it in progress.race ties it to the budget, as the coverage capture does. The snapshot's own errors are still swallowed. I didn't change the lint rule, which also misses optional chaining. I dropped the optional chaining here because the `started()` check already guards it.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0667,
+ "seconds": 17,
+ "diff_stat": "packages/playwright-core/src/server/trace/recorder/tracing.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The tracing hooks that run before and after each API call (snapshot capture in the tracer) await the page's DOM snapshot directly instead of through the progress/time budget wrapper. The snapshot capture should be tied to the 3-second budget (e.g. via progress.race or similar, as coverage capture does), and the lint rule for untied waits should also catch optional-chained calls.",
+    "symptom": "With tracing snapshots on, calls on a page with a busy main thread (evaluate, goto with timeout) never complete and their timeouts never fire, because the snapshot capture waits on the page without being bounded by the budget.",
+    "anchors": [
+     "snapshots",
+     "timeout",
+     "optional chaining",
+     "tracing",
+     "snapshot",
+     "coverage"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/trace/recorder/tracing.ts",
+     508,
+     528
+    ],
+    [
+     "tests/library/tracing.spec.ts",
+     594,
+     760
+    ],
+    [
+     "packages/playwright-core/src/server/trace/recorder/snapshotter.ts",
+     106,
+     121
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     163,
+     166
+    ],
+    [
+     "tests/library/tracing.spec.ts",
+     1,
+     192
+    ]
+   ],
+   "analysis": "Tracing._captureSnapshot awaits this._snapshotter?.captureSnapshot(page, ...) directly, without tying it to the progress budget. The coverage capture already uses the progress. The fix is to wrap the snapshot wait in progress.race (or similar). The lint rule for untied waits, which misses optional chaining, may also need a change, but the main fix is in this function.",
+   "picked": [
+    "packages/playwright-core/src/server/trace/recorder/tracing.ts:Tracing._captureSnapshot"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/trace/recorder/tracing.ts lines 508-528 (Tracing._captureSnapshot)"
+   ],
+   "fix_attempt": "applied: _captureSnapshot awaited the snapshotter's captureSnapshot directly, so when the page main thread is busy the wait never ends and the progress budget can't cut it off. Wrapping it in progress.race ties it to the budget, as the coverage capture does. The snapshot's own errors are still swallowed. I didn't change the lint rule, which also misses optional chaining. I dropped the optional chaining here because the `started()` check already guards it."
+  }
+ ]
+}

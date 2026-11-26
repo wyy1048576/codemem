@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43146",
+ "exit": 0,
+ "seconds": 16,
+ "cost_usd": 0.0380349,
+ "turns": 6,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 4668,
+  "cache_read_input_tokens": 28169,
+  "output_tokens": 1653,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 4668,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 260,
+    "cache_read_input_tokens": 8703,
+    "cache_creation_input_tokens": 1357,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1357
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 3
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 25 ++++++++++++++--------\n 1 file changed, 16 insertions(+), 9 deletions(-)",
+ "final": "I fixed both problems in `parseRawCookie` in `packages/playwright-core/src/server/cookieStore.ts`. I couldn't build or run anything, so the change is untested.\n\n- **Precedence:** `Max-Age` is now held in a separate variable while the attributes are read. It is applied after the loop, so it overrides `Expires` whichever comes first. A cookie with `Max-Age=3600` and a past `Expires` now lives for an hour.\n- **Validation:** `Max-Age` is only used if the value is an optional minus sign followed by digits only. Values like `10abc` or an empty string are ignored. Previously `parseInt` accepted `10abc` as 10.\n\n`harTracer.ts` also has a `max-age` case (line 803). I didn't check or change it.",
+ "stderr": ""
+}

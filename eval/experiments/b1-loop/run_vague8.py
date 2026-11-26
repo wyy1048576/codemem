@@ -1,12 +1,17 @@
-"""Grep agent and the full-code codemem loop (n = 5, 10, 25, 50) on the 8 contamination-free, validated, fair
-pilot tasks with vague prompts (L1 or L2 of eval/tasks/vague-pilot18-v2.jsonl on main).
+"""Grep agent and the codemem loop arms on tasks with vague prompts: by default the 8 contamination-free, validated,
+fair pilot tasks (L1 / L2 of eval/tasks/vague-pilot18-v2.jsonl on main); VAGUE_SET=e2e-b7 for the 6 b7 tasks.
+
+Arms: grep; fullN (e2e_loop.py, judge sees N results as raw code, separate fix call; fullNt: test results condensed);
+loopk / loopk_nc (e2e_loopk.py: Sonnet picks k, one call per round; prompt cache on / off; loopk_nc is the chosen
+loop); loopks / loopks_nc (e2e_loop.py with Sonnet picking k but separate judge and fix calls); mergedN (e2e_loopk.py
+with k fixed at N).
 
 Tasks: out/e2e-vague8/tasks-<LEVEL>.jsonl (the fresh task with `query` replaced by the vague prompt; the issue as
 written is kept in `query_L0`). Outputs: out/e2e-vague8/<LEVEL>/<task_id>/<arm>.*. Each task gets a fresh copy of
 the repo at its base commit (no history), reset between arms. Finished arms are skipped; a failed arm is tried
 once more (Windows file locks on the index have failed a run before).
 
-Usage: python run_vague8.py L1|L2     (CODEMEM_HOME=~/.codemem-e2e, PYTHONPATH as e2e_all.py)
+Usage: python run_vague8.py L1|L2 [ARMS,...] [TASK_IDS,...]     (CODEMEM_HOME=~/.codemem-e2e, PYTHONPATH as e2e_all.py)
 """
 from __future__ import annotations
 
@@ -23,10 +28,12 @@ HERE = Path(__file__).resolve().parent
 PY = sys.executable
 NL = chr(10)
 LEVEL = sys.argv[1]
-BASE = HERE / "out" / "e2e-vague8"
+BASE = HERE / "out" / os.environ.get("VAGUE_SET", "e2e-vague8")  # VAGUE_SET=e2e-b7 for the b7 tasks
 tasks_file = BASE / f"tasks-{LEVEL}.jsonl"
 tasks = [json.loads(x) for x in tasks_file.read_text(encoding="utf8").split(NL) if x.strip()]
-ARMS = ["grep", "full5", "full10", "full25", "full50"]
+ARMS = sys.argv[2].split(",") if len(sys.argv) > 2 else ["grep", "full5", "full10", "full25", "full50"]
+if len(sys.argv) > 3:  # only these task ids (comma-separated)
+    tasks = [t for t in tasks if t["id"] in sys.argv[3].split(",")]
 GIT = ["git", "-c", "core.autocrlf=false", "-c", "core.longpaths=true", "-c", "user.name=e2e", "-c", "user.email=e2e@localhost"]
 
 
@@ -65,10 +72,18 @@ def run_arm(task, arm, out):
     copy = copy_dir(task)
     if arm == "grep":
         cmd, env = [PY, str(HERE / "e2e_run.py"), str(tasks_file), task["id"], "grep", str(copy), str(out)], os.environ.copy()
-    else:
-        n = arm.removeprefix("full")
+    elif arm in ("loopks", "loopks_nc"):  # loop-k with separate judge and fix calls; _nc: no prompt caching
         cmd = [PY, str(HERE / "e2e_loop.py"), str(tasks_file), task["id"], str(copy), str(out)]
-        env = os.environ.copy() | {"LOOP_N": n, "LOOP_TAG": arm, "LOOP_FULL": "1"}
+        env = os.environ.copy() | {"LOOP_TAG": arm, "LOOP_FULL": "1", "LOOP_CHOOSE_K": "1",
+                                   "LLM_NO_PROMPT_CACHE": "1" if arm.endswith("_nc") else "0"}
+    elif arm in ("loopk", "loopk_nc") or arm.startswith("merged"):  # loopk_nc: no prompt caching; mergedN: N fixed
+        cmd = [PY, str(HERE / "e2e_loopk.py"), str(tasks_file), task["id"], str(copy), str(out)]
+        # e2e_loopk.py turns the prompt cache off by default; loopk and mergedN were run with it on
+        env = os.environ.copy() | {"LOOP_TAG": arm, "LLM_NO_PROMPT_CACHE": "1" if arm == "loopk_nc" else "0"} |             ({"LOOP_FIXED_K": arm.removeprefix("merged")} if arm.startswith("merged") else {})
+    else:
+        n = arm.removeprefix("full").removesuffix("t")  # fullNt: test results condensed (LOOP_CONDENSE_TESTS)
+        cmd = [PY, str(HERE / "e2e_loop.py"), str(tasks_file), task["id"], str(copy), str(out)]
+        env = os.environ.copy() | {"LOOP_N": n, "LOOP_TAG": arm, "LOOP_FULL": "1"} |             ({"LOOP_CONDENSE_TESTS": "1"} if arm.endswith("t") else {})
     r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf8", errors="replace", env=env)
     (out / f"{arm}.stdout.txt").write_text(r.stdout + NL + r.stderr[-3000:], encoding="utf8")
     reset(task)

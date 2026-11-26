@@ -1,0 +1,22 @@
+diff --git a/pandas/core/internals/managers.py b/pandas/core/internals/managers.py
+index 13ba2c3..971797d 100644
+--- a/pandas/core/internals/managers.py
++++ b/pandas/core/internals/managers.py
+@@ -1181,13 +1181,15 @@ class BlockManager(libinternals.BlockManager, BaseBlockManager):
+             result: np.ndarray | ExtensionArray = self.blocks[0].iget(
+                 (slice(None), loc)
+             )
+-            # in the case of a single block, the new block is a view
++            # Copy the (small) row so the result does not keep the whole
++            #  possibly-temporary 2D block alive.
++            if isinstance(result, np.ndarray) and result.base is not None:
++                result = result.copy()
+             bp = BlockPlacement(slice(0, len(result)))
+             block = new_block(
+                 result,
+                 placement=bp,
+                 ndim=1,
+-                refs=self.blocks[0].refs,
+             )
+             return SingleBlockManager(block, self.axes[0].view())
+ 

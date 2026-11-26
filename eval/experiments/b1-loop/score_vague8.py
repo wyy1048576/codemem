@@ -1,18 +1,19 @@
 """Score the vague-prompt runs: out/e2e-vague8/<LEVEL>/<task>/<arm>.* for L1 and L2.
 
 A gold function is SEEN when at least half its lines reached the model as raw code (grep: lines returned by Read
-or printed by Grep; loops: results shown whole and the fix call's code, not previews), EDITED when the final diff
+or printed by Grep; loops: results shown whole, the fix call's code and earlier picks shown again, not previews), EDITED when the final diff
 touches a line inside it. Cost of a loop includes its query-writing call. Usage: python score_vague8.py
 """
 import collections as C
 import json
+import os
 import re
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-BASE = HERE / "out" / "e2e-vague8"
+BASE = HERE / "out" / os.environ.get("VAGUE_SET", "e2e-vague8")
 NL = chr(10)
-ARMS = ("grep", "full5", "full10", "full25", "full50")
+ARMS = ("grep", "full5", "full10", "full25", "full50", "loopk", "loopk_nc", "full10t", "merged10", "loopks", "loopks_nc")
 
 src = (HERE / "e2e_score.py").read_text(encoding="utf8")
 exec(src[src.index("def add_range"):src.index("import sys\nCOMMON")])  # add_range, rel, diff_lines, grep_seen, found
@@ -40,7 +41,7 @@ for level in ("L1", "L2"):
                     for (p, a, b), whole in zip(h.get("shown", []), h.get("shown_whole", [])):
                         if whole:
                             add_range(seen, p, a, b)
-                    for x in h.get("fix_shown") or []:
+                    for x in (h.get("fix_shown") or []) + (h.get("picked_shown") or []):
                         m = re.match(r"(.+?) lines (\d+)-(\d+)", x)
                         if m:
                             add_range(seen, *m.groups())

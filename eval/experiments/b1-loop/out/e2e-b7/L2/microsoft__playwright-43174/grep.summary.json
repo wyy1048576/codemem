@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43174",
+ "exit": 0,
+ "seconds": 43,
+ "cost_usd": 0.1139427,
+ "turns": 12,
+ "usage": {
+  "input_tokens": 20,
+  "cache_creation_input_tokens": 14678,
+  "cache_read_input_tokens": 100807,
+  "output_tokens": 4511,
+  "output_tokens_details": {
+   "thinking_tokens": 2302
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 14678,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 458,
+    "cache_read_input_tokens": 18050,
+    "cache_creation_input_tokens": 2020,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2020
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 4,
+  "Read": 6,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/tools/mcp/watchdog.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "final": "I changed `packages/playwright-core/src/tools/mcp/watchdog.ts` so the browser is closed once, gracefully, when the client closes stdin. I haven't built or run anything, so this is untested.\n\n**Root cause:** When stdin ended, two things started closing the browser at the same time:\n- `server.ts` closes the transport on stdin `end`. That runs the backend's `dispose`, which closes the browser gracefully.\n- The exit watchdog also listens for stdin `close` and called `gracefullyCloseAll()`.\n\nIn `processLauncher.gracefullyClose`, a second call while one is already running force-kills the browser. That cut off the graceful shutdown and lost profile data.\n\n**Fix:** On stdin `close`, the watchdog no longer starts its own close. It waits for `gracefullyCloseSet` to empty, which happens as each browser process exits, and then exits. The existing 15-second force-exit timer stays as the fallback. SIGINT and SIGTERM still call `gracefullyCloseAll()` as before.\n\n**Risk:** `setupExitWatchdog` is also used by `cli-daemon` and `playwright/src/program.ts`. If stdin closes there and nothing else closes the browser, they now only exit through the 15-second timer, which force-kills it. I didn't check whether those callers rely on stdin `close` to shut down browsers.",
+ "stderr": ""
+}

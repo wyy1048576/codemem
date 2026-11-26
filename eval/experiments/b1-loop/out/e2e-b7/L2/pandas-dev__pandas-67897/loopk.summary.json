@@ -1,0 +1,71 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-67897",
+ "fixed": {
+  "round": 1,
+  "explanation": "from_numpy_dtype fails for DatetimeTZDtype subtype, and the extension type serializes subtype as str which type_for_alias can't parse for tz timestamps. Build a tz-aware pyarrow timestamp subtype and store tz separately in metadata.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0394,
+ "seconds": 34,
+ "diff_stat": "pandas/core/arrays/arrow/extension_types.py | 11 ++++++++++-\n pandas/core/arrays/interval.py              |  9 ++++++++-\n 2 files changed, 18 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Interval extension array's Arrow conversion (__arrow_array__) and the pyarrow extension type for intervals (ArrowIntervalType) must handle datetime subtypes with timezone, preserving tz in the struct subtype, and convert back via __from_arrow__ to the same IntervalDtype with tz-aware subtype.",
+    "symptom": "Calling pyarrow conversion on an IntervalArray/Series with timezone-aware datetime bounds raises an error, and parquet round trip doesn't preserve the interval dtype.",
+    "anchors": [
+     "pyarrow",
+     "parquet",
+     "timezone-aware",
+     "intervals"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/arrays/interval.py",
+     1608,
+     1658
+    ],
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     60,
+     109
+    ],
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     108,
+     109
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "from_numpy_dtype fails for DatetimeTZDtype subtype, and the extension type serializes subtype as str which type_for_alias can't parse for tz timestamps. Build a tz-aware pyarrow timestamp subtype and store tz separately in metadata.",
+   "picked": [
+    "pandas/core/arrays/interval.py:IntervalArray.__arrow_array__",
+    "pandas/core/arrays/arrow/extension_types.py:ArrowIntervalType"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

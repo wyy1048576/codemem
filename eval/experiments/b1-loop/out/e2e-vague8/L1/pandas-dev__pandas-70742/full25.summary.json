@@ -1,0 +1,370 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0096,
+ "task": "pandas-dev__pandas-70742",
+ "fixed": {
+  "round": 2,
+  "explanation": "The single-block path of `fast_xs` returned a strided view of the block's 2D array and shared its refs. When the block is a temporary copy made by selecting non-adjacent columns, the small row Series keeps that whole array alive. The fix copies the row, which has one value per column, and drops the shared refs. The result then owns its data, and under copy-on-write the behavior is the same.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.1753,
+ "seconds": 34,
+ "diff_stat": "pandas/core/internals/managers.py | 5 +++--\n 1 file changed, 3 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The row-selection path of DataFrame indexing (fast xs / _ixs for a single row on a multi-block or non-contiguous column selection) builds a Series from a row of a temporary 2D array created by taking columns (e.g. take/reindex of blocks, interleaved values). The Series is a view of that temporary array, so it keeps the whole array alive; the result should be copied or otherwise not reference the base temporary.",
+    "symptom": "Selecting a single row with a list of non-adjacent columns (via loc or iloc) returns a small Series whose data is a view on a large temporary (n_columns by n_rows) array, keeping lots of memory alive.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/apply.py",
+     1585,
+     1628
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2126,
+     2152
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     297,
+     310
+    ],
+    [
+     "pandas/core/base.py",
+     260,
+     273
+    ],
+    [
+     "pandas/core/indexing.py",
+     3545,
+     3562
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2252,
+     2290
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     1060,
+     1065
+    ],
+    [
+     "pandas/core/frame.py",
+     4245,
+     4266
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     746,
+     772
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     703,
+     721
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     312,
+     323
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     1051,
+     1058
+    ],
+    [
+     "pandas/core/indexing.py",
+     2100,
+     3283
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2325,
+     2330
+    ],
+    [
+     "pandas/io/pytables.py",
+     6768,
+     6798
+    ],
+    [
+     "pandas/io/pytables.py",
+     275,
+     286
+    ],
+    [
+     "pandas/core/methods/select.py",
+     80,
+     85
+    ],
+    [
+     "pandas/core/series.py",
+     1066,
+     1079
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     500,
+     514
+    ],
+    [
+     "pandas/core/apply.py",
+     1604,
+     1607
+    ],
+    [
+     "pandas/core/apply.py",
+     1616,
+     1618
+    ],
+    [
+     "pandas/tests/indexing/test_iloc.py",
+     71,
+     1783
+    ],
+    [
+     "pandas/core/apply.py",
+     1622,
+     1626
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     91,
+     112
+    ],
+    [
+     "pandas/io/pytables.py",
+     5360,
+     5384
+    ]
+   ],
+   "analysis": "Results show DataFrame._ixs calling mgr.fast_xs, but BlockManager.fast_xs (the multi-block row builder) was not shown. The issue likely comes from the loc/iloc path taking columns (producing a temporary 2D array, perhaps via a single-block fast path) and then fast_xs returning a row view of that array. The fix is probably in BlockManager.fast_xs or in the single-block row path in managers.py.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "BlockManager.fast_xs that builds a single row cross-section: for a single block it returns a view of a row of block.values; the result should not be a view of a temporary array.",
+    "symptom": "Selecting one row with a non-adjacent list of columns returns a Series that is a view on a large temporary 2D array, keeping it alive.",
+    "anchors": [
+     "fast_xs",
+     "_ixs",
+     "iget",
+     "take_block_columns",
+     "_slice_take_blocks_ax0"
+    ],
+    "look_in": [
+     "pandas/core/internals/managers.py"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/internals/managers.py",
+     913,
+     1051
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1166,
+     1247
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2076,
+     2360
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1249,
+     1261
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1263,
+     1273
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1111,
+     2073
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     146,
+     1108
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2101,
+     2112
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2126,
+     2135
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     223,
+     225
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1275,
+     1301
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     719,
+     746
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2547,
+     2579
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     826,
+     911
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2507,
+     2514
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     411,
+     461
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1156,
+     1161
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2449,
+     2504
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2215,
+     2233
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2332,
+     2343
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2235,
+     2251
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2268,
+     2270
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     683,
+     685
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2272,
+     2274
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     286,
+     295
+    ]
+   ],
+   "analysis": "BlockManager.fast_xs has a single-block fast path. It returns `blocks[0].iget((slice(None), loc))` as a view that shares the block's refs. When the columns were chosen with a take, the single block is a temporary 2D copy. The row Series then keeps that whole temporary array alive. The fix belongs in this path: copy the row, or skip the view, when the block's values are not the DataFrame's own data.",
+   "picked": [
+    "pandas/core/internals/managers.py:BlockManager.fast_xs"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/internals/managers.py lines 1166-1247 (BlockManager.fast_xs)"
+   ],
+   "fix_attempt": "applied: The single-block path of `fast_xs` returned a strided view of the block's 2D array and shared its refs. When the block is a temporary copy made by selecting non-adjacent columns, the small row Series keeps that whole array alive. The fix copies the row, which has one value per column, and drops the shared refs. The result then owns its data, and under copy-on-write the behavior is the same."
+  }
+ ]
+}
