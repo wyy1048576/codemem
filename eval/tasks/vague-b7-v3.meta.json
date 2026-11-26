@@ -20,8 +20,8 @@
   "rules": "tasks/vague-rules-v2.md",
   "rules_sha256": "e0190687a7f246317eddfa4da2a6e45130b2e66b016a7b4bf1cd50578be008d2"
  },
- "review": "proposed by Andre's review of 2026-11-26 (branch andre/vague-prompts-v3, commit 5a7c2a2): 13 rows of vague-b7-v2 to correct, and four sentences for the rules. Track A reviewed each row against the rules and the issue, the real fix and the hidden tests of its task",
- "changed_rows": 13,
+ "review": "proposed by Andre's review of 2026-11-26 (branch andre/vague-prompts-v3, commit 5a7c2a2): 13 rows of vague-b7-v2 to correct, and four sentences for the rules. Track A reviewed each row against the rules and the issue, the real fix and the hidden tests of its task. Track A's own review found four more rows with the same kinds of fault and corrected them under rules version 3 (found_in_our_review)",
+ "changed_rows": 17,
  "changed_as_proposed": [
   [
    "microsoft__playwright-41942",
@@ -76,7 +76,7 @@
   "microsoft__playwright-43172 L1": "Andre's text, and also: 'The parser turns' becomes 'Playwright does this for', and 'throws an error that says the locator method is unsupported' becomes 'throws an error' (a near copy of the repo's own error text)"
  },
  "proposed_not_taken": [],
- "unchanged_rows": "77 rows are byte-equal to vague-b7-v2.jsonl",
+ "unchanged_rows": "73 rows are byte-equal to vague-b7-v2.jsonl",
  "with_done_when": [
   "microsoft__playwright-42792"
  ],
@@ -322,11 +322,17 @@
  "checks": {
   "loader": "cmeval.e2e_run.load_prompts reads 45 L1 texts and 45 L2 texts",
   "l2_length": "every L2 has 17 to 29 words without the Done-when line (rule: 10 to 30)",
-  "unchanged": "77 rows byte-equal to vague-b7-v2.jsonl; the ids and levels are in the same order",
-  "review": "each of the 13 proposed rows was checked against the rules version 2 and version 3 and against the issue, the real fix, the hidden tests and the screen reads (tasks/screen/b7.jsonl) of its task: is the finding right, is the new text within the rules, and does it keep the request the same. vague-b7-v3.changes.md gives the reason for each row",
-  "leak": "each writer searched its texts for the names it removed and for the changed names of the real fix. Then one more claude-opus-5-5 session reviewed the 37 new tasks against the issue, the real fix and the hidden tests: 30 ok, 7 with a near copy of an error or log string of the repo's code; its corrected texts are used (8 rows: playwright-42042 L1, playwright-42780 L1, playwright-43012 L1, playwright-43400 L1, playwright-43400 L2, pandas-67897 L1, pandas-70205 L1, pandas-71129 L1). It found no lost or changed fact (for vague-b7-v2; the 13 new rows were read again for code names, file paths and the repo's error text)",
+  "unchanged": "73 rows byte-equal to vague-b7-v2.jsonl; the ids and levels are in the same order",
+  "review": "each of the 13 proposed rows, and the 4 rows found in our review, was checked against the rules version 2 and version 3 and against the issue, the real fix, the hidden tests and the screen reads (tasks/screen/b7.jsonl) of its task: is the finding right, is the new text within the rules, and does it keep the request the same. vague-b7-v3.changes.md gives the reason for each row",
+  "leak": "each writer searched its texts for the names it removed and for the changed names of the real fix. Then one more claude-opus-5-5 session reviewed the 37 new tasks against the issue, the real fix and the hidden tests: 30 ok, 7 with a near copy of an error or log string of the repo's code; its corrected texts are used (8 rows: playwright-42042 L1, playwright-42780 L1, playwright-43012 L1, playwright-43400 L1, playwright-43400 L2, pandas-67897 L1, pandas-70205 L1, pandas-71129 L1). It found no lost or changed fact (for vague-b7-v2; the 17 new rows were read again for code names, file paths and the repo's error text)",
   "solvable": "not done (plan section 9, check 2)",
   "human": "not done (plan section 9, check 3)"
  },
- "sha256": "43a59add3a01c436edfa7978caa1b90b3da5936c3673b5fa0155ebadba9feca6"
+ "sha256": "1797ae6317aedfa9d96078e5b3bcd7fb844233cc073b18cb53ddc20d74857736",
+ "found_in_our_review": {
+  "microsoft__playwright-41942 L1": "the repo's error text 'Unsupported platform' in other words, twice",
+  "pandas-dev__pandas-69015 L1": "a retold stack trace ('from the low-level element comparison')",
+  "pandas-dev__pandas-71232 L1": "a place in the code ('the shared fill code')",
+  "microsoft__playwright-43316 L2": "the tool name browser_cookie_list split into words ('cookie list')"
+ }
 }

@@ -4,8 +4,9 @@
 proposed by Andre's review of 2026-11-26 (branch `andre/vague-prompts-v3`, commit `5a7c2a2`).
 Track A checked each row against the rules, and against the issue, the real fix, the hidden tests
 and the screen reads of its task. 12 rows are taken as proposed. One row (playwright 43172, L1)
-is taken with a further change. No proposed row was left out. The other 77 rows are byte-equal
-to version 2.
+is taken with a further change. No proposed row was left out. Track A's own review found four
+more rows with the same kinds of fault and corrected them under rules version 3 (section "Found
+in our review"). So 17 rows changed, and the other 73 rows are byte-equal to version 2.
 
 The review also proposed four sentences for the rules. All four are in
 `vague-rules-v3.md`, with changes of wording:
@@ -19,11 +20,11 @@ The review also proposed four sentences for the rules. All four are in
    Added: a general term of the domain (cookie, clock, JSON) stays, and a message that the fix
    must show follows the "Done when" rule.
 
-## The changed rows
+## The rows of Andre's review
 
 ### microsoft__playwright-41942 L2
 
-**Taken as proposed.** Proposed by Andre's review of 2026-11-26. "An unsupported platform error" is a near copy of the repo's own error text "Unsupported platform: android", and a text search for it finds the gold files (both screen reads say so). The new text keeps the symptom in the user's words. Rules: v2 L1 bullet on exact error strings; v3 sentence on a name split into words. Not changed: the L1 of this task still has "unsupported platform" and "unsupported-platform check" (see the end of this file).
+**Taken as proposed.** Proposed by Andre's review of 2026-11-26. "An unsupported platform error" is a near copy of the repo's own error text "Unsupported platform: android", and a text search for it finds the gold files (both screen reads say so). The new text keeps the symptom in the user's words. Rules: v2 L1 bullet on exact error strings; v3 sentence on a name split into words. The L1 of this task had the same words; see "Found in our review".
 
 Old:
 
@@ -181,22 +182,60 @@ New:
 
 > In pandas 3.1.0rc0 and on the main branch, appending a DataFrame with a categorical column to an HDF5 store in table format fails with the wrong error when the stored data has integer categories and the new data has float categories. Steps: make a DataFrame with one categorical column of the integers 1, 2, 3, 1 (categories 1, 2, 3), and a second one with the same column as the floats 1.0, 2.0, 4.0, 1.0 (categories 1.0, 2.0, 4.0). Open a new HDF5 store, append the first frame in table format under a key, then append the second frame under the same key. In pandas 3.0.6 the second append is rejected with the intended value error, which says that the new categories differ from the stored ones, so the data cannot be appended. Now it fails inside compiled code instead, with a value error about a buffer type mismatch (expected double, got long). Expected: the second append raises the same different-categories error as in 3.0.6.
 
+## Found in our review
+
+Not part of Andre's proposal. Track A found these four rows while it checked the proposal, and
+corrected each one with the smallest change that removes the fault and keeps every fact of the
+issue.
+
+### microsoft__playwright-41942 L1
+
+**Found in our review.** "on an unsupported platform that lookup fails" becomes "on a platform that Playwright does not support, that lookup fails", and "should not hit the unsupported-platform check" becomes "should not hit the check that rejects the platform". Both phrases kept the words of the repo's error text "Unsupported platform", which this version removes from the L2 of the same task (v3 sentence on a name split into words). No fact changes.
+
+Old:
+
+> Regression since Playwright 1.58.2: on Android under Termux, Playwright fails with an error saying that the platform android is not supported, even when the user sets the environment variable that tells Playwright where browsers are installed. It happens both when that variable is set to 0 and when it points to an explicit folder. Steps: install the latest Playwright in Termux, set that variable, and run any Playwright command, for example the browser install command. The cause is that Playwright now works out its default per-user cache folder as soon as it loads, before it looks at the variable, and on an unsupported platform that lookup fails with the platform error. Expected: when the browser location is given through the variable, Playwright should not compute the default cache folder when it loads and should not hit the unsupported-platform check, as in earlier releases. Loading Playwright on Termux must work, so that Termux users can supply their own browser installation.
+
+New:
+
+> Regression since Playwright 1.58.2: on Android under Termux, Playwright fails with an error saying that the platform android is not supported, even when the user sets the environment variable that tells Playwright where browsers are installed. It happens both when that variable is set to 0 and when it points to an explicit folder. Steps: install the latest Playwright in Termux, set that variable, and run any Playwright command, for example the browser install command. The cause is that Playwright now works out its default per-user cache folder as soon as it loads, before it looks at the variable, and on a platform that Playwright does not support, that lookup fails with the platform error. Expected: when the browser location is given through the variable, Playwright should not compute the default cache folder when it loads and should not hit the check that rejects the platform, as in earlier releases. Loading Playwright on Termux must work, so that Termux users can supply their own browser installation.
+
+### pandas-dev__pandas-69015 L1
+
+**Found in our review.** "raises TypeError: unhashable type: 'list' from the low-level element comparison." becomes "raises TypeError: unhashable type: 'list'." The removed words retell the issue's stack trace, which ends in the compiled testing module that the fix changes (v3 sentence on a place in the code). The error is Python's own message, not the repo's, so it stays.
+
+Old:
+
+> pandas' equality assertions for Series and DataFrames crash with a TypeError instead of raising the normal assertion error when an object-dtype column holds lists with different nesting. Example: one Series of object dtype holds 1, the list [1, 2], and "b"; a second holds 1, the list [1, 2, 3], and "b". Comparing them gives the expected assertion error: it says that the values of the two Series differ, gives the share of values that differ (33.33333 %), shows both sides, and names the earliest position that differs, position 1, with [1, 2] against [1, 2, 3]. But when the second Series holds the nested list [[1, 2]] in place of [1, 2, 3], the comparison raises TypeError: unhashable type: 'list' from the low-level element comparison. The same happens for DataFrames. Expected: the same kind of assertion error as for the flat lists, with the share of values that differ and the earliest position that differs.
+
+New:
+
+> pandas' equality assertions for Series and DataFrames crash with a TypeError instead of raising the normal assertion error when an object-dtype column holds lists with different nesting. Example: one Series of object dtype holds 1, the list [1, 2], and "b"; a second holds 1, the list [1, 2, 3], and "b". Comparing them gives the expected assertion error: it says that the values of the two Series differ, gives the share of values that differ (33.33333 %), shows both sides, and names the earliest position that differs, position 1, with [1, 2] against [1, 2, 3]. But when the second Series holds the nested list [[1, 2]] in place of [1, 2, 3], the comparison raises TypeError: unhashable type: 'list'. The same happens for DataFrames. Expected: the same kind of assertion error as for the flat lists, with the share of values that differ and the earliest position that differs.
+
+### pandas-dev__pandas-71232 L1
+
+**Found in our review.** "the shared fill code transposes the DataFrame" becomes "the fill transposes the DataFrame". "Shared fill code" points at the shared base class code that has the fault, as the sentence removed from pandas 70966 did (v3 sentence on a place in the code). The cause in terms of behaviour (transpose, fill, transpose back, return at once) is in the issue and stays.
+
+Old:
+
+> On a DataFrame, forward fill and backward fill of missing values ignore the request to work in place when they run along the columns (axis 1, or the string for columns). Example: a one-row DataFrame with columns A, B and C and the values 1.0, NaN and 3.0. Forward or backward filling it along the columns in place leaves the original DataFrame unchanged and returns a separate DataFrame that holds the filled values, so the returned object is not the original. Along the rows (axis omitted, 0, or the string for index) both methods work: they change the original and return it. Since pandas 3.0, these methods return the object itself, not None, when they work in place. The reporter traced the cause: for the column direction, the shared fill code transposes the DataFrame, fills it, transposes it back and returns that result at once. This skips the later step that applies an in-place result to the original. Under Copy-on-Write, filling the derived object does not change the original. Seen with pandas 3.0.6 and the 3.2 development version. Expected: when asked to work in place, both methods change the original DataFrame and return that same object.
+
+New:
+
+> On a DataFrame, forward fill and backward fill of missing values ignore the request to work in place when they run along the columns (axis 1, or the string for columns). Example: a one-row DataFrame with columns A, B and C and the values 1.0, NaN and 3.0. Forward or backward filling it along the columns in place leaves the original DataFrame unchanged and returns a separate DataFrame that holds the filled values, so the returned object is not the original. Along the rows (axis omitted, 0, or the string for index) both methods work: they change the original and return it. Since pandas 3.0, these methods return the object itself, not None, when they work in place. The reporter traced the cause: for the column direction, the fill transposes the DataFrame, fills it, transposes it back and returns that result at once. This skips the later step that applies an in-place result to the original. Under Copy-on-Write, filling the derived object does not change the original. Seen with pandas 3.0.6 and the 3.2 development version. Expected: when asked to work in place, both methods change the original DataFrame and return that same object.
+
+### microsoft__playwright-43316 L2
+
+**Found in our review.** "The MCP cookie list's domain filter" becomes "Playwright MCP's domain filter for listing cookies". "Cookie list" is the tool's name (browser_cookie_list) split into words (v3 sentence on a name split into words). The new words describe what the tool does, as the L1 does. 23 words.
+
+Old:
+
+> The MCP cookie list's domain filter uses substring matching, so example.com also returns my-example.com cookies. Match the domain and its subdomains, case-insensitively.
+
+New:
+
+> Playwright MCP's domain filter for listing cookies uses substring matching, so example.com also returns my-example.com cookies. Match the domain and its subdomains, case-insensitively.
+
 ## Proposed rows that were not taken
 
 None.
-
-## Seen in this review, not changed
-
-These texts were not part of the proposal. They are left as in version 2 so that this change
-holds only the reviewed rows. Each one is a candidate for the next version.
-
-- playwright 41942, L1: "on an unsupported platform that lookup fails" and "should not hit the
-  unsupported-platform check" keep the words of the repo's error text that this change removes
-  from L2.
-- pandas 71232, L1: "the shared fill code transposes the DataFrame ..." points at the shared
-  base class code, as the sentence removed from pandas 70966 did.
-- pandas 69015, L1: "from the low-level element comparison" retells the issue's stack trace,
-  which ends in the compiled testing module that the fix changes.
-- playwright 43316, L2: "The MCP cookie list's domain filter" is close to the tool's name
-  (browser_cookie_list) split into words. L1 says "the Playwright MCP tool that lists the cookies",
-  which is a description. The fixed file is cookies.ts.
