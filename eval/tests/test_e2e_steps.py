@@ -948,12 +948,18 @@ def test_recount_changes_only_steps(tmp_path, capsys):
     assert main(["e2e", "recount", "rc1"]) == 0
     out = capsys.readouterr().out
     assert ("pandas-dev__pandas-70742 grep rep 1: content searches - -> 8, files viewed 1 -> 3, gold opened True "
-            "-> True, first edit turn 7 -> 7") in out
+            "-> True, first edit turn 7 -> 7, first gold surfaced turn - -> 1, steps version - -> 3") in out
     new = json.loads(path.read_text())
     assert new["steps"]["steps_version"] == e2e_steps.STEPS_VERSION and new["steps"]["first_gold_read_turn"] == 2
     assert new["steps"]["num_turns_result"] == 18
     # Everything but steps is the same, byte for byte.
     assert json.dumps({**new, "steps": record["steps"]}, indent=2, ensure_ascii=False) + "\n" == before
+    # A second recount of a version 2 record moves it to version 3.
+    old_steps = {**new["steps"], "steps_version": 2, "first_gold_surfaced_turn": 9}
+    write_json(path, {**new, "steps": old_steps})
+    assert main(["e2e", "recount", "rc1"]) == 0
+    assert "first gold surfaced turn 9 -> 1, steps version 2 -> 3" in capsys.readouterr().out
+    assert json.loads(path.read_text())["steps"]["steps_version"] == 3
 
 
 def test_recount_takes_gold_files_from_the_task_file(make_task, tmp_path, capsys):
