@@ -13,6 +13,10 @@ is in doubt.
 With two or more setups, each setup is compared with the baseline (grep when it exists) on the tasks that both
 have: the mean over repetitions for each task and setup, then the mean of the differences (setup - baseline).
 No intervals yet.
+
+With screen files (e2e_screen.py), the completion numbers count only the tasks that the screen calls fair: a
+task with unfair hidden tests, or one that is not decided, leaves them. Tokens, time, turns and behaviour keep
+every task.
 """
 
 from __future__ import annotations
@@ -21,9 +25,13 @@ import json
 import statistics
 from collections import Counter
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .files import write_json
 from .paths import e2e_dir
+
+if TYPE_CHECKING:
+    from .e2e_screen import CompletionSet
 
 MEASURES = (("completed", "completed"), ("processed_tokens", "tokens"), ("agent_s", "seconds"))
 
@@ -85,12 +93,14 @@ def _median(values: list) -> float | None:
     return statistics.median(values) if values else None
 
 
-def score(run_id: str) -> dict:
-    """The tables of one run. Also written to score.json in the run folder."""
+def score(run_id: str, screen: CompletionSet | None = None) -> dict:
+    """The tables of one run. Also written to score.json in the run folder. With `screen`, completion counts only
+    the runs of fair tasks."""
     root = run_root(run_id)
     if not root.is_dir():
         raise FileNotFoundError(f"no run folder {root}")
     records = load_records(root)
+    fair = screen.fair if screen is not None else None
     setups: dict[str, dict] = {}
     for name in sorted({r["setup"] for r in records}):
         rows = [r for r in records if r["setup"] == name]
@@ -102,7 +112,7 @@ def score(run_id: str) -> dict:
             "runs": len(rows),
             "discarded": len(rows) - len(usable),
             "flagged": len(usable) - len(kept),
-            "completed_share": _mean([_value(r, "completed") for r in kept]),
+            "completed_share": _mean([_value(r, "completed") for r in kept if fair is None or r["task_id"] in fair]),
             "tokens_mean": _mean(tokens), "tokens_median": _median(tokens),
             "seconds_mean": _mean(seconds), "seconds_median": _median(seconds),
             "turns_mean": _mean([r.get("steps", {}).get("turns") for r in kept]),
@@ -110,15 +120,23 @@ def score(run_id: str) -> dict:
             "behaviour": behaviour(kept),
             "codemem": any((r.get("identity") or {}).get("codemem") for r in rows),
         }
+        if fair is not None:
+            setups[name]["completion_runs"] = sum(1 for r in kept if r["task_id"] in fair)
     baseline = "grep" if "grep" in setups else next(iter(setups), None)
-    paired = [paired_difference(records, name, baseline) for name in setups if name != baseline]
+    paired = [paired_difference(records, name, baseline, fair) for name in setups if name != baseline]
     summary = {"run_id": run_id, "records": len(records), "baseline": baseline, "setups": setups, "paired": paired}
+    if screen is not None:
+        task_ids = sorted({r["task_id"] for r in records})
+        left = {t: screen.status_of(t) for t in task_ids if t not in fair}
+        summary["screen"] = {"files": screen.files, "tasks": len(task_ids), "fair": len(task_ids) - len(left),
+                             "left_out": left}
     write_json(root / "score.json", summary)
     return summary
 
 
-def paired_difference(records: list[dict], setup: str, baseline: str) -> dict:
-    """Mean over tasks of (task mean in `setup` - task mean in `baseline`), for each measure."""
+def paired_difference(records: list[dict], setup: str, baseline: str, fair: set[str] | None = None) -> dict:
+    """Mean over tasks of (task mean in `setup` - task mean in `baseline`), for each measure. With `fair`,
+    completion is over the fair tasks only."""
     by_task: dict[str, dict[str, list[dict]]] = {}
     for r in records:
         if not r.get("discard") and not r.get("flags") and r["setup"] in (setup, baseline):
@@ -126,9 +144,16 @@ def paired_difference(records: list[dict], setup: str, baseline: str) -> dict:
     result: dict = {"setup": setup, "baseline": baseline}
     both = [runs for runs in by_task.values() if setup in runs and baseline in runs]
     result["tasks"] = len(both)
+    if fair is not None:
+        result["completed_tasks"] = sum(1 for task, runs in by_task.items()
+                                        if task in fair and setup in runs and baseline in runs)
     for measure, label in MEASURES:
         diffs = []
-        for runs in both:
+        for task, runs in by_task.items():
+            if setup not in runs or baseline not in runs:
+                continue
+            if measure == "completed" and fair is not None and task not in fair:
+                continue
             a = _mean([_value(r, measure) for r in runs[setup]])
             b = _mean([_value(r, measure) for r in runs[baseline]])
             if a is not None and b is not None:
@@ -143,6 +168,13 @@ def _fmt(value, digits: int = 1) -> str:
 
 def format_score(summary: dict) -> str:
     lines = [f"run {summary['run_id']}: {summary['records']} runs"]
+    screen = summary.get("screen")
+    if screen:
+        why = Counter(screen["left_out"].values())
+        text = f"  screen {', '.join(screen['files'])}: completion counts {screen['fair']} of {screen['tasks']} tasks"
+        if why:
+            text += f"; {len(screen['left_out'])} left out (" + ", ".join(f"{s} {n}" for s, n in sorted(why.items())) + ")"
+        lines.append(text + "; tokens, time and behaviour count every task")
     lines.append(f"  {'setup':12} {'runs':>5} {'disc.':>5} {'flag.':>5} {'completed':>9} {'tokens mean':>12} "
                  f"{'tokens med.':>12} {'s mean':>8} {'s med.':>8} {'turns':>6}")
     for name, s in summary["setups"].items():
@@ -152,7 +184,8 @@ def format_score(summary: dict) -> str:
                      f"{_fmt(s['turns_mean']):>6}")
         lines.append("    ends: " + ", ".join(f"{end} {n}" for end, n in sorted(s["ends"].items())))
     for p in summary["paired"]:
-        lines.append(f"  {p['setup']} - {p['baseline']} over {p['tasks']} tasks: completed {_fmt(p['completed'], 2)}, "
+        over = f" (over {p['completed_tasks']} fair tasks)" if "completed_tasks" in p else ""
+        lines.append(f"  {p['setup']} - {p['baseline']} over {p['tasks']} tasks: completed {_fmt(p['completed'], 2)}{over}, "
                      f"tokens {_fmt(p['tokens'], 0)}, seconds {_fmt(p['seconds'])}")
     codemem = any(s.get("codemem") or (s["behaviour"]["codemem_calls_mean"] or 0) > 0
                   for s in summary["setups"].values())

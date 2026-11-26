@@ -6,11 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from cmeval import e2e_screen
+from cmeval import e2e_run, e2e_screen
 from cmeval import generate as gen
 from cmeval.cli import main
+from cmeval.e2e_score import format_score, score
 from cmeval.e2e_screen import ScreenError
-from cmeval.tasks import save_tasks
+from cmeval.tasks import load_tasks, save_tasks
 
 PILOT18 = Path(__file__).resolve().parents[1] / "tasks" / "screen" / "pilot18.jsonl"
 
@@ -347,6 +348,63 @@ def test_pilot18_screen_in_the_repo():
     assert (result["total"]["kept"], result["total"]["removed"], result["total"]["disagree"]) == (9, 9, 0)
     assert (by[("pandas-dev/pandas", "all")]["valid"], by[("pandas-dev/pandas", "all")]["kept"]) == (10, 4)
     assert (by[("microsoft/playwright", "all")]["valid"], by[("microsoft/playwright", "all")]["kept"]) == (8, 5)
+
+
+# ---- the score
+
+def _write_run(run_id, task_id, setup, completed, tokens):
+    record = {"task_id": task_id, "setup": setup, "rep": 1, "end": "finished", "completed": completed,
+              "discard": False, "flags": [], "tokens": {"processed_tokens": tokens}, "time": {"agent_s": 10.0},
+              "steps": {"turns": 5}}
+    out = e2e_run.run_dir(run_id, task_id, setup, 1)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "run.json").write_text(json.dumps(record))
+
+
+def test_score_with_a_screen(make_task, tmp_path, capsys):
+    # t1 fair: grep fails, tool completes. t2 unfair: both complete. t3 not screened: grep completes.
+    for task_id, grep_done, tool_done in (("t1", False, True), ("t2", True, True), ("t3", True, False)):
+        _write_run("sc", task_id, "grep", grep_done, 1000)
+        _write_run("sc", task_id, "tool", tool_done, 500)
+    screen = _write_rows(tmp_path / "s.jsonl", [_row("t1"), _row("t1", read=2), _row("t2", fair=False),
+                                                _row("t2", read=2, fair=False)])
+    plain = score("sc")
+    assert "screen" not in plain and "completion_runs" not in plain["setups"]["grep"]
+    assert plain["setups"]["grep"]["completed_share"] == pytest.approx(2 / 3)
+
+    summary = score("sc", e2e_screen.completion_set([screen]))
+    grep, tool = summary["setups"]["grep"], summary["setups"]["tool"]
+    assert (grep["completed_share"], tool["completed_share"]) == (0.0, 1.0)
+    assert grep["completion_runs"] == 1 and grep["tokens_mean"] == 1000 and grep["runs"] == 3
+    assert summary["screen"] == {"files": ["s.jsonl"], "tasks": 3, "fair": 1,
+                                 "left_out": {"t2": "unfair", "t3": "not screened"}}
+    paired = summary["paired"][0]
+    assert (paired["tasks"], paired["completed_tasks"], paired["completed"], paired["tokens"]) == (3, 1, 1.0, -500.0)
+    text = format_score(summary)
+    assert "screen s.jsonl: completion counts 1 of 3 tasks; 2 left out (not screened 1, unfair 1)" in text
+    assert "completed 1.00 (over 1 fair tasks), tokens -500" in text
+
+    assert main(["e2e", "score", "sc", "--screen", str(screen)]) == 0
+    assert "completion counts 1 of 3 tasks" in capsys.readouterr().out
+    assert main(["e2e", "score", "sc", "--tasks", str(screen)]) == 1
+    assert "only with --screen" in capsys.readouterr().err
+    assert main(["e2e", "score", "sc", "--screen", str(tmp_path / "none.jsonl")]) == 1
+
+
+def test_score_screen_checks_hashes_with_the_task_file(make_task, tmp_path, capsys):
+    task = make_task(id="acme__auth-42", test_patch=TEST_PATCH)
+    path = tmp_path / "tasks.jsonl"
+    save_tasks(path, [task])
+    _write_run("sh", "acme__auth-42", "grep", True, 1000)
+    good = e2e_screen.content_hash(task)
+    screen = _write_rows(tmp_path / "s.jsonl", [_row("acme__auth-42", content_hash=good),
+                                                _row("acme__auth-42", read=2, content_hash=good)])
+    assert score("sh", e2e_screen.completion_set([screen], load_tasks(path)))["screen"]["fair"] == 1
+    # The task changed after the reads: they are stale, and the task leaves the completion score.
+    changed = tmp_path / "changed.jsonl"
+    save_tasks(changed, [replace(task, query="another issue")])
+    assert main(["e2e", "score", "sh", "--screen", str(screen), "--tasks", str(changed)]) == 0
+    assert "1 left out (not screened 1)" in capsys.readouterr().out
 
 
 # ---- command line

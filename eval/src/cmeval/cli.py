@@ -514,10 +514,17 @@ def cmd_e2e_index(args) -> int:
 
 def cmd_e2e_score(args) -> int:
     from .e2e_score import format_score, score
+    from .e2e_screen import ScreenError, completion_set
 
     try:
-        summary = score(args.run_id)
-    except FileNotFoundError as exc:
+        screen = None
+        if args.screen:
+            tasks = [t for path in args.tasks or [] for t in load_tasks(path)] if args.tasks else None
+            screen = completion_set(args.screen, tasks)
+        elif args.tasks:
+            raise ScreenError("--tasks is used only with --screen")
+        summary = score(args.run_id, screen)
+    except (FileNotFoundError, ScreenError, TaskError) as exc:
         print(f"e2e score: {exc}", file=sys.stderr)
         return 1
     print(format_score(summary))
@@ -772,6 +779,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_e2e_index)
     p = e2e_sub.add_parser("score", help="tables of an end-to-end run: completion, tokens, time, by setup")
     p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
+    p.add_argument("--screen", type=Path, action="append",
+                   help="screen file (tasks/screen/*.jsonl): completion counts only fair tasks; can be given more than once")
+    p.add_argument("--tasks", type=Path, action="append",
+                   help="with --screen: task file, to check that each read is of the task as it is now")
     p.set_defaults(func=cmd_e2e_score)
     p = e2e_sub.add_parser("screen-pack", help="write the reading material of the unfair-test screen for each valid task")
     p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
