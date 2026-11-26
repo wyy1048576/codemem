@@ -135,7 +135,7 @@ def test_a_search_asks_the_backend_for_plain_lists(tmp_path):
 
     store = Store(tmp_path / "idx", vector_backend="faiss")
     ids = _seed(store, 6)
-    store._backend = Recording
+    store._in_use = store._in_use._replace(cls=Recording)
     store._types.clear()
     q = _vecs(1, seed=3)[0]
     assert len(store.vector_search("code", q, 3, ids[:2])) == 2 and len(store.vector_search("code", q, 3, ids)) == 3

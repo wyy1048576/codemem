@@ -62,7 +62,8 @@ class SearchResponse:
     results: list[ResultCard]
     timings: dict[str, float] = field(default_factory=dict)
     freshness: Any = None  # set by CodememService.search: what the index could not include yet
-    models_loading: bool = False  # set by CodememService.search: keywords only, the model was still loading
+    # set by CodememService.search: keywords only, the model or the search index was still loading
+    models_loading: bool = False
 
     def to_dict(self) -> dict:
         return {
