@@ -129,6 +129,7 @@ CONFIG_PATHSPECS = (":(glob)**/.claude/**", ":(glob)**/CLAUDE.md", ":(glob)**/AG
 KILL_AGENT = "kill -9 -1"
 
 PROMPT_LEVEL = "L0"
+PROMPT_LEVELS = ("L0", "L1", "L2")
 PROMPT_FRAME = "v1"
 FRAME_V1 = """\
 The repository in the current directory has the issue below. Change the code of the repository so that the \
@@ -221,9 +222,47 @@ def check_model(model: str) -> None:
         raise GenerateError(f"model {model}: give a full model id, for example {DEFAULT_MODEL}, not an alias")
 
 
-def make_prompt(task: Task) -> str:
-    """Prompt level L0 (the issue as written), in frame v1."""
-    return FRAME_V1.format(query=task.query.strip())
+@dataclass(frozen=True)
+class PromptSet:
+    """The prompt texts of one level. L0 is the issue as written and needs no texts. L1 and L2 are rewrites
+    (plan section 9), read from a file with one JSON object per line: id, level, prompt."""
+    level: str = PROMPT_LEVEL
+    texts: dict = field(default_factory=dict)
+    source: str | None = None
+    sha256: str | None = None
+
+
+def load_prompts(path: Path, level: str) -> PromptSet:
+    """The texts of one level from a prompts file. Lines of other levels are skipped."""
+    if level not in PROMPT_LEVELS or level == PROMPT_LEVEL:
+        raise GenerateError(f"prompt level {level}: a prompts file holds {', '.join(PROMPT_LEVELS[1:])}")
+    data = Path(path).read_bytes()
+    texts = {}
+    for number, line in enumerate(data.decode("utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            task_id, row_level, text = row["id"], row["level"], row["prompt"]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise GenerateError(f"{path}, line {number}: not a prompt row (id, level, prompt): {exc}") from None
+        if row_level != level:
+            continue
+        if not isinstance(text, str) or not text.strip():
+            raise GenerateError(f"{path}, line {number}: empty prompt for {task_id}")
+        if task_id in texts:
+            raise GenerateError(f"{path}, line {number}: second {level} prompt for {task_id}")
+        texts[task_id] = text
+    return PromptSet(level=level, texts=texts, source=Path(path).name, sha256=hashlib.sha256(data).hexdigest())
+
+
+def make_prompt(task: Task, prompts: PromptSet | None = None) -> str:
+    """The task's text in frame v1: the issue as written (L0), or the rewrite of the prompt set's level."""
+    if prompts is None or prompts.level == PROMPT_LEVEL:
+        return FRAME_V1.format(query=task.query.strip())
+    if task.id not in prompts.texts:
+        raise GenerateError(f"{task.id}: no {prompts.level} prompt in {prompts.source}")
+    return FRAME_V1.format(query=prompts.texts[task.id].strip())
 
 
 # ---- preconditions
@@ -631,7 +670,8 @@ def run_dir(run_id: str, task_id: str, setup: str, rep: int) -> Path:
 
 
 def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out: Path,
-            settings: RunSettings = RunSettings(), run_id: str | None = None) -> dict:
+            settings: RunSettings = RunSettings(), run_id: str | None = None,
+            prompts: PromptSet | None = None) -> dict:
     """One run of Claude Code on one task. `out` is made again. Returns the record, also saved as run.json."""
     spec = get_setup(setup)
     check_model(model)
@@ -642,7 +682,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
         shutil.rmtree(out)
     out.mkdir(parents=True)
     out = out.resolve()
-    prompt = make_prompt(task)
+    prompt = make_prompt(task, prompts)
     (out / "prompt.txt").write_text(prompt, encoding="utf-8")
     mcp_config = codemem_mcp_config(codemem, settings) if codemem else spec.mcp_config
     (out / "mcp.json").write_text(json.dumps(mcp_config) + "\n", encoding="utf-8")
@@ -754,7 +794,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
         "discard_reason": discard,
         "flags": flags,
         "identity": {
-            "prompt_level": PROMPT_LEVEL,
+            "prompt_level": prompts.level if prompts else PROMPT_LEVEL,
+            "prompt_source": {"file": prompts.source, "sha256": prompts.sha256} if prompts and prompts.source else None,
             "prompt_frame": PROMPT_FRAME,
             "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
             "harness": HARNESS,
@@ -933,7 +974,7 @@ class BatchResult:
 
 def run_batch(recipe: Recipe, tasks: list[Task], *, run_id: str, setups: list[str], model: str, reps: int = 1,
               settings: RunSettings = RunSettings(), progress: Callable[[str], None] = lambda message: None,
-              status=None) -> BatchResult:
+              status=None, prompts: PromptSet | None = None) -> BatchResult:
     """The runs of a batch, one at a time, in the order of plan_runs. Stops at a usage limit (exit code 4)
     and after three runs in a row that ended in an error (exit code 5)."""
     status = status or NullStatus()
@@ -951,7 +992,8 @@ def run_batch(recipe: Recipe, tasks: list[Task], *, run_id: str, setups: list[st
         if state == "redo":
             progress(f"{task.id} {setup} rep {rep}: earlier attempt moved to {set_aside(out).name}")
         status.stage(f"{task.id} {setup} rep {rep}")
-        record = run_one(recipe, task, setup=setup, model=model, rep=rep, out=out, settings=settings, run_id=run_id)
+        record = run_one(recipe, task, setup=setup, model=model, rep=rep, out=out, settings=settings, run_id=run_id,
+                         prompts=prompts)
         batch.records.append(record)
         batch.done += 1
         batch.discarded += record["discard"]

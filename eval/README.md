@@ -111,6 +111,17 @@ codemem's tool texts have three steering levels (`none`, `light`, `strong`) that
 
 `run.json` of a `tool` run records the codemem commit, the program, the task's `index.json`, the steering level and the index size before and after the run (`identity.codemem`). `outcome.unexpected_paths` lists files of the agent's patch such as `.codemem*` or `.mcp.json`, which codemem should never write.
 
+### Prompt levels
+
+A run gives the agent the issue as written (level L0) unless the batch names another level. L1 is the same content with the names removed (no paths, identifiers, traces or code). L2 is a short request in a user's voice. Both can end with one "Done when:" line that gives what the hidden tests need and the text does not say.
+
+```
+cmeval e2e run pandas --tasks tasks/fresh-v1.jsonl --run-id vague-l1-1 --setup tool \
+    --prompt-level L1 --prompts tasks/vague-pilot18-v1.jsonl
+```
+
+The prompts file has one JSON object per line: `id`, `level`, `prompt`. A valid task with no prompt of the level is skipped, with a note. `run.json` records the level and the file's name and hash (`identity.prompt_level`, `identity.prompt_source`). Use one level per run ID: a batch does not run a task again that the run ID already holds.
+
 ### Diagnostic runs
 
 Two environment variables are for diagnostic batches. A run made with either is not comparable with other runs; `run.json` records them in `identity.diagnostic`. Use a run ID of its own.
