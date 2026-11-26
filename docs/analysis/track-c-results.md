@@ -19,7 +19,7 @@ Track C is optimization: the same search results, for less memory, less disk and
 | | Before | After | What was kept |
 |---|---|---|---|
 | The search index in memory, real vLLM index (144,729 vectors) | 278 MB | 106 MB with the compact index | the true top 10 and the true top 50 in all 762 searches (§2.2) |
-| The saved search index on disk, real vLLM index | 261 MB | 86 MB with the compact index | the same |
+| The index folder on disk, real vLLM index | 909 MB | 734 MB with the compact index | the full vectors stay in the database |
 | The exact index's own memory, 200,000 vectors | 441 MB | 371 MB | the same index: only its bookkeeping changed |
 | The vector cache on disk | 4.7 KB a vector, no limit | 1.9 KB a vector, capped at 8 GB, and nothing unused for 30 days stays | the same vectors, byte for byte |
 | The embedding model in memory, Apple GPU | 2.64 GB | 1.71 GB | the same vectors, bit for bit |
@@ -57,9 +57,9 @@ The codes only decide which candidates are looked at. Every score a search retur
 one, and the final order is the exact index's order.
 
 **The codes are RaBitQ codes** (Gao and Long, SIGMOD 2024; several bits per number: Gao et al.,
-2025), made and compared by FAISS, Meta's vector search library. Track C did not implement
-RaBitQ. Before a vector is coded, codemem multiplies it by a rotation: a fixed table of random
-numbers, drawn once from a seed, so that the same vector gets the same code on every machine.
+2025), made and compared by FAISS, Meta's vector search library. Before a vector is coded,
+codemem multiplies it by a rotation: a fixed table of random numbers, drawn once from a seed, so
+that the same vector gets the same code on every machine.
 The 1-bit code keeps the sign of each rotated number. The 4-bit code keeps the sign and 3 more
 bits for the number's size: 16 levels. With each code FAISS stores a correction that says how
 well the code matches its own vector, and an estimate divides by it. Each extra bit about halves
@@ -67,11 +67,16 @@ the estimate's error: 0.026 with 1 bit and 0.0036 with 4, on vectors of 896 numb
 are neighbours in a ranking differ by about 0.003. So 1 bit can pick a few thousand candidates,
 4 bits put them in nearly the right order, and the exact scores settle it.
 
-**Why the saving is 3 times, and not 16.** The exact index holds 1,856 bytes per vector: the
-1,792 of its numbers, and bookkeeping. The compact index holds 628: the 1-bit code (120), the
-4-bit code (468), and bookkeeping. With the 1-bit code alone it would be 160 bytes, 11.6 times
-less, at a price that §2.2 shows: it has to read 1,000 full vectors per search where two codes
-need 200.
+**Why the saving is 3 times, and not 16.** A vector of 896 numbers, in memory:
+
+| | Bytes per vector | Against the exact index |
+|---|---|---|
+| the exact index: 896 numbers at 2 bytes each, and 64 bytes of bookkeeping | 1,856 | |
+| the compact index: the 1-bit code (120), the 4-bit code (468), and 40 bytes of bookkeeping | 628 | 3.0 times less |
+| the compact index with the 1-bit code alone | 160 | 11.6 times less |
+
+The default keeps both codes. The 1-bit code alone has a price that §2.2 shows: it has to read
+1,000 full vectors per search where two codes need 200.
 
 **Why two codes.** FAISS can search 4-bit codes by itself: it looks at the first bit of each and
 takes the full estimate only where that leaves a chance. When the index was built, that was 3 to
@@ -125,7 +130,8 @@ at ranks 45 and 44. No top 10 was touched, and on vLLM the whole search still re
 | | The exact index (a full scan) | The compact index |
 |---|---|---|
 | memory held for the search index | 278 MB | 106 MB |
-| saved search index on disk | 261 MB | 86 MB |
+| the saved copy of the search index on disk | 261 MB | 86 MB |
+| the whole index folder on disk | 909 MB | 734 MB |
 | loading it at a start | 0.3 s | 0.3 s |
 | building it from the database (a first start) | 1.8 s | 18.6 s |
 | one search over the 109,562 code vectors | 8.1 ms | 7.5 ms |
@@ -136,6 +142,10 @@ question so that both saw the same machine.
 
 **Memory is the saving today: 3 times less at every size.** Per 100,000 vectors the exact index
 holds 186 MB and the compact one 63 MB.
+
+**On disk the saving is small.** The full 2-byte vectors stay in the database with either index
+(648 MB for vLLM): they are what step 3 reads, and what a search index is rebuilt from. Only the
+saved copy of the search index shrinks, so the folder is a fifth smaller, not three times.
 
 **Time is not a saving today.** A search is milliseconds either way, and at the size of our
 repos the two are level. The reason is how each one's time is made up:
@@ -277,8 +287,8 @@ build, vector by vector, and every return gave the model 0 texts.
 
 **Reused.** RaBitQ, the method, is Gao and Long's, and the implementation is FAISS's: FAISS,
 Meta's vector search library, has had RaBitQ since version 1.11.0 (April 2025) and codes of 2 to
-9 bits per number since 1.13.1 (December 2025). codemem asks FAISS for a 1-bit and a 4-bit code
-and adds no quantization code of its own. The exact index is FAISS's. The storage is SQLite. The
+9 bits per number since 1.13.1 (December 2025). codemem uses its newest release, 1.16.0 (November
+2026). It asks FAISS for a 1-bit and a 4-bit code and adds no quantization code of its own. The exact index is FAISS's. The storage is SQLite. The
 model runs through sentence-transformers.
 
 **Our own design and findings:**
