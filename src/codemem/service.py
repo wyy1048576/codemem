@@ -375,7 +375,13 @@ class CodememService:
             return True
         now = time.monotonic()
         if self.store.vectors_unsaved() and now - self._last_write > SAVE_AFTER_IDLE:
-            self.store.save_vectors()
+            try:
+                self.store.save_vectors()
+            except Exception:
+                # The disk is full, or another process held the database's write lock for longer
+                # than a save waits. This thread goes on: the index in memory is whole, the files
+                # a start reads still agree with each other, and the next change is saved again.
+                log.exception("could not write the search indexes")
             return True
         for embedder in list(self._embedders.values()):  # no model call is due here: a quiet moment for the models
             release_idle(embedder, self.config.model_idle_minutes)

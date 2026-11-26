@@ -526,6 +526,9 @@ it doesn't own.
     `save_id` into `meta`, renames the data file into place and writes the note, also by a
     rename. A save that is stopped leaves the earlier copy, or one that fails rule 5 or 6. The
     transaction waits its turn like any write to `index.db`, and keeps two processes' saves apart;
+  - a save that fails (a full disk, or 30 s without its turn behind another process's write) is
+    logged and given up. The server's writer goes on, the earlier copy stays what a start reads,
+    and the next change to the index is saved again;
   - the MCP server saves lazily (after 30 s idle, on shutdown, on refresh), while the CLI and the
     blocking `update()` save at once;
   - an update that saves (`update()`, the CLI) first makes the saved copies what the next start
