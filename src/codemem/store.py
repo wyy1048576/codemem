@@ -138,10 +138,36 @@ def _temp_path(path: Path) -> Path:
     return path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
 
 
+_REPLACE_TRIES = 6  # a rename that is refused is tried this many times in all, ...
+_REPLACE_WAIT = 0.02  # ... after this many seconds, then twice as long each time: 0.62 s in all
+
+
+def _replace(tmp: Path, path: Path) -> None:
+    """Move `tmp` over `path` in one step (atomic on Windows and POSIX). Windows refuses the move
+    with PermissionError while another handle holds one of the two files open: a second codemem
+    process that reads `path` at its start, a virus scanner, the search indexer. Such a handle
+    is gone a moment later, so a refused move is tried again a few times before the error is
+    raised. Elsewhere a PermissionError is about the folder's permissions and stays: the tries
+    then cost their 0.6 s and end in the same error."""
+    wait = _REPLACE_WAIT
+    for left in range(_REPLACE_TRIES - 1, -1, -1):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if not left:
+                raise
+            time.sleep(wait)
+            wait *= 2
+
+
 def _atomic_write(path: Path, data: bytes) -> None:
     tmp = _temp_path(path)
-    tmp.write_bytes(data)
-    os.replace(tmp, path)  # atomic on Windows and POSIX
+    try:
+        tmp.write_bytes(data)
+        _replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)  # still there only when the write or the move failed
 
 
 def bm25_weights5(weights: Sequence[float]) -> tuple[float, ...]:
@@ -2142,7 +2168,8 @@ class Store:
         transaction then sets the id, moves the file in place and writes the note, which also
         keeps the saves of two processes apart. A save that stops before it leaves the earlier
         file, note and id, which agree; one that stops inside it leaves those, or a file and a
-        note that fail one of the two checks.
+        note that fail one of the two checks. Both moves are tried again for a moment where
+        Windows refuses them because another handle holds the file (_replace).
 
         With `stale` (an update that ends by saving: the CLI's, the eval's), the files are first
         made what the next start needs, so that no search has to wait for it: `auto` picks again,
@@ -2176,7 +2203,7 @@ class Store:
                         tmp.write_bytes(data)  # the long write: nothing a start reads has changed yet
                         with self.transaction():
                             self.set_meta(f"vec.{vec_type}.save_id", note["save_id"])
-                            os.replace(tmp, path)
+                            _replace(tmp, path)
                             _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
                     finally:
                         tmp.unlink(missing_ok=True)
