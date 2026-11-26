@@ -20,7 +20,7 @@ In task 68195 the real fix changes one file, `pandas/core/reshape/merge.py`.
 |---|---|---|
 | **easy** | at most two files and 100 lines | `easy` and `medium` |
 | **medium** | three to five files, or 101 to 200 lines | `hard` |
-| **hard** | 6 to 15 files, or 201 to 600 lines | none: these are collected now (§10) |
+| **hard** | 6 to 15 files, or 201 to 600 lines | none: these are collected now, for every repo (§10) |
 
 Task 68195 is easy. **The tiers are not the labels of the task files:** today's `easy` and
 `medium` are one tier, today's `hard` is the medium tier, and the hard tier is new. Every count
@@ -79,7 +79,7 @@ nothing tells in advance which candidates are valid and fair.
 
 **The rule that saves time:** check a tier only until it has what the sample needs and 2 spare
 tasks, then stop that tier: 8 fair tasks for easy, 6 for medium, and 4 for hard, where each one
-is costly.
+is costly. A repo whose hard tier falls short needs that many more in medium (§3).
 
 ---
 
@@ -97,8 +97,11 @@ is costly.
   labels take turns, starting with `easy`: numbers 1, 3 and 5 have the label `easy`, numbers 2,
   4 and 6 the label `medium`. The table of §4 uses these numbers.
 - A task that breaks during the runs is replaced by the next spare of its tier, in every setup.
-- **A tier that falls short gives all it has.** Nothing is filled in from another tier. pandas
-  has 3 fair tasks in the medium tier today, with 8 candidates left to check.
+- **A repo with fewer than 4 fair hard tasks runs more medium ones instead,** so that medium and
+  hard together are 8: with 2 hard tasks it runs 6 medium ones. Not every repo has enough large
+  fixes of one issue (§10).
+- **A repo that is still short gives all it has.** pandas has 3 fair tasks in the medium tier
+  today, with 8 candidates left to check, and few candidates for the hard tier.
 
 **What this size can show.** The unit of every comparison is the task: `grep` against `tool` on
 the same task, at one prompt level. Six repos give 84 tasks, so 84 pairs at each level. The
@@ -163,10 +166,12 @@ decide it:
 | 9 | airflow | Python | 60% | a third Python repo | reserve |
 | 10 | vllm | Python | 76% | a fourth Python repo, with the issues that name the code most often | reserve |
 
-- **fully:** every row of §4, with the three Sonnet repetitions, in all three tiers.
-- **Sonnet, once:** one Sonnet repetition on the easy and the medium tier, so that the language
-  is in the table. No hard tier is collected for these.
+- **fully:** every row of §4, with the three Sonnet repetitions.
+- **Sonnet, once:** one Sonnet repetition on the repo's whole sample, so that the language is in
+  the table.
 - **reserve:** runs only in place of a repo above it that cannot be built.
+
+Every repo that is run has all three tiers.
 
 Every fix in every pool was merged between July 1 and October 22, 2026.
 
@@ -225,9 +230,9 @@ track C the index, before any more seats are spent.
 | | Runs | On three seats, at 5 to 7 minutes a run |
 |---|---|---|
 | steps 1 to 3 | 864 (Sonnet 504, Haiku 216, Opus 144) | 24 to 34 hours |
-| step 4 | 120 | 3 to 5 hours |
+| step 4 | 168 | 5 to 7 hours |
 | step 5 | 1,008 | 28 to 39 hours |
-| all Claude runs | 1,992 | 2.3 to 3.2 days without a pause |
+| all Claude runs | 2,040 | 2.4 to 3.3 days without a pause |
 | the open models, on the rented GPU | 468 for each model | about 8 hours for each model, if a run takes as long as a Claude run and six run at once |
 
 - **The 5 to 7 minutes are an assumption.** The pilot measured 4.3 to 5.5 minutes for Haiku at
@@ -242,8 +247,8 @@ track C the index, before any more seats are spent.
 
 ## 9. What track A is asked to do
 
-1. **The second collection, for the hard tier** (§10): start it now, for the six repos that are
-   run fully. It needs no container.
+1. **The second collection, for the hard tier** (§10): start it now, for the eight repos of
+   ranks 1 to 8. It needs no container.
 2. **For each repo, in the order of its rank (§5):** validate and screen candidates of the easy
    and the medium tier until each has what §2 says, then the candidates of the hard tier. Post
    the table of fair tasks per repo and tier as each repo ends.
@@ -274,21 +279,25 @@ change code:
 | pandas | 371 | 19 | 5% |
 | home-assistant | 805 | 49 | 6% |
 | duckdb | 231 | 22 | 10% |
+| trino | 78 | 8 | 10% |
+| kubernetes | 128 | 17 | 13% |
 | playwright | 244 | 35 | 14% |
 | ruff | 285 | 55 | 19% |
 | vscode | 1,026 | 253 | 25% |
 
-Most fixes of one issue are small. The limit removed about 430 candidates in these six repos,
-more than half of them in vscode. Larger work often comes as a pull request without a linked
-issue, and such a pull request cannot be a task: there is no request to give the agent.
+Most fixes of one issue are small. The limit removed 458 candidates in these eight repos, more
+than half of them in vscode. How many of them are within the new limit, the second collection
+shows. Larger work often comes as a pull request without a linked issue, and such a pull request
+cannot be a task: there is no request to give the agent.
 
 **How the tier is made.**
 
-1. The same collection again, for the six repos that are run fully, with the limit at 15 code
+1. The same collection again, for the eight repos of ranks 1 to 8, with the limit at 15 code
    files and 600 changed lines. Nothing else changes, so every task of today is found again.
 2. A fix of more than 5 code files or more than 200 changed lines is in the hard tier.
 3. A repo's hard candidates are validated and screened after its easy and medium tasks are
    ready, until 4 are fair. Fewer large fixes pass the screen than small ones: of pandas's valid
-   tasks in the medium tier 11% are fair, of those with the label `easy` 32%. So a repo may end
-   with 3, and pandas, with 19 candidates, with fewer.
+   tasks in the medium tier 11% are fair, of those with the label `easy` 32%. So some repos will
+   end with fewer than 4: pandas has 19 candidates, trino 8. They run more medium tasks instead
+   (§3).
 4. Each hard task gets its L1 and L2 prompts like any other.
