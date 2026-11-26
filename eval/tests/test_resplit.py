@@ -212,3 +212,14 @@ def test_a_code_file_of_the_task_test_patch_stays_a_test(db, make_task):
     assert gen.changed_files(new.test_patch) == ["data/x.bin", "src/b.cpp", "test/sql/a.test", "test/sql/b_test.cpp"]
     assert "src/b.cpp" not in gen.changed_files(new.patch)
 
+
+def test_the_resplit_fields_of_a_recipe_leave_the_fingerprints(make_task):
+    # playwright.toml has dependency_paths now. Its images and validation records stay valid.
+    from dataclasses import replace
+
+    recipe = gen.load_recipe("playwright")
+    assert recipe.dependency_paths == ("**/package.json", "**/package-lock.json")
+    before = replace(recipe, dependency_paths=None, test_paths=(), leave_out=None)
+    task = make_task(repo=recipe.repo)
+    assert gen.image_fingerprint(recipe, task) == gen.image_fingerprint(before, task)
+    assert gen.validation_fingerprint(recipe, task, 3) == gen.validation_fingerprint(before, task, 3)
