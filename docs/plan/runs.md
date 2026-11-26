@@ -78,8 +78,8 @@ fix that came late is wider than the issue. We cannot check fewer by choosing be
 nothing tells in advance which candidates are valid and fair.
 
 **The rule that saves time:** check a tier only until it has what the sample needs and 2 spare
-tasks, then stop that tier: 8 fair tasks for easy, 6 for medium, and 4 for hard, where each one
-is costly. A repo whose hard tier falls short needs that many more in medium (§3).
+tasks, then stop that tier: 8 fair tasks for easy (5 with the label `medium`, 3 with the label
+`easy`), 6 for medium, and 4 for hard, where each one is costly. A repo whose hard tier falls short needs that many more in medium (§3).
 
 ---
 
@@ -88,14 +88,14 @@ is costly. A repo whose hard tier falls short needs that many more in medium (§
 **14 fair tasks per repo: 6 easy, 4 medium, 4 hard. Each has its three prompts,** so a repo has
 42 requests.
 
-- **The six easy tasks are 3 with the label `easy` and 3 with the label `medium`,** so that both
-  ends of the tier are in the sample. Up to 8 may be fair and ready; 6 are run.
+- **The six easy tasks are 4 with the label `medium` and 2 with the label `easy`:** a mix, with
+  more from the larger end of the tier. Up to 8 may be fair and ready; 6 are run.
 - Drawn once per repo with the seeded sampler, from tasks that are valid and fair. Tasks of the
   test split come first: they are the ones no track tuned codemem on. The list is committed
   before the first run and does not change after it.
-- The tasks of each tier are numbered in the order they were drawn. In the easy tier the two
-  labels take turns, starting with `easy`: numbers 1, 3 and 5 have the label `easy`, numbers 2,
-  4 and 6 the label `medium`. The table of §4 uses these numbers.
+- The tasks of each tier are numbered in the order they were drawn. In the easy tier, numbers
+  1, 3, 4 and 6 have the label `medium` and numbers 2 and 5 the label `easy`, so that numbers 1
+  and 2 are one of each. The table of §4 uses these numbers.
 - A task that breaks during the runs is replaced by the next spare of its tier, in every setup.
 - **A repo with fewer than 4 fair hard tasks runs more medium ones instead,** so that medium and
   hard together are 8: with 2 hard tasks it runs 6 medium ones. Not every repo has enough large
