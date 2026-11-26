@@ -68,7 +68,11 @@ The values codemem runs with, and why each was picked. All of these are settings
 | **the model in memory** | kept for as long as codemem runs | On an M1 the model is 1.3 GB of the process (table below). Freeing it after some idle minutes gives that back, and the next search or save then starts a load: 2 to 6 s, longer the busier the machine. Meanwhile a search waits at most its 4 s and then answers from keywords, and an edit is found by keywords only. It stays by default so that no search pays that. A machine short of memory, or one with several agent sessions open, sets a number of minutes | `model_idle_minutes` (0 = keep) |
 | **what a batch needed beside the model** | given back 5 s after the last model call | Up to 1.2 GB on an M1's GPU, which PyTorch keeps for the next batch otherwise. Giving it back takes 0.1 s and cost the next batch nothing that could be measured, so it needs no setting. 5 s keeps the calls of one batch, and a search's catch-up after a save, in one burst | constant (`TRIM_AFTER_IDLE`) |
 | **how long a search may catch up** | 4 s | Chosen on Oct 25 (Andre). A one-function edit takes 0.1–0.5 s, and 4 s covers about 30 average texts at the M1's 8.5 texts a second. A `git pull` or a formatter run is what hits the cap; then the search returns what the index has and its note names the files still pending, so the agent can search again or grep them. A wasted grep turn costs an agent more than the wait | `catchup_budget_ms` |
-| **when a search doesn't wait at all** | more than 1,000 queued chunks, or a first build | that is minutes of embedding; answering at once with a note beats a 4 s wait that changes little | constant |
+| **what a search embeds first** | the queued chunks among its own keyword results, best rank first; then the newest edits. Nothing, if the model is not in memory within the search's 4 s | a queued chunk is ranked by keywords alone, so it sinks in the merge; embedding the search's own candidates puts them back (architecture.md §4.2). An agent's search never loads the model itself (architecture.md §3.5) | constant |
+| **when the queue is too long to wait for** | more than 1,000 queued chunks: a search embeds its own keyword results only, and reports the rest | the rest is minutes of embedding; a note beats a 4 s wait that changes little. During the first structure pass of a new index a search answers at once | constant |
+| **one index per checkout** | the main checkout and every git worktree have their own index folder, named after the folder's path; a branch switch updates it in place | an index per branch would cost its disk for every branch; the vector cache already makes a switch back free of model calls (architecture.md §4.6) | `--index-dir` |
+| **a new checkout's index** | starts as a copy of another checkout's index of the same repository: one built at the same commit, else the main checkout's, else the most recently updated; only one built with the same settings | building it from nothing chunks every file again: on vLLM the first current search came after 76 s, against 4 to 8 s from a copy (architecture.md §4.6) | automatic for the default index folder; never for `--index-dir` |
+| **the index of a removed worktree** | deleted at the next codemem start in any checkout of that repository | a worktree's index is a full index on disk; agents make and remove worktrees all the time (§6 has the rule) | automatic for the default index folder |
 | **grouping saves** | 0.5 s after the last save, at most 2 s after the first | one editor action writes several files; the maximum stops a long burst from postponing indexing | `debounce_ms`, `debounce_max_wait_ms` |
 | **safety full check** | every 5 min (every 10 s without file events) | catches a missed event; one check costs 0.3–0.5 s on vLLM | constants |
 | **writing the search index to disk** | after 30 s idle, at shutdown, on `refresh_index` | writing it on every save blocked searches for 2.2 s on vLLM (520 MB of files, with 4 bytes per number); the CLI and the eval write at once, because the eval measures the index size | constant |
@@ -135,7 +139,7 @@ Values in the code, not in the config.
 
 | Constant | Value | Where | What it controls |
 |---|---|---|---|
-| `CATCHUP_MAX_CHUNKS` | 1,000 | `service.py` | above this many queued chunks, a search answers without embedding first |
+| `CATCHUP_MAX_CHUNKS` | 1,000 | `service.py` | above this many queued chunks, a search embeds its own keyword results only, and reports the rest |
 | `_BATCH` | 64 chunks | `service.py` | the background writer's stage B batch; a fresh edit waits behind at most one |
 | `_CALL_CHARS` | 3,000 characters | `service.py` | the largest model call outside a build, so one call can't overrun a search's 4 s |
 | `SAVE_AFTER_IDLE` | 30 s | `service.py` | writing the search index to disk |
@@ -158,6 +162,7 @@ Values in the code, not in the config.
 | barrier wait | 0.25 s | `service.py` | how long a search waits for its marker file's event |
 | git wait | 10 s | `service.py` | how long an update waits for a running git command |
 | write lock wait | 30 s | `store.py` | how long a second writer process waits before giving up |
+| `COPY_LOCK_WAIT` | 300 s | `worktrees.py` | how long a start waits for another process that is copying an index into the same folder |
 | `k` cap | 50 | `server.py` | results per MCP search |
 
 ---
@@ -244,6 +249,8 @@ only what each file costs to recreate.
 |---|---|---|---|
 | `~/.codemem/indexes/<repo>-<hash>/index.db` | the index | ~640 MB | rebuilt by the next update: the structure in about 70 s, vectors from the cache |
 | `~/.codemem/indexes/<repo>-<hash>/vec_*.faiss` | saved copies of the search indexes | ~260 MB | rebuilt from `index.db` in about 2 s |
+| `~/.codemem/indexes/<worktree>-<hash>/` | the index of a git worktree: a full index of its own | ~640 MB, ~900 MB once its search indexes are saved | copied again from another checkout's index at the next start there (1 to 2 s on vLLM, then one full check) |
+| `~/.codemem/indexes/<worktree>-<hash>/worktree.json` | which worktree the folder serves, and its repository | tiny | written again at the next start in that worktree; until then the folder is not deleted when the worktree is removed |
 | `~/.codemem/cache/vectors.db` | every vector ever computed on this machine | grows about 4.5 KB per vector, never shrinks | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping |
 | `~/.codemem/model_hashes.json` | hashes of local model folders' files | tiny | each local model folder is read once more (about 1 s per GB) |
 | the Hugging Face model cache (`HF_HOME`) | the downloaded model | ~1 GB | downloaded again at the next start (needs the network) |
@@ -251,6 +258,31 @@ only what each file costs to recreate.
 
 `CODEMEM_HOME` moves `~/.codemem`; in this project `.cache/env.sh` keeps every cache, model and
 index inside the project folder.
+
+**codemem deletes one kind of folder by itself:** the index of a git worktree that is gone. Every
+start in a checkout of a repository looks at the index folders of that repository's worktrees and
+deletes one only if all of this holds:
+
+1. it is a real folder (not a link) directly inside `~/.codemem/indexes/`;
+2. it holds a `worktree.json`, which codemem writes only into the default index folder of a
+   linked worktree, never into a main checkout's or into a folder given with `--index-dir`. A
+   start in a folder that has become another kind of checkout (a clone where a worktree used to
+   be) removes the record;
+3. that record names the repository codemem was started in;
+4. the folder's name is the one codemem gives the recorded worktree;
+5. the worktree's folder certainly does not exist. A folder that codemem has no permission to
+   look at counts as existing;
+6. git no longer lists the worktree. After `git worktree remove` it does not. A folder that
+   is missing for another reason (a drive that is not mounted, `rm -rf`) is still listed, and
+   its index stays until `git worktree prune` or git's own clean-up drops it. Two spellings of
+   one path that differ only in letter case count as the same folder. If git's list cannot be
+   read, nothing is deleted.
+
+Then it deletes the files codemem itself writes there (`index.db` and its SQLite side files,
+`vec_*`, `write.lock`, `worktree.json`) and removes the folder if it is empty. Any other file
+stays, with the folder. An index that a codemem process is writing at that moment is left for a
+later start. Indexes of main checkouts, and of repositories that were deleted whole, are never
+deleted: remove them by hand.
 
 ---
 
@@ -282,5 +314,9 @@ whoever can reach that address; `CODEMEM_SERVE_KEY` asks for a key then (§3).
 | the loading note speaks of start-up only | after the model was freed for being idle, a search that answers from keywords still says "the first search after codemem starts" | reword the note in `prompts.py` |
 | the vector cache only grows | about 4.5 KB per vector, forever | a "last used" date per entry, and a size cap |
 | PyTorch is always installed | about 0.8 GB, even for a codemem that only embeds through an API or a `serve-embeddings` server | make the local model an optional install; needs a one-line change in the eval's dependencies. Such a client's environment can be built without the two packages by hand (README, "One model for several codemem processes") |
+| an MCP server answers for the checkout it was started in | an agent that works in another git worktree of the repo, but calls a server started in the main checkout, searches the main checkout's code and gets no note | start a server in each worktree. Whether agent hosts do that for their subagents is not documented; it needs a test with a real agent |
+| a main checkout's index reads git worktrees placed inside it | worktrees in `.claude/worktrees/` add a copy of every function to the main index, unless `.gitignore` covers them | ignore that folder, or make the walk skip linked worktrees |
+| a new worktree's index is copied before the MCP handshake | on vLLM the server answers its first message 1 to 2 s later; an agent host with a short start-up limit could give up on a much larger repo or a busy disk | open the index in the background, or clone the file where the file system can (APFS: no time, no extra disk) |
+| every worktree has a full index on disk | vLLM: ~640 MB each, ~900 MB with its saved search indexes | vectors stored once per machine, so an index holds only structure |
 | the local embedder gives jina's two prompts to every model | a model without jina's prompt names (`nl2code_query`, `nl2code_document`) is embedded with jina's prompt texts in front, which it was not trained with. `serve-embeddings` prints the same two texts as its clients' prefixes, so a served model matches the model in process | the model's own `query` and `document` prompts, else `query_prefix` and `document_prefix`. The key of those models then has to change, and the document prefix becomes an index-time setting of local indexes |
 | the embedding server's client reads vectors as JSON text | 1.2 to 2.1 ms a text in a build (§3): 1 to 2% of the model's time on the M1, and a larger share the faster the model is. A search does not notice it | the server also answers `encoding_format = "base64"`, which costs 0.06 to 0.12 ms a text in the same measurement; have the client ask for it |

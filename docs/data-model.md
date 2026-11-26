@@ -397,6 +397,9 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
                                      (inner product, 2 bytes per number); a file of 4-byte numbers
                                      (IndexFlatIP) is converted when loaded
   write.lock                         one writer at a time (OS file lock)
+  worktree.json                      only in the default index folder of a linked git worktree:
+                                     {"worktree": its folder, "repository": the git folder its checkouts share};
+                                     the folder is deleted once that worktree is gone (decisions.md §6)
 $CODEMEM_HOME/cache/vectors.db       shared vector cache: (embedder key, text_hash) -> float16 vector
 $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sha256], so it is read once
 ```
@@ -411,6 +414,15 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 - `dirty_seq`: the queue's sequence number, one per stage-A commit;
 - per vector type: `vec.<type>.embedder`, `vec.<type>.full_dim`, `vec.<type>.dim_setting`,
   `vec.<type>.epoch`.
+
+**An index that starts as a copy** of another checkout's (architecture.md §4.6) is that
+`index.db` as one SQLite backup, with every `files.mtime` set to 0 and without the `meta` rows
+`indexed_at`, `last_scan_at`, `last_update`, `coverage` and `repo_path`. `vec_*` files that an
+index deleted by hand left in the folder are removed first: a saved search index is matched to
+the vector rows by id, and the copy has another index's ids. An index without
+`indexed_at` has not been compared with its checkout's files yet: `codemem search` asks for
+`codemem index` first, and the MCP server answers from it with its note that the index is still
+being built.
 
 The eval harness writes its own marker files into the index folder. codemem never deletes files
 it doesn't own.
@@ -537,9 +549,9 @@ The tool names stay stable, so other front-ends can be compared.
 the signature (not for blocks), the first doc line, and up to 6 preview lines.
 
 **The freshness note.** `search_code` catches up first (architecture.md §4): the background writer
-applies every save the watcher has seen, then the search embeds the queue, newest edits first, all
-within `catchup_budget_ms` (4 s). If something is still missing, the results end with one line
-naming it, for example:
+applies every save the watcher has seen, then the search embeds the queue, its own keyword results
+first and then the newest edits, all within `catchup_budget_ms` (4 s). If something is still
+missing, the results end with one line naming it, for example:
 
 ```
 Note: 3 code chunks in 1 file (auth/sessions.py) are still being embedded: keyword matches for them

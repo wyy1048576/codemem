@@ -304,6 +304,10 @@ An index lives in `~/.codemem/indexes/<repo-name>-<hash of its path>/` (`CODEMEM
 `~/.codemem`), and every vector computed on the machine in `~/.codemem/cache/vectors.db`. What each
 file holds and what is safe to delete: [decisions.md §6](docs/decisions.md).
 
+Each git worktree is a checkout with an index of its own: run codemem inside it. The index starts
+as a copy of another checkout's index, so it is ready in seconds, and it is deleted after the
+worktree is removed ([architecture.md §4.6](docs/architecture.md)).
+
 ## Evaluating
 
 The eval harness lives in `eval/` (Andrew's `cmeval`; see `eval/README.md`). codemem's systems are

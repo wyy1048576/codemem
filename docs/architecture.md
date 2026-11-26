@@ -95,8 +95,8 @@ save and one search:
      model that turns text into vectors, lists of numbers where similar meanings lie close
      together). This is the slow part, so it runs after stage A, in batches.
 3. The agent searches *"disabled users stay logged in"*. The search first **catches up**: it makes
-   sure every earlier save has gone through stage A, and embeds the newest queued edits itself,
-   for at most 4 s.
+   sure every earlier save has gone through stage A, and embeds queued chunks itself, for at most
+   4 s: the ones among its own keyword results first, then the newest edits.
 4. It ranks the code three ways (by keywords, by the meaning of the code, by the meaning of who
    calls it), merges the three rankings, and returns short **cards**: location, name, a few lines.
    If the catch-up couldn't finish in 4 s, the cards end with a note naming the files still being
@@ -107,6 +107,7 @@ save and one search:
 | finding files, chunking, call links | `indexer.py`, `chunker.py`, `languages/`, `callgraph.py` | §3 |
 | texts and embeddings | `texts.py`, `embedder.py`, `vectorcache.py` | §3 |
 | watcher, writer, catch-up | `watcher.py`, `service.py`, `indexer.py` | §4 |
+| branch switches and git worktrees | `service.py`, `watcher.py`, `worktrees.py` | §4.6 |
 | storage | `store.py` | §5 |
 | search and cards | `search.py`, `render.py` | §6 |
 | MCP server and CLI | `server.py`, `cli.py`, `prompts.py`, `agents.py` | §7 |
@@ -447,7 +448,8 @@ is what makes the split safe:
   each batch of saved paths, and stage B in between, 64 queued chunks at a time, in slices of at
   most 5 s. It pauses at its next model call whenever a search wants the model or a new save
   arrives, and runs stage A alone while the model is loading (§3.5). A search runs stage B itself
-  for the newest queued chunks during its catch-up (§4.2).
+  during its catch-up, for its own keyword results first and then for the newest queued chunks
+  (§4.2).
 - **In the CLI and the eval,** `update()` runs stage A and then all of stage B before it returns
   (batches of 512 chunks; model calls of 256 texts, longest first), and writes the search index to
   disk, so the index is complete when it returns.
@@ -465,8 +467,8 @@ The agent saves `auth/sessions.py` and searches 0.2 s later:
      │                         │ ◄── ② hands over the waiting path ──│
      │                         │ stage A: re-chunk, relink, queue    │   ...waits
      │                         │ what needs new vectors (ms) ───────►│
-     │                         │ (pauses its embedding)              │ ③ stage B for the newest
-     │                         │                                     │   queued chunks
+     │                         │ (pauses its embedding)              │ ③ stage B: its own keyword
+     │                         │                                     │   results, then the newest
      │                         │                                     │ ④ ranks and answers, with a
      │                         │ stage B: embeds whatever is left    │   note if anything is left
      │                         ▼                                     ▼
@@ -479,11 +481,33 @@ The agent saves `auth/sessions.py` and searches 0.2 s later:
 - **② Stage A for them.** The search hands the writer any path it hasn't taken yet, and waits for
   that stage A. Only the writer applies changes, so a slow stage A (a huge file, a checkout still
   writing files) can't hold the search past its 4 s: it stops waiting and reports those files.
-- **③ Stage B for the newest edits.** The writer pauses at its next model call, and the search
-  embeds the queue itself, newest edits first, until its 4 s are up. Each model call is sized to
-  finish in time: at most 3,000 characters, and none is started if the measured model speed says
-  it would end past the limit. A model that is still loading (§3.5) is waited for within the same
-  4 s; the search does not load it itself.
+- **③ Stage B for what this search needs.** The writer pauses at its next model call, and the
+  search embeds the queue itself until its 4 s are up. It starts with the queued chunks among its
+  own keyword results, best rank first, and goes on with the rest, newest edits first. Each model
+  call is sized to finish in time: at most 3,000 characters, and none is started if the measured
+  model speed says it would end past the limit. A model that is still loading (§3.5) is waited
+  for within the same 4 s; the search does not load it itself, and embeds nothing if the model is
+  not in memory by then.
+
+  **Why its own keyword results first.** A queued chunk has an old vector or none. The merge (§6)
+  then ranks it by its keywords alone, below chunks that all three rankings agree on, even when it
+  is the best keyword match. After a branch switch the queue holds exactly the code the switch
+  brought in, which is what the agent tends to ask about next.
+
+  Measured on vLLM right after a switch between two commits a week apart, with 12,355 chunks
+  queued and a fake model. Each of 150 searches asked for one function the switch had added, by
+  the words of its name:
+
+  | The queue when the search ranks | The function is among the first 3 results | among the first 10 |
+  |---|---|---|
+  | nothing embedded | 8% | 48% |
+  | the search's own keyword results embedded first | 56% | 78% |
+  | everything embedded | 55% | 79% |
+
+  A search found a median of 7 queued chunks among its 50 keyword results (16 or fewer in 9 of 10
+  searches). That is 6 texts to embed (17 or fewer): 0.7 s and 2 s at the real model's 8.5 texts
+  a second on the M1, so it fits the 4 s. Functions the switch only changed ranked the same in all
+  three rows: their old vectors still serve.
 - **④ Answer with what the index has, and say what is missing.** The search always returns
   results. If something didn't make it, the last line names it, so the agent can search again or
   grep those files:
@@ -499,10 +523,12 @@ The agent saves `auth/sessions.py` and searches 0.2 s later:
   chunks still waiting for stage B, with the files they are in (above); or that codemem couldn't
   confirm in time that it had seen the latest saves.
 
-**When a search doesn't wait at all.** During the first build of an index, and when more than
-1,000 chunks are queued (a change too big to embed in 4 s), the search skips ③ and answers at
-once, with the same kind of note (`1800 code chunks in 240 files (vllm/a.py, ...) are still being
-embedded ...`).
+**When the queue is too long to wait for.** With more than 1,000 chunks queued (a branch switch, a
+formatter run, the first embedding of a repo), step ③ covers the search's own keyword results and
+nothing else. The search then answers with the same kind of note (`1800 code chunks in 240 files
+(vllm/a.py, ...) are still being embedded ...`), and the writer embeds the rest in the background.
+While a new index gets its first structure, a search answers at once and says the index is still
+being built.
 
 **`get_chunk`** does ① and ② only: the code, lines and links it shows are always current.
 
@@ -573,13 +599,127 @@ and reports any difference.
 |---|---|
 | a crash at any point | SQLite rolls back; the queue was committed with the structure, so the next start embeds what was left; a full check at startup finds files saved meanwhile |
 | a search during an update | it sees the index before or after a transaction, never half of one |
-| a change too big to embed in 4 s (a branch switch, a formatter run) | searches answer at once with what the index has, and a note naming the files still being embedded, so the agent can grep them; the writer embeds them in the background, newest first |
+| a change too big to embed in 4 s (a branch switch, a formatter run) | a search embeds its own keyword results, then answers with what the index has and a note naming the files still being embedded, so the agent can grep them; the writer embeds the rest in the background, newest first |
 | two agent sessions on one repo | one writes at a time (a lock file); each picks up the other's vectors without re-embedding |
 | OS file events don't work (network drives, WSL) | a warning, a full check every 10 s, and a full check before each search (0.5 s on vLLM) |
 | a search while the model is loading (when the server starts, or after the model was freed for being idle) | it waits within its 4 s, then answers from keywords alone and says so |
 | a save while the model is loading | it is applied at once (stage A); its vectors follow when the model is in memory |
 | the model can't be loaded (a wrong name, no network for its first download) | saves are still applied and searches answer from keywords, at once: a search does not wait for a load that has failed. The load is tried again after 1 s, then after twice as long each time, up to a minute, and `index_status` shows the error until it works |
 | the embedding API or the `serve-embeddings` server is down | a search waits for its retries, about 31 s, then fails; edits stay queued and are embedded when it is back (decisions.md §2) |
+
+### 4.6 Branch switches and worktrees
+
+**One index per checkout, not per branch.** A checkout is a folder that holds the repository's
+files: the main one, or one made by `git worktree add`. Its index follows whatever commit the
+folder is on. An index per branch would cost its disk again for every branch, and embedding again
+after every switch would cost model time. codemem does neither. A switch updates the checkout's one
+index in place, and every vector that was computed on this machine before comes back from the
+vector cache (§3.5).
+
+**What a switch does.** `git checkout` is, for the index, a burst of saves:
+
+```
+ git checkout B
+        │   the watcher sees HEAD change and asks for a full check; the writer first waits
+        │   for git to finish writing files
+        ▼
+ a full check ........ every file by size and date, then by content hash
+        ▼
+ STAGE A ............. only for the files whose content differs: re-chunk, relink, queue.
+        │              From here on keywords, names, lines and call links are those of B
+        ▼
+ STAGE B ............. a vector for every queued text that changed: from this index (the same
+                       text under another chunk), else from the vector cache, else from the model
+```
+
+Measured on vLLM (6,235 files, 102k chunks, 145k vectors) between two commits a week apart: 478
+commits, and 1,651 of the indexed files differ. The model is a fake one, so the seconds are
+codemem's own work:
+
+| Switch | Files re-chunked, dropped | Chunks added, changed, deleted | Vectors written | of them by the model | Stage A | Stage B |
+|---|---|---|---|---|---|---|
+| A → B, the first visit to B | 1,291, 360 | 1,347, 3,714, 7,025 | 10,228 | 9,054 | 18 s | 27 s |
+| B → A, a commit seen before | 1,635, 16 | 7,025, 3,714, 1,347 | 18,556 | 0 | 27 s | 22 s |
+| A → B again | 1,291, 360 | 1,347, 3,714, 7,025 | 10,228 | 0 | 18 s | 10 s |
+
+The M1 was shared with other jobs, so each time is the fastest of the runs of that leg. On the
+busy machine half of the 18 runs of stage A took more than 45 s, and the slowest 100 s. Another
+22,335 chunks only moved inside their files and kept everything else. The real model adds its
+time to the first visit only: 9,054 texts are about 18 minutes at the M1's 8.5 texts a second, in
+the background, while keyword search already answers for B. On every later visit the vectors come
+from the cache.
+
+**Switching back before the vectors are done** leaves no work for the branch that was left:
+- a chunk that exists only on that branch is deleted by stage A of the switch back, and its place
+  in the queue with it;
+- a chunk that changed and changed back still has its old vector, so stage B sees an unchanged
+  text hash and only drops it from the queue;
+- a chunk the first switch deleted comes back as a new chunk, and its vector comes from the cache;
+- a model call that is running finishes, and it is the last one: before every call the writer
+  asks whether new changes arrived, and applies them first. One call is at most 3,000 characters,
+  about 0.6 s on the M1, and its vectors go to the cache for the next visit.
+
+**What the vector cache is worth here.** The index alone remembers little of a commit it left:
+deleting a chunk deletes its vectors, and a new vector replaces the old one. With
+`vector_cache = "off"`, coming back embeds again every text the switch removed or replaced. On the
+vLLM switch above that is 17,398 texts, 12% of the index's vectors and about 34 minutes of model
+time on the M1. It is 10,138 when the switch back comes before B's vectors were computed, because
+the vectors stage B had not replaced yet are still in place.
+
+**Each git worktree is a checkout of its own.** Its index folder is named after its path, so two
+worktrees never share an index, and a codemem started inside a worktree (an MCP server, the CLI)
+serves that worktree, with its own watcher and writer. Each such process also holds the embedding
+model, unless they share one through `codemem serve-embeddings` (§3.5).
+
+**A new worktree's index starts from a copy.** Without one, codemem would chunk every file again
+just to find that almost all of them equal the main checkout's.
+
+```
+ codemem starts in a checkout that has no index
+        │
+        ▼
+ another checkout of the repository has one, built with the same settings?
+        │   in this order: one built at the commit this checkout is on, the main
+        │   checkout's, the most recently updated
+        ▼
+ copy its index.db ....... one SQLite backup: a consistent snapshot, even while the other
+        │                  checkout's server is writing. The saved search index is not copied;
+        │                  it is rebuilt from the vector rows
+        ▼
+ forget the file dates ... the copy keeps every file's content hash
+        ▼
+ the first full check .... reads every file, and re-chunks only those whose content differs
+```
+
+- **Every candidate gives a correct index;** the order only decides how many files the first check
+  re-chunks. An index built at the same commit differs by uncommitted edits only. Failing that,
+  worktrees are usually cut from the main checkout. "Most recently updated" comes last: it says
+  how fresh an index is, not how close its code is to the new checkout's.
+- **Content decides, not dates.** A file in the new worktree can have the size and date the copied
+  index recorded and still differ. So the copy forgets every date, and the first check hashes every
+  file. From there on it is the same update as a branch switch, and it ends in the same index as a
+  fresh build (tests check this for changed, added, moved and deleted files).
+- **A copy is not yet this checkout's index.** Until that first check has run, `codemem search`
+  (which never updates an index) asks for `codemem index` first, and the MCP server answers with
+  its note that the index is still being built.
+
+Measured on vLLM (6,235 files, 102k chunks; a fake model; an M1 shared with other jobs), in a new
+worktree with one function added:
+
+| The worktree's index | First fully current search, after codemem starts |
+|---|---|
+| copied from the main checkout's | 4 to 8 s, as `codemem index` then `codemem search` and as the MCP server alike |
+| built from nothing, every vector already in the cache | 76 s |
+
+Of the 4 to 8 s, the copy takes 1 to 2 s (641 MB), the full check 1 to 3 s, and rebuilding the
+search index from the vector rows 2 to 4 s. The copy runs before the MCP server answers its
+first message. A worktree's index is a full index on disk: 641 MB here, and 901 MB once its search
+index is saved.
+
+**The index of a removed worktree is deleted** at the next start of codemem in any checkout of the
+same repository. The rule is narrow on purpose (decisions.md §6): a folder is deleted only if
+codemem recorded it as a worktree's index, the worktree's folder is gone, and git no longer lists
+the worktree.
 
 ---
 
@@ -598,7 +738,8 @@ and reports any difference.
  │     meta         the settings the index was built with, the git commit, version counters
  ├── vec_code.faiss ...... saved copies of the in-memory search indexes,  ┐ rebuilt from the
  ├── vec_usage.faiss         one per text type                            ┘ vectors table if lost
- └── write.lock .......... one writer at a time
+ ├── write.lock .......... one writer at a time
+ └── worktree.json ....... in a git worktree's index: which worktree it serves (§4.6)
 
  ~/.codemem/cache/vectors.db ... the vector cache, shared by every index on the machine
 ```
@@ -683,8 +824,9 @@ Dropping stopwords keeps a 250-word query on vLLM at 0.36 s of BM25 with no loss
                   └─ the embedding model, loaded in the background at startup
 ```
 
-At startup the server answers the agent's handshake at once, then, in the background, checks the
-repo against the index (or builds it the first time), starts the watcher and loads the model.
+At startup the server opens its index and answers the agent's handshake. In a new git worktree
+it first copies another checkout's index (§4.6). Then, in the background, it checks the repo
+against the index (or builds it the first time), starts the watcher and loads the model.
 
 | Tool | Does |
 |---|---|
@@ -754,6 +896,8 @@ they show codemem's own work; the real model adds about 0.1 s per changed text.
 | a search of 10 words / 250 words (vLLM) | 0.12 s / 0.63 s |
 | a save then a search, through MCP, real model (sample repo) | 0.13–0.4 s, the edit included |
 | a full build of vLLM, fake model | 72 s |
+| a switch between two commits a week apart, 1,651 files differ (vLLM): stage A, then stage B with every vector in the cache | 18–27 s, then 10–22 s, in the fastest runs on a busy machine (§4.6) |
+| the first current search in a new worktree (vLLM): its index copied / built from nothing | 4–8 s / 76 s (§4.6) |
 | loading the real model on the GPU, PyTorch already imported | about 2 s at a load average of 3 to 5 (8 cores), 3 to 5 s at 6 to 7, 5.5 s at 8 to 11 |
 | the first search after the model was freed, real model (sample repo) | 3.5 s with every signal at a load average of 5; 4.1 s from keywords at 8 to 11 (the model was back 7.0 s after the search began). A search that waits for the model: 2.2 s and 3.8 s |
 | giving a batch's working memory back, real model on the GPU | the call takes 0.1 s; 256 code texts took 84 s right after it and 87 s with nothing given back, and batches of 32 took 10.0 s and 10.4 s (four of each, in turn) |
@@ -796,6 +940,9 @@ embedding API. After that, updates are small.
  server.py   search_code() ─► service.py CodememService.search()
                                 ├─ catch_up()   RepoWatcher.barrier() ─► hand over unapplied paths
                                 │               ─► wait for the writer's stage A
+                                │               ─► _models_ready(): the model is in memory, or loads in time
+                                │               ─► _embed_first(): Indexer.embed_pending() for the queued
+                                │                  chunks among _keyword_results()
                                 │               ─► Indexer.embed_pending() for the newest edits, until 4 s
                                 └─ search.py search()
                                       ├─ bm25_match() ─► store.bm25_search()
@@ -805,8 +952,12 @@ embedding API. After that, updates are small.
 ```
 
 **Other entry points:**
-- `codemem mcp` ─► `server.run_stdio()` ─► `CodememService.start()` (a full check, the writer, the
-  watcher, model loading) ─► `build_server()` serves the four tools over stdio.
+- `codemem mcp` ─► `server.run_stdio()` ─► `CodememService()` ─► `CodememService.start()` (a full
+  check, the writer, the watcher, model loading) ─► `build_server()` serves the four tools over
+  stdio.
+- `CodememService()` without an index folder (the MCP server, the CLI) ─► `worktrees.py
+  prepare_index()`: `removable_indexes()` and `remove_index()` for worktrees that are gone, then
+  `copy_source()` and `copy_index()` if this checkout has no index, then `record_worktree()`.
 - `get_chunk` ─► `CodememService.get_chunk()`: the catch-up without stage B, then the chunk with its
   callers and callees. `index_status` ─► `CodememService.status()`. `refresh_index` ─►
   `CodememService.refresh()`.
@@ -843,5 +994,6 @@ embedding API. After that, updates are small.
 | `indexer.py` | the update function: finding files, stage A, stage B, verify mode |
 | `service.py` | `CodememService`: the writer thread, the catch-up, the watcher, status |
 | `watcher.py` | file events, batched |
+| `worktrees.py` | the checkouts of a repository; copying an index for a new one; deleting the index of a removed worktree |
 | `search.py`, `render.py` | search, and the cards and notes an agent reads |
 | `server.py`, `cli.py`, `__main__.py`, `prompts.py`, `agents.py` | the MCP server, the CLI (also `python -m codemem`), agent-facing text, agent registration |

@@ -61,6 +61,8 @@ def cmd_index(args) -> int:
         svc.config.vector_cache = "off"
     try:
         print(f"indexing {svc.repo_root} -> {svc.index_dir}", file=sys.stderr)
+        if svc.copied_from is not None:
+            print(f"starting from a copy of {svc.copied_from}", file=sys.stderr)
         indexer = Indexer(svc.repo_root, svc.store, svc.config, progress=_progress_printer(not args.json))
         stats = indexer.update(full=args.full)
         print(file=sys.stderr)
