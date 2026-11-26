@@ -1,0 +1,93 @@
+# Recipe for duckdb/duckdb: how to build it at a task's commit and run a task's tests.
+# The fields are described in src/cmeval/generate.py.
+#
+# Use the task file that `cmeval resplit duckdb` makes (tasks/fresh-cpp-v1-duckdb.jsonl), not
+# fresh-cpp-v1.jsonl. The collector did not know duckdb's test files (.test), so in the old file
+# most duckdb tasks have no test change.
+
+repo = "duckdb/duckdb"
+# gcc 12, git, curl and Python 3 are in the image. bookworm adds CMake 3.25, ninja and ccache.
+base_image = "python:3.12-bookworm"
+
+# What counts as a test file in this repo (plan section 10), for `cmeval resplit`. test/ holds
+# the C++ tests, the sqllogictest files (.test, .test_slow), their configs (test/configs/*.json)
+# and the CMake files of the C++ tests. data/ holds only test data. tools/shell/tests holds the
+# tests of the command-line shell.
+test_paths = ["test/**", "data/**", "tools/shell/tests/**"]
+
+base_setup = [
+    "apt-get update && apt-get install -y --no-install-recommends cmake ninja-build ccache && rm -rf /var/lib/apt/lists/*",
+    # For the shell tests (tools/shell/tests).
+    "pip install --no-cache-dir pytest==8.3.5",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+]
+
+# After the source of the task's commit is in /testbed. A release build with assertions on
+# (FORCE_ASSERT, as in the CI's "relassert" build that runs the changed tests) and without the
+# address and undefined-behaviour sanitizers that FORCE_ASSERT turns on by default.
+# Extensions: core_functions and parquet are in every build. The tests in the task window also
+# need json, icu and tpch (their "require" lines). LINK_CORE_EXTENSIONS links them into the
+# binaries from 2026-10-14 on; older commits link every extension in BUILD_EXTENSIONS and do not
+# know the option. A test whose extension is not in the binary is skipped.
+# The version: the image's one commit has the nearest tag of the real history (generate.py).
+# Before 2026-09-01, duckdb reads its version with "git describe --match v*.*.0", which does not
+# match a tag such as v1.5.5, and falls back to v0.0.1. OVERRIDE_GIT_DESCRIBE gives the tag's
+# version to the old and the new version code.
+# ccache keeps its files in /root/.cache/ccache, the build cache that the build steps of all
+# tasks share. That is sound: ccache finds an object by a hash of the compiler, its arguments and
+# the content of the source and of every header it reads, not by path or time. Two tasks share an
+# object only when its inputs are the same. (The path-keyed cache of F9 5.1 trap 1 was uv's.)
+build = [
+    "cmake -G Ninja -S . -B build/release -DCMAKE_BUILD_TYPE=Release -DFORCE_ASSERT=1 -DENABLE_SANITIZER=FALSE -DENABLE_UBSAN=FALSE -DBUILD_EXTENSIONS='json;icu;tpch' -DLINK_CORE_EXTENSIONS=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DOVERRIDE_GIT_DESCRIBE=$(git describe --tags --abbrev=0)",
+    # 12 jobs, not 16: two builds can run at once, and one unity source of duckdb can need 1 GB or more.
+    "cmake --build build/release --target unittest shell -j 12",
+    # Fails when an extension that the tests need is not in the binary.
+    "build/release/duckdb -c 'LOAD parquet; LOAD json; LOAD icu; LOAD tpch; PRAGMA version'",
+]
+
+# An incremental build after a patch: ninja compiles only what changed, and runs CMake again when
+# a CMakeLists.txt changed. The ccache of the build step is not in the image, so it is off here.
+# 8 jobs: the validation container has 8 processors.
+refresh = ["CCACHE_DISABLE=1 cmake --build build/release --target unittest shell -j 8"]
+
+timeout_min = 10
+
+[env]
+CCACHE_MAXSIZE = "20G"
+
+# sqllogictest files. One file is one test case of the unittest program, named by its path.
+# Each file runs in its own process, so a crash before the fix fails that file only. The command
+# writes the JUnit file itself: the junit reporter of Catch writes no test case that has no
+# assertion, and a test that the runner skips looks like a pass to Catch.
+#   exit code not 0 (a failure, a crash, the time limit), or no test of that name: failure
+#   exit code 0, and a skip for a "require" line (an extension or setting that the build lacks): skipped
+#   else: pass
+# .test_slow files run when they are named. C++ test files (test/**/*.cpp) are compiled into
+# unittest by the refresh, but no suite runs them: the tests run before the fix without a
+# rebuild, so a changed C++ test would run in its old form.
+[[suite]]
+test_files = ["test/**/*.test", "test/**/*.test_slow"]
+test = '''
+x={junit}
+echo '<testsuites><testsuite name="sqllogictest">' > "$x"
+for f in {files}; do
+  timeout -k 10 240 build/release/test/unittest "$f" > /tmp/unittest-one.log 2>&1
+  c=$?
+  cat /tmp/unittest-one.log
+  if [ "$c" != 0 ] || grep -q 'No test cases matched' /tmp/unittest-one.log; then
+    o="<failure message='exit code $c'/>"
+  elif sed -n '/^Skipped tests for the following reasons:/,$p' /tmp/unittest-one.log | grep -q '^require'; then
+    o='<skipped/>'
+  else
+    o=''
+  fi
+  echo "<testcase classname='sqllogictest' name='$f'>$o</testcase>" >> "$x"
+done
+echo '</testsuite></testsuites>' >> "$x"
+'''
+
+# The tests of the command-line shell, as the CI runs them.
+[[suite]]
+test_files = ["tools/shell/tests/**/test_*.py"]
+test = "python3 -m pytest {files} --shell-binary build/release/duckdb -p no:cacheprovider --junitxml={junit}"
