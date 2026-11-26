@@ -487,6 +487,11 @@ test = "cmeval-trino-test {junit} {files}"
 parser = "junit"
 timeout_min = 10
 
+# For `cmeval resplit`. Test code and test resources are under src/test of each module.
+test_paths = ["**/src/test/**"]
+# The image installs from the poms and the Maven wrapper's settings.
+dependency_paths = ["pom.xml", "**/pom.xml", ".mvn/**"]
+
 [env]
 # The Maven distribution of the wrapper and the local repository must be in the image, and readable
 # by the agent, who has another home folder. /root/.cache is a build-time cache mount.
