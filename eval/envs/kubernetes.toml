@@ -55,6 +55,13 @@ test = '''pkgs=$(for f in {files}; do case $f in (*/test/integration/*|cmd/kubea
 parser = "junit"
 timeout_min = 10
 
+# For cmeval resplit: the test files of the repo whatever their extension, as the collector's
+# configs/fresh-go-v1.toml has them (golden files and test inputs in testdata/).
+test_paths = ["**/*_test.go", "**/testdata/**", "test/**", "staging/src/k8s.io/*/test/**"]
+# The third-party modules are vendored: vendor/modules.txt has their versions, and each go.mod
+# (also those of staging/) names them. Modules of staging/ are the repo's own.
+dependency_paths = ["go.mod", "go.work", "**/go.mod", "vendor/modules.txt"]
+
 [env]
 # The build cache must be in the image. /root/.cache is a build-time cache mount.
 GOCACHE = "/opt/gocache"

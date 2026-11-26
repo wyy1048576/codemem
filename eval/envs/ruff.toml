@@ -218,6 +218,24 @@ refresh = ["cargo nextest run --workspace --all-features --no-run"]
 # tests, snapshots, integration tests, and source files with test code only.
 test_files = ["crates/*/resources/**", "crates/*/tests/**", "crates/*/src/**"]
 test = "cmeval-ruff-test {junit} {files}"
+# For cmeval resplit: the test files of the repo whatever their extension, as the collector's
+# configs/fresh-rust-v1.toml has them. Without them the default would be crates/*/tests/** only.
+test_paths = [
+    "crates/*/resources/test/**",
+    "crates/*/resources/mdtest/**",
+    "crates/ty_python_semantic/resources/corpus/**",
+    "crates/ruff_python_parser/resources/valid/**",
+    "crates/ruff_python_parser/resources/invalid/**",
+    "crates/ruff_python_parser/resources/inline/**",
+    "**/tests/**",
+    "**/snapshots/**",
+    "**/*.snap",
+    "**/src/**/tests.rs",
+    "**/property_tests.rs",
+    "**/property_tests/**",
+]
+# The image fetches the crates of Cargo.lock. The Cargo.toml files only name ranges: the lock decides.
+dependency_paths = ["Cargo.lock", "**/Cargo.toml"]
 parser = "junit"
 timeout_min = 10
 

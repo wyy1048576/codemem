@@ -88,6 +88,14 @@ refresh = ["cmeval-vscode-out"]
 
 timeout_min = 10
 
+# For cmeval resplit. npm ci installs the packages of the package-lock.json files (its postinstall
+# step goes through the folders of build/, remote/, extensions/ and test/). The .npmrc files give
+# the Electron and Node.js versions that native modules are built for and that the image downloads.
+dependency_paths = ["**/package.json", "**/package-lock.json", "**/.npmrc"]
+# Test files whatever their extension: the default (made from test_files) is src/vs/**/test/**.
+# test/ at the top holds the test runners and their fixtures (test/unit/electron/fixtures/).
+test_paths = ["src/vs/**/test/**", "test/**"]
+
 # Do not set CI, GITHUB_WORKSPACE or BUILD_ARTIFACTSTAGINGDIRECTORY: the test runners read them.
 
 [[suite]]

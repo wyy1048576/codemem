@@ -104,6 +104,12 @@ test = "python -m pytest {files} -p no:cacheprovider -p no:rerunfailures --timeo
 parser = "junit"
 timeout_min = 10
 
+# For cmeval resplit. The image installs requirements/test/cpu.txt, a compiled file with a pin for
+# each package. requirements/common.txt and the other files only name ranges.
+dependency_paths = ["requirements/test/cpu.txt"]
+# The repo's CI files are in .buildkite/: no build and no test reads them.
+leave_out = [".github/**", ".buildkite/**", "**/CHANGELOG*", "**/*.rst"]
+
 # For the build and for the tests. The network is off when the tests run; these variables make
 # the Hugging Face libraries read only their cache, and keep vllm off the GPU.
 [env]

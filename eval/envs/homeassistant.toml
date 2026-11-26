@@ -71,6 +71,17 @@ test = "python -b -X dev -m pytest {files} -p no:cacheprovider -p no:sugar -n 8 
 parser = "junit"
 timeout_min = 10
 
+# For cmeval resplit. The image installs these files (deps_files), so a fix that adds or raises a
+# requirement in them needs a package that the image does not have. A manifest.json names the
+# same requirements as requirements_all.txt.
+dependency_paths = [
+    "requirements.txt",
+    "requirements_all.txt",
+    "requirements_test.txt",
+    "requirements_test_pre_commit.txt",
+    "homeassistant/package_constraints.txt",
+]
+
 # The uv cache is a build cache mount on another file system, so uv cannot make hard links into
 # the image. This says so, instead of a warning for each install.
 [env]

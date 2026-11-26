@@ -51,6 +51,15 @@ refresh = ["cmeval-provider-deps"]
 
 timeout_min = 10
 
+# For cmeval resplit. The image installs the Python packages of uv.lock and the UI packages of the
+# UI's pnpm-lock.yaml. The pyproject.toml and package.json files only name ranges: the locks decide.
+dependency_paths = [
+    "uv.lock",
+    "**/pyproject.toml",
+    "airflow-core/src/airflow/ui/pnpm-lock.yaml",
+    "airflow-core/src/airflow/ui/package.json",
+]
+
 # The test commands: fixed worker counts (-n 8 for pytest, --maxWorkers=4 for vitest), never the
 # number of processors of the host. "-p no:rerunfailures": the repo marks some tests "flaky" with
 # reruns, and a rerun hides a failure. --continue-on-collection-errors: before the fix, a test file
