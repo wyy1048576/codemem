@@ -1,0 +1,93 @@
+{
+  "kind": "resplit",
+  "source": "fresh-go-v1-large.jsonl",
+  "source_sha256": "71e551500416a615f8d452be3aed60ebc33b5007c9a20375a36d7b38ce52149f",
+  "repo": "kubernetes/kubernetes",
+  "recipe": "kubernetes",
+  "test_paths": [
+    "**/*_test.go",
+    "**/testdata/**",
+    "test/**",
+    "staging/src/k8s.io/*/test/**"
+  ],
+  "test_paths_from_test_files": false,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "go.mod",
+    "go.work",
+    "**/go.mod",
+    "vendor/modules.txt"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 8,
+  "changed": 4,
+  "unchanged": 4,
+  "not_split": {},
+  "with_test_files_added": 0,
+  "with_fix_files_added": 4,
+  "test_files_added": 0,
+  "fix_files_added": 26,
+  "files_left_out": {},
+  "with_dependency_needed": 2,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 2
+  },
+  "dependency_needed": {
+    "kubernetes__kubernetes-140429": [
+      {
+        "file": "go.mod",
+        "package": "github.com/google/cadvisor/lib",
+        "old": "v0.60.4",
+        "new": "v0.60.5",
+        "kind": "raised"
+      },
+      {
+        "file": "vendor/modules.txt",
+        "package": "github.com/google/cadvisor/lib",
+        "old": "v0.60.4",
+        "new": "v0.60.5",
+        "kind": "raised"
+      }
+    ],
+    "kubernetes__kubernetes-143002": [
+      {
+        "file": "go.mod",
+        "package": "github.com/godbus/dbus/v5",
+        "old": "v5.2.2",
+        "new": "v5.2.4",
+        "kind": "raised"
+      },
+      {
+        "file": "vendor/modules.txt",
+        "package": "github.com/godbus/dbus/v5",
+        "old": "v5.2.2",
+        "new": "v5.2.4",
+        "kind": "raised"
+      }
+    ]
+  },
+  "with_dependency_other": 2,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 2
+  },
+  "with_test_patch_before": 6,
+  "with_test_patch_after": 6,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "13fc033cc54cf097279ca38d159a8bfda1a65311",
+    "dirty": false
+  },
+  "created": "2026-11-26T18:58:14+00:00"
+}

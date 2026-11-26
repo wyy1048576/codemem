@@ -1,0 +1,151 @@
+{
+  "config": "fresh-cpp-v1-large.toml",
+  "since": "2026-07-01",
+  "until": "2026-10-22",
+  "settings": {
+    "min_body_chars": 100,
+    "extra_bots": [],
+    "max_code_files": 15,
+    "max_code_lines": 600
+  },
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "13fc033cc54cf097279ca38d159a8bfda1a65311",
+    "dirty": false
+  },
+  "labeler": "cmeval-labels/5",
+  "created": "2026-11-26T18:56:44+00:00",
+  "funnel_steps": [
+    {
+      "key": "merged",
+      "text": "merged into the default branch in the date range"
+    },
+    {
+      "key": "opened_after_cutoff",
+      "text": "the fix PR was opened on or after the start date (its code was not public before)"
+    },
+    {
+      "key": "not_bot",
+      "text": "author is not a bot"
+    },
+    {
+      "key": "one_link",
+      "text": "links exactly one issue in the same repo or a listed issue repo (GitHub's list or the SWE-bench regex)"
+    },
+    {
+      "key": "is_issue",
+      "text": "the link is an issue that exists (not a PR)"
+    },
+    {
+      "key": "issue_before_pr",
+      "text": "the issue was opened before the fix PR (not written after the fix)"
+    },
+    {
+      "key": "body_ok",
+      "text": "body (as of when the fix PR was opened) has the minimum length"
+    },
+    {
+      "key": "no_leak",
+      "text": "query does not name the fix PR or a fix commit"
+    },
+    {
+      "key": "base_found",
+      "text": "base commit found from the merge type (Decision 7)"
+    },
+    {
+      "key": "files_match",
+      "text": "our patch touches exactly the PR's files"
+    },
+    {
+      "key": "test_split",
+      "text": "no file mixes fix code and test code (Rust: changes inside and outside #[cfg(test)] code)"
+    },
+    {
+      "key": "applies",
+      "text": "the code patch applies at the base commit"
+    },
+    {
+      "key": "size_ok",
+      "text": "1 to max_code_files code files and at most max_code_lines changed code lines"
+    },
+    {
+      "key": "labeled",
+      "text": "labeled, with at least one gold file that exists at the base commit"
+    }
+  ],
+  "repos": {
+    "duckdb/duckdb": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 939,
+        "opened_after_cutoff": 917,
+        "not_bot": 917,
+        "one_link": 240,
+        "is_issue": 239,
+        "issue_before_pr": 235,
+        "body_ok": 235,
+        "no_leak": 235,
+        "base_found": 235,
+        "files_match": 234,
+        "test_split": 234,
+        "applies": 234,
+        "size_ok": 229,
+        "labeled": 229
+      },
+      "link_methods": {
+        "both": 200,
+        "list": 21,
+        "regex": 14
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 22,
+        "no linked issue": 663,
+        "several linked issues": 14,
+        "issue opened after the fix PR": 4,
+        "link is a PR, not an issue": 1,
+        "too many changed lines": 1,
+        "more than 100 files": 1,
+        "no code files": 3,
+        "too many code files": 1
+      }
+    }
+  },
+  "stats": {
+    "tasks": 20,
+    "tasks_per_repo": {
+      "duckdb/duckdb": 20
+    },
+    "mean_gold_files": 7.5,
+    "mean_gold_classes": 3.5,
+    "mean_gold_functions": 12.1,
+    "share_no_gold_function": 0.0,
+    "share_module_level_change": 1.0,
+    "share_partial_labels": 0.25,
+    "share_identifier_in_query": 0.2,
+    "share_with_unretrievable_functions": 0.95,
+    "tasks_per_split": {
+      "dev": 3,
+      "test": 17
+    },
+    "share_gold_all_python": 0.0,
+    "merge_types": {
+      "merge": 20
+    }
+  },
+  "excluded": {
+    "files": [
+      {
+        "name": "fresh-cpp-v1.jsonl",
+        "sha256": "228973a58961eb69b026f30a478526c8deb98ff08f4cc0eb3478c8430aa75a88"
+      }
+    ],
+    "repos": {
+      "duckdb/duckdb": {
+        "found": 229,
+        "left_out": 209,
+        "kept": 20,
+        "not_found_again": []
+      }
+    }
+  }
+}
