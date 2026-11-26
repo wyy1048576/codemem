@@ -167,6 +167,17 @@ def models_loading_notice() -> str:
     )
 
 
+def copy_notice() -> str:
+    """Before an answer read from a new checkout's index that is still a copy of another
+    checkout's: its first full check did not end within the time the tool waits."""
+    return (
+        "Note: codemem's index for this checkout started as a copy of another checkout's index, and codemem is "
+        "still comparing it with the files here. Until that is done, what it returns can be the other checkout's "
+        "code: names, line numbers and code may differ from the files in this checkout. Ask again in a few "
+        "seconds, or read the files themselves."
+    )
+
+
 def indexing_notice(percent: float) -> str:
     return (
         f"Note: the codemem index is still being built ({percent:.0f}% done); results may be "

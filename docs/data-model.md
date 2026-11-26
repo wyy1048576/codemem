@@ -462,9 +462,11 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 `indexed_at`, `last_scan_at`, `last_update`, `coverage` and `repo_path`. `vec_*` files that an
 index deleted by hand left in the folder are removed first: a saved search index is matched to
 the vector rows by id, and the copy has another index's ids. An index without
-`indexed_at` has not been compared with its checkout's files yet: `codemem search` asks for
-`codemem index` first, and the MCP server answers from it with its note that the index is still
-being built.
+`indexed_at` has not been compared with its checkout's files yet, and one that has rows all the
+same is such a copy: it holds the other checkout's code. `codemem search` asks for
+`codemem index` first. The MCP server's `search_code` and `get_chunk` wait for the first full
+check within `catchup_budget_ms`; past that they answer from the copy, with a note that says so
+(§12.1).
 
 The eval harness writes its own marker files into the index folder. codemem never deletes files
 it doesn't own.
@@ -606,8 +608,8 @@ The tool names stay stable, so other front-ends can be compared.
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding |
-| `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)` |
+| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding. An opening `Note:` while a new index is being built, or is still a copy of another checkout's |
+| `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)`. An opening `Note:` when it is read from a copy of another checkout's index that is not checked yet |
 | `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the search index in use (exact or compact, why, and about how much memory each vector type takes), the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
 
@@ -635,12 +637,21 @@ those files.
 
 The parts it can hold: files saved moments ago that are still being indexed; chunks still being
 embedded (with the files they are in); or that codemem could not confirm it has seen the latest
-saves. `get_chunk` waits for the structure only, so its code, lines and links are current. While
-the embedding model is loading when the server starts, or a search index is still loading, a
-search waits within the same budget, then answers from keywords alone with a note; after a model
-load that failed it answers that way at once. A model that was freed for being idle (§12.3) is
-waited for longer, up to 20 s: the first search after an idle time is slower and has the same
-results. The CLI and the eval always wait for both.
+saves. `get_chunk` waits for the structure only, so its code, lines and links are current.
+
+**The copy note.** A new worktree's index starts as a copy of another checkout's (architecture.md
+§4.6). `search_code` and `get_chunk` wait for its first full check within `catchup_budget_ms`. If
+the check has not ended by then, the answer is read from the copy and begins with `Note:
+codemem's index for this checkout started as a copy of another checkout's index, ...`: what
+follows can be the other checkout's code. A `get_chunk` that finds nothing in the copy ends with
+the same note. `CodememService.search()` reports the case as `freshness.unchecked_copy`, and
+`get_chunk()` as the key `unchecked_copy` of its answer.
+
+**While something is loading.** While the embedding model is loading when the server starts, or
+a search index is still loading, a search waits within the same budget, then answers from
+keywords alone with a note; after a model load that failed it answers that way at once. A model
+that was freed for being idle (§12.3) is waited for longer, up to 20 s: the first search after an
+idle time is slower and has the same results. The CLI and the eval always wait for both.
 
 **Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
 model of every enabled vector type is in the memory of the process that answers, false when one is

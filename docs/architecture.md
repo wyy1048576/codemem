@@ -626,9 +626,10 @@ formatter run, the first embedding of a repo), step ③ covers the search's own 
 nothing else. The search then answers with the same kind of note (`1800 code chunks in 240 files
 (vllm/a.py, ...) are still being embedded ...`), and the writer embeds the rest in the background.
 While a new index gets its first structure, a search answers at once and says the index is still
-being built.
+being built. A new index that starts as a copy of another checkout's is waited for instead (§4.6).
 
-**`get_chunk`** does ① and ② only: the code, lines and links it shows are always current.
+**`get_chunk`** does ① and ② only: the code, lines and links it shows are current. One case has a
+note instead: a new worktree's index that is still a copy of another checkout's (§4.6).
 
 ### 4.3 The watcher and the writer
 
@@ -701,6 +702,7 @@ and reports any difference.
 | a change too big to embed in 4 s (a branch switch, a formatter run) | a search embeds its own keyword results, then answers with what the index has and a note naming the files still being embedded, so the agent can grep them; the writer embeds the rest in the background, newest first |
 | two agent sessions on one repo | one writes at a time (a lock file); each picks up the other's vectors without re-embedding |
 | OS file events don't work (network drives, WSL) | a warning, a full check every 10 s, and a full check before each search (0.5 s on vLLM) |
+| a search or `get_chunk` in a new worktree, before the copied index is checked (§4.6) | it waits for that check within its 4 s; past that it answers from the copy, and a note says that this can be the other checkout's code |
 | a search while the model is loading (when the server starts, or after the model was freed for being idle) | it waits within its 4 s, then answers from keywords alone and says so |
 | a search while a search index is still loading, or is being rebuilt from the stored vectors (§5) | the same: it waits within its 4 s, and not for a rebuild that will take longer; then keywords alone, and the note |
 | a save while the model is loading | it is applied at once (stage A); its vectors follow when the model is in memory |
@@ -844,9 +846,25 @@ just to find that almost all of them equal the main checkout's.
   index recorded and still differ. So the copy forgets every date, and the first check hashes every
   file. From there on it is the same update as a branch switch, and it ends in the same index as a
   fresh build (tests check this for changed, added, moved and deleted files).
-- **A copy is not yet this checkout's index.** Until that first check has run, `codemem search`
-  asks for `codemem index` first, and the MCP server answers with its note that the index is
-  still being built.
+- **A copy is not yet this checkout's index.** Until that first check has run, it holds the other
+  checkout's code: functions that are not in this checkout, and other lines for the ones that are.
+  So `codemem search` asks for `codemem index` first. The MCP server's `search_code` and
+  `get_chunk` wait for the check within their 4 s, as they wait for stage A of a save (§4.2).
+  Near its source the check takes well under a second, and the first answer is this checkout's.
+  Where it takes longer than the wait (a worktree far from its source, a large repository), the
+  answer comes from the copy and begins with a note that says so:
+
+  ```
+  Note: codemem's index for this checkout started as a copy of another checkout's index, and
+  codemem is still comparing it with the files here. Until that is done, what it returns can be
+  the other checkout's code: names, line numbers and code may differ from the files in this
+  checkout. Ask again in a few seconds, or read the files themselves.
+  ```
+
+  Measured on flask, in a worktree 853 commits from the main checkout (52 files to re-chunk, 12
+  to drop): in 6 starts, the `search_code` and the `get_chunk` sent right after the handshake
+  answered 1.4 to 2.3 s after the server's start, for this checkout, and no answer held a
+  function of the other commit.
 
 Measured on vLLM (6,235 files, 102k chunks; a fake model; an M1 shared with other jobs), in a new
 worktree with one function added:

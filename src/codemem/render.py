@@ -58,6 +58,8 @@ def freshness_note(fresh: Any, pending: tuple[int, list[str]] = (0, [])) -> str:
         )
     if fresh.unconfirmed:
         parts.append("codemem could not confirm it has seen your most recent saves")
+    if not parts:
+        return ""  # an answer from a copy of another checkout's index: the tool's own notice says so (prompts.py)
     return "Note: " + "; ".join(parts) + ". Search again in a few seconds, or use grep for those files."
 
 

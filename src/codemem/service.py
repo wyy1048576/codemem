@@ -89,10 +89,13 @@ class Freshness:
     indexing: bool = False  # the index is being built: many chunks still to embed
     pending_files: int = 0  # saved files not applied yet (still being applied, or applying failed)
     unconfirmed: bool = False  # the watcher could not confirm in time that every earlier save was seen
+    # The index is still a copy of another checkout's that no full check has compared with this
+    # checkout's files (worktrees.py): what it holds can be the other checkout's code.
+    unchecked_copy: bool = False
 
     @property
     def complete(self) -> bool:
-        return self.pending_chunks == 0 and self.pending_files == 0 and not self.unconfirmed
+        return self.pending_chunks == 0 and self.pending_files == 0 and not self.unconfirmed and not self.unchecked_copy
 
 
 class _Retry:
@@ -206,6 +209,14 @@ class CodememService:
     # ---- indexing on request (CLI, eval)
     def has_index(self) -> bool:
         return self.store.get_meta("indexed_at") is not None
+
+    def copy_unchecked(self) -> bool:
+        """The index is still a copy of another checkout's (worktrees.py): it holds that checkout's
+        chunks, and no full check has compared it with this checkout's files yet. An answer from
+        it can show code that is not in this checkout, so every answer waits for that check or
+        says what it comes from. An index that is this checkout's own says no without a look at
+        the store."""
+        return self.state in ("empty", "indexing", "error") and not self.has_index() and self.store.chunk_total() > 0
 
     def _on_progress(self, phase: str, done: int, total: int) -> None:
         lo, hi = _PHASE_SPAN.get(phase, (0.0, 0.0))
@@ -566,10 +577,15 @@ class CodememService:
         however long the queue is, then the newest edits. With `embed=False` it stops after stage
         A (`get_chunk` needs no vectors). With `wait_for_models=False` it embeds, the chunks of
         `first()` too, only if the model is in memory by then. What doesn't fit is reported, not
-        waited for."""
+        waited for.
+
+        A new index that starts as a copy of another checkout's holds that checkout's code until
+        its first full check has run. That check is waited for like any stage A, within the same
+        budget; if it has not ended by then, the answer is reported as coming from the copy."""
         budget = self.config.catchup_budget_ms / 1000 if budget is None else budget
         deadline = time.monotonic() + budget
-        if self.state in ("empty", "indexing"):
+        copy = self.copy_unchecked()
+        if self.state in ("empty", "indexing") and not copy:
             return Freshness(self.store.dirty_count(), indexing=True)  # a first build: report, don't wait
         self._ensure_worker()
         stats = IndexStats()
@@ -584,6 +600,8 @@ class CodememService:
             with self._cond:
                 while self._settled < target and (left := deadline - time.monotonic()) > 0:
                     self._cond.wait(left)
+                if copy and not self.has_index():  # its first full check has not ended, or it failed
+                    return Freshness(unchecked_copy=True)
                 if self._applied < target:  # still being applied (a huge file, a checkout), or it failed
                     files = max(1, len(self._dirty) + self._applying)
                     return Freshness(self.store.dirty_count(), pending_files=files, unconfirmed=not confirmed)
@@ -724,6 +742,8 @@ class CodememService:
             # under the catch-up's own rule for a model that is loading (`wait_for_models`).
             first = (lambda: self._keyword_results(query, kwargs)) if _by_meaning(kwargs.get("signals")) else None
             freshness = self.catch_up(wait_for_models=wait_for_models, first=first)
+        elif self.copy_unchecked():
+            freshness = Freshness(unchecked_copy=True)  # no writer here makes its first full check: say what it is
         loading = not wait_for_models and "signals" not in kwargs and not (
             self._models_ready(deadline, after_idle=True) and self._indexes_ready(deadline))
         if loading:
@@ -796,8 +816,14 @@ class CodememService:
         return None
 
     def get_chunk(self, ref: str | int) -> dict[str, Any] | None:
+        """One chunk in full, with its members, callers and callees; None if `ref` names none.
+        Read from a copy of another checkout's index whose first full check has not ended, the
+        answer has `unchecked_copy`: it can be the other checkout's code."""
         if self._worker is not None or self._watcher is not None:
             self.catch_up(embed=False)  # code, lines and links as of every earlier save
+        # Asked before the chunk is read: a copy that is checked in between gets a note too many,
+        # never one too few.
+        copy = self.copy_unchecked()
         chunk = self.resolve_ref(ref)
         if chunk is None:
             return None
@@ -817,6 +843,7 @@ class CodememService:
             "members": [brief(c) for c in members],
             "callers": [brief(c) for c in self.store.callers_of(chunk.chunk_id)],
             "callees": [brief(c) for c in self.store.callees_of(chunk.chunk_id)],
+            **({"unchecked_copy": True} if copy else {}),
         }
 
     def check_assist(self) -> list[dict[str, Any]]:

@@ -290,6 +290,141 @@ def test_a_server_started_in_a_new_worktree_copies_then_checks(repo, main_index,
         service.close()
 
 
+@pytest.fixture
+def held_check(main_index, monkeypatch):
+    """Every full check waits until the test sets the event: the time in which a new worktree's
+    index is still the copy of the main checkout's (commit A)."""
+    gate = threading.Event()
+    structure = Indexer.structure
+
+    def held(self, *args, **kwargs):
+        assert gate.wait(30), "the test never let the full check run"
+        return structure(self, *args, **kwargs)
+
+    monkeypatch.setattr(Indexer, "structure", held)
+    yield gate
+    gate.set()
+
+
+def _keys(resp):
+    return [r.key for r in resp.results]
+
+
+def test_a_search_waits_for_the_first_check_of_a_copied_index(repo, tmp_path, held_check):
+    """Fixed bug: until its first full check had run, a new worktree's server answered from the
+    copy, which is the other checkout's code, with the note of an index that is being built. A
+    search and `get_chunk` now wait for that check, as they wait for stage A of a save."""
+    tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
+    service = CodememService(tree)
+    try:
+        assert service.copy_unchecked()
+        service.start(watch=False, prewarm=False)
+        threading.Timer(0.5, held_check.set).start()  # the check takes half a second: well within a search's 4 s
+        started = time.monotonic()
+        resp = service.search("logout", k=10, wait_for_models=False)
+        assert time.monotonic() - started >= 0.4 and "api/routes.py::logout" not in _keys(resp)  # exists only on A
+        assert not resp.freshness.unchecked_copy and service.has_index() and not service.copy_unchecked()
+        assert "auth/audit.py::record_audit_event" in _keys(service.search("record audit event", k=5))  # only on B
+        assert service.get_chunk(ONLY_ON_A[0]) is None
+        assert "unchecked_copy" not in service.get_chunk(ONLY_ON_B[0])
+    finally:
+        service.close()
+
+
+def test_get_chunk_waits_for_the_first_check_of_a_copied_index(repo, tmp_path, held_check):
+    tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
+    service = CodememService(tree)
+    try:
+        service.start(watch=False, prewarm=False)
+        threading.Timer(0.5, held_check.set).start()
+        assert service.get_chunk(ONLY_ON_A[0]) is None  # the copy has it: this checkout does not
+        assert service.get_chunk(ONLY_ON_B[0])["qualname"] == "record_audit_event"
+    finally:
+        service.close()
+
+
+def test_an_answer_from_a_copy_that_is_not_checked_in_time_says_so(repo, tmp_path, held_check):
+    """The first check of a worktree far from its source, or of a large repository, can take
+    longer than a search waits. The answer then comes from the copy, and says so."""
+    from mcp import Client
+
+    from codemem import prompts
+    from codemem.server import build_server
+
+    tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
+    (tree / ".codemem.toml").write_text("catchup_budget_ms = 300\n")
+    service = CodememService(tree)
+    notice = prompts.copy_notice()
+    assert "started as a copy of another checkout's index" in notice and "can be the other checkout's code" in notice
+    try:
+        service.start(watch=False, prewarm=False)
+        resp = service.search("logout", k=10, wait_for_models=False)
+        assert "api/routes.py::logout" in _keys(resp)  # the other checkout's code ...
+        assert resp.freshness.unchecked_copy and not resp.freshness.complete  # ... and the answer knows it
+        assert service.get_chunk(ONLY_ON_A[0])["unchecked_copy"] is True
+        assert service.get_chunk(ONLY_ON_B[0]) is None
+        server = build_server(service)
+
+        async def before():
+            async with Client(server) as client:
+                found = (await client.call_tool("search_code", {"query": "logout"})).content[0].text
+                assert found.startswith(notice) and "logout" in found and "still being built" not in found
+                shown = (await client.call_tool("get_chunk", {"ref": ONLY_ON_A[0]})).content[0].text
+                assert shown.startswith(notice) and "def logout" in shown
+                missing = (await client.call_tool("get_chunk", {"ref": ONLY_ON_B[0]})).content[0].text
+                assert missing.startswith("No indexed function matches") and missing.endswith(notice)
+
+        anyio.run(before)
+        held_check.set()
+        assert _wait_for(lambda: service.state == "ready" and service.store.dirty_count() == 0), service.last_error
+
+        async def after():
+            async with Client(server) as client:
+                found = (await client.call_tool("search_code", {"query": "record audit event"})).content[0].text
+                assert "record_audit_event" in found and "copy of another checkout" not in found
+                gone = (await client.call_tool("get_chunk", {"ref": ONLY_ON_A[0]})).content[0].text
+                assert gone.startswith("No indexed function matches") and "copy of another checkout" not in gone
+                shown = (await client.call_tool("get_chunk", {"ref": UNCHANGED[0]})).content[0].text
+                assert shown.startswith("auth/db.py:")
+
+        anyio.run(after)
+        assert service.search("logout", k=10).freshness.complete and service.indexer.verify() == []
+    finally:
+        service.close()
+
+
+def test_a_copy_that_nothing_checks_says_what_it_is(repo, main_index, tmp_path):
+    """A service nobody started has no writer that would make the first check. What it answers
+    with is marked all the same."""
+    tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
+    service = CodememService(tree)
+    try:
+        resp = service.search("logout", k=10)
+        assert "api/routes.py::logout" in _keys(resp) and resp.freshness.unchecked_copy
+        assert service.get_chunk(ONLY_ON_A[0])["unchecked_copy"] is True
+        service.update()
+        assert not service.search("logout", k=10).freshness.unchecked_copy
+    finally:
+        service.close()
+
+
+def test_an_index_of_its_own_checkout_is_not_asked_whether_it_is_a_copy(repo, main_index, monkeypatch):
+    """The normal case pays nothing: a service whose index is its checkout's answers from its
+    state, without a query to the store."""
+    service = CodememService(repo)
+    try:
+        def fail(*args, **kwargs):
+            raise AssertionError("an index that is the checkout's own was asked for its rows")
+
+        monkeypatch.setattr(service.store, "chunk_total", fail)
+        monkeypatch.setattr(service, "has_index", fail)
+        assert service.state == "ready" and not service.copy_unchecked()
+        assert "unchecked_copy" not in service.get_chunk(UNCHANGED[0])
+        assert service.search("revoke session", k=3).freshness.complete
+    finally:
+        service.close()
+
+
 def test_the_mcp_server_started_in_a_new_worktree_serves_it_from_the_copy(repo, main_index, tmp_path, isolated_home, fake_config):
     """Real `codemem mcp` over stdio, launched in the worktree's folder as an agent host does."""
     import sys
