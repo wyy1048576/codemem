@@ -23,8 +23,9 @@ The fields of a row:
   reason                 why the reader decided so
   confidence             high, medium or low
   rules                  the version of the reader's rules
-  content_hash           content_hash() of the issue, the real fix and the test change that the reader read.
-                         A row whose hash is not the task's hash of today is stale and is not used
+  content_hash           content_hash() of what the reader read: the issue, the real fix, the test change and
+                         the task's facts. A row whose hash is not the task's hash of today is stale and is
+                         not used
   date                   the day of the read, YYYY-MM-DD
   note                   optional text
 
@@ -34,7 +35,14 @@ The status of a task, from its rows that are not stale:
   disagree       two reads that do not agree, or no majority. The task needs another read
   one read       only one read
   not screened   no read
-Only "fair" counts in the completion score.
+Only "fair" counts in the completion score. The conservative variant (a sensitivity number) also leaves out
+every fair task that has an "unfair" read.
+
+A fact (tasks/screen/facts.jsonl) is the result of a check that was run for a task, for example the behaviour
+of the version that the issue names as the reference. One JSON row per fact: id, fact, date, source. The
+facts of a task go into its packet and into its content hash. So a new fact makes the earlier reads of the
+task stale, and fresh reads decide (the reopening rule in the README). A fact never holds agent results, pass
+or fail counts of runs, or verdicts.
 """
 
 from __future__ import annotations
@@ -53,6 +61,7 @@ from .tasks import Task
 
 RULES_VERSION = "screen-rules-v1"
 RULES_FILE = Path(__file__).resolve().parents[2] / "tasks" / f"{RULES_VERSION}.md"
+FACTS_FILE = Path(__file__).resolve().parents[2] / "tasks" / "screen" / "facts.jsonl"
 
 # The kinds of unfairness seen so far (F9 5.3), and "other".
 KINDS = {
@@ -74,6 +83,8 @@ STATUSES = ("fair", "unfair", "disagree", "one read", "not screened")
 # 10 easy, 15 medium and 10 hard (8.3) and the admission mix 3:4:3, rounded so that the sum is 20.
 NEED_REPO = 20
 NEED_LEVEL = {"easy": 6, "medium": 8, "hard": 6}
+EARLY_FACTOR = 1.25  # an early warning below 1.25 times the need: 25 per repo, levels 8, 10, 8
+FLOOR_REPO = 12  # plan 3.3: when usage runs short, the sample shrinks to 15, then 12 tasks per repo
 
 LIST_SHOWN = 200  # test ids shown in a packet for each list
 GROUPS_SHOWN = 50  # groups of test ids (the part before "::") shown in a packet for each list
@@ -94,10 +105,67 @@ class ScreenError(ValueError):
     pass
 
 
-def content_hash(task: Task) -> str:
-    """A short hash of what a reader reads: the issue text, the real fix and the test change."""
+def content_hash(task: Task, facts: list[str] | None = None) -> str:
+    """A short hash of what a reader reads: the issue text, the real fix, the test change, and the task's facts.
+    A task with no fact has the hash it had before facts existed."""
     data = {"issue": task.query, "fix": task.patch, "tests": task.test_patch or ""}
+    if facts:
+        data["facts"] = list(facts)
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def load_facts(path: Path | None = None) -> dict[str, list[str]]:
+    """Task id -> its facts, in file order. The file is JSON lines (id, fact, date, source), or one JSON object
+    that maps a task id to a list of fact strings. Without `path`, tasks/screen/facts.jsonl (no file: no facts).
+    A bad file is refused."""
+    if path is None:
+        if not FACTS_FILE.exists():
+            return {}
+        path = FACTS_FILE
+    path = Path(path)
+    if not path.exists():
+        raise ScreenError(f"{path}: no such facts file")
+    text = path.read_text(encoding="utf-8")
+    facts: dict[str, list[str]] = {}
+    problems = []
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        data = None
+    if isinstance(data, dict) and "fact" not in data:
+        for task_id, items in data.items():
+            if not isinstance(items, list) or not all(isinstance(i, str) and i.strip() for i in items):
+                problems.append(f"{task_id}: give a list of fact texts")
+            else:
+                facts[task_id] = list(items)
+    else:
+        for n, line in enumerate(text.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                problems.append(f"line {n}: not JSON ({exc.msg})")
+                continue
+            bad = _type_problems(row, {"id": str, "fact": str, "date": str, "source": str}) if isinstance(row, dict) \
+                else ["a row must be a JSON object"]
+            if not bad:
+                bad += [f"'{k}' is empty" for k in ("id", "fact", "source") if not row[k].strip()]
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", row["date"]):
+                    bad.append("'date' must be YYYY-MM-DD")
+            if bad:
+                problems.append(f"line {n}: " + "; ".join(bad))
+            else:
+                facts.setdefault(row["id"], []).append(row["fact"])
+    if problems:
+        raise ScreenError(f"{path}: {len(problems)} problems:\n  " + "\n  ".join(problems[:20]))
+    return facts
+
+
+def task_hashes(tasks: list[Task], facts: dict[str, list[str]] | None = None) -> dict[str, str]:
+    """Task id -> content_hash of today, with the task's facts."""
+    facts = facts or {}
+    return {t.id: content_hash(t, facts.get(t.id)) for t in tasks}
 
 
 def today() -> str:
@@ -233,6 +301,15 @@ class TaskScreen:
     reads: list[dict] = field(default_factory=list)
     stale: int = 0  # rows left out, because the task changed after the read
 
+    @property
+    def by_majority(self) -> bool:
+        """Decided by a majority of reads that do not agree (for example 2 to 1)."""
+        return self.status in ("fair", "unfair") and len({bool(r["fair"]) for r in self.reads}) > 1
+
+    @property
+    def any_unfair(self) -> bool:
+        return any(not r["fair"] for r in self.reads)
+
 
 def task_status(reads: list[dict]) -> str:
     """fair, unfair, disagree, one read or not screened (see the module text)."""
@@ -283,15 +360,22 @@ class CompletionSet:
     def fair(self) -> set[str]:
         return {i for i, s in self.status.items() if s.status == "fair"}
 
+    @property
+    def fair_strict(self) -> set[str]:
+        """The conservative variant: fair tasks with no unfair read."""
+        return {i for i, s in self.status.items() if s.status == "fair" and not s.any_unfair}
+
     def status_of(self, task_id: str) -> str:
         screen = self.status.get(task_id)
         return screen.status if screen else "not screened"
 
 
-def completion_set(paths: list[Path], tasks: list[Task] | None = None) -> CompletionSet:
-    """Load and merge screen files for the score. With `tasks`, rows are checked against each task's hash."""
+def completion_set(paths: list[Path], tasks: list[Task] | None = None,
+                   facts: dict[str, list[str]] | None = None) -> CompletionSet:
+    """Load and merge screen files for the score. With `tasks`, rows are checked against each task's hash (with
+    its facts)."""
     rows = load_screens(paths)
-    hashes = {t.id: content_hash(t) for t in tasks} if tasks is not None else None
+    hashes = task_hashes(tasks, facts) if tasks is not None else None
     return CompletionSet([Path(p).name for p in paths], merge(rows, hashes))
 
 
@@ -313,8 +397,9 @@ def short_list(tests: list[str], limit: int = LIST_SHOWN, groups: int = GROUPS_S
     return result
 
 
-def packet_facts(task: Task, record: dict, tests: dict) -> dict:
-    """The facts of one packet, for packet.json and the index."""
+def packet_facts(task: Task, record: dict, tests: dict, facts: list[str] | None = None) -> dict:
+    """The facts of one packet, for packet.json and the index. `facts` are the results of checks that were
+    run for the task (load_facts)."""
     from .generate import changed_files, changed_lines, difficulty
     from .patches import classify_path
 
@@ -323,7 +408,7 @@ def packet_facts(task: Task, record: dict, tests: dict) -> dict:
         "id": task.id,
         "repo": task.repo,
         "difficulty": difficulty(task.patch),
-        "content_hash": content_hash(task),
+        "content_hash": content_hash(task, facts),
         "rules": RULES_VERSION,
         "fix_files": fix_files,
         "fix_changed_lines": changed_lines(task.patch),
@@ -338,7 +423,7 @@ def packet_facts(task: Task, record: dict, tests: dict) -> dict:
         "fail_to_pass_before": {kind: record.get(f"fail_to_pass_{kind}_before")
                                 for kind in ("failed", "skipped", "missing")},
         "pass_to_pass": short_list(tests.get("pass_to_pass", [])),
-    }
+    } | ({"facts": list(facts)} if facts else {})
 
 
 def _valid_record(recipe, task: Task) -> tuple[dict | None, dict | None, str]:
@@ -405,7 +490,7 @@ def load_index(folder: Path) -> dict:
 
 
 def pack(recipe, tasks: list[Task], out: Path, *, task_file: str = "", ids: list[str] | None = None,
-         n_batches: int = 1) -> dict:
+         n_batches: int = 1, facts: dict[str, list[str]] | None = None) -> dict:
     """Write a packet for each valid task of the recipe's repo, and update the index in `out`. Returns the
     index entry of this recipe: packets, skipped tasks, the pool counts, and the batch files. The index keeps the
     packets of the last call for each recipe."""
@@ -427,11 +512,11 @@ def pack(recipe, tasks: list[Task], out: Path, *, task_file: str = "", ids: list
         if tests is None:
             skipped.append({"id": task.id, "reason": problem})
             continue
-        facts = packet_facts(task, record, tests)
-        write_packet(out / task.id, task, facts)
-        packets.append({k: facts[k] for k in ("id", "repo", "difficulty", "content_hash", "fix_changes_only_tests")}
-                       | {"recipe": recipe.name, "fail_to_pass": facts["fail_to_pass"]["total"],
-                          "pass_to_pass": facts["pass_to_pass"]["total"]})
+        info = packet_facts(task, record, tests, (facts or {}).get(task.id))
+        write_packet(out / task.id, task, info)
+        packets.append({k: info[k] for k in ("id", "repo", "difficulty", "content_hash", "fix_changes_only_tests")}
+                       | {"recipe": recipe.name, "fail_to_pass": info["fail_to_pass"]["total"],
+                          "pass_to_pass": info["pass_to_pass"]["total"], "facts": len(info.get("facts", []))})
     batch_files = []
     for old in (out / "batches").glob(f"{recipe.name}-*.txt"):
         old.unlink()  # batch files of an earlier call
@@ -560,10 +645,69 @@ def _counts(screens: list[TaskScreen]) -> dict[str, int]:
             "disagree": status["disagree"], "open": status["one read"] + status["not screened"]}
 
 
+def agreement(status: dict[str, TaskScreen]) -> dict:
+    """How read 1 and read 2 agree, on the tasks that have both (rows that are not stale): the count, the raw
+    share, and Cohen's kappa (None when it is not defined: both reads give one answer for every task)."""
+    pairs = []
+    for screen in status.values():
+        by_read = {r["read"]: bool(r["fair"]) for r in screen.reads}
+        if 1 in by_read and 2 in by_read:
+            pairs.append((by_read[1], by_read[2]))
+    n = len(pairs)
+    if not n:
+        return {"tasks": 0, "agree": 0, "share": None, "kappa": None}
+    agree = sum(1 for a, b in pairs if a == b)
+    observed = agree / n
+    p1 = sum(a for a, _ in pairs) / n
+    p2 = sum(b for _, b in pairs) / n
+    expected = p1 * p2 + (1 - p1) * (1 - p2)
+    kappa = None if expected == 1 else (observed - expected) / (1 - expected)
+    return {"tasks": n, "agree": agree, "share": observed, "kappa": kappa}
+
+
+def _tier(kept: int, need: int, early: int, floor: int | None) -> tuple[str, int] | None:
+    """The most severe line that `kept` falls below, and the count to aim for."""
+    if floor is not None and kept < floor:
+        return "below the floor", need
+    if kept < need:
+        return "below the need", need
+    if kept < early:
+        return "early warning", early
+    return None
+
+
+def _estimate(counts: dict, target: int, pool: dict | None, levels: tuple[str, ...]) -> str:
+    """What is missing to reach `target` kept tasks: in candidates to validate when the pool is known."""
+    decided = counts["kept"] + counts["removed"]
+    pending = counts["disagree"] + counts["open"]
+    if not decided:
+        return "no keep rate yet"
+    text = f"keep rate {counts['kept']} of {decided}"
+    if not counts["kept"]:
+        return text + ", so no estimate"
+    more_valid = max(0, math.ceil((target - counts["kept"]) * decided / counts["kept"]) - pending)
+    if pool is None:
+        return text + f"; to reach {target}: about {more_valid} more valid tasks (give --packets for candidates)"
+    validated = sum(pool[lv]["validated"] for lv in levels)
+    valid = sum(pool[lv]["valid"] for lv in levels)
+    left = sum(pool[lv]["candidates"] - pool[lv]["validated"] for lv in levels)
+    if not valid:
+        return text + f"; to reach {target}: about {more_valid} more valid tasks (no validity rate yet); " \
+                      f"{left} candidates with tests are not validated yet"
+    candidates = math.ceil(more_valid * validated / valid)
+    return text + (f"; to reach {target}: about {candidates} more candidates to validate (validity rate {valid} of "
+                   f"{validated}); {left} candidates with tests are not validated yet")
+
+
 def table(status: dict[str, TaskScreen], *, pools: dict[str, dict] | None = None, need_repo: int = NEED_REPO,
-          need_level: dict[str, int] | None = None) -> dict:
-    """Counts per repo and level, warnings, the disagreements and the level shares. `pools` (repo -> the pool of
-    pool_counts) adds the candidates that are not validated yet to the warnings."""
+          need_level: dict[str, int] | None = None, early_factor: float = EARLY_FACTOR,
+          floor_repo: int = FLOOR_REPO) -> dict:
+    """Counts per repo and level (every level, also one with no task), warnings, the agreement of the reads,
+    the disagreements and the level shares. `pools` (repo -> the pool of pool_counts) turns the estimates into
+    candidates to validate.
+
+    Three warning lines: early (below early_factor times the need), below the need, and, for a whole repo,
+    below the plan's floor (plan 3.3: the sample shrinks to 15, then 12 tasks per repo)."""
     need_level = need_level or NEED_LEVEL
     repos = sorted({s.repo for s in status.values()})
     rows, warnings = [], []
@@ -572,43 +716,30 @@ def table(status: dict[str, TaskScreen], *, pools: dict[str, dict] | None = None
         pool = (pools or {}).get(repo)
         for level in (*LEVELS, "all"):
             part = mine if level == "all" else [s for s in mine if s.difficulty == level]
-            if not part and level != "all":
-                continue
             counts = _counts(part)
             rows.append({"repo": repo, "level": level, **counts})
             need = need_repo if level == "all" else need_level.get(level, 0)
-            if counts["kept"] < need:
-                left = None
-                if pool:
-                    levels = LEVELS if level == "all" else (level,)
-                    left = sum(pool[lv]["candidates"] - pool[lv]["validated"] for lv in levels)
-                warnings.append(_warning(repo, level, counts, need, left))
+            early = math.ceil(need * early_factor)
+            tier = _tier(counts["kept"], need, early, floor_repo if level == "all" else None)
+            if tier:
+                label, target = tier
+                levels = LEVELS if level == "all" else (level,)
+                where = repo if level == "all" else f"{repo} {level}"
+                pending = counts["disagree"] + counts["open"]
+                text = (f"{where}: {counts['kept']} kept; need {need}, early warning below {early}"
+                        + (f", floor {floor_repo}" if level == "all" else "")
+                        + (f"; {pending} valid tasks not decided yet" if pending else "")
+                        + "; " + _estimate(counts, target, pool, levels))
+                warnings.append({"tier": label, "repo": repo, "level": level, "text": text})
     total = _counts(list(status.values()))
     shares = {level: _counts([s for s in status.values() if s.difficulty == level]) for level in LEVELS}
-    disagree = sorted(s.id for s in status.values() if s.status == "disagree")
-    one_read = sorted(s.id for s in status.values() if s.status == "one read")
-    stale = sorted(s.id for s in status.values() if s.stale)
-    return {"rows": rows, "total": total, "warnings": warnings, "levels": shares, "disagree": disagree,
-            "one_read": one_read, "stale": stale, "need_repo": need_repo, "need_level": need_level}
-
-
-def _warning(repo: str, level: str, counts: dict, need: int, left: int | None) -> str:
-    where = repo if level == "all" else f"{repo} {level}"
-    decided = counts["kept"] + counts["removed"]
-    text = f"{where}: {counts['kept']} kept, {need} needed"
-    if counts["disagree"] or counts["open"]:
-        text += f"; {counts['disagree'] + counts['open']} valid tasks not decided yet"
-    if decided:
-        rate = counts["kept"] / decided
-        text += f"; keep rate {counts['kept']} of {decided}"
-        if rate > 0:
-            more = max(0, math.ceil((need - counts["kept"]) / rate) - counts["disagree"] - counts["open"])
-            text += f", so about {more} more valid tasks are needed"
-        else:
-            text += ", so no estimate of the valid tasks needed"
-    if left is not None:
-        text += f"; {left} candidates with tests are not validated yet"
-    return text
+    return {"rows": rows, "total": total, "warnings": warnings, "levels": shares,
+            "agreement": agreement(status),
+            "majority": sorted(s.id for s in status.values() if s.by_majority),
+            "disagree": sorted(s.id for s in status.values() if s.status == "disagree"),
+            "one_read": sorted(s.id for s in status.values() if s.status == "one read"),
+            "stale": sorted(s.id for s in status.values() if s.stale),
+            "need_repo": need_repo, "need_level": need_level, "early_factor": early_factor, "floor_repo": floor_repo}
 
 
 def _pct(part: int, whole: int) -> str:
@@ -617,7 +748,8 @@ def _pct(part: int, whole: int) -> str:
 
 def format_table(result: dict, files: list[str]) -> str:
     """The table as Markdown, for the work log."""
-    lines = [f"Screen: {', '.join(files)}. Kept = both reads say fair; removed = both say unfair.", "",
+    lines = [(f"Screen: {', '.join(files)}. Kept = fair (all reads agree, or a majority of three or more); "
+              "removed = unfair."), "",
              "| Repo | Difficulty | Valid | Kept | Removed | Disagree | Not done |",
              "|---|---|---|---|---|---|---|"]
     for row in result["rows"]:
@@ -630,34 +762,51 @@ def format_table(result: dict, files: list[str]) -> str:
     shares = ", ".join(f"{level} {_pct(c['kept'], c['kept'] + c['removed'])}"
                        for level, c in result["levels"].items())
     lines.append(f"Kept share by difficulty, all repos (decided tasks only): {shares}.")
+    a = result["agreement"]
+    if a["tasks"]:
+        kappa = "not defined (one answer for every task)" if a["kappa"] is None else f"{a['kappa']:.2f}"
+        lines.append(f"Read 1 and read 2 agree on {_pct(a['agree'], a['tasks'])} tasks; Cohen's kappa {kappa}.")
+    majority = result["majority"]
+    lines.append(f"Decided by a majority of reads that do not agree (for example 2 to 1): {len(majority)}"
+                 + (f" ({', '.join(majority)})." if majority else "."))
     need = ", ".join(f"{level} {n}" for level, n in result["need_level"].items())
-    lines.append(f"Need: {result['need_repo']} kept tasks per repo; per level {need}.")
+    early = ", ".join(f"{level} {math.ceil(n * result['early_factor'])}" for level, n in result["need_level"].items())
+    lines.append(f"Need: {result['need_repo']} kept tasks per repo (per level {need}); early warning below "
+                 f"{math.ceil(result['need_repo'] * result['early_factor'])} per repo (per level {early}); "
+                 f"floor {result['floor_repo']} per repo.")
     if result["warnings"]:
         lines.append("")
-        lines += [f"- **Warning:** {w}" for w in result["warnings"]]
+        lines += [f"- **{w['tier'].capitalize()}:** {w['text']}" for w in result["warnings"]]
     if result["disagree"]:
         lines.append("")
         lines.append(f"Disagree, needs a third read ({len(result['disagree'])}): " + ", ".join(result["disagree"]))
     if result["one_read"]:
         lines.append(f"One read only ({len(result['one_read'])}): " + ", ".join(result["one_read"]))
     if result["stale"]:
-        lines.append("Reads left out because the task changed after the read: " + ", ".join(result["stale"]))
+        lines.append("Reads left out because the task or its facts changed after the read: "
+                     + ", ".join(result["stale"]))
     return "\n".join(lines)
 
 
-def screen_table(paths: list[Path], packet_dirs: list[Path] = (), *, need_repo: int = NEED_REPO,
-                 need_level: dict[str, int] | None = None) -> dict:
-    """Load, merge and count. With packet folders, the valid tasks and their hashes come from their indexes."""
+def screen_table(paths: list[Path], packet_dirs: list[Path] = (), *, tasks: list[Task] | None = None,
+                 facts: dict[str, list[str]] | None = None, need_repo: int = NEED_REPO,
+                 need_level: dict[str, int] | None = None, early_factor: float = EARLY_FACTOR,
+                 floor_repo: int = FLOOR_REPO) -> dict:
+    """Load, merge and count. With packet folders, the valid tasks and their hashes come from their indexes.
+    Else, with `tasks`, the hashes come from the tasks and their facts."""
     rows = load_screens(paths)
-    hashes, tasks, pools = None, None, None
+    hashes, known, pools = None, None, None
     if packet_dirs:
-        hashes, tasks, pools = {}, {}, {}
+        hashes, known, pools = {}, {}, {}
         for folder in packet_dirs:
             index = load_index(folder)
             for packet in index.get("packets", []):
                 hashes[packet["id"]] = packet["content_hash"]
-                tasks[packet["id"]] = (packet["repo"], packet["difficulty"])
+                known[packet["id"]] = (packet["repo"], packet["difficulty"])
             for entry in index.get("recipes", {}).values():
                 pools[entry["repo"]] = entry["pool"]
-    status = merge(rows, hashes, tasks)
-    return table(status, pools=pools, need_repo=need_repo, need_level=need_level)
+    elif tasks is not None:
+        hashes = task_hashes(tasks, facts)
+    status = merge(rows, hashes, known)
+    return table(status, pools=pools, need_repo=need_repo, need_level=need_level, early_factor=early_factor,
+                 floor_repo=floor_repo)

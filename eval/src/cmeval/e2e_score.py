@@ -16,7 +16,8 @@ No intervals yet.
 
 With screen files (e2e_screen.py), the completion numbers count only the tasks that the screen calls fair: a
 task with unfair hidden tests, or one that is not decided, leaves them. Tokens, time, turns and behaviour keep
-every task.
+every task. A conservative variant, as a sensitivity number, also leaves out every fair task that had an
+"unfair" read.
 """
 
 from __future__ import annotations
@@ -101,6 +102,7 @@ def score(run_id: str, screen: CompletionSet | None = None) -> dict:
         raise FileNotFoundError(f"no run folder {root}")
     records = load_records(root)
     fair = screen.fair if screen is not None else None
+    strict = screen.fair_strict if screen is not None else None
     setups: dict[str, dict] = {}
     for name in sorted({r["setup"] for r in records}):
         rows = [r for r in records if r["setup"] == name]
@@ -122,6 +124,8 @@ def score(run_id: str, screen: CompletionSet | None = None) -> dict:
         }
         if fair is not None:
             setups[name]["completion_runs"] = sum(1 for r in kept if r["task_id"] in fair)
+            setups[name]["completed_share_strict"] = _mean([_value(r, "completed") for r in kept
+                                                           if r["task_id"] in strict])
     baseline = "grep" if "grep" in setups else next(iter(setups), None)
     paired = [paired_difference(records, name, baseline, fair) for name in setups if name != baseline]
     summary = {"run_id": run_id, "records": len(records), "baseline": baseline, "setups": setups, "paired": paired}
@@ -129,7 +133,7 @@ def score(run_id: str, screen: CompletionSet | None = None) -> dict:
         task_ids = sorted({r["task_id"] for r in records})
         left = {t: screen.status_of(t) for t in task_ids if t not in fair}
         summary["screen"] = {"files": screen.files, "tasks": len(task_ids), "fair": len(task_ids) - len(left),
-                             "left_out": left}
+                             "fair_strict": sum(1 for t in task_ids if t in strict), "left_out": left}
     write_json(root / "score.json", summary)
     return summary
 
@@ -175,6 +179,9 @@ def format_score(summary: dict) -> str:
         if why:
             text += f"; {len(screen['left_out'])} left out (" + ", ".join(f"{s} {n}" for s, n in sorted(why.items())) + ")"
         lines.append(text + "; tokens, time and behaviour count every task")
+        lines.append(f"  conservative (no unfair read at all): completion over {screen['fair_strict']} tasks: "
+                     + ", ".join(f"{name} {_fmt(s.get('completed_share_strict'), 2)}"
+                                 for name, s in summary["setups"].items()))
     lines.append(f"  {'setup':12} {'runs':>5} {'disc.':>5} {'flag.':>5} {'completed':>9} {'tokens mean':>12} "
                  f"{'tokens med.':>12} {'s mean':>8} {'s med.':>8} {'turns':>6}")
     for name, s in summary["setups"].items():

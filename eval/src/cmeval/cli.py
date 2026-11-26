@@ -514,15 +514,15 @@ def cmd_e2e_index(args) -> int:
 
 def cmd_e2e_score(args) -> int:
     from .e2e_score import format_score, score
-    from .e2e_screen import ScreenError, completion_set
+    from .e2e_screen import ScreenError, completion_set, load_facts
 
     try:
         screen = None
         if args.screen:
             tasks = [t for path in args.tasks or [] for t in load_tasks(path)] if args.tasks else None
-            screen = completion_set(args.screen, tasks)
-        elif args.tasks:
-            raise ScreenError("--tasks is used only with --screen")
+            screen = completion_set(args.screen, tasks, load_facts(args.facts))
+        elif args.tasks or args.facts:
+            raise ScreenError("--tasks and --facts are used only with --screen")
         summary = score(args.run_id, screen)
     except (FileNotFoundError, ScreenError, TaskError) as exc:
         print(f"e2e score: {exc}", file=sys.stderr)
@@ -538,8 +538,9 @@ def cmd_e2e_screen_pack(args) -> int:
     try:
         recipe = gen.load_recipe(args.recipe)
         tasks = load_tasks(args.tasks)
+        facts = e2e_screen.load_facts(args.facts)
         entry = e2e_screen.pack(recipe, tasks, args.out, task_file=args.tasks.name, ids=args.id,
-                                n_batches=args.batches)
+                                n_batches=args.batches, facts=facts)
     except (gen.GenerateError, e2e_screen.ScreenError, FileNotFoundError, TaskError) as exc:
         print(f"e2e screen-pack: {exc}", file=sys.stderr)
         return 1
@@ -567,12 +568,14 @@ def cmd_e2e_screen_add(args) -> int:
 
 
 def cmd_e2e_screen_table(args) -> int:
-    from .e2e_screen import ScreenError, format_table, parse_need_level, screen_table
+    from .e2e_screen import ScreenError, format_table, load_facts, parse_need_level, screen_table
 
     try:
-        result = screen_table(args.screen, args.packets or [], need_repo=args.need_repo,
-                              need_level=parse_need_level(args.need_level or ""))
-    except (ScreenError, FileNotFoundError) as exc:
+        tasks = [t for path in args.tasks for t in load_tasks(path)] if args.tasks else None
+        result = screen_table(args.screen, args.packets or [], tasks=tasks, facts=load_facts(args.facts),
+                              need_repo=args.need_repo, need_level=parse_need_level(args.need_level or ""),
+                              early_factor=args.early_factor, floor_repo=args.floor_repo)
+    except (ScreenError, FileNotFoundError, TaskError) as exc:
         print(f"e2e screen-table: {exc}", file=sys.stderr)
         return 1
     print(format_table(result, [p.name for p in args.screen]))
@@ -783,6 +786,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="screen file (tasks/screen/*.jsonl): completion counts only fair tasks; can be given more than once")
     p.add_argument("--tasks", type=Path, action="append",
                    help="with --screen: task file, to check that each read is of the task as it is now")
+    p.add_argument("--facts", type=Path, help="with --tasks: facts file (default tasks/screen/facts.jsonl)")
     p.set_defaults(func=cmd_e2e_score)
     p = e2e_sub.add_parser("screen-pack", help="write the reading material of the unfair-test screen for each valid task")
     p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
@@ -790,6 +794,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, required=True, help="folder of the packets and of index.json")
     p.add_argument("--id", action="append", help="only this task; can be given more than once")
     p.add_argument("--batches", type=int, default=1, help="split the packets into this number of batch files (default 1)")
+    p.add_argument("--facts", type=Path, help="facts of checks run for tasks (default tasks/screen/facts.jsonl)")
     p.set_defaults(func=cmd_e2e_screen_pack)
     p = e2e_sub.add_parser("screen-add", help="check a reader's verdicts against the packets and append them as one read")
     p.add_argument("output", type=Path, help="the reader's output: a JSON list of verdicts, or JSON lines")
@@ -808,6 +813,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="folder of screen-pack: its valid tasks, their hashes and the candidates left; can be repeated")
     p.add_argument("--need-repo", type=int, default=20, help="kept tasks needed per repo (default 20, plan 3.3)")
     p.add_argument("--need-level", help="kept tasks needed per level, for example easy=6,medium=8,hard=6 (the default)")
+    p.add_argument("--early-factor", type=float, default=1.25,
+                   help="early warning below this factor times the need (default 1.25)")
+    p.add_argument("--floor-repo", type=int, default=12, help="the plan's floor of kept tasks per repo (default 12)")
+    p.add_argument("--tasks", type=Path, action="append",
+                   help="without --packets: task file, to check that each read is of the task and facts as they are now")
+    p.add_argument("--facts", type=Path, help="with --tasks: facts file (default tasks/screen/facts.jsonl)")
     p.set_defaults(func=cmd_e2e_screen_table)
     p = e2e_sub.add_parser("recount", help="count the steps of each run again from its stream, with today's rules")
     p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")

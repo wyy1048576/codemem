@@ -13,7 +13,8 @@ from cmeval.e2e_score import format_score, score
 from cmeval.e2e_screen import ScreenError
 from cmeval.tasks import load_tasks, save_tasks
 
-PILOT18 = Path(__file__).resolve().parents[1] / "tasks" / "screen" / "pilot18.jsonl"
+TASKS = Path(__file__).resolve().parents[1] / "tasks"
+PILOT18 = TASKS / "screen" / "pilot18.jsonl"
 
 TEST_PATCH = """\
 diff --git a/pandas/tests/io/test_core.py b/pandas/tests/io/test_core.py
@@ -59,6 +60,35 @@ def test_content_hash_follows_issue_fix_and_test_change(make_task):
     assert e2e_screen.content_hash(replace(task, test_patch=None)) != base
     # Fields a reader does not read do not change it.
     assert e2e_screen.content_hash(replace(task, split="dev")) == base
+
+
+def test_facts_change_the_hash_and_load(tmp_path, make_task):
+    task = make_task(test_patch=TEST_PATCH)
+    assert e2e_screen.content_hash(task, []) == e2e_screen.content_hash(task)
+    with_fact = e2e_screen.content_hash(task, ["checked on 1.0: the case passes"])
+    assert with_fact != e2e_screen.content_hash(task)
+    assert e2e_screen.task_hashes([task], {task.id: ["checked on 1.0: the case passes"]}) == {task.id: with_fact}
+
+    lines = tmp_path / "facts.jsonl"
+    lines.write_text(json.dumps({"id": "a", "fact": "f1", "date": "2026-11-26", "source": "check"}) + "\n\n"
+                     + json.dumps({"id": "a", "fact": "f2", "date": "2026-11-27", "source": "check"}) + "\n")
+    assert e2e_screen.load_facts(lines) == {"a": ["f1", "f2"]}
+    mapping = tmp_path / "facts.json"
+    mapping.write_text(json.dumps({"a": ["f1"], "b": ["f2", "f3"]}))
+    assert e2e_screen.load_facts(mapping) == {"a": ["f1"], "b": ["f2", "f3"]}
+    bad = tmp_path / "bad.jsonl"
+    bad.write_text(json.dumps({"id": "a", "fact": " ", "date": "26.11.2026", "source": "x"}) + "\nnope\n"
+                   + json.dumps({"id": "a", "fact": "f"}) + "\n")
+    with pytest.raises(ScreenError, match="3 problems") as info:
+        e2e_screen.load_facts(bad)
+    assert "'fact' is empty" in str(info.value) and "YYYY-MM-DD" in str(info.value) and "'date' is missing" in str(info.value)
+    mapping.write_text(json.dumps({"a": "f1"}))
+    with pytest.raises(ScreenError, match="list of fact texts"):
+        e2e_screen.load_facts(mapping)
+    with pytest.raises(ScreenError, match="no such facts file"):
+        e2e_screen.load_facts(tmp_path / "none.jsonl")
+    # The facts file of the repo is good.
+    assert all(e2e_screen.load_facts().values())
 
 
 def test_row_problems():
@@ -206,6 +236,15 @@ def test_pack_writes_packets_index_and_batches(make_task, tmp_path):
     assert sorted(i for b in batches for i in b) == ["pandas-dev__pandas-1", "pandas-dev__pandas-2"]
     assert len(batches) == 2
 
+    # A fact goes into the packet and its hash.
+    fact = {"pandas-dev__pandas-1": ["checked: the case fails on 2.0"]}
+    e2e_screen.pack(recipe, tasks, out, facts=fact)
+    facts = json.loads((first / "packet.json").read_text())
+    assert facts["facts"] == ["checked: the case fails on 2.0"]
+    assert facts["content_hash"] == e2e_screen.content_hash(tasks[0], fact["pandas-dev__pandas-1"])
+    assert [p["facts"] for p in e2e_screen.load_index(out)["packets"]] == [1, 0]
+    assert "facts" not in json.loads((out / "pandas-dev__pandas-2" / "packet.json").read_text())
+
     # Packing one task again keeps the index of the other recipe and replaces this recipe's packets.
     entry = e2e_screen.pack(recipe, tasks, out, ids=["pandas-dev__pandas-1"])
     assert entry["packets"] == 1 and [p["id"] for p in e2e_screen.load_index(out)["packets"]] == ["pandas-dev__pandas-1"]
@@ -297,37 +336,81 @@ def test_add_read_needs_an_index(tmp_path):
 
 # ---- table
 
-def test_table_counts_and_warnings():
+def _table_rows():
     rows = []
-    for i, (level, verdicts) in enumerate([("easy", (True, True)), ("easy", (False, False)), ("medium", (True, False)),
-                                           ("hard", (True,)), ("hard", (True, True))]):
+    cases = [("easy", (True, True)), ("easy", (False, False)), ("medium", (True, False)), ("hard", (True,)),
+             ("hard", (True, True)), ("hard", (True, False, True))]
+    for i, (level, verdicts) in enumerate(cases):
         rows += [_row(f"t{i}", read=n, fair=v, difficulty=level, kinds=[] if v else ["other"])
                  for n, v in enumerate(verdicts, start=1)]
     rows.append(_row("u1", repo="other/repo"))
     rows.append(_row("u1", read=2, repo="other/repo"))
-    status = e2e_screen.merge(rows)
+    return rows
+
+
+def test_table_counts_and_warnings():
+    status = e2e_screen.merge(_table_rows())
+    assert status["t5"].by_majority and status["t5"].any_unfair and not status["t4"].by_majority
     pools = {"acme/auth": {lv: {"candidates": 10, "validated": 4, "valid": 2} for lv in e2e_screen.LEVELS}}
-    result = e2e_screen.table(status, pools=pools, need_repo=3, need_level={"easy": 1, "medium": 1, "hard": 1})
+    result = e2e_screen.table(status, pools=pools, need_repo=3, need_level={"easy": 1, "medium": 1, "hard": 1},
+                              early_factor=2, floor_repo=2)
     by = {(r["repo"], r["level"]): r for r in result["rows"]}
-    assert by[("acme/auth", "all")] == {"repo": "acme/auth", "level": "all", "valid": 5, "kept": 2, "removed": 1,
+    assert by[("acme/auth", "all")] == {"repo": "acme/auth", "level": "all", "valid": 6, "kept": 3, "removed": 1,
                                          "disagree": 1, "open": 1}
-    assert by[("acme/auth", "easy")]["kept"] == 1 and ("other/repo", "medium") not in by
-    assert result["disagree"] == ["t2"] and result["one_read"] == ["t3"]
-    assert result["total"]["valid"] == 6 and result["levels"]["easy"] == {"valid": 3, "kept": 2, "removed": 1,
+    # Every level has a row, also one with no task.
+    assert by[("other/repo", "medium")] == {"repo": "other/repo", "level": "medium", "valid": 0, "kept": 0,
+                                            "removed": 0, "disagree": 0, "open": 0}
+    assert len(result["rows"]) == 8
+    assert result["disagree"] == ["t2"] and result["one_read"] == ["t3"] and result["majority"] == ["t5"]
+    assert result["total"]["valid"] == 7 and result["levels"]["easy"] == {"valid": 3, "kept": 2, "removed": 1,
                                                                          "disagree": 0, "open": 0}
-    warnings = result["warnings"]
-    assert len(warnings) == 3
-    assert warnings[0] == ("acme/auth medium: 0 kept, 1 needed; 1 valid tasks not decided yet; 6 candidates with "
-                           "tests are not validated yet")
-    assert warnings[1].startswith("acme/auth: 2 kept, 3 needed; 2 valid tasks not decided yet; keep rate 2 of 3, "
-                                  "so about 0 more valid tasks are needed; 18 candidates")
-    assert warnings[2] == "other/repo: 1 kept, 3 needed; keep rate 1 of 1, so about 2 more valid tasks are needed"
+    agreement = result["agreement"]
+    assert (agreement["tasks"], agreement["agree"]) == (6, 4)
+    assert agreement["kappa"] == pytest.approx(1 / 3)
+
+    warnings = {(w["repo"], w["level"]): (w["tier"], w["text"]) for w in result["warnings"]}
+    assert sorted(warnings) == [("acme/auth", "all"), ("acme/auth", "easy"), ("acme/auth", "medium"),
+                                ("other/repo", "all"), ("other/repo", "easy"), ("other/repo", "hard"),
+                                ("other/repo", "medium")]
+    assert warnings[("acme/auth", "easy")] == ("early warning", (
+        "acme/auth easy: 1 kept; need 1, early warning below 2; keep rate 1 of 2; to reach 2: about 4 more "
+        "candidates to validate (validity rate 2 of 4); 6 candidates with tests are not validated yet"))
+    assert warnings[("acme/auth", "medium")] == ("below the need", (
+        "acme/auth medium: 0 kept; need 1, early warning below 2; 1 valid tasks not decided yet; no keep rate yet"))
+    assert warnings[("acme/auth", "all")] == ("early warning", (
+        "acme/auth: 3 kept; need 3, early warning below 6, floor 2; 2 valid tasks not decided yet; keep rate 3 of 4; "
+        "to reach 6: about 4 more candidates to validate (validity rate 6 of 12); 18 candidates with tests are not "
+        "validated yet"))
+    assert warnings[("other/repo", "all")] == ("below the floor", (
+        "other/repo: 1 kept; need 3, early warning below 6, floor 2; keep rate 1 of 1; to reach 3: about 2 more "
+        "valid tasks (give --packets for candidates)"))
 
     text = e2e_screen.format_table(result, ["s.jsonl"])
-    assert "| **acme/auth** | **all** | 5 | 2 | 1 | 1 | 1 |" in text
-    assert "| **all** | **all** | 6 | 3 | 1 | 1 | 1 |" in text
+    assert "| **acme/auth** | **all** | 6 | 3 | 1 | 1 | 1 |" in text
+    assert "| other/repo | medium | 0 | 0 | 0 | 0 | 0 |" in text
+    assert "| **all** | **all** | 7 | 4 | 1 | 1 | 1 |" in text
     assert "easy 2 of 3 (67%)" in text and "Disagree, needs a third read (1): t2" in text
-    assert "- **Warning:** other/repo: 1 kept" in text
+    assert "Read 1 and read 2 agree on 4 of 6 (67%) tasks; Cohen's kappa 0.33." in text
+    assert "(for example 2 to 1): 1 (t5)." in text
+    assert "- **Below the floor:** other/repo: 1 kept" in text and "- **Early warning:** acme/auth easy" in text
+    assert "early warning below 6 per repo (per level easy 2, medium 2, hard 2); floor 2 per repo." in text
+
+
+def test_agreement_edge_cases():
+    assert e2e_screen.agreement({}) == {"tasks": 0, "agree": 0, "share": None, "kappa": None}
+    same = e2e_screen.merge([_row("a"), _row("a", read=2), _row("b"), _row("b", read=2)])
+    result = e2e_screen.agreement(same)
+    assert (result["share"], result["kappa"]) == (1.0, None)
+    assert "Cohen's kappa not defined" in e2e_screen.format_table(e2e_screen.table(same), ["s"])
+
+
+def test_default_needs():
+    status = e2e_screen.merge([_row("a"), _row("a", read=2)])
+    result = e2e_screen.table(status)
+    assert [w["tier"] for w in result["warnings"]] == ["below the need"] * 3 + ["below the floor"]
+    text = e2e_screen.format_table(result, ["s"])
+    assert ("Need: 20 kept tasks per repo (per level easy 6, medium 8, hard 6); early warning below 25 per repo "
+            "(per level easy 8, medium 10, hard 8); floor 12 per repo.") in text
 
 
 def test_parse_need_level():
@@ -340,7 +423,8 @@ def test_parse_need_level():
 
 
 def test_pilot18_screen_in_the_repo():
-    """The two reads of 2026-11-25: they agree on all 18 tasks, 9 fair and 9 not."""
+    """The two reads of 2026-11-25 agree on all 18 tasks, 9 fair and 9 not. A fact of 2026-11-26 reopened
+    pandas 70742: with the task files and the facts, its two reads are stale, and 17 tasks are decided."""
     rows = e2e_screen.load_screen(PILOT18)
     assert len(rows) == 36 and {r["read"] for r in rows} == {1, 2}
     result = e2e_screen.table(e2e_screen.merge(rows))
@@ -348,6 +432,18 @@ def test_pilot18_screen_in_the_repo():
     assert (result["total"]["kept"], result["total"]["removed"], result["total"]["disagree"]) == (9, 9, 0)
     assert (by[("pandas-dev/pandas", "all")]["valid"], by[("pandas-dev/pandas", "all")]["kept"]) == (10, 4)
     assert (by[("microsoft/playwright", "all")]["valid"], by[("microsoft/playwright", "all")]["kept"]) == (8, 5)
+
+    tasks = load_tasks(TASKS / "fresh-v1.jsonl") + load_tasks(TASKS / "fresh-ts-v1.jsonl")
+    facts = e2e_screen.load_facts()
+    assert list(facts) == ["pandas-dev__pandas-70742"]
+    result = e2e_screen.screen_table([PILOT18], tasks=tasks, facts=facts)
+    by = {(r["repo"], r["level"]): r for r in result["rows"]}
+    assert result["stale"] == ["pandas-dev__pandas-70742"]
+    assert result["total"] == {"valid": 18, "kept": 8, "removed": 9, "disagree": 0, "open": 1}
+    assert by[("pandas-dev/pandas", "all")] == {"repo": "pandas-dev/pandas", "level": "all", "valid": 10, "kept": 3,
+                                                 "removed": 6, "disagree": 0, "open": 1}
+    assert by[("pandas-dev/pandas", "medium")]["kept"] == 0 and by[("microsoft/playwright", "all")]["kept"] == 5
+    assert (result["agreement"]["tasks"], result["agreement"]["agree"]) == (17, 17)
 
 
 # ---- the score
@@ -363,29 +459,37 @@ def _write_run(run_id, task_id, setup, completed, tokens):
 
 def test_score_with_a_screen(make_task, tmp_path, capsys):
     # t1 fair: grep fails, tool completes. t2 unfair: both complete. t3 not screened: grep completes.
-    for task_id, grep_done, tool_done in (("t1", False, True), ("t2", True, True), ("t3", True, False)):
+    # t4 fair by 2 to 1: grep completes, tool fails.
+    for task_id, grep_done, tool_done in (("t1", False, True), ("t2", True, True), ("t3", True, False),
+                                          ("t4", True, False)):
         _write_run("sc", task_id, "grep", grep_done, 1000)
         _write_run("sc", task_id, "tool", tool_done, 500)
     screen = _write_rows(tmp_path / "s.jsonl", [_row("t1"), _row("t1", read=2), _row("t2", fair=False),
-                                                _row("t2", read=2, fair=False)])
+                                                _row("t2", read=2, fair=False), _row("t4"),
+                                                _row("t4", read=2, fair=False), _row("t4", read=3)])
     plain = score("sc")
     assert "screen" not in plain and "completion_runs" not in plain["setups"]["grep"]
-    assert plain["setups"]["grep"]["completed_share"] == pytest.approx(2 / 3)
+    assert "completed_share_strict" not in plain["setups"]["grep"]
+    assert plain["setups"]["grep"]["completed_share"] == pytest.approx(3 / 4)
+    assert "conservative" not in format_score(plain)
 
     summary = score("sc", e2e_screen.completion_set([screen]))
     grep, tool = summary["setups"]["grep"], summary["setups"]["tool"]
-    assert (grep["completed_share"], tool["completed_share"]) == (0.0, 1.0)
-    assert grep["completion_runs"] == 1 and grep["tokens_mean"] == 1000 and grep["runs"] == 3
-    assert summary["screen"] == {"files": ["s.jsonl"], "tasks": 3, "fair": 1,
+    assert (grep["completed_share"], tool["completed_share"]) == (0.5, 0.5)
+    # The conservative variant also leaves out t4, which had an unfair read.
+    assert (grep["completed_share_strict"], tool["completed_share_strict"]) == (0.0, 1.0)
+    assert grep["completion_runs"] == 2 and grep["tokens_mean"] == 1000 and grep["runs"] == 4
+    assert summary["screen"] == {"files": ["s.jsonl"], "tasks": 4, "fair": 2, "fair_strict": 1,
                                  "left_out": {"t2": "unfair", "t3": "not screened"}}
     paired = summary["paired"][0]
-    assert (paired["tasks"], paired["completed_tasks"], paired["completed"], paired["tokens"]) == (3, 1, 1.0, -500.0)
+    assert (paired["tasks"], paired["completed_tasks"], paired["completed"], paired["tokens"]) == (4, 2, 0.0, -500.0)
     text = format_score(summary)
-    assert "screen s.jsonl: completion counts 1 of 3 tasks; 2 left out (not screened 1, unfair 1)" in text
-    assert "completed 1.00 (over 1 fair tasks), tokens -500" in text
+    assert "screen s.jsonl: completion counts 2 of 4 tasks; 2 left out (not screened 1, unfair 1)" in text
+    assert "conservative (no unfair read at all): completion over 1 tasks: grep 0.00, tool 1.00" in text
+    assert "completed 0.00 (over 2 fair tasks), tokens -500" in text
 
     assert main(["e2e", "score", "sc", "--screen", str(screen)]) == 0
-    assert "completion counts 1 of 3 tasks" in capsys.readouterr().out
+    assert "completion counts 2 of 4 tasks" in capsys.readouterr().out
     assert main(["e2e", "score", "sc", "--tasks", str(screen)]) == 1
     assert "only with --screen" in capsys.readouterr().err
     assert main(["e2e", "score", "sc", "--screen", str(tmp_path / "none.jsonl")]) == 1
@@ -405,6 +509,14 @@ def test_score_screen_checks_hashes_with_the_task_file(make_task, tmp_path, caps
     save_tasks(changed, [replace(task, query="another issue")])
     assert main(["e2e", "score", "sh", "--screen", str(screen), "--tasks", str(changed)]) == 0
     assert "1 left out (not screened 1)" in capsys.readouterr().out
+    # A new fact reopens the task: the reads made without it are stale.
+    facts = tmp_path / "facts.jsonl"
+    facts.write_text(json.dumps({"id": task.id, "fact": "f", "date": "2026-11-26", "source": "check"}) + "\n")
+    assert main(["e2e", "score", "sh", "--screen", str(screen), "--tasks", str(path), "--facts", str(facts)]) == 0
+    assert "1 left out (not screened 1)" in capsys.readouterr().out
+    assert main(["e2e", "screen-table", "--screen", str(screen), "--tasks", str(path), "--facts", str(facts)]) == 0
+    assert "Reads left out because the task or its facts changed after the read: acme__auth-42" in \
+        capsys.readouterr().out
 
 
 # ---- command line
