@@ -108,6 +108,14 @@ The default keeps both codes: 3.0 times less memory than the exact index. The 1-
 would be 11.6 times less. §3.2 shows its price: it has to read 1,000 full vectors per search to
 return what the default returns with 200.
 
+**Why a separate 1-bit code, when the 4-bit code holds it.** For speed. Step 1 compares the query
+with every code: 109,562 on vLLM. A 1-bit comparison takes about 0.04 microseconds and a 4-bit
+one about 3.4, so all of them take about 4.5 ms at 1 bit and would take about 370 ms at 4 bits.
+FAISS's own search over 4-bit codes skips most of them by their first bit, and still measured 3
+to 4 times slower than the exact index. FAISS scans at 1-bit speed only over an index of 1-bit
+codes, so the compact index keeps one: 120 of its 628 bytes per vector. One code for both steps
+would need a scan of our own over the bits inside the 4-bit codes. It is not built.
+
 ### 3.2 Does it return the same results?
 
 It was checked on three sets of real vectors. The largest comes first.
@@ -193,6 +201,8 @@ and the 1-bit code cannot order them well.
 | vLLM | the 352 pandas questions: 704 searches | 704 | 703 | a pandas question lost its result at rank 44. Its vector lay at place 2,178 in step 1, which kept 2,000 |
 
 - Both misses are in step 1 and at the tail of the top 50. Neither touched the top 10.
+- On vLLM the miss changed nothing a search returns: for that question the merged search gave the
+  same 10 results, and the same 50, in the same order as with the exact index.
 - The result that took the lost one's place scored 0.0006 less on pandas and 0.0016 less on vLLM.
 - More bits would not have caught either. A wider scan does: with step 1 keeping 4,000 codes, all
   704 searches on vLLM were right. It costs about 3 ms more per vector type and search (§3.3).
@@ -397,8 +407,11 @@ build, vector by vector, and every return gave the model 0 texts.
 
 ## 7. What is our own work, and what is reused
 
-**Reused.** RaBitQ, the method, is Gao and Long's, and the implementation is FAISS's. The exact
-index is FAISS's. The storage is SQLite. The model runs through sentence-transformers.
+**Reused.** RaBitQ, the method, is Gao and Long's, and the implementation is FAISS's: FAISS,
+Meta's vector search library, has had RaBitQ since version 1.11.0 (April 2025) and codes of 2 to
+9 bits per number since 1.13.1 (December 2025). codemem asks FAISS for a 1-bit and a 4-bit code
+and adds no quantization code of its own. The exact index is FAISS's. The storage is SQLite. The
+model runs through sentence-transformers.
 
 **Our own design and findings:**
 
