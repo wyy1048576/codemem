@@ -22,6 +22,10 @@ log = logging.getLogger(__name__)
 
 
 def build_server(service: CodememService) -> MCPServer:
+    # Every tool answers in plain text, registered with `structured_output=False`. A tool that
+    # returns `str` would otherwise also send `{"result": "<the text>"}` as structured content, and a
+    # client that shows that to the model shows the line ends as the two characters `\n`: code
+    # previews then read as one escaped line.
     steering = service.config.steering
     server = MCPServer(
         name=prompts.SERVER_NAME,
@@ -29,7 +33,9 @@ def build_server(service: CodememService) -> MCPServer:
         instructions=prompts.server_instructions(steering),
     )
 
-    @server.tool(name="search_code", description=prompts.tool_description("search_code", steering))
+    @server.tool(
+        name="search_code", description=prompts.tool_description("search_code", steering), structured_output=False
+    )
     def search_code(
         query: str, k: int = 10, path_prefix: str | None = None, kinds: list[str] | None = None,
         tests: str = "include",
@@ -62,7 +68,9 @@ def build_server(service: CodememService) -> MCPServer:
         notes.append(prompts.search_footer(steering))
         return notice + format_results(resp) + "".join(f"\n\n{n}" for n in notes if n)
 
-    @server.tool(name="get_chunk", description=prompts.tool_description("get_chunk", steering))
+    @server.tool(
+        name="get_chunk", description=prompts.tool_description("get_chunk", steering), structured_output=False
+    )
     def get_chunk(ref: str) -> str:
         d = service.get_chunk(ref)
         if d is None:
@@ -71,11 +79,15 @@ def build_server(service: CodememService) -> MCPServer:
             return f"{missing}\n\n{prompts.copy_notice()}" if service.copy_unchecked() else missing
         return (prompts.copy_notice() + "\n\n" if d.get("unchecked_copy") else "") + format_chunk(d)
 
-    @server.tool(name="refresh_index", description=prompts.tool_description("refresh_index", steering))
+    @server.tool(
+        name="refresh_index", description=prompts.tool_description("refresh_index", steering), structured_output=False
+    )
     def refresh_index() -> str:
         return format_refresh(service.refresh(timeout=60))
 
-    @server.tool(name="index_status", description=prompts.tool_description("index_status", steering))
+    @server.tool(
+        name="index_status", description=prompts.tool_description("index_status", steering), structured_output=False
+    )
     def index_status() -> str:
         info = service.status(check_staleness=True)
         return format_status(info) + "\n\n" + json.dumps(
