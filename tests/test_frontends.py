@@ -413,6 +413,31 @@ def test_the_search_indexes_are_written_once_the_index_is_quiet(service, sample_
     assert _wait_for(lambda: saved.stat().st_mtime_ns != before and not service.store.vectors_unsaved())
 
 
+def test_a_save_that_fails_does_not_stop_the_writer(service, monkeypatch, caplog):
+    """The writer thread writes the search indexes' files in a quiet moment. A save can fail: the
+    disk is full, or another process holds the database's write lock for longer than a save waits
+    (Store.save_vectors ends in a short transaction). An error that left the step would end the
+    thread, and with it the watcher's updates until a search started a new one."""
+    import sqlite3
+
+    import codemem.service as svc_mod
+
+    service.update()
+    tries = []
+
+    def locked(**_):
+        tries.append(1)
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(svc_mod, "SAVE_AFTER_IDLE", -1.0)
+    monkeypatch.setattr(service.store, "vectors_unsaved", lambda: True)
+    monkeypatch.setattr(service.store, "save_vectors", locked)
+    with caplog.at_level("ERROR", logger="codemem"):
+        assert service._step() is True  # logged, not raised
+    assert tries == [1]
+    assert any("could not write the search indexes" in r.getMessage() for r in caplog.records)
+
+
 # ---------------------------------------------------------------- CLI
 
 

@@ -177,6 +177,33 @@ def test_a_compact_index_goes_back_to_exact_only_well_under_the_budget(tmp_path,
     assert _saved(path) == ["vec_code.faiss"]
 
 
+def test_the_note_of_a_vector_type_that_lost_its_vectors_does_not_count_as_compact(tmp_path, monkeypatch):
+    """Two types were compact. One lost all its vectors and keeps the files of its last save; the
+    other went back to exact. The index is exact then, and stays exact up to the whole budget."""
+    path = tmp_path / "idx"
+    _budget(monkeypatch, 150 * PER_VECTOR)
+    store = _auto(path)
+    _seed(store, 100)
+    _seed(store, 100, vec_type="usage", prefix="u", seed=1)
+    store.save_vectors(stale=True)  # 200 vectors: over the budget
+    store.close()
+    assert _saved(path) == ["vec_code.rabitq", "vec_usage.rabitq"]
+    store = _auto(path)
+    store.delete_vectors("usage", [vid for vid, _ in store.vector_rows("usage").values()])
+    store.save_vectors(stale=True)  # 100 vectors, 67% of the budget: exact again
+    assert _kinds(store) == {"code": FaissVectorStore}
+    _seed(store, 30, prefix="g", seed=2)  # 130 vectors, 87%: over what a compact index goes back at
+    store.save_vectors()
+    store.close()
+    assert _saved(path) == ["vec_code.faiss", "vec_usage.rabitq"]  # nothing rewrote the emptied type's files
+    monkeypatch.setattr(Store, "_rebuild", lambda *a: pytest.fail("the saved exact index should have been read"))
+    store = _auto(path)
+    status = store.search_index_status()
+    assert status["index"] == "faiss" and "within the budget" in status["why"]
+    assert _kinds(store) == {"code": FaissVectorStore} and _exact_results(store)
+    store.close()
+
+
 def test_auto_picks_when_an_index_is_loaded_and_keeps_to_it_while_the_store_is_open(tmp_path, monkeypatch):
     path = tmp_path / "idx"
     _budget(monkeypatch, 100 * PER_VECTOR)

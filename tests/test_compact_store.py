@@ -6,6 +6,7 @@ the rows, its saved file, and the checks in front of every FAISS call.
 """
 
 import json
+import logging
 import sqlite3
 import threading
 
@@ -173,17 +174,37 @@ def test_restart_from_the_saved_file(tmp_path, backend, monkeypatch):
     s3.close()
 
 
-def test_a_damaged_file_is_rebuilt_from_the_rows(tmp_path, backend):
+def test_a_damaged_file_is_rebuilt_from_the_rows(tmp_path, backend, monkeypatch, caplog):
+    """The note holds the checksum of the file, and a file with other bytes is not handed to the
+    backend: FAISS reads an exact index with one flipped bit as it is, and scores with it."""
     s = _open(tmp_path / "idx", backend)
     _seed(s, 20)
     s.save_vectors()
     s.close()
     path = tmp_path / "idx" / json.loads((tmp_path / "idx" / "vec_code.json").read_text())["file"]
-    for damaged in (b"garbage", path.read_bytes()[:-9], b""):
-        path.write_bytes(damaged)
-        s2 = _open(tmp_path / "idx", backend)
-        assert _same_as_brute_force(s2) and _in_sync(s2)
-        s2.close()
+    saved = path.read_bytes()
+    one_bit = bytearray(saved)
+    one_bit[len(saved) // 2] ^= 0x40  # in a stored number
+    cls = {"faiss": FaissVectorStore, "compact": CompactVectorStore}[backend]
+    rebuilds = []
+    rebuild = Store._rebuild
+    with monkeypatch.context() as m:
+        m.setattr(Store, "_rebuild", lambda self, *a: rebuilds.append(a) or rebuild(self, *a))
+        m.setattr(cls, "from_bytes", lambda *a, **k: pytest.fail("the backend must not be given these bytes"))
+        for n, damaged in enumerate((b"garbage", saved[:-9], b"", bytes(one_bit), saved + b"\0"), 1):
+            path.write_bytes(damaged)
+            caplog.clear()
+            with caplog.at_level(logging.WARNING, logger="codemem.store"):
+                s2 = _open(tmp_path / "idx", backend)
+                assert _same_as_brute_force(s2) and _in_sync(s2) and len(rebuilds) == n
+                s2.close()
+            assert [r.levelname for r in caplog.records] == ["WARNING"]  # one line, and no traceback
+            assert "is not the file its note describes" in caplog.text
+    path.write_bytes(saved)  # the bytes that were saved are read
+    monkeypatch.setattr(Store, "_rebuild", lambda *a: pytest.fail("the saved file should have been used"))
+    s3 = _open(tmp_path / "idx", backend)
+    assert _same_as_brute_force(s3) and _in_sync(s3)
+    s3.close()
 
 
 def test_another_process_writes_and_this_one_catches_up(tmp_path, backend):
@@ -221,6 +242,21 @@ def test_an_empty_index_and_more_results_asked_for_than_it_holds(store):
     with store.transaction():
         store.delete_chunks(ids)
     assert store.vector_search("code", q, 5) == [] and _in_sync(store)
+
+
+def test_a_query_of_zeros_gets_no_results_and_no_index_is_asked(store, monkeypatch):
+    """Every vector scores 0 against it, and ties are taken whole: the search would ask for more
+    and more until it had seen every vector, and the compact index would read every row each time."""
+    ids = _seed(store, 300)
+    backend = store._type_index("code").store
+    usual = store.vector_search("code", _vecs(1, seed=3)[0], 5)
+    assert len(usual) == 5
+    with monkeypatch.context() as m, np.errstate(over="ignore"):
+        m.setattr(backend, "search", lambda *a, **k: pytest.fail("the index must not be asked"))
+        too_long = _vecs(1, seed=3)[0] * np.float32(1e30)  # its squared length overflows: no direction is left
+        for q in (np.zeros(16, dtype=np.float32), np.zeros(16), np.zeros(64), too_long, _vecs(1, seed=3)[0] * 1e-46):
+            assert store.vector_search("code", q, 5) == [] and store.vector_search("code", q, 5, ids[:20]) == []
+    assert store.vector_search("code", _vecs(1, seed=3)[0], 5) == usual
 
 
 def test_copies_of_one_vector_tie_and_are_ordered_by_location(store):
@@ -724,12 +760,44 @@ def test_the_code_covers_the_first_numbers_of_any_length(dim, code_dim, expect):
     assert len(hits) == 3 and hits[0][1] == pytest.approx(max(float(s) for s in v @ v[7]), abs=1e-6)
 
 
-def test_an_index_wider_than_the_longest_code_is_coded_on_its_first_numbers(monkeypatch):
+def test_an_index_wider_than_the_longest_code_is_coded_on_its_first_numbers(monkeypatch, caplog):
     monkeypatch.setattr("codemem.store.COMPACT_MAX_DIM", 16)
-    vs = CompactVectorStore(40)
-    assert (vs.dim, vs.code_dim, vs._coarse.d, vs._fine.d) == (40, 16, 16, 16)
+    with caplog.at_level(logging.WARNING, logger="codemem.store"):
+        vs = CompactVectorStore(40)
+        assert (vs.dim, vs.code_dim, vs._coarse.d, vs._fine.d) == (40, 16, 16, 16)
+        said = [r.getMessage() for r in caplog.records]  # in the log, once, when the index is made
+        assert len(said) == 1 and "codes the first 16 numbers of each vector, and these vectors have 40" in said[0]
+        caplog.clear()
+        v = for_index(_vecs(60, dim=40), 40)
+        _bound(vs, range(1, 61), v)
+        assert all(len(vs.search(q, 3)) == 3 for q in v[:5]) and len(vs.to_bytes()) > 0
+        assert CompactVectorStore.bytes_per_vector(40) == vs.code_bytes + 8 + 32
+        for whole_or_asked_for in (CompactVectorStore(16), CompactVectorStore(12), CompactVectorStore(40, dim=8),
+                                   CompactVectorStore(40, dim=16)):
+            assert whole_or_asked_for.code_dim <= 16
+        assert caplog.records == []  # not by a search, a save or a status, and not for a code length that was asked for
+        assert CompactVectorStore.from_bytes(vs.to_bytes()).code_dim == 16 and len(caplog.records) == 1  # made again
     with pytest.raises(ValueError, match="dim 0 to 16"):
         CompactVectorStore(40, dim=17)
+
+
+def test_the_store_warns_once_for_each_index_of_vectors_longer_than_a_code(tmp_path, monkeypatch, caplog):
+    monkeypatch.setattr("codemem.store.COMPACT_MAX_DIM", 16)
+    said = lambda: [r.getMessage() for r in caplog.records if "codes the first 16 numbers" in r.getMessage()]  # noqa: E731
+    with caplog.at_level(logging.WARNING, logger="codemem.store"):
+        s = _open(tmp_path / "idx", "compact")
+        _seed(s, 100, dim=40)  # few enough for every one to be scored exactly, whatever the codes cover
+        assert len(said()) == 1 and _same_as_brute_force(s, dim=40) and s.search_index_status()["index"] == "compact"
+        s.save_vectors()
+        s.close()
+        assert len(said()) == 1
+        s = _open(tmp_path / "idx", "compact")  # another start: its index is made from the saved file
+        assert _same_as_brute_force(s, dim=40) and len(said()) == 2
+        s.close()
+        exact = _open(tmp_path / "exact", "faiss")
+        _seed(exact, 100, dim=40)
+        assert _same_as_brute_force(exact, dim=40) and len(said()) == 2  # the exact index holds every number
+        exact.close()
 
 
 def test_vectors_and_queries_of_the_wrong_shape_raise_before_faiss():
@@ -791,6 +859,84 @@ def test_ids_and_codes_that_are_out_of_step_raise_before_faiss_is_asked(bits, sp
                  lambda: vs.remove([13]), lambda: vs.upsert([50], v[:1]), lambda: vs.upsert([5], v[:1])):
         with pytest.raises(RuntimeError, match=message):
             call()
+
+
+def _fail_the(monkeypatch, call, nth):
+    """Make the nth call of a FAISS method on a code index raise, as FAISS does when it cannot get
+    memory. The calls before it go through. Returns the list the calls are counted in."""
+    made = []
+    real = getattr(faiss.IndexRaBitQ, call)
+
+    def counted(index, *args):
+        made.append(index)
+        if len(made) == nth:
+            raise MemoryError(f"the {call} that fails")
+        return real(index, *args)
+
+    monkeypatch.setattr(faiss.IndexRaBitQ, call, counted)
+    return made
+
+
+@pytest.mark.parametrize("bits", [1, 4])
+def test_an_upsert_that_fails_part_of_the_way_leaves_the_index_as_it_was(bits, monkeypatch):
+    """A change is several FAISS calls, on two indexes when there is a fine code. Whichever of
+    them fails, the index holds exactly what it held before, and the error is raised."""
+    v = for_index(_vecs(400, dim=32), 32)
+    kept = list(range(101, 301))
+
+    def built():
+        vs = CompactVectorStore(32, bits=bits, rescore=8)
+        _bound(vs, kept, v[100:300])
+        return vs
+
+    vs = built()
+    before, found = vs.to_bytes(), [vs.search(q, 5) for q in v[:300:30]]
+    upserts = {"new ids": [301, 302], "ids it holds": [150, 151], "ids older than the newest": [5, 6],
+               "all of these": [350, 150, 50]}
+    failed = set()
+    for what, ids in upserts.items():
+        for call in ("add", "remove_ids", "permute_entries"):
+            for nth in (1, 2):
+                with monkeypatch.context() as m:
+                    made = _fail_the(m, call, nth)
+                    try:
+                        vs.upsert(ids, v[np.asarray(ids) - 1])
+                    except MemoryError:
+                        failed.add((what, call, nth))
+                if (what, call, nth) not in failed:
+                    vs = built()  # this upsert makes that call less often: it went through
+                    continue
+                assert len(made) == nth and vs.ids() == set(kept) and vs.to_bytes() == before
+                assert [index.ntotal for index in vs._indexes] == [200] * len(vs._indexes)
+                assert [vs.search(q, 5) for q in v[:300:30]] == found
+    calls = {  # what each of these upserts asks of FAISS, once for each of its indexes
+        "new ids": {"add"}, "ids it holds": {"remove_ids", "add", "permute_entries"},
+        "ids older than the newest": {"add", "permute_entries"}, "all of these": {"remove_ids", "add", "permute_entries"},
+    }
+    every = {(what, call, nth) for what in calls for call in calls[what] for nth in range(1, len(vs._indexes) + 1)}
+    assert failed == every
+    for ids in upserts.values():  # and when nothing fails, the index is the one built once from the same vectors
+        vs.upsert(ids, v[np.asarray(ids) - 1])
+    final = sorted(set(kept) | {i for ids in upserts.values() for i in ids})
+    once = CompactVectorStore(32, bits=bits, rescore=8)
+    once.upsert(final, v[np.asarray(final) - 1])
+    assert vs._ids.tolist() == final and vs.to_bytes() == once.to_bytes()
+
+
+def test_the_store_adds_the_vectors_again_after_an_upsert_that_failed(tmp_path, monkeypatch):
+    """The rows are committed before the index takes them. When the index fails to, the write
+    raises, the index is as it was, and the next search brings it up to the rows by vector id."""
+    s = _open(tmp_path / "idx", "compact")
+    _seed(s, 60)
+    with monkeypatch.context() as m:
+        _fail_the(m, "add", 2)  # the fine index, after the coarse one took the codes
+        with pytest.raises(MemoryError):
+            _seed(s, 5, seed=7, prefix="g")
+    assert s.counts()["vectors"]["code"] == 65 and len(s._types["code"].store) == 60
+    assert _same_as_brute_force(s) and _in_sync(s) and len(s._types["code"].store) == 65
+    _seed(s, 5, seed=8, prefix="h")
+    assert _same_as_brute_force(s) and _in_sync(s)
+    s.close()
 
 
 def test_search_needs_the_stored_vectors():

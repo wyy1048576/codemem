@@ -114,6 +114,14 @@ def exercise(rng: np.random.Generator, d: int, bits: int, n: int) -> None:
     owner = faiss.deserialize_index(faiss.serialize_index(index))  # this object owns the C++ index
     assert owner.thisown and owner.ntotal == index.ntotal and owner.codes.size() == owner.ntotal * owner.code_size
     owner.add(np.ascontiguousarray(x[:5]))
+    # the store takes the codes of an upsert that failed off the end again: the index is the one it was
+    keep, sel = bitmap_of(np.arange(owner.ntotal) >= index.ntotal)
+    assert owner.remove_ids(sel) == 5 and faiss.serialize_index(owner).tobytes() == faiss.serialize_index(index).tobytes()
+    owner.add(np.ascontiguousarray(x[:5]))
+    order = rng.permutation(owner.ntotal).astype(np.int64)  # and it drops and moves codes on a copy made this way
+    before = faiss.vector_to_array(owner.codes).reshape(owner.ntotal, -1).copy()
+    owner.permute_entries(order)
+    assert np.array_equal(faiss.vector_to_array(owner.codes).reshape(owner.ntotal, -1), before[order])
     mask = rng.random(owner.ntotal) < 0.5
     keep, sel = bitmap_of(mask)
     owner.search(q, min(13, owner.ntotal), params=params(sel))

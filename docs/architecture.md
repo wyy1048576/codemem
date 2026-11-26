@@ -1123,6 +1123,13 @@ loses results that no count of candidates brings back. Share of searches with th
 A fine code does not make up for the missing numbers: 256 numbers with a 4-bit code kept the top
 10 in 91% of question searches at 200 candidates, and 512 numbers in 99.3%.
 
+A code covers at most 4,096 numbers. Vectors longer than that are coded on their first 4,096,
+and the index logs a warning when it is made, once: its searches can miss what only the other
+numbers tell apart. With 2,100 vectors of 8,192 numbers whose first half was noise, none of 12
+searches returned what the exact index returned; with vectors alike over their whole length,
+all 12 did. The exact index compares every number, and `embedding_dim` cuts the vectors
+themselves.
+
 **What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50),
 with FAISS on one thread:
 
@@ -1193,12 +1200,22 @@ checksum, the options and the rotation are the expected ones. What FAISS was not
 refused with a message: a code of more than 4,096 numbers when the config is read, a FAISS older
 than 1.15.1 when the index is opened.
 
+**A call that raises** (FAISS cannot get memory) must not leave the two FAISS indexes with
+different codes. A change is several calls: codes are added to each index, and for an id that
+is held already or is older than the newest held, codes are dropped and moved as well. New
+codes that one index took are taken off again when the other fails. Dropping and moving is
+done on copies of the two indexes, which replace them once every call has worked. Either way
+the index holds what it held before, the write raises, and the store adds the vectors again
+when it next catches up with the rows.
+
 **Loading a search index.** A search index is saved beside `index.db` and read back at the next
 start: 0.9 s for the exact index of 200,000 vectors, 0.5 s for the compact one. It is rebuilt
 from the stored vectors instead when the saved copy cannot be used: there is none, it is another
-backend's (the rule picks the other index, or the config names another), or its note names no
-database. That last case is every index built before saved copies named their database: the
-first start on one rebuilds its search index, once. On an M1 that was running other jobs, an
+backend's (the rule picks the other index, or the config names another), its bytes are not the
+bytes that were saved, the database has gone back to a state from before the copy, or its note
+lacks the database, the save's id or the checksum that a start checks. That last case is every
+copy saved by a codemem that did not write them: the first start on such an index rebuilds its
+search index, once. On an M1 that was running other jobs, an
 exact index took 0.5 to 1.5 s to rebuild at 50,000 vectors and 2.5 to 5 s at 200,000. A compact
 index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000, with FAISS on
 one thread.
@@ -1232,6 +1249,12 @@ the index for proportionally more vectors, so that the best 50 chunks are comple
 An SQLite index over these columns (about 25 bytes per vector on disk) lets a start read them
 without touching the pages that hold the vectors: 0.2 s instead of 0.8 s at 200,000 vectors.
 
+**A query without a direction** (a vector of zeros) gets no results by meaning, from any index.
+Every stored vector scores 0 against it, and equal scores are taken whole, so that their order
+never depends on where a cut falls: the search would go on until it had seen every vector. On
+the pandas index (43,187 code vectors) that took the compact index 4.1 s and 561,431 row reads.
+The store answers such a query with nothing and asks no index.
+
 **Keeping the copy in step with SQLite.** The in-memory index changes only after a commit, so it
 never holds a vector that could be rolled back. Every commit that changes a type's vectors also
 bumps that type's version number in `meta`, and an index that is behind catches up by comparing
@@ -1243,6 +1266,32 @@ A saved copy is read only into the database it was saved from. Each `index.db` c
 `database_id` in `meta`, and the copy's note names it. A copy whose note names another database,
 or none, is rebuilt from the rows. Vector ids start again at 1 in a new `index.db`, so without the
 name the copy of a deleted one would be matched, id by id, against vectors it was not made from.
+
+A saved copy is read only by the state of the database it was saved from, or a later one.
+Matching by vector id is right while no id is used twice, and a database that goes back uses
+them twice: an `index.db` put back from a backup, or one that lost its last commits in a power
+cut (commits are not synced to the disk one by one), hands out again the ids of the rows it
+lost, for other vectors. The version number does not show it, because it counts up again. So
+each save writes a random `save_id` into the copy's note and into `meta`, and a start reads the
+copy only when the two are equal. `meta` goes back with the database: after a step back they
+differ, and the search index is rebuilt from the rows. The id is committed after the index was
+copied from memory, so a state that holds it comes after every vector of the copy. A save
+writes the file under a temporary name first; one short transaction then sets the id, renames
+the file and writes the note. A save that is stopped part of the way leaves the earlier copy,
+or one that a start refuses.
+
+A saved copy is read only if its bytes are the bytes that were saved. Its note holds a checksum
+of the file (CRC-32), and a start compares the two before the index is given the file. A file
+that differs is rebuilt from the rows, with one warning in the log: a damaged file, one that
+was cut short, and the file of another index under this one's note. FAISS itself reads an exact
+index with a flipped bit as it is. In a test with 2,500 vectors the damaged vector then scored
+up to 2,427 (a similarity cannot pass 1), and a flipped bit in a size field made the start
+allocate past 500 MB for a file of 0.3 MB.
+
+A note never chooses a file. Whoever can write to the index folder can write a note, and the
+file a note describes is read at a start and deleted when a save replaces it. So that file is
+always `vec_<type><suffix>` in the index folder, with the suffix of the note's backend. A note
+that names anything else, a path among them, counts as no note.
 
 **The vector cache** maps (embedder key, text hash) to a vector: 2 bytes per number, at the
 model's full length. It is one SQLite file for the whole machine, and every codemem process

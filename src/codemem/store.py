@@ -10,13 +10,15 @@ which keeps small codes of each vector and scores its best candidates from the r
 named in config. By default (`auto`) it is the exact one while that fits a memory budget, and
 the compact one when it does not (Store._pick). It is truncated to `embedding_dim` if set, kept
 in memory and saved as `vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it
-reflects (and the database, backend and options it was saved from). Every transaction that
-changes a vector type's rows bumps its epoch in `meta`, and the index is patched right after the
-commit (never before, so it never holds an uncommitted vector). Vector rows never change in
-place: a new vector is a new row with a new id. So an index that is behind (a saved file from
-before a crash, or another process wrote) catches up by comparing vector ids and applying only
-the difference; a missing or corrupt file is rebuilt from the rows, which needs no model, and
-outside the vector lock (Store._type_index). docs/architecture.md §5 lists the tables.
+reflects (and the database, backend and options it was saved from, the checksum of the file,
+and the id of the save). Every transaction that changes a vector type's rows bumps its epoch in
+`meta`, and the index is patched right after the commit (never before, so it never holds an
+uncommitted vector). Vector rows never change in place: a new vector is a new row with a new
+id. So an index that is behind (a saved file from before a crash, or another process wrote)
+catches up by comparing vector ids and applying only the difference. A missing file, one whose
+bytes are not the bytes that were saved, and one saved from a later state than the database is
+in (Store.save_vectors) are rebuilt from the rows, which needs no model, and outside the vector
+lock (Store._type_index). docs/architecture.md §5 lists the tables.
 """
 
 from __future__ import annotations
@@ -131,9 +133,13 @@ _CHUNK_COLS = (
 )
 
 
-def _atomic_write(path: Path, data: bytes) -> None:
+def _temp_path(path: Path) -> Path:
     # A name of its own per process and thread: two writers never share a half-written temp file.
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    return path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+
+
+def _atomic_write(path: Path, data: bytes) -> None:
+    tmp = _temp_path(path)
     tmp.write_bytes(data)
     os.replace(tmp, path)  # atomic on Windows and POSIX
 
@@ -167,7 +173,8 @@ class VectorStore(ABC):
     `search(query, k, allowed_ids)` returns at most k (id, score) pairs, best first, with the real
     similarity as the score (equal scores are ties); fewer than k only when no other vector
     qualifies; only ids in `allowed_ids` when it is given. An approximate index (HNSW, IVF) can
-    miss some, as it does anywhere else.
+    miss some, as it does anywhere else. The store never asks for a query of zeros: it has no
+    direction, every vector would tie, and the store answers it with nothing.
 
     A backend that keeps less than the vectors themselves can read them back to score with:
     `bind(fetch)` hands it the function for that.
@@ -346,6 +353,8 @@ class CompactVectorStore(VectorStore):
 
     The codes are RaBitQ's, from FAISS, of the first `dim` numbers of the vector (0 = all of
     them, at most COMPACT_MAX_DIM; `code_dim` once resolved), scaled to length 1 and rotated.
+    An index of longer vectors is coded on their first COMPACT_MAX_DIM numbers, and logs a
+    warning when it is made: its searches can miss what only the other numbers tell apart.
     Every vector has a coarse code, 1 bit per number plus 8 bytes: that is what a search scans.
     With `bits` above 1 it also has a fine code of `bits` bits per number, and the scan's best
     (4,000 or more: `_candidates`) are ranked again by their fine estimates. The best of that, at
@@ -378,6 +387,15 @@ class CompactVectorStore(VectorStore):
         self._fine = _rabitq(self.code_dim, bits) if bits > 1 else None
         self._ids = np.empty(0, dtype=np.int64)
         self._fetch: Fetch | None = None
+        if not dim and self.code_dim < index_dim:
+            # Asked to code every number, and the longest code is shorter: said once, here, where
+            # the index is made. Vectors that differ only past the code are told apart by no code.
+            log.warning(
+                "the compact search index codes the first %d numbers of each vector, and these vectors have %d: it "
+                'can miss results that only the other numbers tell apart. The exact index (vector_backend = "faiss") '
+                "compares every number, and embedding_dim = %d or less cuts the vectors themselves",
+                self.code_dim, index_dim, self.code_dim,
+            )
 
     @staticmethod
     def _code_dim(index_dim: int, bits: int, dim: int, rescore: int) -> int:
@@ -447,19 +465,40 @@ class CompactVectorStore(VectorStore):
         if id_arr.ndim != 1 or vecs.shape != (len(id_arr), self.dim):
             raise ValueError(f"expected vectors of shape ({len(id_arr)}, {self.dim}), got {vecs.shape}")
         self._in_step()
-        self.remove(id_arr)
         rows = self._coded(vecs)
-        for index in self._indexes:
-            index.add(rows)
-        self._ids = np.concatenate([self._ids, id_arr])
-        self._in_step()
-        if not (self._ids[1:] > self._ids[:-1]).all():
-            # Ids are handed out in increasing order, so this is rare: a saved index or a catch-up
-            # brings vectors older than the newest held. Move them to their place.
-            order = np.argsort(self._ids, kind="stable")
+        # FAISS holds the codes in two indexes and changes them one call at a time. If a call fails
+        # after others worked, the index must still hold what it held before: the store then adds
+        # the vectors again when it next catches up, where an index left out of step would refuse
+        # every call until the process ended.
+        held = (self._ids, self._coarse, self._fine)
+        at_the_end = (len(self._ids) == 0 or id_arr[0] > self._ids[-1]) and bool((id_arr[1:] > id_arr[:-1]).all())
+        try:
+            if not at_the_end:
+                # Ids are handed out in increasing order, so this is rare: an id that is held
+                # already, or older than the newest held (a saved index or a catch-up brings
+                # those). Codes are then dropped and moved as well, which FAISS cannot take back:
+                # it is done on copies, and they take the indexes' place when all of it worked.
+                self._coarse, self._fine = (
+                    None if index is None else faiss.deserialize_index(faiss.serialize_index(index))
+                    for index in (self._coarse, self._fine)
+                )
+                self.remove(id_arr)
             for index in self._indexes:
-                index.permute_entries(order)  # the code at position i becomes the one that was at order[i]
-            self._ids = self._ids[order]
+                index.add(rows)
+            self._ids = np.concatenate([self._ids, id_arr])
+            self._in_step()
+            if not (self._ids[1:] > self._ids[:-1]).all():
+                order = np.argsort(self._ids, kind="stable")  # move them to their place
+                for index in self._indexes:
+                    index.permute_entries(order)  # the code at position i becomes the one that was at order[i]
+                self._ids = self._ids[order]
+        except BaseException:
+            self._ids, self._coarse, self._fine = held
+            for index in self._indexes:
+                if index.ntotal > len(self._ids):  # codes this call added at its end: take them off again
+                    added = np.packbits(np.arange(index.ntotal) >= len(self._ids), bitorder="little")
+                    index.remove_ids(faiss.IDSelectorBitmap(len(added), faiss.swig_ptr(added)))  # `added` outlives the call
+            raise
 
     def remove(self, ids: Iterable[int]) -> None:
         gone = np.isin(self._ids, np.fromiter(ids, dtype=np.int64))
@@ -1475,13 +1514,25 @@ class Store:
 
     def _read_note(self, vec_type: str) -> dict[str, Any] | None:
         try:
-            return json.loads(self._note_path(vec_type).read_text("utf-8"))
+            note = json.loads(self._note_path(vec_type).read_text("utf-8"))
         except (OSError, ValueError):
             return None
+        return note if isinstance(note, dict) else None
 
     def _noted_file(self, vec_type: str, note: dict[str, Any] | None) -> Path | None:
-        """The saved index a note describes (notes from before backends were pluggable: FAISS)."""
-        return self.index_dir / note.get("file", f"vec_{vec_type}.faiss") if note else None
+        """The saved index a note describes: this folder's `vec_<type>` file of the backend the
+        note names (none: a note from before backends were pluggable, so FAISS). A note is a file
+        that whoever can write to the folder can write, and the file it names is read by a start
+        and deleted by a save. So its `file` counts only when it is that very name. With a path,
+        or the name of anything else in the folder, it is no note: None."""
+        if not note:
+            return None
+        use, backend = self._search_index(), note.get("backend", "faiss")
+        for name, cls in ((use.name, use.cls), ("faiss", FaissVectorStore), ("compact", CompactVectorStore)):
+            if backend == name:
+                path = self.index_dir / f"vec_{vec_type}{cls.suffix}"
+                return path if note.get("file", path.name) == path.name else None
+        return None  # a plugin that is not the one in use: the suffix of its files is not known here
 
     def database_id(self) -> str:
         """This database's identity: a random token set when it is created. A saved search index
@@ -1529,8 +1580,10 @@ class Store:
         return sum(n * FaissVectorStore.bytes_per_vector(self.vector_dim(vec_type) or 0) for vec_type, n in counts)
 
     def _saved_as_compact(self) -> bool:
-        """Whether this database's saved search indexes are compact ones."""
-        notes = (self._read_note(p.name[len("vec_"):-len(".json")]) for p in self.index_dir.glob("vec_*.json"))
+        """Whether this database's saved search indexes are compact ones. Only the vector types
+        that have vectors count: a type that lost them all keeps the note of its last save, which
+        says nothing of the index as it is."""
+        notes = (self._read_note(vec_type) for vec_type in self.vec_types())
         return any(n.get("backend") == "compact" and n.get("database") == self.database_id() for n in notes if n)
 
     def _pick(self, compact_now: bool) -> _InUse:
@@ -1620,7 +1673,7 @@ class Store:
 
     def drop_vec_type(self, vec_type: str) -> None:
         self.conn.execute("DELETE FROM vectors WHERE vec_type = ?", (vec_type,))
-        for key in ("embedder", "full_dim", "dim_setting"):
+        for key in ("embedder", "full_dim", "dim_setting", "save_id"):
             self.conn.execute("DELETE FROM meta WHERE key = ?", (f"vec.{vec_type}.{key}",))
         self._bump_epoch(vec_type)
 
@@ -1907,13 +1960,17 @@ class Store:
     def _usable_note(self, vec_type: str, dim: int | None) -> dict[str, Any] | None:
         """The note of a vector type's saved index, when a start can read that index: it was saved
         from this database, by the backend in use with its options, for this length and embedder,
-        and its file is there. Whatever epoch it was saved at."""
+        it holds the checksum of its file, and the file is there. Whatever epoch it was saved at,
+        as long as the database has not gone back behind that save: the note and `meta` then hold
+        the same `save_id` (save_vectors)."""
         use = self._search_index()
         note = self._read_note(vec_type)
-        if (note is None or note.get("database") != self.database_id()
+        path = self._noted_file(vec_type, note)
+        if (note is None or path is None or note.get("database") != self.database_id()
+                or not note.get("save_id") or note.get("save_id") != self.get_meta(f"vec.{vec_type}.save_id")
                 or note.get("backend", "faiss") != use.name or note.get("options", {}) != use.options
                 or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder")
-                or not self._noted_file(vec_type, note).is_file()):
+                or type(note.get("crc32")) is not int or not path.is_file()):
             return None
         return note
 
@@ -1921,17 +1978,23 @@ class Store:
         """The saved index file, reconciled with the committed rows by vector id: vectors whose
         row is gone are dropped, rows the file lacks are added. Rows never change in place, so
         this is exact whichever epoch the file was saved at (another process, a crash, a save
-        that is behind), and it costs only the difference instead of a full rebuild. No file, or
-        one from another database, another backend or other options: None, and the index is
-        rebuilt from the rows."""
+        that is behind), and it costs only the difference instead of a full rebuild. No file, one
+        from another database, another backend or other options, or one whose bytes are not the
+        bytes that were saved: None, and the index is rebuilt from the rows."""
         use = self._search_index()
         note = self._usable_note(vec_type, dim)
         if note is None:
             return None
         path = self._noted_file(vec_type, note)
         try:
-            store = use.cls.from_bytes(path.read_bytes(), **use.options)
-        except Exception:  # corrupt or partial file: rebuild from the rows
+            data = path.read_bytes()
+            if zlib.crc32(data) != note["crc32"]:
+                # Damaged, cut short, or another index's file under this note. A backend can read
+                # such bytes without a word and score with them, or allocate without end: it gets none.
+                log.warning("%s is not the file its note describes; rebuilding it from the stored vectors", path)
+                return None
+            store = use.cls.from_bytes(data, **use.options)
+        except Exception:  # a file that cannot be read: rebuild from the rows
             log.exception("could not load %s; rebuilding it from the stored vectors", path)
             return None
         if store.dim != dim:
@@ -1985,8 +2048,8 @@ class Store:
         self, vec_type: str, query: np.ndarray, n: int, allowed_ids: Sequence[int] | None = None
     ) -> list[VectorHit]:
         """The n best chunks for a query by one vector type. A chunk with several parts scores its
-        best part. Equal scores are ordered by location. A type whose index is not in memory is
-        loaded first: this waits for that."""
+        best part. Equal scores are ordered by location. A query of zeros has no best chunks: it
+        returns nothing. A type whose index is not in memory is loaded first: this waits for that."""
         while True:
             with self._vec_lock:
                 ti = self._loaded(vec_type)
@@ -2006,6 +2069,11 @@ class Store:
         if ti is None or len(ti.store) == 0 or n <= 0:
             return {}, []
         q = prepare(np.asarray(query), ti.dim)[0]
+        if not q.any():
+            # No direction (zeros, or numbers so large that their length overflows): every vector
+            # scores 0. Ties are taken whole, here and in the index, so the search would go on
+            # until it had seen every vector: the compact index read every row a dozen times.
+            return {}, []
         allowed_vids = None
         if allowed_ids is not None:
             allowed = ti.vectors_of(allowed_ids)
@@ -2060,8 +2128,21 @@ class Store:
     def save_vectors(self, *, stale: bool = False) -> None:
         """Persist the in-memory indexes that changed, with the epoch they reflect. The indexes are
         copied while holding the vector lock (fast) and written after it is released, so searches
-        don't wait for the disk. Saves run one at a time; data first, note second. A backend that
-        is not saved leaves no file, and is rebuilt from the stored vectors at the next start.
+        don't wait for the disk. Saves run one at a time; data first, note second. The note holds
+        the checksum of the data: a start reads no other bytes under it (_load_saved). A backend
+        that is not saved leaves no file, and is rebuilt from the stored vectors at the next start.
+
+        Each save has a random `save_id`, written into the note and into `meta`. A start matches
+        a saved index to the rows by vector id, which is right for the state of the database the
+        index was saved from and for later ones only: a database that went back (an `index.db`
+        put back from a copy, commits lost in a power cut) hands the same ids out again, for
+        other vectors. `meta` goes back with it, so the two ids then differ and the index is
+        rebuilt. The id is committed after the index is copied: a state that holds it comes after
+        every row of the copy. The file is written under a temporary name first. One short
+        transaction then sets the id, moves the file in place and writes the note, which also
+        keeps the saves of two processes apart. A save that stops before it leaves the earlier
+        file, note and id, which agree; one that stops inside it leaves those, or a file and a
+        note that fail one of the two checks.
 
         With `stale` (an update that ends by saving: the CLI's, the eval's), the files are first
         made what the next start needs, so that no search has to wait for it: `auto` picks again,
@@ -2078,7 +2159,7 @@ class Store:
                         continue
                     note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
                             "embedder": self.get_meta(f"vec.{vec_type}.embedder"), "database": self.database_id(),
-                            "backend": use.name, "file": self._data_path(vec_type).name}
+                            "save_id": uuid.uuid4().hex, "backend": use.name, "file": self._data_path(vec_type).name}
                     if use.options:
                         note["options"] = use.options
                     copies.append((vec_type, ti.store.to_bytes(), note))
@@ -2088,8 +2169,17 @@ class Store:
                 if data is None:
                     self._note_path(vec_type).unlink(missing_ok=True)
                 else:
-                    _atomic_write(self.index_dir / note["file"], data)
-                    _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
+                    note["crc32"] = zlib.crc32(data)
+                    path = self.index_dir / note["file"]
+                    tmp = _temp_path(path)
+                    try:
+                        tmp.write_bytes(data)  # the long write: nothing a start reads has changed yet
+                        with self.transaction():
+                            self.set_meta(f"vec.{vec_type}.save_id", note["save_id"])
+                            os.replace(tmp, path)
+                            _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
+                    finally:
+                        tmp.unlink(missing_ok=True)
                 if old is not None and old.name != (note["file"] if data is not None else None):
                     old.unlink(missing_ok=True)  # another backend's file: no note describes it any more
 
