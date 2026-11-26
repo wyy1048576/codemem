@@ -60,6 +60,7 @@ def two_commits(repo: Path) -> tuple[str, str]:
 
 
 def add_worktree(repo: Path, folder: Path, *args: str) -> Path:
-    """`git worktree add` outside the repo's folder, as `git worktree add ../name` does."""
+    """`git worktree add` at `folder`: outside the repo's folder, as `git worktree add ../name`
+    does, or inside it, where agent hosts put them (`.claude/worktrees/<name>`)."""
     git(repo, "worktree", "add", "-q", str(folder), *args)
     return folder.resolve()

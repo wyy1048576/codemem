@@ -150,11 +150,13 @@ right half (the texts and their vectors). The rest of this section takes them in
 codemem indexes every file in a supported language: Python, JavaScript, TypeScript, TSX, Go,
 Java, Rust, C and C++ (with CUDA). It skips what `.gitignore` excludes, folders like
 `node_modules` and `.venv`, vendored or generated code (`vendor/`, `*.min.js`, `*_pb2.py`), binary
-files, and files over 10 MB.
+files, and files over 10 MB. It also skips a git worktree of the same repository that lies inside
+the checkout: that folder is another checkout, with an index of its own (§4.6).
 
 **Nothing is skipped silently.** Every skipped file is stored with its reason, and `index_status`
 lists them, together with counts of ignored folders and of files in no supported language
-(README, YAML, SQL…). A file whose size and modification date haven't changed is never re-read.
+(README, YAML, SQL…), and the worktrees it left out. A file whose size and modification date
+haven't changed is never re-read.
 
 ### 3.2 Chunks
 
@@ -547,7 +549,8 @@ is what makes the split safe:
   (§4.2).
 - **In the CLI and the eval,** `update()` runs stage A and then all of stage B before it returns
   (batches of 512 chunks; model calls of 256 texts, longest first), and writes the search index to
-  disk, so the index is complete when it returns.
+  disk, so the index is complete when it returns. `codemem search` runs both stages itself when
+  it finds the index behind the checkout (§4.6).
 
 ### 4.2 A search catches up first, within 4 s
 
@@ -623,9 +626,10 @@ formatter run, the first embedding of a repo), step ③ covers the search's own 
 nothing else. The search then answers with the same kind of note (`1800 code chunks in 240 files
 (vllm/a.py, ...) are still being embedded ...`), and the writer embeds the rest in the background.
 While a new index gets its first structure, a search answers at once and says the index is still
-being built.
+being built. A new index that starts as a copy of another checkout's is waited for instead (§4.6).
 
-**`get_chunk`** does ① and ② only: the code, lines and links it shows are always current.
+**`get_chunk`** does ① and ② only: the code, lines and links it shows are current. One case has a
+note instead: a new worktree's index that is still a copy of another checkout's (§4.6).
 
 ### 4.3 The watcher and the writer
 
@@ -633,7 +637,8 @@ The **watcher** turns file events into changed paths. It collects them until sav
 or for at most 2 s while saves keep coming, then hands them to the writer in one batch. A change to
 `.gitignore`, `.codemem.toml` or the git branch, or more than 2,000 paths at once, asks for a full
 check of the repo instead. While git is rewriting files (a checkout or a merge), updates wait for
-it, up to 10 s.
+it, up to 10 s. A save in a worktree that lies inside the checkout is ignored: it belongs to that
+worktree's index (§4.6).
 
 The **writer** is one thread, the only thing that writes the index while codemem runs, so updates
 never race. Besides running the two stages (§4.1), it:
@@ -697,11 +702,12 @@ and reports any difference.
 | a change too big to embed in 4 s (a branch switch, a formatter run) | a search embeds its own keyword results, then answers with what the index has and a note naming the files still being embedded, so the agent can grep them; the writer embeds the rest in the background, newest first |
 | two agent sessions on one repo | one writes at a time (a lock file); each picks up the other's vectors without re-embedding |
 | OS file events don't work (network drives, WSL) | a warning, a full check every 10 s, and a full check before each search (0.5 s on vLLM) |
+| a search or `get_chunk` in a new worktree, before the copied index is checked (§4.6) | it waits for that check within its 4 s; past that it answers from the copy, and a note says that this can be the other checkout's code |
 | a search while the model is loading (when the server starts, or after the model was freed for being idle) | it waits within its 4 s, then answers from keywords alone and says so |
 | a search while a search index is still loading, or is being rebuilt from the stored vectors (§5) | the same: it waits within its 4 s, and not for a rebuild that will take longer; then keywords alone, and the note |
 | a save while the model is loading | it is applied at once (stage A); its vectors follow when the model is in memory |
-| the model can't be loaded (a wrong name, no network for its first download) | saves are still applied and searches answer from keywords, at once: a search does not wait for a load that has failed. The load is tried again after 1 s, then after twice as long each time, up to a minute, and `index_status` shows the error until it works |
-| the embedding API or the `serve-embeddings` server is down | a search waits for its retries, about 31 s, then fails; edits stay queued and are embedded when it is back (decisions.md §2) |
+| the model can't be loaded (a wrong name, no network for its first download) | saves are still applied and searches answer from keywords, at once: a search does not wait for a load that has failed, and its note says why. The load is tried again after 1 s, then after twice as long each time, up to a minute, and `index_status` shows the error until it works |
+| the embedding API or the `serve-embeddings` server is down | the same as a model that can't be loaded: searches answer from keywords and their note names the address that does not answer; edits stay queued and are embedded when it is back. Only the first search to find the endpoint down waits for its request's retries, about 31 s. After that each search asks the endpoint once, and the writer on the schedule above, so the first search after it is back ranks by meaning again. `codemem index` and `codemem search` stop after the retries with one line that names the address (decisions.md §2) |
 
 ### 4.6 Branch switches and worktrees
 
@@ -745,6 +751,38 @@ time to the first visit only: 9,054 texts are about 18 minutes at the M1's 8.5 t
 the background, while keyword search already answers for B. On every later visit the vectors come
 from the cache.
 
+**A switch with no server running.** `codemem search` is a command that runs once: no watcher
+tells it that the checkout moved. So it starts with a full check that changes nothing, the one
+`codemem status` makes. If no file differs from the index, it searches. If files differ (a
+switch, a pull, edits), it brings the index to the checkout first, and says so on stderr:
+
+```
+the index is behind this checkout (52 files changed, 12 deleted, git HEAD moved); updating it first
+```
+
+- **It waits for stage A,** as it waits for the model: the names, lines and keywords of its
+  answer are the checkout's.
+- **Then stage B:** first the vectors its own keyword results need (§4.2), then the other
+  queued ones for at most 20 s, and none of them with more than 1,000 chunks queued. So the
+  command answers within the time limit a caller may have (an agent's shell tool). What is left
+  is named after the results, with the command that embeds it:
+
+  ```
+  note: 4384 code chunks in 240 files (vllm/a.py, ...) are not embedded yet: keyword matches for
+  them are current, ranking by meaning may be out of date. Run `codemem index` to embed them.
+  ```
+- **A search by keywords alone** (`--signals bm25`) runs stage A and loads no model.
+- **It only follows the files.** An index that was built with other settings, or by another
+  model, would be rebuilt or embedded again by an update, and its old vectors dropped first.
+  A search never starts that: `codemem index` does.
+- **If the index cannot be updated,** for that reason or because another codemem process holds
+  its write lock for more than 30 s, the search answers from the index as it is. It says that the
+  index is behind the checkout, why it was not updated, and to run `codemem index`.
+
+On flask a search right after a switch across 853 commits (64 files differ) takes 1.1 s, against
+0.4 s when nothing differs (a fake model, the vectors in the cache). The check itself costs what
+`codemem status` costs: 0.02 s there.
+
 **Switching back before the vectors are done** leaves no work for the branch that was left:
 - a chunk that exists only on that branch is deleted by stage A of the switch back, and its place
   in the queue with it;
@@ -766,6 +804,22 @@ the vectors stage B had not replaced yet are still in place.
 worktrees never share an index, and a codemem started inside a worktree (an MCP server, the CLI)
 serves that worktree, with its own watcher and writer. Each such process also holds the embedding
 model, unless they share one through `codemem serve-embeddings` (§3.5).
+
+**A worktree inside another checkout stays out of that checkout's index.** Agent hosts put
+worktrees inside the main checkout, in `.claude/worktrees/<name>/`. Read as plain folders, they
+would give the main index a second copy of every function, and a search would return each one
+twice. So:
+- the scan of a checkout skips every folder that is a linked worktree of the checkout's own
+  repository, and `index_status` lists the folders it left out;
+- the watcher ignores the saves in such a folder, and its `.gitignore` and `.codemem.toml`;
+- the worktree's own index is not affected: a codemem started inside it indexes it as it would
+  anywhere else.
+
+The rule is narrow. A folder counts only if its `.git` file leads to a git folder that shares this
+repository's own (git writes that link for every `git worktree add`). A submodule, a repository of
+another project and a worktree of another repository are read as part of the checkout. A folder
+that cannot be looked into (the user may not enter it), or whose `.git` file is not text, does not
+count either: the question never stops a scan, which goes on as for any other folder.
 
 **A new worktree's index starts from a copy.** Without one, codemem would chunk every file again
 just to find that almost all of them equal the main checkout's.
@@ -795,9 +849,25 @@ just to find that almost all of them equal the main checkout's.
   index recorded and still differ. So the copy forgets every date, and the first check hashes every
   file. From there on it is the same update as a branch switch, and it ends in the same index as a
   fresh build (tests check this for changed, added, moved and deleted files).
-- **A copy is not yet this checkout's index.** Until that first check has run, `codemem search`
-  (which never updates an index) asks for `codemem index` first, and the MCP server answers with
-  its note that the index is still being built.
+- **A copy is not yet this checkout's index.** Until that first check has run, it holds the other
+  checkout's code: functions that are not in this checkout, and other lines for the ones that are.
+  So `codemem search` asks for `codemem index` first. The MCP server's `search_code` and
+  `get_chunk` wait for the check within their 4 s, as they wait for stage A of a save (§4.2).
+  Near its source the check takes well under a second, and the first answer is this checkout's.
+  Where it takes longer than the wait (a worktree far from its source, a large repository), the
+  answer comes from the copy and begins with a note that says so:
+
+  ```
+  Note: codemem's index for this checkout started as a copy of another checkout's index, and
+  codemem is still comparing it with the files here. Until that is done, what it returns can be
+  the other checkout's code: names, line numbers and code may differ from the files in this
+  checkout. Ask again in a few seconds, or read the files themselves.
+  ```
+
+  Measured on flask, in a worktree 853 commits from the main checkout (52 files to re-chunk, 12
+  to drop): in 6 starts, the `search_code` and the `get_chunk` sent right after the handshake
+  answered 1.4 to 2.3 s after the server's start, for this checkout, and no answer held a
+  function of the other commit.
 
 Measured on vLLM (6,235 files, 102k chunks; a fake model; an M1 shared with other jobs), in a new
 worktree with one function added:
@@ -1062,6 +1132,13 @@ loses results that no count of candidates brings back. Share of searches with th
 A fine code does not make up for the missing numbers: 256 numbers with a 4-bit code kept the top
 10 in 91% of question searches at 200 candidates, and 512 numbers in 99.3%.
 
+A code covers at most 4,096 numbers. Vectors longer than that are coded on their first 4,096,
+and the index logs a warning when it is made, once: its searches can miss what only the other
+numbers tell apart. With 2,100 vectors of 8,192 numbers whose first half was noise, none of 12
+searches returned what the exact index returned; with vectors alike over their whole length,
+all 12 did. The exact index compares every number, and `embedding_dim` cuts the vectors
+themselves.
+
 **What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50),
 with FAISS on one thread:
 
@@ -1132,12 +1209,22 @@ checksum, the options and the rotation are the expected ones. What FAISS was not
 refused with a message: a code of more than 4,096 numbers when the config is read, a FAISS older
 than 1.15.1 when the index is opened.
 
+**A call that raises** (FAISS cannot get memory) must not leave the two FAISS indexes with
+different codes. A change is several calls: codes are added to each index, and for an id that
+is held already or is older than the newest held, codes are dropped and moved as well. New
+codes that one index took are taken off again when the other fails. Dropping and moving is
+done on copies of the two indexes, which replace them once every call has worked. Either way
+the index holds what it held before, the write raises, and the store adds the vectors again
+when it next catches up with the rows.
+
 **Loading a search index.** A search index is saved beside `index.db` and read back at the next
 start: 0.9 s for the exact index of 200,000 vectors, 0.5 s for the compact one. It is rebuilt
 from the stored vectors instead when the saved copy cannot be used: there is none, it is another
-backend's (the rule picks the other index, or the config names another), or its note names no
-database. That last case is every index built before saved copies named their database: the
-first start on one rebuilds its search index, once. On an M1 that was running other jobs, an
+backend's (the rule picks the other index, or the config names another), its bytes are not the
+bytes that were saved, the database has gone back to a state from before the copy, or its note
+lacks the database, the save's id or the checksum that a start checks. That last case is every
+copy saved by a codemem that did not write them: the first start on such an index rebuilds its
+search index, once. On an M1 that was running other jobs, an
 exact index took 0.5 to 1.5 s to rebuild at 50,000 vectors and 2.5 to 5 s at 200,000. A compact
 index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000, with FAISS on
 one thread.
@@ -1171,6 +1258,12 @@ the index for proportionally more vectors, so that the best 50 chunks are comple
 An SQLite index over these columns (about 25 bytes per vector on disk) lets a start read them
 without touching the pages that hold the vectors: 0.2 s instead of 0.8 s at 200,000 vectors.
 
+**A query without a direction** (a vector of zeros) gets no results by meaning, from any index.
+Every stored vector scores 0 against it, and equal scores are taken whole, so that their order
+never depends on where a cut falls: the search would go on until it had seen every vector. On
+the pandas index (43,187 code vectors) that took the compact index 4.1 s and 561,431 row reads.
+The store answers such a query with nothing and asks no index.
+
 **Keeping the copy in step with SQLite.** The in-memory index changes only after a commit, so it
 never holds a vector that could be rolled back. Every commit that changes a type's vectors also
 bumps that type's version number in `meta`, and an index that is behind catches up by comparing
@@ -1182,6 +1275,32 @@ A saved copy is read only into the database it was saved from. Each `index.db` c
 `database_id` in `meta`, and the copy's note names it. A copy whose note names another database,
 or none, is rebuilt from the rows. Vector ids start again at 1 in a new `index.db`, so without the
 name the copy of a deleted one would be matched, id by id, against vectors it was not made from.
+
+A saved copy is read only by the state of the database it was saved from, or a later one.
+Matching by vector id is right while no id is used twice, and a database that goes back uses
+them twice: an `index.db` put back from a backup, or one that lost its last commits in a power
+cut (commits are not synced to the disk one by one), hands out again the ids of the rows it
+lost, for other vectors. The version number does not show it, because it counts up again. So
+each save writes a random `save_id` into the copy's note and into `meta`, and a start reads the
+copy only when the two are equal. `meta` goes back with the database: after a step back they
+differ, and the search index is rebuilt from the rows. The id is committed after the index was
+copied from memory, so a state that holds it comes after every vector of the copy. A save
+writes the file under a temporary name first; one short transaction then sets the id, renames
+the file and writes the note. A save that is stopped part of the way leaves the earlier copy,
+or one that a start refuses.
+
+A saved copy is read only if its bytes are the bytes that were saved. Its note holds a checksum
+of the file (CRC-32), and a start compares the two before the index is given the file. A file
+that differs is rebuilt from the rows, with one warning in the log: a damaged file, one that
+was cut short, and the file of another index under this one's note. FAISS itself reads an exact
+index with a flipped bit as it is. In a test with 2,500 vectors the damaged vector then scored
+up to 2,427 (a similarity cannot pass 1), and a flipped bit in a size field made the start
+allocate past 500 MB for a file of 0.3 MB.
+
+A note never chooses a file. Whoever can write to the index folder can write a note, and the
+file a note describes is read at a start and deleted when a save replaces it. So that file is
+always `vec_<type><suffix>` in the index folder, with the suffix of the note's backend. A note
+that names anything else, a path among them, counts as no note.
 
 **The vector cache** maps (embedder key, text hash) to a vector: 2 bytes per number, at the
 model's full length. It is one SQLite file for the whole machine, and every codemem process
@@ -1349,7 +1468,8 @@ three strengths (`none`, `light`, `strong`): getting agents to use the tool at a
 adoption problem, and the agent study varies it.
 
 The CLI is for people and scripts: `codemem init` registers the MCP server with your agents,
-downloads the model and builds the index; `codemem index`, `search` and `status` do what they say;
+downloads the model and builds the index; `codemem index`, `search` and `status` do what they say
+(`search` first brings the index to the checkout if files changed since its last update, §4.6);
 `codemem serve-embeddings` serves the local model to other codemem processes (§3.5).
 
 ---

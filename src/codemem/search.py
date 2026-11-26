@@ -64,6 +64,9 @@ class SearchResponse:
     freshness: Any = None  # set by CodememService.search: what the index could not include yet
     # set by CodememService.search: keywords only, the model or the search index was still loading
     models_loading: bool = False
+    # set with it: why no vector could be used, when that is a failure and not a load in progress
+    # (a model that did not load, an embedding endpoint that does not answer)
+    models_error: str | None = None
 
     def to_dict(self) -> dict:
         return {

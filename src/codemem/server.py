@@ -41,7 +41,10 @@ def build_server(service: CodememService) -> MCPServer:
             return f"tests must be one of {', '.join(TEST_FILTERS)}."
         notice = ""
         if service.state == "indexing":
-            notice = prompts.indexing_notice(service.progress) + "\n\n"
+            # A copy of another checkout's index is not a build in progress: the search waits for
+            # its first full check, and has a notice of its own if that takes longer.
+            if not service.copy_unchecked():
+                notice = prompts.indexing_notice(service.progress) + "\n\n"
         elif service.state in ("empty", "error") and not service.has_index():
             return "The codemem index is not available yet." + (
                 f" Last error: {service.last_error}" if service.last_error else ""
@@ -50,9 +53,11 @@ def build_server(service: CodememService) -> MCPServer:
             query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
         )
         fresh = resp.freshness
+        if fresh is not None and fresh.unchecked_copy:
+            notice = prompts.copy_notice() + "\n\n"
         notes = [freshness_note(fresh, service.store.pending_paths() if fresh is not None and fresh.pending_chunks else (0, []))]
         if resp.models_loading:
-            notes.append(prompts.models_loading_notice())
+            notes.append(prompts.vectors_unavailable_notice(resp.models_error) if resp.models_error else prompts.models_loading_notice())
         # Appended here, not in format_results: the eval builds its hit text from format_results.
         notes.append(prompts.search_footer(steering))
         return notice + format_results(resp) + "".join(f"\n\n{n}" for n in notes if n)
@@ -61,8 +66,10 @@ def build_server(service: CodememService) -> MCPServer:
     def get_chunk(ref: str) -> str:
         d = service.get_chunk(ref)
         if d is None:
-            return f"No indexed function matches {ref!r}. Use a chunk id, path:line, or path::qualname."
-        return format_chunk(d)
+            missing = f"No indexed function matches {ref!r}. Use a chunk id, path:line, or path::qualname."
+            # In a copy of another checkout's index, a function of this checkout may only be missing still.
+            return f"{missing}\n\n{prompts.copy_notice()}" if service.copy_unchecked() else missing
+        return (prompts.copy_notice() + "\n\n" if d.get("unchecked_copy") else "") + format_chunk(d)
 
     @server.tool(name="refresh_index", description=prompts.tool_description("refresh_index", steering))
     def refresh_index() -> str:

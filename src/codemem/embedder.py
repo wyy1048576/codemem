@@ -73,6 +73,13 @@ class LocalModelUnavailable(RuntimeError):
     """The packages the local embedding model runs on are not installed."""
 
 
+class EmbeddingUnavailable(RuntimeError):
+    """An embedding endpoint gave no vectors after every retry: nothing answers at its address,
+    or it kept answering with a rate limit or a server error. The message names the address and
+    what the last try met. A command says so and stops; a search that has a budget answers from
+    keywords (service.py)."""
+
+
 def require_local_model() -> None:
     """Raise, naming what to install and what to set instead, when the local model's packages are
     missing (an environment built without them, for a client of an API or of a served model)."""
@@ -221,6 +228,13 @@ class Embedder(ABC):
         """The model was in memory, `unload` freed it, and nothing has loaded it again. What the
         next call waits for is then a reload, which a search waits out (service.py)."""
         return False
+
+    @property
+    def unreachable(self) -> str | None:
+        """Why this embedder cannot embed now, when it embeds through an endpoint that has stopped
+        answering: what its last request met, after every retry. None for a model that runs in
+        this process, and for an endpoint whose last request got its vectors."""
+        return None
 
     def touch(self) -> None:
         """Count as used now. A caller that will embed only if the model is in memory calls this
@@ -587,7 +601,12 @@ class OpenAIEmbedder(Embedder):
     or TEI server, Ollama. Texts go in requests of `batch_size`, up to `max_concurrency` at once.
     Rate limits (429), server errors (5xx) and dropped connections are retried with backoff;
     other errors fail at once, with the provider's message. The key is read from the environment
-    variable `api_key_env` at each request and never stored."""
+    variable `api_key_env` at each request and never stored.
+
+    A request that gave no vectors after every retry raises EmbeddingUnavailable and leaves the
+    embedder not `ready`, as a model that is not in memory is: `unreachable` says why. Until a
+    request gets its vectors again, each one is sent once, so whoever asks next learns at once
+    whether the endpoint is back."""
 
     RETRIES = 6
     BACKOFF_S = 1.0  # first wait between retries; doubles, up to 30 s
@@ -601,10 +620,19 @@ class OpenAIEmbedder(Embedder):
         self._client: Any = None
         self._lock = threading.Lock()
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._unreachable: str | None = None  # what the last request met, if it gave no vectors after every retry
 
     @property
     def host(self) -> str:
         return urlparse(self.cfg.base_url).netloc or self.cfg.base_url
+
+    @property
+    def ready(self) -> bool:
+        return self._unreachable is None
+
+    @property
+    def unreachable(self) -> str | None:
+        return self._unreachable
 
     @property
     def key(self) -> str:
@@ -667,15 +695,20 @@ class OpenAIEmbedder(Embedder):
         return np.asarray(rows, dtype=np.float32)
 
     def _request(self, texts: list[str]) -> np.ndarray:
+        tries = 1 if self._unreachable else self.RETRIES  # known not to answer: asked once, not six times
         delay = self.BACKOFF_S
-        for attempt in range(self.RETRIES):
+        for attempt in range(tries):
             try:
-                return self._shape(self.attempt(texts))
+                vecs = self._shape(self.attempt(texts))
             except TryLater as e:
-                if attempt == self.RETRIES - 1:
-                    raise RuntimeError(str(e)) from e
+                if attempt == tries - 1:
+                    self._unreachable = str(e)
+                    raise EmbeddingUnavailable(str(e)) from e
                 time.sleep(e.wait or delay)
                 delay = min(delay * 2, 30.0)
+            else:
+                self._unreachable = None
+                return vecs
         raise AssertionError("unreachable")
 
     def _shape(self, vecs: np.ndarray) -> np.ndarray:

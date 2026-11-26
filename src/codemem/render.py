@@ -52,15 +52,45 @@ def freshness_note(fresh: Any, pending: tuple[int, list[str]] = (0, [])) -> str:
     if fresh.pending_files:
         parts.append(f"{_files(fresh.pending_files)} saved moments ago are still being indexed, so results may miss their latest edits")
     if fresh.pending_chunks:
-        n, examples = pending
-        where = f" in {_files(n)} ({', '.join(examples)}{', ...' if n > len(examples) else ''})" if examples else ""
         parts.append(
-            f"{fresh.pending_chunks} code chunks{where} are still being embedded: keyword matches for them are "
+            f"{_chunks_in(fresh.pending_chunks, pending)} are still being embedded: keyword matches for them are "
             "current, ranking by meaning may be out of date"
         )
     if fresh.unconfirmed:
         parts.append("codemem could not confirm it has seen your most recent saves")
+    if not parts:
+        return ""  # an answer from a copy of another checkout's index: the tool's own notice says so (prompts.py)
     return "Note: " + "; ".join(parts) + ". Search again in a few seconds, or use grep for those files."
+
+
+def pending_note(fresh: Any, pending: tuple[int, list[str]] = (0, [])) -> str:
+    """The same line for a command that answers once (`codemem search`), "" when its search had
+    every vector. Nothing goes on embedding after such a command, so the line names the one that does."""
+    if fresh is None or not fresh.pending_chunks:
+        return ""
+    return (
+        f"note: {_chunks_in(fresh.pending_chunks, pending)} are not embedded yet: keyword matches for them are "
+        "current, ranking by meaning may be out of date. Run `codemem index` to embed them."
+    )
+
+
+def format_behind(behind: dict[str, Any]) -> str:
+    """How far an index is behind its checkout (`CodememService.behind`), worded as `status` words
+    it: `3 files changed, 2 deleted, git HEAD moved`, and the chunks still to embed."""
+    parts = []
+    if behind["changed_files"] or behind["deleted_files"]:
+        moved = ", git HEAD moved" if behind["head_moved"] else ""
+        parts.append(f"{_files(behind['changed_files'])} changed, {behind['deleted_files']} deleted{moved}")
+    if behind["pending_chunks"]:
+        parts.append(f"{behind['pending_chunks']} chunks to embed")
+    return "; ".join(parts)
+
+
+def _chunks_in(chunks: int, pending: tuple[int, list[str]]) -> str:
+    """`12 code chunks in 4 files (a.py, b.py, c.py, ...)`, from the files with queued chunks."""
+    n, examples = pending
+    where = f" in {_files(n)} ({', '.join(examples)}{', ...' if n > len(examples) else ''})" if examples else ""
+    return f"{chunks} code chunks{where}"
 
 
 def format_refresh(out: dict[str, Any]) -> str:
@@ -240,4 +270,11 @@ def format_coverage(info: dict[str, Any]) -> list[str]:
     if cov.get("ignored_files") or dirs:
         folders = ", ".join(f"{n} by ignore rules" if d == "(ignored)" else f"{d} {n}" for d, n in dirs.items())
         out.append(f"ignored: {_files(cov.get('ignored_files', 0))}; skipped folders: {folders or 'none'}")
+    trees = cov.get("worktrees") or {}
+    if n := trees.get("count"):
+        shown = trees.get("examples", [])[:3]
+        names = f" ({', '.join(shown)}{', ...' if n > len(shown) else ''})" if shown else ""
+        out.append(
+            f"not indexed here (git worktrees, each a checkout with its own index): {n} folder{'' if n == 1 else 's'}{names}"
+        )
     return out

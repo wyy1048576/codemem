@@ -3,6 +3,8 @@
 The watcher only notices; the service decides when to index (docs/architecture.md §4):
 - paths are collected until saves stop for `debounce_ms`, or at most `max_wait_ms` after the
   first one, then handed over in one batch;
+- a save in another checkout of the repository that lies inside this one (a git worktree in
+  `.claude/worktrees/`) is not this checkout's: its own index follows it;
 - a change to `.gitignore`, the repo config or the git branch asks for a full reconcile instead;
 - `barrier()` lets a search wait until every event before it has arrived: it writes a marker file
   into the git folder and waits for that file's own event (events arrive in order).
@@ -38,7 +40,7 @@ def git_dir(root: Path) -> Path | None:
     if dot.is_file():
         try:
             line = dot.read_text("utf-8").strip()
-        except OSError:
+        except (OSError, ValueError):  # it cannot be read, or it is not text (UTF-16, as PowerShell writes it)
             return None
         if line.startswith("gitdir:"):
             target = Path(line.split(":", 1)[1].strip())
@@ -118,10 +120,14 @@ class RepoWatcher:
         self, root: Path, on_change: OnChange, *, debounce_ms: int = 500, max_wait_ms: int = 2000,
         skip: Sequence[Path] = (),
     ):
+        from .worktrees import git_common_dir, is_worktree_of  # here, not at the top: worktrees.py imports this module
+
         self.root = Path(root).resolve()
         self.debouncer = Debouncer(debounce_ms / 1000, on_change, max_wait_ms / 1000)
         self.skip = [os.path.normcase(str(Path(p).resolve())) for p in skip]
         self.git = git_dir(self.root)
+        self._common = git_common_dir(self.root)  # the git folder every checkout of the repository shares
+        self._is_worktree_of = is_worktree_of
         self.observer = Observer()
         self.observer.schedule(_Handler(self), str(self.root), recursive=True)
         if self.git is not None and not self._inside_root(self.git):
@@ -148,6 +154,19 @@ class RepoWatcher:
             except (ValueError, OSError):
                 return None
 
+    def _in_other_checkout(self, parts: tuple[str, ...], is_dir: bool) -> bool:
+        """The path lies in a linked worktree of this repository that is inside this checkout: the
+        folders the scan skips too (`IgnoreRules.other_checkout`). The folders themselves are asked
+        at every event, so a worktree added or removed while the watcher runs counts at once."""
+        if self._common is None:
+            return False
+        folder = self.root
+        for part in parts if is_dir else parts[:-1]:
+            folder = folder / part
+            if self._is_worktree_of(folder, self._common):
+                return True
+        return False
+
     # ---- events
     def seen(self, raw: str, is_dir: bool) -> None:
         path = Path(raw)
@@ -172,6 +191,8 @@ class RepoWatcher:
         parts = rel.parts
         if not parts or any(p in ALWAYS_SKIP_DIRS for p in parts[:-1]) or parts[0] in ALWAYS_SKIP_DIRS:
             return
+        if self._in_other_checkout(parts, is_dir):
+            return  # that checkout's own index follows it, its `.gitignore` and its config too
         name = parts[-1]
         if name in (".gitignore", REPO_CONFIG_NAME):
             self.debouncer.trigger(reconcile=True)

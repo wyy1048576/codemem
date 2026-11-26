@@ -89,6 +89,31 @@ def test_watcher_reindexes_after_save(service, sample_repo):
     assert hits[0].qualname == "record_audit_event"
 
 
+def test_a_watcher_that_is_still_starting_is_not_taken_for_one_that_stopped(service, monkeypatch):
+    """Fixed bug: the service handed the watcher to the writer before it started it. A start takes
+    a while (on Linux it adds a watch to every folder before its thread runs). A writer that had
+    a quiet moment in between saw a watcher that was not alive, took it for one that had stopped,
+    and scanned the whole repo every few seconds for the rest of the session."""
+    from codemem.watcher import RepoWatcher
+
+    service.update()
+    real_start = RepoWatcher.start
+    during_start = []
+
+    def slow_start(watcher):
+        for _ in range(5):  # the writer's quiet moments while the watcher starts
+            service._step()
+        during_start.append(service._polling)
+        real_start(watcher)
+
+    monkeypatch.setattr(RepoWatcher, "start", slow_start)
+    service.start_watcher()
+    for _ in range(5):
+        service._step()
+    assert during_start == [False] and not service._polling
+    assert service.status(check_staleness=False)["watching"] is True
+
+
 def test_watcher_ignores_non_code_and_skip_dirs(service, sample_repo):
     service.update()
     calls = []
@@ -388,6 +413,31 @@ def test_the_search_indexes_are_written_once_the_index_is_quiet(service, sample_
     assert _wait_for(lambda: saved.stat().st_mtime_ns != before and not service.store.vectors_unsaved())
 
 
+def test_a_save_that_fails_does_not_stop_the_writer(service, monkeypatch, caplog):
+    """The writer thread writes the search indexes' files in a quiet moment. A save can fail: the
+    disk is full, or another process holds the database's write lock for longer than a save waits
+    (Store.save_vectors ends in a short transaction). An error that left the step would end the
+    thread, and with it the watcher's updates until a search started a new one."""
+    import sqlite3
+
+    import codemem.service as svc_mod
+
+    service.update()
+    tries = []
+
+    def locked(**_):
+        tries.append(1)
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(svc_mod, "SAVE_AFTER_IDLE", -1.0)
+    monkeypatch.setattr(service.store, "vectors_unsaved", lambda: True)
+    monkeypatch.setattr(service.store, "save_vectors", locked)
+    with caplog.at_level("ERROR", logger="codemem"):
+        assert service._step() is True  # logged, not raised
+    assert tries == [1]
+    assert any("could not write the search indexes" in r.getMessage() for r in caplog.records)
+
+
 # ---------------------------------------------------------------- CLI
 
 
@@ -435,7 +485,12 @@ def test_cli_without_pytorch_names_the_remedy_and_status_still_works(sample_repo
 def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sample_repo, tmp_path, monkeypatch):
     """The MCP server's service in an environment built without PyTorch, with a config that asks
     for the local model: no update is applied, nothing is dropped, and a search answers from
-    keywords once its wait for the model is over."""
+    keywords once its wait for the model is over. Its note says why, not that the model is
+    still loading."""
+    from mcp import Client
+
+    from codemem.server import build_server
+
     monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
     built = CodememService(sample_repo, index_dir=tmp_path / "idx")
     built.update()
@@ -451,8 +506,19 @@ def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sa
         assert _wait_for(lambda: "pip install torch" in (svc.last_error or ""))
         resp = svc.search("revoke session", k=3, wait_for_models=False)
         assert resp.signals == ["bm25"] and resp.models_loading
+        assert resp.models_error.startswith("LocalModelUnavailable: The local embedding model cannot run")
         assert resp.results[0].qualname == "revoke_session"
         assert svc.store.counts()["vectors"] == vectors and sum(vectors.values()) > 0
+        server = build_server(svc)
+
+        async def run():
+            async with Client(server) as client:
+                text = (await client.call_tool("search_code", {"query": "revoke session", "k": 3})).content[0].text
+                assert "revoke_session" in text and "still loading" not in text
+                assert "Note: codemem cannot embed right now (LocalModelUnavailable: The local embedding model" in text
+                assert "pip install torch sentence-transformers" in text and "keyword matching only" in text
+
+        anyio.run(run)
     finally:
         svc.close()
 

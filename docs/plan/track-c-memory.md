@@ -489,7 +489,7 @@ documentation gives the host above.
 | Batching | 64 texts per request, 4 requests at once, 6 tries | batch by tokens, not by count, with texts sorted by length; back off on the provider's rate-limit reply |
 | Resuming | stage B's queue already survives a stop | show progress and remaining cost in `codemem status` |
 | Cost | not shown | print the estimate before a first build ("about 38M tokens, $0.38") |
-| The API is down | each search waits about 31 s, then fails | answer at once from keywords and the graph, with a note, and show the error in `index_status` |
+| The API is down | a search answers from keywords, with a note that names the address that does not answer, and `index_status` shows the error until a request works again. The first search to find the endpoint down still waits for its own request's retries, about 31 s | cut that first wait to the search's 4 s |
 | Query time | one request per search | keep the cache of recent query vectors; measure the real delay (C-E7 reports it) |
 | Privacy | `codemem status` says code is sent to the provider | add the provider's terms in one line. Nebius's documents disagree: its quick guide says content is not used for training; its terms say inputs are stored and used to train small helper models unless you opt out *(reported)* |
 | A second provider | any OpenAI-compatible endpoint works | list DeepInfra as the tested fallback: same model, same price |

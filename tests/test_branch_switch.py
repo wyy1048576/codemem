@@ -1,11 +1,13 @@
 """What a branch switch costs. One index follows its checkout from commit A to commit B and back
 (gitrepo.py: a changed, an added, a moved and a deleted file). Coming back to a commit seen before
 must cost no model call, work queued for the branch that was left must not be done, and a search
-right after a switch embeds first what its own keywords rank on top.
+right after a switch embeds first what its own keywords rank on top. `codemem search` on the
+command line, which no server keeps current, brings the index to the checkout before it answers.
 
 The model is a fake one that records every text it is asked to embed.
 """
 
+import json
 import threading
 import time
 from contextlib import contextmanager
@@ -15,10 +17,12 @@ from conftest import RecordingEmbedder
 from gitrepo import ONLY_ON_A, ONLY_ON_B, TO_A, TO_B, UNCHANGED, add_worktree, git, needs_git, two_commits
 
 from codemem import service as service_module
+from codemem.cli import main
+from codemem.config import default_index_dir
 from codemem.embedder import FakeEmbedder
 from codemem.indexer import Indexer, IndexStats
 from codemem.service import CodememService
-from codemem.store import Store, diff_snapshots
+from codemem.store import IndexLock, Store, diff_snapshots
 
 pytestmark = needs_git
 CHANGED_BOTH_WAYS = "auth/sessions.py::revoke_session"  # its body differs between A and B
@@ -482,3 +486,191 @@ def test_a_search_that_may_wait_for_the_model_loads_it_for_its_keyword_results(s
     assert all("auth/audit.py" in line for line in _first_lines(mine))
     assert resp.results[0].qualname == "record_audit_event" and "code" in resp.results[0].ranks
     assert resp.freshness.indexing and not resp.models_loading
+
+
+# --------------------------------------------------------------------------- `codemem search` on the command line
+
+
+@pytest.fixture
+def cli_repo(repo, monkeypatch, capsys):
+    """The checkout with the command line's own index of it, current on A. No server runs."""
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+    assert main(["index", str(repo)]) == 0
+    capsys.readouterr()
+    return repo
+
+
+def _cli_search(capsys, repo, query, *options):
+    """`codemem search --json`: its exit status, its results and what it wrote to stderr."""
+    status = main(["search", query, "--repo", str(repo), "--json", *options])
+    out, err = capsys.readouterr()
+    return status, json.loads(out)["results"] if status == 0 else [], err
+
+
+def _queued(repo):
+    store = Store(default_index_dir(repo))
+    try:
+        return store.dirty_count()
+    finally:
+        store.close()
+
+
+def test_the_command_lines_search_follows_a_switch(cli_repo, capsys):
+    """Fixed bug: `codemem search` never looked at the checkout. After `git switch` it answered
+    from the branch that was left, with nothing on stderr, while `codemem status` knew."""
+    git(cli_repo, "switch", "-q", "feature")
+    status, results, err = _cli_search(capsys, cli_repo, "record audit event")
+    assert status == 0 and results[0]["key"] == "auth/audit.py::record_audit_event"  # exists only on B
+    assert "the index is behind this checkout (3 files changed, 2 deleted, git HEAD moved); updating it first" in err
+    assert "note:" not in err  # 11 chunks: every vector is in before the answer
+
+    status, results, err = _cli_search(capsys, cli_repo, "logout")  # exists only on A
+    assert status == 0 and "api/routes.py::logout" not in [r["key"] for r in results]
+    assert err == ""  # the index is this checkout's now: nothing to update, nothing to say
+    service = CodememService(cli_repo)
+    try:
+        assert service.store.get_meta("indexed_commit") == git(cli_repo, "rev-parse", "feature")
+        assert service.store.dirty_count() == 0 and service.indexer.verify() == []
+        assert service.status()["stale"] == {
+            "changed_files": 0, "deleted_files": 0, "head": git(cli_repo, "rev-parse", "HEAD"), "head_moved": False,
+        }
+    finally:
+        service.close()
+
+
+def test_the_command_lines_search_keeps_stdout_for_the_results(cli_repo, capsys):
+    git(cli_repo, "switch", "-q", "feature")
+    assert main(["search", "record audit event", "--repo", str(cli_repo), "-k", "3"]) == 0
+    out, err = capsys.readouterr()
+    assert out.startswith("1. auth/audit.py:4-5  record_audit_event") and "behind this checkout" not in out
+    assert "updating it first" in err
+
+
+def test_the_command_lines_search_follows_edits_no_server_saw(cli_repo, capsys):
+    """Not only a switch: any file that differs from the index, with git's HEAD where it was."""
+    (cli_repo / "auth" / "quota.py").write_text("def enforce_login_quota(user):\n    return user\n")
+    (cli_repo / "api" / "routes.py").unlink()
+    status, results, err = _cli_search(capsys, cli_repo, "enforce login quota")
+    assert status == 0 and results[0]["key"] == "auth/quota.py::enforce_login_quota"
+    assert "the index is behind this checkout (1 file changed, 1 deleted); updating it first" in err
+    assert "api/routes.py::logout" not in [r["key"] for r in _cli_search(capsys, cli_repo, "logout")[1]]
+
+
+def test_after_a_large_switch_the_command_lines_search_names_what_is_left(cli_repo, capsys, monkeypatch):
+    """More chunks need vectors than a search waits for. The structure is the checkout's all the
+    same; the search embeds the chunks its own keywords rank on top, and says what is left and
+    which command embeds it."""
+    monkeypatch.setattr("codemem.service.CATCHUP_MAX_CHUNKS", 5)  # the 11 chunks of this switch are a large change
+    git(cli_repo, "switch", "-q", "feature")
+    status, results, err = _cli_search(capsys, cli_repo, "record audit event", "--debug")
+    assert status == 0 and results[0]["key"] == "auth/audit.py::record_audit_event"
+    assert {"bm25", "code"} <= set(results[0]["ranks"])  # ranked by its new vector too
+    left = _queued(cli_repo)
+    assert 0 < left < 11
+    assert f"note: {left} code chunks in " in err and "are not embedded yet" in err
+    assert "Run `codemem index` to embed them." in err
+
+    status, _, err = _cli_search(capsys, cli_repo, "record audit event")  # the next search is not silent about them
+    assert status == 0 and f"the index is behind this checkout ({left} chunks to embed); updating it first" in err
+    assert main(["index", str(cli_repo)]) == 0
+    capsys.readouterr()
+    assert _queued(cli_repo) == 0 and _cli_search(capsys, cli_repo, "record audit event")[2] == ""
+
+
+def test_the_command_lines_search_embeds_the_rest_of_a_change_for_a_limited_time(cli_repo, capsys, monkeypatch):
+    """A change of fewer chunks than a large one is embedded whole before the answer, but not for
+    longer than a caller with a time limit of its own would wait (an agent's shell tool). When the
+    time is up, the search has its own keyword results' vectors, answers, and names what is left."""
+    monkeypatch.setattr("codemem.service.FOLLOW_EMBED_SECONDS", 0.0)  # no time for the rest
+    git(cli_repo, "switch", "-q", "feature")
+    status, results, err = _cli_search(capsys, cli_repo, "record audit event", "--debug")
+    assert status == 0 and results[0]["key"] == "auth/audit.py::record_audit_event"
+    assert {"bm25", "code"} <= set(results[0]["ranks"])  # its own results were embedded first, and are not counted
+    left = _queued(cli_repo)
+    assert 0 < left < 11
+    assert f"note: {left} code chunks in " in err and "Run `codemem index` to embed them." in err
+
+    monkeypatch.setattr("codemem.service.FOLLOW_EMBED_SECONDS", 20.0)
+    status, _, err = _cli_search(capsys, cli_repo, "record audit event")  # with time, the next search embeds the rest
+    assert status == 0 and f"({left} chunks to embed); updating it first" in err and "note:" not in err
+    assert _queued(cli_repo) == 0
+
+
+def test_a_keyword_search_on_the_command_line_follows_a_switch_and_embeds_nothing(cli_repo, capsys):
+    """`--signals bm25` needs no vector: it brings the structure to the checkout and loads no
+    model for the rest, which the next search by meaning embeds."""
+    git(cli_repo, "switch", "-q", "feature")
+    status, results, err = _cli_search(capsys, cli_repo, "record audit event", "--signals", "bm25")
+    assert status == 0 and results[0]["key"] == "auth/audit.py::record_audit_event"
+    assert "(3 files changed, 2 deleted, git HEAD moved); updating it first" in err and "note:" not in err
+    assert _queued(cli_repo) == 11
+    assert _cli_search(capsys, cli_repo, "record audit event", "--signals", "bm25")[2] == ""  # nothing a keyword search lacks
+
+    status, _, err = _cli_search(capsys, cli_repo, "record audit event")
+    assert status == 0 and "the index is behind this checkout (11 chunks to embed); updating it first" in err
+    assert "note:" not in err and _queued(cli_repo) == 0
+
+
+def test_the_command_lines_search_says_so_when_it_cannot_update_the_index(cli_repo, capsys, monkeypatch):
+    """Another codemem process holds the index's write lock for longer than the search waits. It
+    then answers from the index as it is, and says that this is another state of the checkout."""
+    git(cli_repo, "switch", "-q", "feature")
+    monkeypatch.setattr(IndexLock.acquire, "__defaults__", (0.2,))  # not the half minute a writer is waited for
+    lock = IndexLock(default_index_dir(cli_repo))
+    lock.acquire()
+    try:
+        status, results, err = _cli_search(capsys, cli_repo, "logout")
+    finally:
+        lock.release()
+    assert status == 0 and "api/routes.py::logout" in [r["key"] for r in results]  # A's code still
+    assert "note: the index is behind this checkout (3 files changed, 2 deleted, git HEAD moved) and could not be " in err
+    assert "another codemem process is writing to" in err and "Run `codemem index`, then search again." in err
+
+
+def test_the_command_lines_search_never_rebuilds_an_index(cli_repo, capsys, monkeypatch):
+    """An index built with other settings, or by another embedder, is rebuilt or embedded again by
+    its next update: minutes to hours on a real repository, and the old vectors are dropped first.
+    `codemem index` does that. A search answers from the index as it is and says why."""
+    def stored():
+        store = Store(default_index_dir(cli_repo))
+        try:
+            return store.counts()["vectors"], sorted(store.get_files()), store.get_meta("indexed_commit")
+        finally:
+            store.close()
+
+    built = stored()
+    git(cli_repo, "switch", "-q", "feature")
+    (cli_repo / ".codemem.toml").write_text("max_block_lines = 7\n")  # the chunker would cut other blocks
+    status, results, err = _cli_search(capsys, cli_repo, "logout", "--signals", "bm25")
+    assert status == 0 and "api/routes.py::logout" in [r["key"] for r in results]  # A's code still
+    assert "the index is behind this checkout (3 files changed, 2 deleted, git HEAD moved); updating it first" in err
+    assert (
+        "and could not be updated: the index was built with other settings than the config has now "
+        "(max_block_lines), and only `codemem index` rebuilds it. These results are from the index as it is."
+    ) in err
+    assert stored() == built
+
+    (cli_repo / ".codemem.toml").unlink()
+    store = Store(default_index_dir(cli_repo))
+    store.set_meta("vec.code.embedder", "fake:64|doc|float16|mps")  # as if built on another device
+    store.close()
+    status, _, err = _cli_search(capsys, cli_repo, "logout", "--signals", "bm25")
+    assert status == 0 and "the index holds the vectors of another embedder (fake:64|doc|float16|mps, now fake:64|doc)" in err
+    assert stored() == built  # no vector was dropped
+
+    assert main(["index", str(cli_repo)]) == 0  # the command that does embed it again
+    assert stored()[2] == git(cli_repo, "rev-parse", "feature")
+
+
+def test_a_keyword_search_answers_where_the_index_cannot_be_updated_for_want_of_a_model(cli_repo, capsys, monkeypatch):
+    """An environment built without PyTorch, and a config that names the local model: no update
+    can run there. A search by keywords needs no model, so it still answers, from the index as
+    it is, and says so."""
+    git(cli_repo, "switch", "-q", "feature")
+    monkeypatch.delenv("CODEMEM_MODEL")
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+    monkeypatch.setattr("codemem.embedder._CACHE", {})
+    status, results, err = _cli_search(capsys, cli_repo, "logout", "--signals", "bm25")
+    assert status == 0 and "api/routes.py::logout" in [r["key"] for r in results]
+    assert "and could not be updated: The local embedding model cannot run because PyTorch" in err
+    assert "These results are from the index as it is." in err and "Traceback" not in err

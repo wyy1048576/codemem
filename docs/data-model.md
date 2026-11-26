@@ -84,14 +84,17 @@ repo file ──► File row (status + reason)
 - Never read:
   - paths in `.gitignore`;
   - `ALWAYS_SKIP_DIRS` (`.git`, `node_modules`, `.venv`, `build`, `dist`, …);
-  - `DEFAULT_IGNORE` (`vendor/`, `*.min.js`, `*_pb2.py`, `*.pb.go`, …).
+  - `DEFAULT_IGNORE` (`vendor/`, `*.min.js`, `*_pb2.py`, `*.pb.go`, …);
+  - a folder that is a git worktree of the checkout's own repository (architecture.md §4.6). A
+    submodule and a repository of another project are read.
 - **Stored as skipped with a reason**, so the next scan doesn't read them again:
   - files over `max_file_size` (10 MB);
   - binary files (a NUL byte in the first 8 KB);
   - files marked `Code generated … DO NOT EDIT` or `@generated` (in the first 2 KB);
   - JS/TS files with a line over 5,000 characters.
 - **Coverage:** ignored files and files in unsupported languages have no row. They are counted in
-  `meta.coverage` (by folder and by extension) at each full check.
+  `meta.coverage` (by folder and by extension) at each full check. The worktrees left out are
+  counted there too, with up to 10 of their folders.
 
 ---
 
@@ -394,10 +397,15 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
   index.db                           SQLite (WAL): meta, files, chunks, fts (word lists only, + fts_vocab), calls, edges, vectors,
                                      dirty_texts (the queue)
   vec_code.faiss, vec_code.json      a saved copy of the search index + a note {epoch, dim, count, embedder,
-  vec_usage.faiss, vec_usage.json    database, backend, file}; another backend saves vec_<type><suffix>, or nothing.
+  vec_usage.faiss, vec_usage.json    database, save_id, backend, file, crc32}; another backend saves
+                                     vec_<type><suffix>, or nothing.
                                      `database` is the `database_id` of the index.db the copy was saved from.
+                                     `save_id` is a random token of the save, also in `meta` (§8).
+                                     `crc32` is the checksum of the copy's file, whatever the backend.
                                      `backend` is the search index the file holds (`faiss`, `compact` or a
                                      plugin's name), whether a configuration named it or `auto` picked it.
+                                     `file` is the copy's name: vec_<type><suffix> of that backend, and
+                                     nothing else (§8).
                                      FAISS files hold an IndexIDMap2 over an fp16 IndexScalarQuantizer
                                      (inner product, 2 bytes per number); a file of 4-byte numbers
                                      (IndexFlatIP) is converted when loaded
@@ -444,23 +452,27 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
   database that has none; a copy made to start another index drops the row and so gets its own;
 - `repo_path`, `indexed_commit`, `indexed_at`;
 - `codemem_version`, `index_settings`, `last_update` (the last `IndexStats`);
-- `coverage`: ignored and non-code counts;
+- `coverage`: ignored and non-code counts, and `worktrees`: how many git worktrees inside the
+  checkout the scan left out (`count`), and up to 10 of their folders (`examples`);
 - `last_scan_at`: when the last full check started (files saved within 2 s of it are re-hashed next
   time);
 - `dirty_seq`: the queue's sequence number, one per stage-A commit;
 - `cache_marked_day`: the day (days since 1970, UTC) on which this index last marked the vectors it
   holds as used in the vector cache, so that it does so once a day (§7);
 - per vector type: `vec.<type>.embedder`, `vec.<type>.full_dim`, `vec.<type>.dim_setting`,
-  `vec.<type>.epoch`.
+  `vec.<type>.epoch`, and `vec.<type>.save_id`: the random token of the last save of that type's
+  search index, which the saved copy's note holds too (§8).
 
 **An index that starts as a copy** of another checkout's (architecture.md §4.6) is that
 `index.db` as one SQLite backup, with every `files.mtime` set to 0 and without the `meta` rows
 `indexed_at`, `last_scan_at`, `last_update`, `coverage` and `repo_path`. `vec_*` files that an
 index deleted by hand left in the folder are removed first: a saved search index is matched to
 the vector rows by id, and the copy has another index's ids. An index without
-`indexed_at` has not been compared with its checkout's files yet: `codemem search` asks for
-`codemem index` first, and the MCP server answers from it with its note that the index is still
-being built.
+`indexed_at` has not been compared with its checkout's files yet, and one that has rows all the
+same is such a copy: it holds the other checkout's code. `codemem search` asks for
+`codemem index` first. The MCP server's `search_code` and `get_chunk` wait for the first full
+check within `catchup_budget_ms`; past that they answer from the copy, with a note that says so
+(§12.1).
 
 The eval harness writes its own marker files into the index folder. codemem never deletes files
 it doesn't own.
@@ -471,7 +483,7 @@ it doesn't own.
 
 - **SQLite is the source of truth.** A vector row is committed in the same transaction as its
   bookkeeping.
-- **The search index is derived. It is kept correct by three rules:**
+- **The search index is derived. It is kept correct by these rules:**
   1. every transaction that changes a vector type's rows bumps `vec.<type>.epoch`;
   2. the in-memory index is patched only after the commit, and its epoch is set last;
   3. an index that is behind catches up by vector id: vector rows never change in place (a new
@@ -483,16 +495,31 @@ it doesn't own.
      database's `database_id`; a note that names another, or none, means a rebuild from the rows.
      Vector ids start again at 1 in a new `index.db`, so the copy of a deleted one would match
      other vectors by id.
+  5. a saved copy is read only if its bytes are the bytes that were saved. Its note holds their
+     CRC-32, which is compared before the backend is given the file. A file that differs (damaged,
+     cut short, or another index's file under this note), or a note without a checksum, means a
+     rebuild from the rows. A file that differs is also a warning in the log.
+  6. a saved copy is read only by the state of the database it was saved from, or a later one.
+     Each save writes a random `save_id` into the note and into `meta` (`vec.<type>.save_id`),
+     and commits it after the index was copied. A note whose `save_id` is not the one in `meta`,
+     or a note without one, means a rebuild from the rows. That is the case after `index.db` was
+     put back from a copy, or lost its last commits in a power cut: such a database hands out
+     again the vector ids of the rows it lost, and its epoch counts up again.
+  7. a note never chooses a file. A start reads, and a save or the removal of a vector type
+     deletes, only `vec_<type><suffix>` in the index folder, the suffix being that of the note's
+     backend. A note whose `file` is anything else (a path, another file of the folder), or one
+     that is not a JSON object, counts as no note.
 - **Which search index** (`vector_backend`): the one a configuration names, or for `auto` the
   exact index while the exact indexes of every vector type fit the budget together
   (`vector_memory_mb`), and the compact one for every type when they do not (architecture.md §5).
   - `auto` picks when the first search index of a process is loaded or built, and the pick holds
     while the store is open;
-  - an index whose saved copies are compact goes back to exact only under 80% of the budget;
+  - an index whose saved copies are compact goes back to exact only under 80% of the budget. The
+    copies that count are those of the vector types that have vectors;
   - where the installed FAISS cannot make the compact index, `auto` picks the exact one.
 - **Loading the search index:**
   - a vector type's index is read from its saved copy, or rebuilt from the rows when the copy
-    cannot be used (rule 3 and rule 4, or no copy);
+    cannot be used (rules 3 to 7, or no copy);
   - loading holds no lock. One thread loads a type; the others that need it wait for that thread.
     Rows written meanwhile are applied when the index is installed, by vector id;
   - a write to a type whose index is not in memory does not load it: the index is loaded at its
@@ -501,7 +528,16 @@ it doesn't own.
     comes before they are in memory waits within `catchup_budget_ms`, then answers from keywords
     alone with a note (§12.1); the CLI and the eval wait for the index.
 - **Saving the search index:**
-  - the data file is written first and its note second, each by atomic rename;
+  - the data is written under a temporary name. One short transaction then writes the save's
+    `save_id` into `meta`, renames the data file into place and writes the note, also by a
+    rename. A save that is stopped leaves the earlier copy, or one that fails rule 5 or 6. The
+    transaction waits its turn like any write to `index.db`, and keeps two processes' saves apart;
+  - Windows refuses a rename while another handle holds the file open (a second codemem process
+    that reads the saved copy at its start, a virus scanner). Each of the two renames is then
+    tried again, six times within 0.6 s, before the save fails;
+  - a save that fails (a full disk, or 30 s without its turn behind another process's write) is
+    logged and given up. The server's writer goes on, the earlier copy stays what a start reads,
+    and the next change to the index is saved again;
   - the MCP server saves lazily (after 30 s idle, on shutdown, on refresh), while the CLI and the
     blocking `update()` save at once;
   - an update that saves (`update()`, the CLI) first makes the saved copies what the next start
@@ -529,6 +565,11 @@ it doesn't own.
   - A crash before saving: the saved file is behind and catches up by id at the next load. A corrupt
     or missing file is rebuilt from the rows. No model call, no re-embedding, either way.
   - A process sees an epoch change made by another process: it catches up by id before searching.
+  - `index.db` goes back to an earlier state under a search index that was saved later: the two
+    `save_id`s differ, and the index is rebuilt from the rows.
+  - FAISS fails in the middle of a change to a compact index: the index is left as it was before
+    the change, and the write raises after its commit. The index is then one epoch behind, and
+    catches up by id before the next search.
   - Another process deletes vectors while a compact index is searching: the rows it can no longer
     read are left out of the result, and the search takes more candidates to fill it.
 - **Large deletions** give pages back to the OS (`auto_vacuum = INCREMENTAL`).
@@ -602,8 +643,8 @@ The tool names stay stable, so other front-ends can be compared.
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding |
-| `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)` |
+| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding. An opening `Note:` while a new index is being built, or is still a copy of another checkout's |
+| `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)`. An opening `Note:` when it is read from a copy of another checkout's index that is not checked yet |
 | `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the search index in use (exact or compact, why, and about how much memory each vector type takes), the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
 
@@ -631,12 +672,28 @@ those files.
 
 The parts it can hold: files saved moments ago that are still being indexed; chunks still being
 embedded (with the files they are in); or that codemem could not confirm it has seen the latest
-saves. `get_chunk` waits for the structure only, so its code, lines and links are current. While
-the embedding model is loading when the server starts, or a search index is still loading, a
-search waits within the same budget, then answers from keywords alone with a note; after a model
-load that failed it answers that way at once. A model that was freed for being idle (§12.3) is
-waited for longer, up to 20 s: the first search after an idle time is slower and has the same
-results. The CLI and the eval always wait for both.
+saves. `get_chunk` waits for the structure only, so its code, lines and links are current.
+
+**The copy note.** A new worktree's index starts as a copy of another checkout's (architecture.md
+§4.6). `search_code` and `get_chunk` wait for its first full check within `catchup_budget_ms`. If
+the check has not ended by then, the answer is read from the copy and begins with `Note:
+codemem's index for this checkout started as a copy of another checkout's index, ...`: what
+follows can be the other checkout's code. A `get_chunk` that finds nothing in the copy ends with
+the same note. `CodememService.search()` reports the case as `freshness.unchecked_copy`, and
+`get_chunk()` as the key `unchecked_copy` of its answer.
+
+**While something is loading.** While the embedding model is loading when the server starts, or
+a search index is still loading, a search waits within the same budget, then answers from
+keywords alone with a note; after a model load that failed it answers that way at once. A model
+that was freed for being idle (§12.3) is waited for longer, up to 20 s: the first search after an
+idle time is slower and has the same results. The CLI and the eval always wait for both.
+
+**When codemem cannot embed.** A model that did not load, or an embedding endpoint that does not
+answer, is not a load in progress: the note then says why, `Note: codemem cannot embed right now
+(embedding request to 127.0.0.1:8791 failed: ...), so these results come from keyword matching
+only. ...`. `CodememService.search()` reports the reason as `models_error`, beside
+`models_loading`. A search that waits (`wait_for_models`, the CLI's) raises the error instead:
+`embedder.EmbeddingUnavailable` for an endpoint.
 
 **Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
 model of every enabled vector type is in the memory of the process that answers, false when one is
@@ -719,7 +776,7 @@ A change to any of these must be made together with the eval:
   | Key | Default | Range | Meaning |
   |---|---|---|---|
   | `bits` | 4 | 1 to 8 | bits per number of the fine code, which ranks the candidates. Every vector also has a 1-bit code, which a search scans; at `bits = 1` that is the only code, and the index is at its smallest |
-  | `dim` | 0 | 0 to 4,096 | how many numbers of each vector the codes cover (the first N); 0 = as many as the index uses, which is `embedding_dim` or the model's length. A code never covers more than 4,096 |
+  | `dim` | 0 | 0 to 4,096 | how many numbers of each vector the codes cover (the first N); 0 = as many as the index uses, which is `embedding_dim` or the model's length. A code never covers more than 4,096: at 0, an index of longer vectors codes their first 4,096 and logs a warning when it is made |
   | `rescore` | 200 | 1 or more | candidates scored exactly from the stored vectors: at least this many, and at least 4 for each result asked for |
 
   Those that differ from their defaults are in `index_settings()` as `compact`, for the same
@@ -817,7 +874,8 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   already truncated to `embedding_dim` and normalized;
 - `search(query, k, allowed_ids=None)` returns at most `k` `(id, score)` pairs, best first, with
   the real similarity as the score (equal scores are ties); fewer than `k` only when no other
-  vector qualifies; only ids in `allowed_ids` when it is given;
+  vector qualifies; only ids in `allowed_ids` when it is given. The store does not call it for a
+  query of zeros: `Store.vector_search` returns nothing for one;
 - saving is optional: `to_bytes()` returns the bytes for `vec_<type><suffix>` (`suffix`, a class
   attribute, defaults to `.vec`) or None, and the class method `from_bytes(data)` reads them back;
 - the class method `bytes_per_vector(dim)` is optional: about how many bytes one vector takes in

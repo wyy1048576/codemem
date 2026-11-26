@@ -1,10 +1,12 @@
 """What every search index shares (docs/architecture.md §5): where each vector came from, how many
 vectors a search asks its index for, the hook that lets an index read stored vectors back, and
-the database a saved index belongs to."""
+what a saved index belongs to: one database, a state of it, and the bytes that were saved."""
 
 import json
+import os
 import shutil
 import sqlite3
+import zlib
 from contextlib import closing
 
 import numpy as np
@@ -227,7 +229,7 @@ def test_the_base_class_ignores_bind():
     assert Plain().bind(lambda ids: None) is None
 
 
-# ---------------------------------------------------------------- a saved index belongs to one database
+# ---------------------------------------------------------------- what a saved index belongs to
 
 
 class SavedPlugin(FaissVectorStore):
@@ -243,9 +245,11 @@ def _count_rebuilds(monkeypatch):
     return rebuilds
 
 
-@pytest.mark.parametrize("backend, options", [
-    ("faiss", {}), ("compact", {"rescore": 2}), (f"{__name__}:SavedPlugin", {}),
-])
+# Every kind of saved index. The compact one scores 2 candidates, so that its codes choose them.
+SAVED = [("faiss", {}), ("compact", {"rescore": 2}), (f"{__name__}:SavedPlugin", {})]
+
+
+@pytest.mark.parametrize("backend, options", SAVED)
 def test_a_saved_index_is_never_read_into_another_database(tmp_path, monkeypatch, backend, options):
     """`index.db` deleted by hand, its saved search index left beside it, then a rebuild: the new
     database numbers its vectors from 1 again, so the old file would match them by id."""
@@ -277,15 +281,42 @@ def test_a_saved_index_is_never_read_into_another_database(tmp_path, monkeypatch
     again.close()
 
 
-def test_a_saved_index_whose_note_names_no_database_is_rebuilt_once(tmp_path, monkeypatch):
+@pytest.mark.parametrize("backend, options", SAVED)
+def test_another_index_s_file_under_this_index_s_note_is_not_read(tmp_path, monkeypatch, backend, options):
+    """Two indexes of the same shape, and the saved file of one copied over the other's: by vector
+    id it matches every row. The note beside it holds the checksum of other bytes."""
+    vecs = {}
+    for name, seed in (("a", 0), ("b", 9)):
+        s = Store(tmp_path / name, vector_backend=backend, vector_options=options)
+        ids = _add_chunks(s, 40)
+        vecs[name] = _vecs(40, seed=seed)
+        s.put_vectors("code", EMBEDDER, [VectorRow(c, 0, 1, 0, 1, f"h{c}") for c in ids], vecs[name])
+        s.save_vectors()
+        s.close()
+    (saved,) = [p for p in (tmp_path / "a").glob("vec_code.*") if p.suffix != ".json"]
+    shutil.copy(tmp_path / "b" / saved.name, saved)
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    a = Store(tmp_path / "a", vector_backend=backend, vector_options=options)
+    for i in range(0, 40, 4):
+        hit = a.vector_search("code", vecs["a"][i], 1)[0]
+        assert hit.chunk_id == ids[i] and hit.score == pytest.approx(1.0, abs=1e-3)
+    assert len(rebuilds) == 1
+    a.close()
+
+
+@pytest.mark.parametrize("field", ["database", "save_id", "crc32"])
+def test_a_saved_index_whose_note_lacks_what_a_start_checks_is_rebuilt_once(tmp_path, monkeypatch, field):
     idx = tmp_path / "idx"
     s = Store(idx, vector_backend="faiss")
     ids = _seed(s, 5)
     s.save_vectors()
     s.close()
     note = json.loads((idx / "vec_code.json").read_text())
-    assert len(note.pop("database")) == 32
-    (idx / "vec_code.json").write_text(json.dumps(note))  # as an index saved before notes named their database
+    assert len(note["database"]) == len(note["save_id"]) == 32 and note["database"] != note["save_id"]
+    assert note["crc32"] == zlib.crc32((idx / "vec_code.faiss").read_bytes())
+    del note[field]
+    (idx / "vec_code.json").write_text(json.dumps(note))  # as an index saved before notes held it
 
     rebuilds = _count_rebuilds(monkeypatch)
     s = Store(idx, vector_backend="faiss")
@@ -294,14 +325,16 @@ def test_a_saved_index_whose_note_names_no_database_is_rebuilt_once(tmp_path, mo
     s.close()
     s = Store(idx, vector_backend="faiss")
     assert s.vector_search("code", _vecs(5)[2], 1)[0].chunk_id == ids[2] and len(rebuilds) == 1
-    assert json.loads((idx / "vec_code.json").read_text())["database"] == s.database_id()
+    again = json.loads((idx / "vec_code.json").read_text())
+    assert again["database"] == s.database_id() and again["crc32"] == zlib.crc32((idx / "vec_code.faiss").read_bytes())
+    assert again["save_id"] == s.get_meta("vec.code.save_id") != note.get("save_id")  # a new one for each save
     s.close()
 
 
 def test_a_database_copied_without_its_identity_gets_its_own(tmp_path, monkeypatch):
     """Another index started from a backup of this one's database: the copy drops the
     `database_id` row, and the store gives it a new one. The original's saved files are not read
-    into it, wherever they lie."""
+    into it, wherever they lie, although the copy holds the `save_id` they were saved with."""
     a = Store(tmp_path / "a", vector_backend="faiss")
     ids = _seed(a, 5)
     a.save_vectors()
@@ -318,7 +351,296 @@ def test_a_database_copied_without_its_identity_gets_its_own(tmp_path, monkeypat
     rebuilds = _count_rebuilds(monkeypatch)
     a, b = Store(tmp_path / "a", vector_backend="faiss"), Store(tmp_path / "b", vector_backend="faiss")
     assert len(b.database_id()) == 32 and b.database_id() != a.database_id()
+    assert b.get_meta("vec.code.save_id") == a.get_meta("vec.code.save_id") is not None
     assert a.vector_search("code", _vecs(5)[1], 1)[0].chunk_id == ids[1] and rebuilds == []  # its own file
     assert b.vector_search("code", _vecs(5)[1], 1)[0].chunk_id == ids[1] and len(rebuilds) == 1  # not the original's
     assert Store(tmp_path / "b").database_id() == b.database_id()  # and it keeps the one it got
     a.close(), b.close()
+
+
+def _more(store, n, prefix, seed):
+    """n more chunks with one vector each; returns the chunk ids and the vectors."""
+    with store.transaction():
+        ids = [store.upsert_chunk(_chunk(f"{prefix}{i:03d}")) for i in range(n)]
+    vecs = _vecs(n, seed=seed)
+    store.put_vectors("code", EMBEDDER, [VectorRow(c, 0, 1, 0, 1, f"{prefix}{c}") for c in ids], vecs)
+    return ids, vecs
+
+
+def _finds_each(store, ids, vecs):
+    for chunk_id, vec in zip(ids, vecs):
+        hit = store.vector_search("code", vec, 1)[0]
+        assert hit.chunk_id == chunk_id and hit.score == pytest.approx(1.0, abs=1e-3)
+    return True
+
+
+@pytest.mark.parametrize("backend, options", SAVED)
+@pytest.mark.parametrize("first", ["the vectors are written", "the index is used"])
+def test_a_database_that_went_back_does_not_read_an_index_saved_after_it(tmp_path, monkeypatch, backend, options, first):
+    """`index.db` restored to an earlier state (a backup put back, or its last commits lost in a
+    power cut) under a search index that was saved later. The database hands out again the vector
+    ids of the rows it lost, so the saved index holds other vectors under the new rows' ids."""
+    idx, backup = tmp_path / "idx", tmp_path / "backup"
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    ids = _seed(s, 40)
+    s.save_vectors()
+    s.close()
+    backup.mkdir()
+    for part in idx.glob("index.db*"):
+        shutil.copy(part, backup)
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    _more(s, 20, "lost", seed=7)
+    s.load_vectors()
+    s.save_vectors()
+    assert json.loads((idx / "vec_code.json").read_text())["count"] == 60
+    s.close()
+    for part in idx.glob("index.db*"):
+        part.unlink()
+    for part in backup.iterdir():
+        shutil.copy(part, idx)  # the database holds 40 again
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    if first == "the index is used":
+        assert _finds_each(s, ids[:3], _vecs(40)[:3])
+    new, vecs = _more(s, 20, "new", seed=8)
+    assert sorted(vid for vid, _ in s.vector_rows("code").values()) == list(range(1, 61))  # the lost rows' ids again
+    assert _finds_each(s, new, vecs) and _finds_each(s, ids, _vecs(40)) and len(rebuilds) == 1
+    s.save_vectors()
+    s.close()
+    s = Store(idx, vector_backend=backend, vector_options=options)  # the index saved now is of this state
+    assert _finds_each(s, new, vecs) and len(rebuilds) == 1
+    s.close()
+
+
+@pytest.mark.parametrize("backend, options", SAVED)
+@pytest.mark.parametrize("stopped, changed, rebuilt", [
+    ("before the file is in place", [], 0),
+    ("before the note is written", ["file"], 1),
+    ("before the commit", ["file", "note"], 1),
+])
+def test_a_save_that_is_stopped_leaves_what_a_start_reads_right_or_rebuilds(tmp_path, monkeypatch, backend, options,
+                                                                          stopped, changed, rebuilt):
+    """The file, its note and the `save_id` in `meta` cannot change in one step. Wherever a save
+    stops, the next start reads a file that is of this state of the database or of an earlier one,
+    or it rebuilds. Here: the earlier file, which is behind the rows and is brought up to them;
+    the new file under the earlier note; the new file and note under the earlier `save_id`."""
+    from codemem import store as store_module
+
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    ids = _seed(s, 40)
+    s.save_vectors()
+    before = {p.name: p.read_bytes() for p in idx.glob("vec_code*")}
+    earlier = s.get_meta("vec.code.save_id")
+    new, vecs = _more(s, 5, "new", seed=3)
+
+    class Stopped(BaseException):
+        """As when the process is killed: nothing of the save runs after this."""
+
+    set_meta, atomic_write = Store.set_meta, store_module._atomic_write
+
+    def no_save_id(self, key, value):
+        if key == "vec.code.save_id":
+            raise Stopped
+        set_meta(self, key, value)
+
+    def no_note(path, data):
+        if stopped == "before the commit":
+            atomic_write(path, data)
+        raise Stopped
+
+    with monkeypatch.context() as m:
+        if stopped == "before the file is in place":
+            m.setattr(Store, "set_meta", no_save_id)
+        else:
+            m.setattr(store_module, "_atomic_write", no_note)
+        with pytest.raises(Stopped):
+            s.save_vectors()
+    assert s.get_meta("vec.code.save_id") == earlier
+    s.close()
+    after = {p.name: p.read_bytes() for p in idx.glob("vec_code*")}
+    assert set(after) == set(before)  # and no temporary file is left
+    assert sorted("note" if name.endswith(".json") else "file" for name in after if after[name] != before[name]) == changed
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    assert _finds_each(s, new, vecs) and _finds_each(s, ids, _vecs(40)) and len(rebuilds) == rebuilt
+    s.save_vectors()
+    s.close()
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    assert _finds_each(s, new, vecs) and len(rebuilds) == rebuilt  # a save that ends is read
+    s.close()
+
+
+def test_two_processes_that_save_in_turn_each_leave_a_file_a_start_reads(tmp_path, monkeypatch):
+    """Two stores on one folder stand in for two processes. One saves the index as it holds it,
+    without the vectors the other wrote last: a start reads that file and adds the rows it lacks."""
+    idx = tmp_path / "idx"
+    a, b = Store(idx, vector_backend="faiss"), Store(idx, vector_backend="faiss")
+    held = [(_seed(a, 10), _vecs(10))]
+    a.save_vectors()
+    rebuilds = _count_rebuilds(monkeypatch)
+    for turn, (saver, other) in enumerate([(b, a), (a, b), (a, b), (b, a)]):
+        held.append(_more(saver, 2, f"own{turn}", seed=10 + turn))
+        assert all(_finds_each(saver, *vectors) for vectors in held)  # its index is in memory, and current
+        held.append(_more(other, 2, f"other{turn}", seed=20 + turn))
+        saver.save_vectors()
+        note = json.loads((idx / "vec_code.json").read_text())
+        assert note["save_id"] == other.get_meta("vec.code.save_id") and note["count"] == 10 + 4 * turn + 2
+        start = Store(idx, vector_backend="faiss")
+        assert all(_finds_each(start, *vectors) for vectors in held) and rebuilds == []
+        start.close()
+    a.close(), b.close()
+
+
+def _refuse_renames(monkeypatch, times):
+    """`os.replace` raises PermissionError the first `times[name]` times it is asked to move a file
+    over `name`, as Windows does while another handle holds the file open. The waits between two
+    tries are for a real handle to go away: here they take no time. Returns the renames refused."""
+    from codemem import store as store_module
+
+    refused, replace = [], os.replace
+
+    def held(src, dst):
+        name = os.path.basename(dst)
+        if refused.count(name) < times.get(name, 0):
+            refused.append(name)
+            raise PermissionError(13, "The process cannot access the file because it is being used by another process")
+        replace(src, dst)
+
+    monkeypatch.setattr(store_module.os, "replace", held)
+    monkeypatch.setattr(store_module, "_REPLACE_WAIT", 0.0)
+    return refused
+
+
+def test_a_rename_that_is_refused_for_a_moment_is_tried_again(tmp_path, monkeypatch):
+    """Fixed bug: on Windows a rename is refused with PermissionError while another handle holds
+    the file (a second codemem process that reads the saved index at its start, a virus scanner,
+    the search indexer), and one such moment failed the save, and the update that ended in it.
+    The handle is gone a moment later: both renames of a save are tried again."""
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend="faiss")
+    ids = _seed(s, 40)
+    s.save_vectors()
+    new, vecs = _more(s, 5, "new", seed=3)
+    with monkeypatch.context() as windows:
+        refused = _refuse_renames(windows, {"vec_code.faiss": 2, "vec_code.json": 1})
+        s.save_vectors()
+    assert refused == ["vec_code.faiss", "vec_code.faiss", "vec_code.json"]
+    note = json.loads((idx / "vec_code.json").read_text())
+    assert note["count"] == 45 and note["save_id"] == s.get_meta("vec.code.save_id")
+    assert note["crc32"] == zlib.crc32((idx / "vec_code.faiss").read_bytes())
+    assert sorted(p.name for p in idx.glob("vec_code*")) == ["vec_code.faiss", "vec_code.json"]  # no temporary file
+    s.close()
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend="faiss")
+    assert _finds_each(s, new, vecs) and _finds_each(s, ids, _vecs(40)) and rebuilds == []  # the new copy is read
+    s.close()
+
+
+@pytest.mark.parametrize("held, changed, rebuilt", [("vec_code.faiss", [], 0), ("vec_code.json", ["file"], 1)])
+def test_a_rename_that_stays_refused_fails_the_save_and_a_start_still_reads_right(tmp_path, monkeypatch, held, changed, rebuilt):
+    """A handle that does not go away: the save gives up after its tries and raises. Refused on
+    the file, the save leaves the earlier file, note and `save_id`, which agree. Refused on the
+    note, it leaves the new file under the earlier note and `save_id`, which a start refuses by
+    the checksum. Either way the transaction is rolled back and no temporary file is left."""
+    from codemem import store as store_module
+
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend="faiss")
+    ids = _seed(s, 40)
+    s.save_vectors()
+    before = {p.name: p.read_bytes() for p in idx.glob("vec_code*")}
+    earlier = s.get_meta("vec.code.save_id")
+    new, vecs = _more(s, 5, "new", seed=3)
+    with monkeypatch.context() as windows:
+        refused = _refuse_renames(windows, {held: 1000})
+        with pytest.raises(PermissionError):
+            s.save_vectors()
+    assert refused == [held] * store_module._REPLACE_TRIES  # a handful of tries, not for ever
+    assert s.get_meta("vec.code.save_id") == earlier and not s.conn.in_transaction
+    s.close()
+    after = {p.name: p.read_bytes() for p in idx.glob("vec_code*")}
+    assert set(after) == set(before)  # and no temporary file is left
+    assert sorted("note" if name.endswith(".json") else "file" for name in after if after[name] != before[name]) == changed
+
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend="faiss")
+    assert _finds_each(s, new, vecs) and _finds_each(s, ids, _vecs(40)) and len(rebuilds) == rebuilt
+    s.save_vectors()
+    s.close()
+    s = Store(idx, vector_backend="faiss")
+    assert _finds_each(s, new, vecs) and len(rebuilds) == rebuilt  # a save that ends is read
+    s.close()
+
+
+# ---------------------------------------------------------------- the file a note names
+
+
+@pytest.mark.parametrize("backend, options", SAVED)
+@pytest.mark.parametrize("named, of_this_database", [
+    ("../outside.bin", True), ("../outside.bin", False), ("{absolute}", True), ("sub/inside.bin", True),
+    ("index.db", True), ("vec_usage{suffix}", True), ("vec_code.json", True), (7, True), (["vec_code{suffix}"], True),
+    (None, True),
+])
+def test_a_note_names_no_file_but_its_own_index(tmp_path, monkeypatch, backend, options, named, of_this_database):
+    """A note is a file in the index folder, and what it names is read by a start and deleted by
+    a save and by `drop_vec_type`. Only the name a save gives that vector type's index counts.
+    Any other note is no note: the index is rebuilt, and no file but the type's own is touched."""
+    idx, outside = tmp_path / "idx", tmp_path / "outside.bin"
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    ids = _seed(s, 40)
+    with s.transaction():
+        s.ensure_vec_type("usage", EMBEDDER)
+    s.put_vectors("usage", EMBEDDER, [VectorRow(c, 0, 1, 0, 1, f"u{c}") for c in ids], _vecs(40, seed=1))
+    s.save_vectors()
+    s.close()
+    note = json.loads((idx / "vec_code.json").read_text())
+    suffix = note["file"][len("vec_code"):]
+    (idx / "sub").mkdir()
+    for copy in (outside, idx / "sub" / "inside.bin"):  # an index that could be read, where no note may reach
+        shutil.copy(idx / note["file"], copy)
+    if isinstance(named, str):
+        named = named.format(suffix=suffix, absolute=outside)
+    elif isinstance(named, list):
+        named = [name.format(suffix=suffix) for name in named]
+    bad = json.dumps({**note, "file": named, "database": note["database"] if of_this_database else "0" * 32})
+    others = [outside, idx / "sub" / "inside.bin", idx / "index.db", idx / f"vec_usage{suffix}", idx / "vec_usage.json"]
+
+    (idx / "vec_code.json").write_text(bad)
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    assert _finds_each(s, ids, _vecs(40)) and [a[0] for a in rebuilds] == ["code"]  # the file it names is not read
+    _more(s, 5, "new", seed=3)
+    s.save_vectors()  # a save removes the file an earlier note described, when it is another backend's
+    assert all(path.is_file() for path in others)
+    assert json.loads((idx / "vec_code.json").read_text())["file"] == f"vec_code{suffix}"
+    s.close()
+
+    (idx / "vec_code.json").write_text(bad)
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    with s.transaction():
+        s.drop_vec_type("code")  # and so does dropping the type
+    assert all(path.is_file() for path in others) and not list(idx.glob("vec_code*"))
+    assert s.counts()["vectors"] == {"usage": 40}
+    s.close()
+
+
+@pytest.mark.parametrize("text", ["[1, 2]", '"vec_code.faiss"', "3", "null", "{}", '{"backend": ["compact"], "file": 3}', ""])
+def test_a_note_that_is_not_what_a_save_writes_is_no_note(tmp_path, monkeypatch, text):
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend="auto")
+    ids = _seed(s, 5)
+    s.save_vectors()
+    s.close()
+    (idx / "vec_code.json").write_text(text)
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend="auto")  # `auto` reads every note to see what the index was saved as
+    assert s.search_index_status()["index"] == "faiss"
+    assert s.vector_search("code", _vecs(5)[2], 1)[0].chunk_id == ids[2] and len(rebuilds) == 1
+    s.save_vectors()
+    with s.transaction():
+        s.drop_vec_type("code")
+    assert not list(idx.glob("vec_code*"))
+    s.close()

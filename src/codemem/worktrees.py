@@ -9,6 +9,10 @@ checkout has its own index folder, named after its path. This module does two th
 
 Both apply to default index folders only (`config.default_index_dir`), never to a folder the
 caller chose.
+
+It also says which folders are linked worktrees of a repository (`is_worktree_of`). A checkout's
+scan and its watcher leave out the ones that lie inside the checkout, so that its index holds its
+own files only.
 """
 
 from __future__ import annotations
@@ -69,6 +73,29 @@ def is_linked_worktree(root: Path) -> bool:
     The main checkout's git folder has none, and neither has a submodule's."""
     own = git_dir(root)
     return own is not None and (own / "commondir").is_file()
+
+
+def is_worktree_of(folder: Path, common: Path) -> bool:
+    """`folder` is a linked worktree of the repository whose shared git folder is `common`: another
+    checkout of that repository. It is what a checkout's scan and watcher leave out when such a
+    worktree lies inside the checkout (indexer.py, watcher.py): agent hosts put them in
+    `<repo>/.claude/worktrees/<name>/`, and each has an index of its own.
+
+    Narrow on purpose. A submodule also has a `.git` file, but its git folder shares nothing
+    (`is_linked_worktree`). A worktree of another repository shares that repository's git folder.
+    A repository of its own has a `.git` folder. None of them counts.
+
+    It never raises. The scan asks this of every folder, and the look itself can fail: `is_file`
+    raises for a folder the user may not enter (a container's volume owned by root, a test's
+    `chmod 000`). Nothing then says the folder is a checkout of this repository, so the answer is
+    no, and the scan and the watcher go on as they did before they asked."""
+    try:
+        if not (folder / ".git").is_file():  # nearly every folder: one look, and no more
+            return False
+        shared = git_common_dir(folder) if is_linked_worktree(folder) else None
+        return shared is not None and os.path.samefile(shared, common)  # one folder, however it is spelled
+    except (OSError, ValueError):
+        return False
 
 
 def linked_worktrees(common: Path, *, certain: bool = False) -> list[Path]:
