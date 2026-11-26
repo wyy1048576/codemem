@@ -26,6 +26,11 @@ In task 68195 the real fix changes one file, `pandas/core/reshape/merge.py`.
 
 Task 68195 is easy.
 
+**The pools hold nothing larger than "hard".** The collector kept only fixes of at most 5 code
+files and 200 changed lines, because a larger pull request is rarely the fix of one issue. So
+"hard" here is the hard end of small fixes. A feature that touches ten files is not in the
+sample (§10).
+
 **The prompt level** is how the request is worded. It is not a property of the task: **every
 task has all three wordings**, and the hidden tests are the same for all three.
 
@@ -59,16 +64,22 @@ minutes, and nobody runs it in full.
 
 Two checks turn candidates into tasks, and only they cost time:
 
-| Step | pandas, as expected | What it costs |
-|---|---|---|
-| candidates with tests on `main` | 298 | nothing more |
-| drawn, the same number from each difficulty | 60 | nothing |
-| **valid:** in the task's container the hidden tests fail before the real fix and pass after it | about 54 (9 in 10) | a container and two test runs for each |
-| **fair:** a correct fix made from the issue alone would pass the hidden tests | about 27 (half; 9 of the 18 pilot tasks) | two reads by a model for each |
-| in the sample | 15 | |
+- **valid:** in the task's container the hidden tests fail before the real fix and pass after
+  it. It costs a container and two test runs for each candidate;
+- **fair:** every reasonable fix made from the issue alone would pass the hidden tests. It costs
+  two reads by a model for each valid task.
 
-So about four candidates are checked for each task we run. We cannot check fewer by choosing
-better, because nothing tells in advance which candidates are valid and fair.
+| | pandas | playwright |
+|---|---|---|
+| candidates with tests on `main` | 298 | 182 |
+| checked so far | 100 | 60 |
+| valid | 92 | 49 |
+| fair | 17: 9 easy, 5 medium, 3 hard | 28: 11 easy, 9 medium, 8 hard |
+
+So two to six candidates are checked for each task we can run, and the share differs by repo:
+18% of pandas's valid tasks are fair, 57% of playwright's. Many pandas issues are old, and the
+fix that came late is wider than the issue. We cannot check fewer by choosing better, because
+nothing tells in advance which candidates are valid and fair.
 
 **The rule that saves time:** check each difficulty level only until it has 7 fair tasks (the 5
 of the sample and 2 spare), then stop that level.
@@ -86,6 +97,9 @@ of the sample and 2 spare), then stop that level.
 - The five tasks of each level are numbered 1 to 5 in the order they were drawn. The table of §4
   uses these numbers.
 - A task that breaks during the runs is replaced by the next spare of its level, in every setup.
+- **A level that has fewer than 5 fair tasks gives all it has,** and the repo's sample is filled
+  to 15 from its other levels, the nearer level first. pandas has 3 fair hard tasks, and only 8
+  hard candidates are left to check: its sample is 7 easy, 5 medium and 3 hard.
 
 **What this size can show.** The unit of every comparison is the task: `grep` against `tool` on
 the same task, at one prompt level. Six repos give 90 tasks, so 90 pairs at each level. The
@@ -235,3 +249,14 @@ can be compared.
 4. **Run the check run** (§6) and post its five points and the first Sonnet numbers. Go on only
    when it has passed.
 5. **Then run in the order of §7.**
+
+---
+
+## 10. What the sample does not hold
+
+**Large changes.** No task's real fix has more than 5 code files or 200 changed lines (§1). A
+request such as "add OCR to the upload pipeline", which touches many files, is what codemem is
+meant for, and it is not here. A second collection with a higher limit would add such tasks as
+a fourth level. They cost more to check, and fewer of them pass the screen: of pandas's valid
+hard tasks 11% are fair, of its easy ones 32%. Whether to collect them before the presentation
+or for the paper is Andre's decision.
