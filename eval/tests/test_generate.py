@@ -33,6 +33,42 @@ def test_difficulty_counts_code_files_only():
     assert gen.difficulty(_patch("a.py", lines=15) + data + build) == "easy"
 
 
+def _files(n):
+    return [f"f{i}.py" for i in range(n)]
+
+
+def test_tier_is_the_run_plan_tier():
+    # easy: difficulty easy and medium
+    assert gen.tier(_patch("a.py", lines=15)) == "easy"
+    assert gen.tier(_patch("a.py", "b.py", lines=50)) == "easy"
+    # medium: 3 to 5 files, or 101 to 200 lines
+    assert gen.tier(_patch("a.py", "b.py", lines=51)) == "medium"
+    assert gen.tier(_patch("a.py", "b.py", "c.py")) == "medium"
+    assert gen.tier(_patch(*_files(5), lines=40)) == "medium"
+    assert gen.tier(_patch("a.py", lines=200)) == "medium"
+    # hard: 6 to 15 files, or 201 to 600 lines
+    assert gen.tier(_patch(*_files(6))) == "hard"
+    assert gen.tier(_patch("a.py", lines=201)) == "hard"
+    assert gen.tier(_patch(*_files(5), lines=41)) == "hard"
+    assert gen.tier(_patch(*_files(15), lines=40)) == "hard"
+    # larger than the second collection's limits
+    assert gen.tier(_patch(*_files(16))) is None
+    assert gen.tier(_patch("a.py", lines=601)) is None
+
+
+def test_tier_counts_code_files_only():
+    data = "".join(f"diff --git a/t/{i}.csv b/t/{i}.csv\n--- a/t/{i}.csv\n+++ b/t/{i}.csv\n@@ -1 +1 @@\n" + "+x\n" * 100
+                   for i in range(10))
+    assert gen.tier(_patch("a.py", "b.py", "c.py") + data) == "medium"
+
+
+def test_tier_splits_difficulty_hard_only():
+    for files in range(1, 18):
+        for lines in (1, 15, 16, 50, 51, 100, 101, 200, 201, 600, 601):
+            patch = _patch(*_files(files), lines=lines // files or 1)
+            assert (gen.tier(patch) == "easy") == (gen.difficulty(patch) != "hard")
+
+
 def test_exclude_newer_is_the_sunday_of_the_week():
     monday = 1790553600  # 2026-09-28 00:00 UTC, a Monday
     assert gen.exclude_newer(monday) == "2026-10-04T23:59:59Z"

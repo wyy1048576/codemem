@@ -214,6 +214,29 @@ def difficulty(patch: str) -> str:
     return "hard"
 
 
+# The tiers of the run plan (docs/plan/runs.md, section 3): the largest fix of each tier, as
+# (code files, changed lines). The easy tier is the labels easy and medium of difficulty. The
+# first collection kept fixes up to the medium limit; the second one (configs/*-large.toml) up to
+# the hard limit.
+TIER_LIMITS = (("medium", 5, 200), ("hard", 15, 600))
+
+
+def tier(patch: str) -> str | None:
+    """Tier of the real fix in the run plan: easy (at most 2 code files and 100 lines), medium
+    (at most 5 files and 200 lines), hard (at most 15 files and 600 lines), or None for a larger
+    fix, which no task file holds. It counts as difficulty counts, so the easy tier is exactly
+    difficulty easy and medium, and difficulty hard splits into the tiers medium and hard.
+    difficulty stays the label of the task files and of the tables written before the plan."""
+    if difficulty(patch) != "hard":
+        return "easy"
+    patch = code_part(patch)
+    files, lines = len(changed_files(patch)), changed_lines(patch)
+    for name, max_files, max_lines in TIER_LIMITS:
+        if files <= max_files and lines <= max_lines:
+            return name
+    return None
+
+
 def _glob_match(path: str, pattern: str) -> bool:
     # fnmatch lets "*" cross "/", so "a/**/test_*.py" also matches files right below "a/".
     return fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, pattern.replace("/**/", "/"))

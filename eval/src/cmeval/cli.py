@@ -275,7 +275,7 @@ def cmd_repo_stats(args) -> int:
 def cmd_collect(args) -> int:
     from .collect.candidates import (CollectError, collect_candidates, load_settings, render_funnel,
                                      write_candidates)
-    from .collect.tasks_build import build_tasks, write_task_set
+    from .collect.tasks_build import build_tasks, drop_known, write_task_set
     from .github import GitHub, GitHubError
     from .paths import collect_dir, default_tasks_dir
     from .repos import RepoError, slug
@@ -325,7 +325,17 @@ def cmd_collect(args) -> int:
         where = "dry run (GitHub steps only), nothing written"
     else:
         out = args.out or default_tasks_dir() / f"{settings.name}.jsonl"
-        write_task_set(out, tasks, funnels, settings, args.config)
+        excluded = None
+        if args.exclude_tasks:
+            found = len(tasks)
+            tasks, excluded = drop_known(tasks, args.exclude_tasks, repos)
+            for repo, info in excluded["repos"].items():
+                if info["not_found_again"]:
+                    print(f"{repo}: {len(info['not_found_again'])} tasks of the excluded files not found again",
+                          file=sys.stderr)
+            print(f"{found} tasks found, {found - len(tasks)} left out (in {', '.join(map(str, args.exclude_tasks))})",
+                  file=sys.stderr)
+        write_task_set(out, tasks, funnels, settings, args.config, excluded)
         where = f"{out}: {len(tasks)} tasks; candidates and funnels in {collect_dir() / settings.name}"
     print(f"{where} ({gh.api_calls} API calls, {gh.cache_hits} from the cache, {gh.retries} retries)",
           file=sys.stderr)
@@ -777,6 +787,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dry-run", action="store_true", help="GitHub steps only (no clone); print the funnel, write nothing")
     p.add_argument("--refresh", action="store_true", help="ask GitHub again instead of using cached answers")
     p.add_argument("--out", type=Path, default=None, help="task file (default: eval/tasks/<config name>.jsonl)")
+    p.add_argument("--exclude-tasks", type=Path, action="append", default=None, metavar="FILE",
+                   help="leave out the tasks whose id is in this task file (an earlier collection); repeatable. "
+                        "The meta file records what was left out")
     p.set_defaults(func=cmd_collect)
 
     p = sub.add_parser("repo-stats", help="size, PR funnel, and code counts of candidate repos for fresh tasks")
