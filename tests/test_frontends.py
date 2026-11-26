@@ -456,6 +456,11 @@ def test_cli_index_search_status(sample_repo, tmp_path, fake_env, capsys):
     related = [x for r in data["results"] for x in r["related"]]
     assert related and {"qualname", "path", "start_line", "relation"} <= set(related[0])
 
+    args = ["search", "close an account", "--repo", str(sample_repo), "--index-dir", idx, "--json", "--debug"]
+    assert main([*args, "--names", "revoke_session, disable_user"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["signals"][-1] == "names" and any(r["ranks"].get("names") == 1 for r in data["results"])
+
     assert main(["search", "x", "--repo", str(sample_repo), "--index-dir", idx, "--signals", "bogus"]) == 2
     capsys.readouterr()
 
@@ -982,6 +987,9 @@ def test_mcp_tools_end_to_end(service):
             assert text.endswith("\n\n" + prompts.search_footer("light"))
             assert "\n   related: " in text  # the cards name their closest callers and callees
             assert "\n\nMore results, by name (ask get_chunk for any of them):\n" in text
+            res = await client.call_tool("search_code", {"query": "close an account", "k": 3, "names": ["revoke_session"]})
+            cards = [line for line in res.content[0].text.split("\n\n")[0].splitlines() if line[:1].isdigit()]
+            assert any("auth/sessions.py:19-20  revoke_session" in line for line in cards)
             res = await client.call_tool("get_chunk", {"ref": "auth/sessions.py:20"})
             assert "db.sessions.delete(session_id)" in res.content[0].text
             assert "callers: " in res.content[0].text

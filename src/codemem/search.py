@@ -21,6 +21,14 @@ from .store import ChunkFilter, Store, VectorHit
 from .tokenize import fts_or, tokenize
 
 BM25 = "bm25"
+# The names a caller passes apart from its query (search_code's `names`): a fourth list of the merge,
+# by keywords alone. Built exactly as the lab's experiment 12 built it (.cache/review/lab,
+# bm25_variants.py, Nov 26): the names joined by spaces go through bm25_match(), the query's own
+# keyword rule (identifiers split into words and also kept whole, stopwords dropped, the distinct
+# words OR-ed), then Store.bm25_search() over the five keyword columns (name, path, signature, doc,
+# body, weighted 10, 3, 5, 2, 1 by default) under the search's filters; its top `candidates` (50) are
+# merged by RRF with weight `rrf_weights["names"]`, 1 by default (chosen there among 0.25 to 1).
+NAMES = "names"
 # A card's related names leave out a callee with more callers than this, and do not follow its callers
 # (store.neighbours): calls are linked by name, so such a callee is mostly a common method name
 # (`append`: 4,362 callers on vLLM). 100 is about the 99th percentile of callers per callee on vLLM,
@@ -265,8 +273,11 @@ def search(
     test_weight: float | None = None,
     kind_weights: dict[str, float] | None = None,
     tests: str = "include",
+    names: Sequence[str] | None = None,
 ) -> SearchResponse:
-    """`tests`: "include" (default), "exclude" or "only" test code."""
+    """`tests`: "include" (default), "exclude" or "only" test code. `names`: function, class, method
+    or file names the caller knows or guesses, ranked by keywords alone as a fourth list (NAMES).
+    Without names (none, or only blanks) the search is what it is without the argument."""
     if tests not in TEST_FILTERS:
         raise ValueError(f"tests must be one of {'|'.join(TEST_FILTERS)}, got {tests!r}")
     timings: dict[str, float] = {}
@@ -299,6 +310,13 @@ def search(
         match = bm25_match(store, query, config)
         ranked[BM25] = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
         timings[BM25] = time.perf_counter() - t
+    names_text = " ".join(x.strip() for x in names or () if x and x.strip())
+    named_list: list[int] | None = None
+    if BM25 in signals and names_text and config.rrf_weights.get(NAMES, 1.0) > 0:
+        t = time.perf_counter()
+        match = bm25_match(store, names_text, config)
+        named_list = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
+        timings[NAMES] = time.perf_counter() - t
 
     vec_signals = [s for s in signals if s != BM25]
     # Embed the query once per distinct model (and plugin and weights), not once per vector set.
@@ -322,6 +340,8 @@ def search(
         for vec_type in vec_signals:
             ranked[vec_type] = []
 
+    if named_list is not None:  # merged after the query's own lists
+        ranked[NAMES] = named_list
     t = time.perf_counter()
     fused = rrf(ranked, k=config.rrf_k, weights=config.rrf_weights)
     kind_weights = config.kind_weights if kind_weights is None else kind_weights
@@ -354,7 +374,8 @@ def search(
         _add_relations(store, results, by_meaning, query_vec, config.card_relations, None if allowed is None else set(allowed))
         timings["relations"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
-    return SearchResponse(query=query, signals=list(signals), results=results, timings=timings, more=more)
+    used = [*signals, NAMES] if NAMES in ranked else list(signals)
+    return SearchResponse(query=query, signals=used, results=results, timings=timings, more=more)
 
 
 def _add_relations(

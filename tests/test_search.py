@@ -390,3 +390,47 @@ def test_more_results_setting_is_validated():
     for bad in (-1, 2.5, "20", False):
         with pytest.raises(ValueError, match="more_results"):
             config_from_dict({"more_results": bad})
+
+
+# ---------------------------------------------------------------- names, apart from the query
+
+
+def test_names_move_a_named_function_up(index):
+    store, cfg, factory = index
+    plain = search(store, "close an account", cfg, k=50, debug=True, embedder_factory=factory)
+    named = search(store, "close an account", cfg, k=50, debug=True, names=["revoke_session"], embedder_factory=factory)
+    assert plain.signals == ["bm25", "code", "usage"] and named.signals == ["bm25", "code", "usage", "names"]
+    place = lambda resp: [r.qualname for r in resp.results].index("revoke_session")  # noqa: E731
+    assert place(named) < place(plain) and place(named) < 3  # moved up, into the first three
+    assert named.results[place(named)].ranks["names"] == 1
+
+
+def test_without_names_the_search_is_what_it_was(index):
+    """No names (none, an empty list, blanks, or a names weight of 0) leaves every result and score
+    as the three lists' merge gives them, the search as it is without the argument."""
+    from codemem.search import bm25_match
+
+    store, cfg, factory = index
+    for query in (QUERY, "revoke_session", "close an account", "table rows"):
+        q = factory(cfg.vectors["code"], cfg).embed_queries([query])[0]
+        match = bm25_match(store, query, cfg)
+        lists = {"bm25": store.bm25_search(match, 50, cfg.bm25_weights5()) if match else []}
+        for vec_type in ("code", "usage"):
+            lists[vec_type] = [h.chunk_id for h in store.vector_search(vec_type, q, 50)]
+        expected = [(c.key, s) for c, s in _pick_top(rrf(lists, k=cfg.rrf_k), 10, store.get_chunks)]
+        for names in (None, [], ["", "  "]):
+            resp = search(store, query, cfg, k=10, names=names, embedder_factory=factory)
+            assert resp.signals == ["bm25", "code", "usage"]
+            assert [(r.key, r.score) for r in resp.results] == expected
+        cfg.rrf_weights = {"names": 0.0}  # the list switched off
+        resp = search(store, query, cfg, k=10, names=["revoke_session"], embedder_factory=factory)
+        assert resp.signals == ["bm25", "code", "usage"] and [(r.key, r.score) for r in resp.results] == expected
+        cfg.rrf_weights = {}
+
+
+def test_every_tool_description_asks_for_names():
+    from codemem import prompts
+
+    for level in ("none", "light", "strong"):
+        text = prompts.tool_description("search_code", level)
+        assert "`names`" in text and "guess" in text

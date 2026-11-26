@@ -179,7 +179,8 @@ common_share = 0.0           # a query over query_terms words also drops words f
                              # this share of chunks: faster, less accurate
 [rrf]
 k = 60
-weights = { bm25 = 1.0, code = 1.0, usage = 1.0 }
+weights = { bm25 = 1.0, code = 1.0, usage = 1.0, names = 1.0 }  # names: the keyword list of search_code's
+                             # `names`, searched apart from the query; 0 turns it off
 [usage]
 max_defs_per_name = 5        # a name defined more often than this is not linked
 max_items = 20               # caller and test lines per usage text

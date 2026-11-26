@@ -748,7 +748,9 @@ class CodememService:
         self.store.close()
 
     # ---- queries
-    def search(self, query: str, *, wait_for_models: bool = True, **kwargs: Any) -> SearchResponse:
+    def search(
+        self, query: str, *, wait_for_models: bool = True, names: Sequence[str] | None = None, **kwargs: Any
+    ) -> SearchResponse:
         """Catch up on pending saves, then search. With `wait_for_models=False` (the MCP server), a
         search waits for what is still loading only within `catchup_budget_ms` too: the embedding
         model at start-up, and the search indexes (read from their files, or rebuilt from the stored
@@ -761,7 +763,12 @@ class CodememService:
         The same holds when the vectors cannot be had at all: a model whose load failed, or an
         embedding endpoint that does not answer. Such a search answers from keywords and says why
         (`models_error`), at once while that is known, and after its own request's retries if it
-        is the first to find out. A search that waits (the CLI's) fails with the reason instead."""
+        is the first to find out. A search that waits (the CLI's) fails with the reason instead.
+
+        `names`: function, class, method or file names the caller knows or guesses, searched by
+        keywords apart from the query (search.NAMES); a keyword-only answer keeps them."""
+        if names:
+            kwargs["names"] = list(names)
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
         freshness = Freshness()
         if self._worker is not None or self._watcher is not None:

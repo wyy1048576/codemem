@@ -8,7 +8,11 @@ from __future__ import annotations
 
 SERVER_NAME = "codemem"
 
-_FILTERS = (
+_NAMES = (
+    " Put any function, class, method or file names you know or guess in `names`, apart from the "
+    "query: they are matched as exact words, and guessed names are welcome."
+)
+_FILTERS = _NAMES + (
     " Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests "
     "(include, exclude, only)."
 )

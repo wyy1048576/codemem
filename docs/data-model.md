@@ -643,7 +643,7 @@ The tool names stay stable, so other front-ends can be compared.
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), each naming its closest callers and callees, then the next results by name, and a closing `Note:` when the search could not include every save or embedding. An opening `Note:` while a new index is being built, or is still a copy of another checkout's |
+| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"`, `names: list[str] \| None` (function, class, method or file names the caller knows or guesses: a fourth list of the merge, by keywords alone; without them the search is unchanged) | numbered cards (below), each naming its closest callers and callees, then the next results by name, and a closing `Note:` when the search could not include every save or embedding. An opening `Note:` while a new index is being built, or is still a copy of another checkout's |
 | `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)`. An opening `Note:` when it is read from a copy of another checkout's index that is not checked yet |
 | `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the search index in use (exact or compact, why, and about how much memory each vector type takes), the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
@@ -790,6 +790,9 @@ A change to any of these must be made together with the eval:
   `CODEMEM_VECTOR_BACKEND` sets it from the environment, for an index that is built in one place
   and opened in another: `auto` picks by the memory of the place it runs in, so the two can
   differ, and every start that begins from the build's files then rebuilds the search index.
+- **`[rrf] weights`:** search-time; signal -> weight, 1 for a signal not named. The signals are
+  `bm25`, each vector type, and `names`, the keyword list of the names a caller passes apart from
+  the query (§12.1); `names = 0` turns that list off.
 - **`card_relations`:** search-time; a whole number, 0 or more; the default is 3. How many callers
   and callees each card names (§12.1); 0 names none. The ranking does not depend on it.
 - **`more_results`:** search-time; a whole number, 0 or more; the default is 20. How many results

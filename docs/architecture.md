@@ -1405,7 +1405,9 @@ and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and bec
         │                                                                       it shares no word)
         ├──► code vectors ───────────► ... 10. revoke_session
         │
-        └──► usage vectors ──────────► ...  2. revoke_session  (its callers match)
+        ├──► usage vectors ──────────► ...  2. revoke_session  (its callers match)
+        │
+        └──► names given apart ──────► (keywords only; when the agent passes some)
                        │
                        ▼
         merge by rank: each list adds 1 / (60 + rank) to a chunk's score
@@ -1420,12 +1422,20 @@ and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and bec
    matches `revoke`, `session` and `revoke_session`. Query stopwords ("the", "in") are dropped.
 2. **Meaning.** The query is embedded once, then compared with every code vector and, separately,
    every usage vector.
-3. **Merge by rank** (reciprocal rank fusion). Ranks are merged, not raw scores, because keyword
+3. **Names, apart from the query.** An agent can pass function, class, method or file names it
+   knows or guesses (`names`) beside a plain-words query. They are ranked by keywords alone, as a
+   fourth list. A short query keeps them that way: with an issue's first line as the query and the
+   issue's identifiers as `names`, a gold function reached the top 10 for 88 of 175 vLLM tasks
+   against 58, and 81 of 162 pandas tasks against 70, on the half of the tasks no setting was chosen
+   on (the weight, 1, was chosen on the other half). With the whole issue as the query as well, they
+   gained vLLM 11 tasks and cost pandas 7 of 179 gold files in the top 10. Without names a search is
+   what it was. `[rrf] weights = { names = 0 }` turns the list off.
+4. **Merge by rank** (reciprocal rank fusion). Ranks are merged, not raw scores, because keyword
    scores and vector similarities aren't comparable. Each list contributes its top 50.
-4. **Filters and weights.** A folder (`path_prefix`), kinds (functions only, say), languages and
+5. **Filters and weights.** A folder (`path_prefix`), kinds (functions only, say), languages and
    tests (include, exclude or only) filter each list. Tests, classes and blocks score like
    everything else by default, since vague questions often need them; weights can lower them.
-5. **Cards.** Equal scores are ordered by location, so every machine gives the same order:
+6. **Cards.** Equal scores are ordered by location, so every machine gives the same order:
 
 ```
 3. auth/sessions.py:19-20  revoke_session  [id 14]
@@ -1476,7 +1486,7 @@ against the index (or builds it the first time), starts the watcher and loads th
 
 | Tool | Does |
 |---|---|
-| `search_code(query, k, path_prefix, kinds, tests)` | catches up (§4.2), then returns up to `k` cards (10 by default, 50 at most), with a note if something is still pending |
+| `search_code(query, k, path_prefix, kinds, tests, names)` | catches up (§4.2), then returns up to `k` cards (10 by default, 50 at most), each naming its closest callers and callees, then the next results by name, with a note if something is still pending; `names` are searched by keywords apart from the query (§6) |
 | `get_chunk(ref)` | the full code of a chunk, by id, `path:line` or `path::qualname`, with its callers and callees |
 | `index_status()` | what is indexed, what is pending or skipped and why, which model and whether it is in memory, and any error |
 | `refresh_index()` | a full check now, for changes the watcher can't see |
