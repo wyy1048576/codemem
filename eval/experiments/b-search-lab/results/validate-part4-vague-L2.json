@@ -1,0 +1,10 @@
+{
+ "set": "vague-L2",
+ "tasks": 16,
+ "today": 8,
+ "tests_apart": 11,
+ "named_test_calls_gold": 3,
+ "of_them_not_in_cards": 0,
+ "tests_among_todays_10": 3.1875,
+ "tests_apart_ms_median": 54.70631248317659
+}

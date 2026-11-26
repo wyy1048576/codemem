@@ -1,0 +1,136 @@
+{
+ "vllm": {
+  "chunks": 102224,
+  "test_chunks": 38862,
+  "edges": 305482,
+  "distinct_callers": 60639,
+  "distinct_callees": 35167,
+  "callers_per_callee": {
+   "median": 2.0,
+   "p90": 10.0,
+   "p99": 95.33999999999651,
+   "max": 4362
+  },
+  "callees_per_caller": {
+   "median": 3.0,
+   "p90": 11.0,
+   "p99": 25.0,
+   "max": 99
+  },
+  "top_hubs": [
+   [
+    "ConstantList.append",
+    "method",
+    4362
+   ],
+   [
+    "FreeKVCacheBlockQueue.append",
+    "method",
+    4362
+   ],
+   [
+    "FlatLogprobs.append",
+    "method",
+    4361
+   ],
+   [
+    "KernelAbi.zeros",
+    "method",
+    2287
+   ],
+   [
+    "zeros",
+    "function",
+    2287
+   ],
+   [
+    "_Probe.__init__.zeros",
+    "function",
+    2286
+   ],
+   [
+    "TimeCollector.max",
+    "method",
+    2162
+   ],
+   [
+    "ScalarType.max",
+    "method",
+    2162
+   ]
+  ],
+  "edges_b99": 157712,
+  "K99": 95,
+  "edges_b90": 81496,
+  "K90": 10,
+  "edges_c_unique_name": 111216,
+  "edges_from_test_callers": 151484
+ },
+ "pandas": {
+  "chunks": 41632,
+  "test_chunks": 28755,
+  "edges": 163090,
+  "distinct_callers": 30872,
+  "distinct_callees": 6583,
+  "callers_per_callee": {
+   "median": 2.0,
+   "p90": 25.0,
+   "p99": 381.1800000000003,
+   "max": 9117
+  },
+  "callees_per_caller": {
+   "median": 4.0,
+   "p90": 11.0,
+   "p99": 20.0,
+   "max": 69
+  },
+  "top_hubs": [
+   [
+    "DataFrame",
+    "class",
+    9117
+   ],
+   [
+    "DataFrame",
+    "class",
+    9117
+   ],
+   [
+    "Series",
+    "class",
+    6460
+   ],
+   [
+    "assert_frame_equal",
+    "function",
+    5669
+   ],
+   [
+    "assert_series_equal",
+    "function",
+    3700
+   ],
+   [
+    "ListAccessor.len",
+    "method",
+    2830
+   ],
+   [
+    "StringMethods.len",
+    "method",
+    2830
+   ],
+   [
+    "_TextAdjustment.len",
+    "method",
+    2829
+   ]
+  ],
+  "edges_b99": 75311,
+  "K99": 381,
+  "edges_b90": 20870,
+  "K90": 25,
+  "edges_c_unique_name": 57905,
+  "edges_from_test_callers": 128568
+ }
+}

@@ -1,0 +1,7016 @@
+{
+ "vllm-L0": {
+  "labels": {
+   "tasks": 381,
+   "gold_files": 604,
+   "gold_files_in_snapshot": 596,
+   "gold_functions": 854,
+   "gold_functions_in_snapshot": 787,
+   "tasks_no_function_label": 23,
+   "tasks_with_file": 375,
+   "tasks_with_fn": 342,
+   "lab_equals_product_top50": 381,
+   "lab_equals_product_top10": 381,
+   "search_ms_median": 2282.38
+  },
+  "metrics": {
+   "file@5": 250,
+   "file@10": 277,
+   "file@15": 294,
+   "file@20": 302,
+   "file@30": 311,
+   "file@50": 321,
+   "file_mrr": 0.5584386186152401,
+   "fn@5": 175,
+   "fn@10": 206,
+   "fn@15": 223,
+   "fn@20": 232,
+   "fn@30": 242,
+   "fn@50": 254,
+   "fn_mrr": 0.34418908249598196
+  },
+  "per_task": {
+   "vllm-project__vllm-47567": {
+    "file_rank": 45,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47332": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47589": {
+    "file_rank": 6,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47429": {
+    "file_rank": 14,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-47716": {
+    "file_rank": 18,
+    "fn_rank": 23,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47725": {
+    "file_rank": 6,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47908": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47445": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-47910": {
+    "file_rank": 13,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47797": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47801": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "vllm-project__vllm-47381": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47404": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47314": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-48330": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48390": {
+    "file_rank": 2,
+    "fn_rank": 25,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48262": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48379": {
+    "file_rank": 9,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48098": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48901": {
+    "file_rank": 50,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48878": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48417": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49015": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-48674": {
+    "file_rank": 43,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49208": {
+    "file_rank": 3,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48444": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49146": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48843": {
+    "file_rank": 14,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48860": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47953": {
+    "file_rank": 15,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48425": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49704": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49803": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49671": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49226": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-49052": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48366": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49823": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50210": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-49073": {
+    "file_rank": 23,
+    "fn_rank": 26,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48245": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50420": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50328": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50352": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-50491": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "vllm-project__vllm-50302": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49498": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49608": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50746": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-48420": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-50462": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50867": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49919": {
+    "file_rank": 11,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50958": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49397": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51131": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50358": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51002": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51116": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51113": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49206": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51100": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50393": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50965": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50960": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51391": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51161": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50528": {
+    "file_rank": 15,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51603": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51573": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50693": {
+    "file_rank": 8,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49815": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51727": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51259": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51734": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-48223": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51840": {
+    "file_rank": 2,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51139": {
+    "file_rank": 35,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-52098": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47692": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50685": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52164": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52246": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51823": {
+    "file_rank": 2,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52385": {
+    "file_rank": 2,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52044": {
+    "file_rank": 19,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52430": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52692": {
+    "file_rank": 15,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52805": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52702": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48109": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49996": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52399": {
+    "file_rank": 15,
+    "fn_rank": 20,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47640": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52041": {
+    "file_rank": 21,
+    "fn_rank": 45,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49688": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47272": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-52491": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51703": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53016": {
+    "file_rank": 6,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-49811": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51866": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53034": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49195": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53101": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52389": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53513": {
+    "file_rank": 21,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-52951": {
+    "file_rank": 2,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51979": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53165": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52157": {
+    "file_rank": 1,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52193": {
+    "file_rank": 1,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53523": {
+    "file_rank": 2,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53467": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53657": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53682": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51292": {
+    "file_rank": 21,
+    "fn_rank": 21,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53329": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53854": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53704": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52185": {
+    "file_rank": 10,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48922": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "vllm-project__vllm-53939": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-50932": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54005": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52545": {
+    "file_rank": 1,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53253": {
+    "file_rank": 31,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54196": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54048": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52033": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54324": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54427": {
+    "file_rank": 3,
+    "fn_rank": 33,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53808": {
+    "file_rank": 2,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52912": {
+    "file_rank": 4,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52596": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54684": {
+    "file_rank": 2,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54136": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54052": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53870": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54533": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47562": {
+    "file_rank": 10,
+    "fn_rank": 42,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53291": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54622": {
+    "file_rank": 17,
+    "fn_rank": 17,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54303": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-51678": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53532": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51453": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54838": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49869": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52923": {
+    "file_rank": 1,
+    "fn_rank": 30,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54908": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54886": {
+    "file_rank": 13,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55288": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "vllm-project__vllm-54285": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50220": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55234": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55341": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50254": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "vllm-project__vllm-54288": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54022": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50257": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52771": {
+    "file_rank": 16,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55369": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53163": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55954": {
+    "file_rank": 10,
+    "fn_rank": 24,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56035": {
+    "file_rank": 8,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54973": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55310": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53824": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53174": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "vllm-project__vllm-55710": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54192": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55325": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49675": {
+    "file_rank": 8,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55548": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55305": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56017": {
+    "file_rank": 17,
+    "fn_rank": 19,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55426": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54416": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55897": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56299": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56211": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50984": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56844": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53453": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53444": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55602": {
+    "file_rank": 6,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52781": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53124": {
+    "file_rank": 18,
+    "fn_rank": 18,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55879": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57027": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54098": {
+    "file_rank": 15,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53674": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56576": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-54923": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57148": {
+    "file_rank": 5,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-55084": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56799": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51081": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57269": {
+    "file_rank": 13,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57189": {
+    "file_rank": 1,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48956": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56950": {
+    "file_rank": 15,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56359": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57289": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57317": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-51856": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57425": {
+    "file_rank": 1,
+    "fn_rank": 46,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57575": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57487": {
+    "file_rank": 4,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57654": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57076": {
+    "file_rank": 1,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57948": {
+    "file_rank": 22,
+    "fn_rank": 22,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51565": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56448": {
+    "file_rank": 9,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56250": {
+    "file_rank": 45,
+    "fn_rank": 45,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56579": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58149": {
+    "file_rank": 32,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53283": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49845": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57696": {
+    "file_rank": 6,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57528": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-50769": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48760": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57988": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57743": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58489": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57957": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58583": {
+    "file_rank": 41,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58112": {
+    "file_rank": 2,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58292": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58754": {
+    "file_rank": 1,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57105": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56377": {
+    "file_rank": 21,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58919": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55128": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58929": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58961": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-57476": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55647": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59020": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59171": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58938": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-47512": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59254": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51810": {
+    "file_rank": 28,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-55222": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55596": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58021": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-51899": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58268": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59373": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-48867": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58887": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59257": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53020": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49821": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57693": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58932": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59156": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58623": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59613": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59293": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59565": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-58569": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55161": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59859": {
+    "file_rank": 1,
+    "fn_rank": 39,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59106": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59990": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56198": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56974": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59873": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59632": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59031": {
+    "file_rank": 14,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59975": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58709": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59105": {
+    "file_rank": 11,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56531": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60142": {
+    "file_rank": 1,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59103": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59751": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59992": {
+    "file_rank": 1,
+    "fn_rank": 29,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59061": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57635": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60307": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-60310": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58373": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60215": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60309": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-55601": {
+    "file_rank": 2,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58088": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59749": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60501": {
+    "file_rank": 7,
+    "fn_rank": 41,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60098": {
+    "file_rank": 1,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60221": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59412": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59917": {
+    "file_rank": 9,
+    "fn_rank": 33,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59627": {
+    "file_rank": 28,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59997": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57633": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59829": {
+    "file_rank": 11,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60709": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60359": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60053": {
+    "file_rank": 19,
+    "fn_rank": 26,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60225": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57035": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60876": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60714": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59085": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57511": {
+    "file_rank": 36,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60812": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60982": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-57516": {
+    "file_rank": 3,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61012": {
+    "file_rank": 1,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60917": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59962": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58936": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61047": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59900": {
+    "file_rank": 2,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61041": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61104": {
+    "file_rank": 1,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60826": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60219": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60979": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60704": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60749": {
+    "file_rank": 2,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-52412": {
+    "file_rank": 8,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59166": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59928": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59935": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58064": {
+    "file_rank": 1,
+    "fn_rank": 20,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61257": {
+    "file_rank": 8,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-59260": {
+    "file_rank": 6,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58143": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60759": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60885": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60279": {
+    "file_rank": 19,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61757": {
+    "file_rank": 1,
+    "fn_rank": 28,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59472": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59468": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61016": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61161": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61736": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60437": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-53036": {
+    "file_rank": 9,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-61906": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62046": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58778": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61365": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61759": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60877": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61884": {
+    "file_rank": 2,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62224": {
+    "file_rank": 5,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62371": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58385": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61965": {
+    "file_rank": 6,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58231": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60179": {
+    "file_rank": 1,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-56270": {
+    "file_rank": 37,
+    "fn_rank": 37,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60362": {
+    "file_rank": 3,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60767": {
+    "file_rank": 8,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-58471": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62709": {
+    "file_rank": 2,
+    "fn_rank": 41,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-49625": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59611": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62164": {
+    "file_rank": 14,
+    "fn_rank": 34,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62652": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-59941": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60306": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61284": {
+    "file_rank": 11,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61786": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61090": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-61196": {
+    "file_rank": 1,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-61749": {
+    "file_rank": 21,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "vllm-project__vllm-62704": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62928": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62665": {
+    "file_rank": 1,
+    "fn_rank": 41,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-60774": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62555": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-62856": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "vllm-project__vllm-63138": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   }
+  }
+ },
+ "pandas-L0": {
+  "labels": {
+   "tasks": 352,
+   "gold_files": 488,
+   "gold_files_in_snapshot": 433,
+   "gold_functions": 624,
+   "gold_functions_in_snapshot": 598,
+   "tasks_no_function_label": 53,
+   "tasks_with_file": 324,
+   "tasks_with_fn": 295,
+   "lab_equals_product_top50": 352,
+   "lab_equals_product_top10": 352,
+   "search_ms_median": 438.9
+  },
+  "metrics": {
+   "file@5": 248,
+   "file@10": 260,
+   "file@15": 265,
+   "file@20": 268,
+   "file@30": 276,
+   "file@50": 286,
+   "file_mrr": 0.6321442492613228,
+   "fn@5": 160,
+   "fn@10": 180,
+   "fn@15": 193,
+   "fn@20": 197,
+   "fn@30": 205,
+   "fn@50": 217,
+   "fn_mrr": 0.4005022354543767
+  },
+  "per_task": {
+   "pandas-dev__pandas-66115": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66188": {
+    "file_rank": 1,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66162": {
+    "file_rank": 1,
+    "fn_rank": 40,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66200": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66198": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66206": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66120": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66122": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66223": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66216": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66214": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66225": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66226": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66247": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66227": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66305": {
+    "file_rank": 9,
+    "fn_rank": 26,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66306": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66312": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66258": {
+    "file_rank": 1,
+    "fn_rank": 24,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66330": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66174": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66136": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66175": {
+    "file_rank": 3,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66145": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66401": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66399": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66477": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66515": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66543": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66570": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66562": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66557": {
+    "file_rank": 1,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66530": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66473": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66381": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66590": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66642": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66640": {
+    "file_rank": 1,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66621": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66666": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66553": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66671": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66676": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66444": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66190": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66687": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66680": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66704": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66713": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66753": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66696": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66649": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66357": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66797": {
+    "file_rank": 11,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66815": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66270": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66600": {
+    "file_rank": 24,
+    "fn_rank": 24,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66340": {
+    "file_rank": 2,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66722": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66879": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66841": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66235": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66914": {
+    "file_rank": 5,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66913": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66894": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66910": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66943": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66882": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66944": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66930": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66957": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66955": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66584": {
+    "file_rank": 1,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66352": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66849": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66885": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66836": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66851": {
+    "file_rank": 5,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66438": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66972": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67058": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67069": {
+    "file_rank": 2,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67036": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67068": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67275": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67272": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67142": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67343": {
+    "file_rank": 3,
+    "fn_rank": 43,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67291": {
+    "file_rank": 17,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67471": {
+    "file_rank": 24,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67037": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66201": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66633": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67034": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66719": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67351": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67944": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67723": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67945": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67716": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67725": {
+    "file_rank": 4,
+    "fn_rank": 22,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66765": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67997": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66956": {
+    "file_rank": 32,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68081": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66234": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66708": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68168": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67826": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68090": {
+    "file_rank": 1,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68003": {
+    "file_rank": 2,
+    "fn_rank": 31,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68463": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68206": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68508": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68575": {
+    "file_rank": 32,
+    "fn_rank": 32,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68561": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68687": {
+    "file_rank": 27,
+    "fn_rank": 27,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66883": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68368": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67462": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66117": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68947": {
+    "file_rank": 30,
+    "fn_rank": 32,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68946": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68943": {
+    "file_rank": 11,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68942": {
+    "file_rank": 1,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68928": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67029": {
+    "file_rank": 1,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68941": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68940": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68002": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68991": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69119": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69132": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69115": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69023": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69118": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69116": {
+    "file_rank": 2,
+    "fn_rank": 37,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68936": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69015": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68945": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68689": {
+    "file_rank": 7,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67946": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66191": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67897": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68122": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68195": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67004": {
+    "file_rank": 38,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69123": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69415": {
+    "file_rank": 39,
+    "fn_rank": 39,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69437": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69449": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68587": {
+    "file_rank": 2,
+    "fn_rank": 34,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69455": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69468": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69457": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69480": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69450": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69454": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69427": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69447": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69471": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69453": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69133": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68196": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69659": {
+    "file_rank": 31,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69646": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69640": {
+    "file_rank": 3,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69607": {
+    "file_rank": 8,
+    "fn_rank": 19,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68358": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69500": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69502": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69635": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69627": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69491": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69490": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69507": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69456": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69624": {
+    "file_rank": 49,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69408": {
+    "file_rank": 23,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69134": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69489": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68278": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69719": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69463": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69496": {
+    "file_rank": 1,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69784": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68922": {
+    "file_rank": 2,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69475": {
+    "file_rank": 1,
+    "fn_rank": 46,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69494": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69478": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69668": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68083": {
+    "file_rank": 43,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69807": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69860": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69853": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69781": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69840": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69778": {
+    "file_rank": 1,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69917": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69117": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69792": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69503": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69868": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67628": {
+    "file_rank": 2,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69789": {
+    "file_rank": 1,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70091": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69637": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69988": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69497": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70134": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70132": {
+    "file_rank": 1,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69498": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70107": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70101": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70106": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69113": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69647": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70146": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70221": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69859": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69656": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70296": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70102": {
+    "file_rank": 1,
+    "fn_rank": 47,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70523": {
+    "file_rank": 1,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69445": {
+    "file_rank": 2,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70493": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70515": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70506": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70529": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70530": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69446": {
+    "file_rank": 2,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70631": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70526": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70138": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70744": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70734": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70701": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70507": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70713": {
+    "file_rank": 8,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70502": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70809": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70496": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70567": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70525": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69862": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69786": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69921": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70083": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70945": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70978": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70205": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70973": {
+    "file_rank": 5,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70982": {
+    "file_rank": 20,
+    "fn_rank": 38,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70885": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71021": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70827": {
+    "file_rank": 1,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70970": {
+    "file_rank": 19,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70976": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70960": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70924": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71009": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70911": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70826": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69924": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70962": {
+    "file_rank": 43,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70838": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70968": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70627": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70566": {
+    "file_rank": 30,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71019": {
+    "file_rank": 37,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69495": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70961": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71010": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70828": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70464": {
+    "file_rank": 4,
+    "fn_rank": 29,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71104": {
+    "file_rank": 12,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70825": {
+    "file_rank": 8,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71082": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71093": {
+    "file_rank": 26,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70492": {
+    "file_rank": 8,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71129": {
+    "file_rank": 1,
+    "fn_rank": 23,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71099": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71097": {
+    "file_rank": 6,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71096": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69485": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71107": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71092": {
+    "file_rank": 47,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71029": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69866": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70935": {
+    "file_rank": 30,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71110": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69960": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71095": {
+    "file_rank": 2,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71135": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70084": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70141": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71090": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71032": {
+    "file_rank": 11,
+    "fn_rank": 31,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71086": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71091": {
+    "file_rank": 10,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68456": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69645": {
+    "file_rank": 2,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69290": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71222": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71179": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71054": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71236": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71233": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70494": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71248": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70969": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71033": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70742": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71231": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71227": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71232": {
+    "file_rank": 1,
+    "fn_rank": 23,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71031": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71026": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71229": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71005": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70963": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70917": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71271": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71020": {
+    "file_rank": 1,
+    "fn_rank": 19,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69779": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69499": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70958": {
+    "file_rank": 5,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71087": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70989": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70977": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69790": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69652": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70915": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70868": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71171": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70966": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70130": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69137": {
+    "file_rank": 11,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70105": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70765": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70736": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67925": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70967": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71180": {
+    "file_rank": 1,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71287": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71175": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71334": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70773": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67025": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71383": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71065": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71442": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   }
+  }
+ },
+ "vague-L0": {
+  "labels": {
+   "tasks": 17,
+   "gold_files": 27,
+   "gold_files_in_snapshot": 24,
+   "gold_functions": 33,
+   "gold_functions_in_snapshot": 30,
+   "tasks_no_function_label": 1,
+   "tasks_with_file": 16,
+   "tasks_with_fn": 16,
+   "lab_equals_product_top50": 17,
+   "lab_equals_product_top10": 17,
+   "search_ms_median": 516.5
+  },
+  "metrics": {
+   "file@5": 15,
+   "file@10": 15,
+   "file@15": 15,
+   "file@20": 15,
+   "file@30": 15,
+   "file@50": 15,
+   "file_mrr": 0.8958333333333333,
+   "fn@5": 11,
+   "fn@10": 13,
+   "fn@15": 13,
+   "fn@20": 13,
+   "fn@30": 15,
+   "fn@50": 15,
+   "fn_mrr": 0.5144625603864734
+  },
+  "per_task": {
+   "pandas-dev__pandas-66352": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68090": {
+    "file_rank": 1,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69015": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68945": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67897": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68195": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68278": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70734": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70205": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69924": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70828": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71129": {
+    "file_rank": 1,
+    "fn_rank": 23,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71248": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71232": {
+    "file_rank": 1,
+    "fn_rank": 23,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69779": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70966": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67025": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   }
+  }
+ },
+ "vague-L1": {
+  "labels": {
+   "tasks": 17,
+   "gold_files": 27,
+   "gold_files_in_snapshot": 24,
+   "gold_functions": 33,
+   "gold_functions_in_snapshot": 30,
+   "tasks_no_function_label": 1,
+   "tasks_with_file": 16,
+   "tasks_with_fn": 16,
+   "lab_equals_product_top50": 17,
+   "lab_equals_product_top10": 17,
+   "search_ms_median": 206.69
+  },
+  "metrics": {
+   "file@5": 11,
+   "file@10": 12,
+   "file@15": 12,
+   "file@20": 12,
+   "file@30": 12,
+   "file@50": 15,
+   "file_mrr": 0.6365548292858075,
+   "fn@5": 9,
+   "fn@10": 9,
+   "fn@15": 9,
+   "fn@20": 10,
+   "fn@30": 11,
+   "fn@50": 13,
+   "fn_mrr": 0.35450621817469646
+  },
+  "per_task": {
+   "pandas-dev__pandas-66352": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68090": {
+    "file_rank": 9,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69015": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68945": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67897": {
+    "file_rank": 2,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68195": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68278": {
+    "file_rank": 2,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70734": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70205": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69924": {
+    "file_rank": 40,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70828": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71129": {
+    "file_rank": 1,
+    "fn_rank": 25,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71248": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71232": {
+    "file_rank": 1,
+    "fn_rank": 20,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69779": {
+    "file_rank": 37,
+    "fn_rank": 37,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70966": {
+    "file_rank": 46,
+    "fn_rank": 46,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67025": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   }
+  }
+ },
+ "vague-L2": {
+  "labels": {
+   "tasks": 17,
+   "gold_files": 27,
+   "gold_files_in_snapshot": 24,
+   "gold_functions": 33,
+   "gold_functions_in_snapshot": 30,
+   "tasks_no_function_label": 1,
+   "tasks_with_file": 16,
+   "tasks_with_fn": 16,
+   "lab_equals_product_top50": 17,
+   "lab_equals_product_top10": 17,
+   "search_ms_median": 43.28
+  },
+  "metrics": {
+   "file@5": 11,
+   "file@10": 13,
+   "file@15": 13,
+   "file@20": 14,
+   "file@30": 14,
+   "file@50": 16,
+   "file_mrr": 0.43489322851546214,
+   "fn@5": 7,
+   "fn@10": 8,
+   "fn@15": 9,
+   "fn@20": 10,
+   "fn@30": 12,
+   "fn@50": 12,
+   "fn_mrr": 0.19227272727272726
+  },
+  "per_task": {
+   "pandas-dev__pandas-66352": {
+    "file_rank": 31,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68090": {
+    "file_rank": 43,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69015": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68945": {
+    "file_rank": 20,
+    "fn_rank": 25,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67897": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68195": {
+    "file_rank": 9,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68278": {
+    "file_rank": 2,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70734": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70205": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69924": {
+    "file_rank": 8,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70828": {
+    "file_rank": 3,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71129": {
+    "file_rank": 2,
+    "fn_rank": 22,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71248": {
+    "file_rank": 2,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71232": {
+    "file_rank": 1,
+    "fn_rank": 20,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69779": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70966": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67025": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   }
+  }
+ },
+ "pandas-title": {
+  "labels": {
+   "tasks": 352,
+   "gold_files": 488,
+   "gold_files_in_snapshot": 433,
+   "gold_functions": 624,
+   "gold_functions_in_snapshot": 598,
+   "tasks_no_function_label": 53,
+   "tasks_with_file": 324,
+   "tasks_with_fn": 295,
+   "lab_equals_product_top50": 352,
+   "lab_equals_product_top10": 352,
+   "search_ms_median": 32.085
+  },
+  "metrics": {
+   "file@5": 198,
+   "file@10": 221,
+   "file@15": 230,
+   "file@20": 242,
+   "file@30": 253,
+   "file@50": 268,
+   "file_mrr": 0.5204273965822142,
+   "fn@5": 111,
+   "fn@10": 136,
+   "fn@15": 151,
+   "fn@20": 162,
+   "fn@30": 173,
+   "fn@50": 197,
+   "fn_mrr": 0.2799635758076989
+  },
+  "per_task": {
+   "pandas-dev__pandas-66115": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66188": {
+    "file_rank": 10,
+    "fn_rank": 19,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66162": {
+    "file_rank": 1,
+    "fn_rank": 36,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66200": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66198": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66206": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66120": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66122": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66223": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66216": {
+    "file_rank": 2,
+    "fn_rank": 21,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66214": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66225": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66226": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66247": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66227": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66305": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66306": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66312": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66258": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66330": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66174": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66136": {
+    "file_rank": 9,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66175": {
+    "file_rank": 33,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66145": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66401": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66399": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66477": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66515": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66543": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66570": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66562": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66557": {
+    "file_rank": 1,
+    "fn_rank": 9,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66530": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66473": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66381": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66590": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66642": {
+    "file_rank": 13,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66640": {
+    "file_rank": 31,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66621": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66666": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66553": {
+    "file_rank": 38,
+    "fn_rank": 40,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66671": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66676": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66444": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66190": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66687": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66680": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66704": {
+    "file_rank": 18,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66713": {
+    "file_rank": 2,
+    "fn_rank": 42,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66753": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66696": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66649": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66357": {
+    "file_rank": 10,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66797": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66815": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66270": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66600": {
+    "file_rank": 35,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66340": {
+    "file_rank": 27,
+    "fn_rank": 45,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66722": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66879": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66841": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66235": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66914": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66913": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66894": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66910": {
+    "file_rank": 14,
+    "fn_rank": 35,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66943": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66882": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66944": {
+    "file_rank": 23,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66930": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66957": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66955": {
+    "file_rank": 5,
+    "fn_rank": 33,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66584": {
+    "file_rank": 1,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66352": {
+    "file_rank": 11,
+    "fn_rank": 29,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66849": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66885": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66836": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66851": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66438": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66972": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67058": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67069": {
+    "file_rank": 13,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67036": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67068": {
+    "file_rank": 1,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67275": {
+    "file_rank": 13,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67272": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67142": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67343": {
+    "file_rank": 5,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67291": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67471": {
+    "file_rank": 33,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67037": {
+    "file_rank": 8,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66201": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66633": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67034": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66719": {
+    "file_rank": 1,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67351": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-67944": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67723": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67945": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67716": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67725": {
+    "file_rank": 16,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66765": {
+    "file_rank": 6,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67997": {
+    "file_rank": 16,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66956": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68081": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-66234": {
+    "file_rank": 1,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66708": {
+    "file_rank": 3,
+    "fn_rank": 21,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68168": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67826": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68090": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68003": {
+    "file_rank": 2,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68463": {
+    "file_rank": 22,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68206": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68508": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68575": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68561": {
+    "file_rank": 16,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68687": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66883": {
+    "file_rank": 2,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68368": {
+    "file_rank": 1,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67462": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66117": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68947": {
+    "file_rank": 30,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68946": {
+    "file_rank": 10,
+    "fn_rank": 32,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68943": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68942": {
+    "file_rank": 2,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68928": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67029": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68941": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68940": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68002": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68991": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69119": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69132": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69115": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69023": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69118": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69116": {
+    "file_rank": 6,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68936": {
+    "file_rank": 3,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69015": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68945": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68689": {
+    "file_rank": 1,
+    "fn_rank": 26,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67946": {
+    "file_rank": 2,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-66191": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67897": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68122": {
+    "file_rank": 1,
+    "fn_rank": 30,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68195": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67004": {
+    "file_rank": 41,
+    "fn_rank": 41,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69123": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69415": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69437": {
+    "file_rank": 41,
+    "fn_rank": 43,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69449": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68587": {
+    "file_rank": 38,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69455": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69468": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69457": {
+    "file_rank": 2,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69480": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69450": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69454": {
+    "file_rank": 1,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69427": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69447": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69471": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69453": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69133": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-68196": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69659": {
+    "file_rank": 46,
+    "fn_rank": 46,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69646": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69640": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69607": {
+    "file_rank": 3,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68358": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69500": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69502": {
+    "file_rank": 1,
+    "fn_rank": 20,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69635": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69627": {
+    "file_rank": 1,
+    "fn_rank": 19,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69491": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69490": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69507": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69456": {
+    "file_rank": 9,
+    "fn_rank": 49,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69624": {
+    "file_rank": 1,
+    "fn_rank": 33,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69408": {
+    "file_rank": 31,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69134": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69489": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68278": {
+    "file_rank": 1,
+    "fn_rank": 11,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69719": {
+    "file_rank": 27,
+    "fn_rank": 27,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69463": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69496": {
+    "file_rank": 18,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69784": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68922": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69475": {
+    "file_rank": 1,
+    "fn_rank": 49,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69494": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69478": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69668": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68083": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69807": {
+    "file_rank": 18,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69860": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69853": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69781": {
+    "file_rank": 48,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69840": {
+    "file_rank": 8,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69778": {
+    "file_rank": 1,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69917": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69117": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69792": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69503": {
+    "file_rank": 8,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69868": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67628": {
+    "file_rank": 1,
+    "fn_rank": 8,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69789": {
+    "file_rank": 1,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70091": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69637": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69988": {
+    "file_rank": 5,
+    "fn_rank": 30,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69497": {
+    "file_rank": 14,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70134": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70132": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69498": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70107": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70101": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70106": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69113": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69647": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70146": {
+    "file_rank": 45,
+    "fn_rank": 45,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70221": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69859": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69656": {
+    "file_rank": 19,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70296": {
+    "file_rank": 19,
+    "fn_rank": 19,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70102": {
+    "file_rank": 1,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70523": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69445": {
+    "file_rank": 1,
+    "fn_rank": 22,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70493": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70515": {
+    "file_rank": 24,
+    "fn_rank": 24,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70506": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70529": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70530": {
+    "file_rank": 3,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69446": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70631": {
+    "file_rank": 16,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70526": {
+    "file_rank": 1,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70138": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70744": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70734": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70701": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70507": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70713": {
+    "file_rank": 1,
+    "fn_rank": 49,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70502": {
+    "file_rank": 16,
+    "fn_rank": 18,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70809": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70496": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70567": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70525": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69862": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69786": {
+    "file_rank": 1,
+    "fn_rank": 6,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69921": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70083": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70945": {
+    "file_rank": 15,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70978": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70205": {
+    "file_rank": 2,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70973": {
+    "file_rank": 26,
+    "fn_rank": 33,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70982": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70885": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71021": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70827": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70970": {
+    "file_rank": 30,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70976": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70960": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70924": {
+    "file_rank": 9,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71009": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70911": {
+    "file_rank": 22,
+    "fn_rank": 22,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70826": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69924": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70962": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70838": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70968": {
+    "file_rank": 3,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70627": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70566": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71019": {
+    "file_rank": 31,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-69495": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70961": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71010": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70828": {
+    "file_rank": 1,
+    "fn_rank": 35,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70464": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71104": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70825": {
+    "file_rank": 10,
+    "fn_rank": 10,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71082": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71093": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70492": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71129": {
+    "file_rank": 1,
+    "fn_rank": 33,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71099": {
+    "file_rank": 6,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71097": {
+    "file_rank": 3,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71096": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69485": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71107": {
+    "file_rank": 26,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71092": {
+    "file_rank": 41,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71029": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69866": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70935": {
+    "file_rank": 44,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71110": {
+    "file_rank": 7,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69960": {
+    "file_rank": 19,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71095": {
+    "file_rank": 2,
+    "fn_rank": 15,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71135": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70084": {
+    "file_rank": 1,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70141": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71090": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71032": {
+    "file_rank": 13,
+    "fn_rank": 24,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71086": {
+    "file_rank": 1,
+    "fn_rank": 7,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71091": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-68456": {
+    "file_rank": 1,
+    "fn_rank": 46,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69645": {
+    "file_rank": 1,
+    "fn_rank": 12,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69290": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71222": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71179": {
+    "file_rank": 13,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71054": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71236": {
+    "file_rank": 16,
+    "fn_rank": 16,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71233": {
+    "file_rank": 1,
+    "fn_rank": 18,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70494": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71248": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70969": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71033": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70742": {
+    "file_rank": 1,
+    "fn_rank": 49,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71231": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71227": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": false,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-71232": {
+    "file_rank": 1,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71031": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71026": {
+    "file_rank": 4,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71229": {
+    "file_rank": 4,
+    "fn_rank": 4,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71005": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70963": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70917": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71271": {
+    "file_rank": 2,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71020": {
+    "file_rank": 28,
+    "fn_rank": 44,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69779": {
+    "file_rank": 3,
+    "fn_rank": 49,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69499": {
+    "file_rank": 9,
+    "fn_rank": 34,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70958": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71087": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70989": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70977": {
+    "file_rank": 2,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69790": {
+    "file_rank": 7,
+    "fn_rank": 14,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69652": {
+    "file_rank": 1,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70915": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70868": {
+    "file_rank": 2,
+    "fn_rank": 13,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71171": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70966": {
+    "file_rank": 5,
+    "fn_rank": 5,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70130": {
+    "file_rank": 7,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-69137": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70105": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70765": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70736": {
+    "file_rank": 2,
+    "fn_rank": 2,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67925": {
+    "file_rank": 5,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-70967": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71180": {
+    "file_rank": 1,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71287": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71175": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71334": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": false
+   },
+   "pandas-dev__pandas-70773": {
+    "file_rank": 3,
+    "fn_rank": 48,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-67025": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71383": {
+    "file_rank": 1,
+    "fn_rank": 1,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71065": {
+    "file_rank": 1,
+    "fn_rank": 3,
+    "has_file": true,
+    "has_fn": true
+   },
+   "pandas-dev__pandas-71442": {
+    "file_rank": null,
+    "fn_rank": null,
+    "has_file": true,
+    "has_fn": true
+   }
+  }
+ }
+}

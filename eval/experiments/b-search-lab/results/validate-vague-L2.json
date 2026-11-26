@@ -1,0 +1,12 @@
+{
+ "set": "vague-L2",
+ "tasks": 16,
+ "top10": 8,
+ "reach": 9,
+ "named_mean": 15.125,
+ "relations_ms_median": 3.1424169428646564,
+ "relations_ms_p90": 4.849041462875903,
+ "search_ms_median": 36.30872955545783,
+ "top10_with_names": 11,
+ "names_ms_median": 72.97799992375076
+}

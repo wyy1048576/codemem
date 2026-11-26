@@ -1,0 +1,10 @@
+{
+ "set": "pandas-L0",
+ "tasks": 162,
+ "top10": 94,
+ "reach": 108,
+ "named_mean": 15.87037037037037,
+ "relations_ms_median": 4.173292079940438,
+ "relations_ms_p90": 9.451028611510994,
+ "search_ms_median": 418.453021091409
+}

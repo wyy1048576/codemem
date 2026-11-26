@@ -1,0 +1,112 @@
+{
+ "pandas-L0|all": {
+  "tasks": 324,
+  "whole_file_text@5": 146,
+  "whole_file_text@10": 189,
+  "whole_file_fields@5": 153,
+  "whole_file_fields@10": 177,
+  "chunk_keywords_by_best_chunk@5": 151,
+  "chunk_keywords_by_best_chunk@10": 184,
+  "product_results_files@5": 260,
+  "product_results_files@10": 265
+ },
+ "pandas-L0|held": {
+  "tasks": 179,
+  "whole_file_text@5": 83,
+  "whole_file_text@10": 109,
+  "whole_file_fields@5": 88,
+  "whole_file_fields@10": 100,
+  "chunk_keywords_by_best_chunk@5": 84,
+  "chunk_keywords_by_best_chunk@10": 98,
+  "product_results_files@5": 140,
+  "product_results_files@10": 142
+ },
+ "pandas-title|all": {
+  "tasks": 324,
+  "whole_file_text@5": 166,
+  "whole_file_text@10": 213,
+  "whole_file_fields@5": 159,
+  "whole_file_fields@10": 191,
+  "chunk_keywords_by_best_chunk@5": 153,
+  "chunk_keywords_by_best_chunk@10": 187,
+  "product_results_files@5": 219,
+  "product_results_files@10": 246
+ },
+ "pandas-title|held": {
+  "tasks": 179,
+  "whole_file_text@5": 94,
+  "whole_file_text@10": 121,
+  "whole_file_fields@5": 94,
+  "whole_file_fields@10": 109,
+  "chunk_keywords_by_best_chunk@5": 88,
+  "chunk_keywords_by_best_chunk@10": 99,
+  "product_results_files@5": 109,
+  "product_results_files@10": 128
+ },
+ "vague-L1|all": {
+  "tasks": 16,
+  "whole_file_text@5": 10,
+  "whole_file_text@10": 12,
+  "whole_file_fields@5": 9,
+  "whole_file_fields@10": 12,
+  "chunk_keywords_by_best_chunk@5": 10,
+  "chunk_keywords_by_best_chunk@10": 10,
+  "product_results_files@5": 11,
+  "product_results_files@10": 12
+ },
+ "vague-L2|all": {
+  "tasks": 16,
+  "whole_file_text@5": 12,
+  "whole_file_text@10": 14,
+  "whole_file_fields@5": 9,
+  "whole_file_fields@10": 12,
+  "chunk_keywords_by_best_chunk@5": 7,
+  "chunk_keywords_by_best_chunk@10": 9,
+  "product_results_files@5": 12,
+  "product_results_files@10": 13
+ },
+ "vllm-L0|all": {
+  "tasks": 375,
+  "whole_file_text@5": 179,
+  "whole_file_text@10": 220,
+  "whole_file_fields@5": 167,
+  "whole_file_fields@10": 202,
+  "chunk_keywords_by_best_chunk@5": 228,
+  "chunk_keywords_by_best_chunk@10": 259,
+  "product_results_files@5": 262,
+  "product_results_files@10": 295
+ },
+ "vllm-L0|held": {
+  "tasks": 193,
+  "whole_file_text@5": 84,
+  "whole_file_text@10": 112,
+  "whole_file_fields@5": 80,
+  "whole_file_fields@10": 98,
+  "chunk_keywords_by_best_chunk@5": 113,
+  "chunk_keywords_by_best_chunk@10": 131,
+  "product_results_files@5": 134,
+  "product_results_files@10": 148
+ },
+ "vllm-title|all": {
+  "tasks": 375,
+  "whole_file_text@5": 200,
+  "whole_file_text@10": 234,
+  "whole_file_fields@5": 197,
+  "whole_file_fields@10": 227,
+  "chunk_keywords_by_best_chunk@5": 206,
+  "chunk_keywords_by_best_chunk@10": 244,
+  "product_results_files@5": 214,
+  "product_results_files@10": 251
+ },
+ "vllm-title|held": {
+  "tasks": 193,
+  "whole_file_text@5": 101,
+  "whole_file_text@10": 120,
+  "whole_file_fields@5": 98,
+  "whole_file_fields@10": 113,
+  "chunk_keywords_by_best_chunk@5": 102,
+  "chunk_keywords_by_best_chunk@10": 126,
+  "product_results_files@5": 109,
+  "product_results_files@10": 128
+ }
+}

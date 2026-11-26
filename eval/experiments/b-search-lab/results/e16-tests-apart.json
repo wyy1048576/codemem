@@ -1,0 +1,189 @@
+{
+ "vllm-L0|all": {
+  "tasks": 342,
+  "today": 206,
+  "cards": 211,
+  "diff": 5.0,
+  "ci": [
+   -1.0,
+   12.0
+  ],
+  "won": 8,
+  "lost": 3,
+  "tests_among_todays_10": 1.9239766081871346,
+  "named_test_calls_a_gold_function": 86,
+  "named_test_calls_a_gold_function_cap100": 83,
+  "of_them_gold_not_in_cards": 8,
+  "cards_or_a_named_test_calls_it": 219
+ },
+ "vllm-L0|held": {
+  "tasks": 175,
+  "today": 99,
+  "cards": 103,
+  "diff": 4.0,
+  "ci": [
+   0.0,
+   9.0
+  ],
+  "won": 5,
+  "lost": 1,
+  "tests_among_todays_10": 1.8742857142857143,
+  "named_test_calls_a_gold_function": 48,
+  "named_test_calls_a_gold_function_cap100": 47,
+  "of_them_gold_not_in_cards": 4,
+  "cards_or_a_named_test_calls_it": 107
+ },
+ "vllm-title|all": {
+  "tasks": 342,
+  "today": 118,
+  "cards": 141,
+  "diff": 23.0,
+  "ci": [
+   13.0,
+   34.0
+  ],
+  "won": 26,
+  "lost": 3,
+  "tests_among_todays_10": 3.198830409356725,
+  "named_test_calls_a_gold_function": 66,
+  "named_test_calls_a_gold_function_cap100": 65,
+  "of_them_gold_not_in_cards": 18,
+  "cards_or_a_named_test_calls_it": 159
+ },
+ "vllm-title|held": {
+  "tasks": 175,
+  "today": 58,
+  "cards": 67,
+  "diff": 9.0,
+  "ci": [
+   2.0,
+   17.0
+  ],
+  "won": 12,
+  "lost": 3,
+  "tests_among_todays_10": 3.257142857142857,
+  "named_test_calls_a_gold_function": 39,
+  "named_test_calls_a_gold_function_cap100": 38,
+  "of_them_gold_not_in_cards": 11,
+  "cards_or_a_named_test_calls_it": 78
+ },
+ "pandas-L0|all": {
+  "tasks": 295,
+  "today": 180,
+  "cards": 190,
+  "diff": 10.0,
+  "ci": [
+   0.0,
+   20.0
+  ],
+  "won": 18,
+  "lost": 8,
+  "tests_among_todays_10": 2.647457627118644,
+  "named_test_calls_a_gold_function": 75,
+  "named_test_calls_a_gold_function_cap100": 49,
+  "of_them_gold_not_in_cards": 1,
+  "cards_or_a_named_test_calls_it": 191
+ },
+ "pandas-L0|held": {
+  "tasks": 162,
+  "today": 94,
+  "cards": 100,
+  "diff": 6.0,
+  "ci": [
+   -2.0,
+   14.0
+  ],
+  "won": 12,
+  "lost": 6,
+  "tests_among_todays_10": 2.932098765432099,
+  "named_test_calls_a_gold_function": 40,
+  "named_test_calls_a_gold_function_cap100": 31,
+  "of_them_gold_not_in_cards": 1,
+  "cards_or_a_named_test_calls_it": 101
+ },
+ "vague-L0|all": {
+  "tasks": 16,
+  "today": 13,
+  "cards": 13,
+  "diff": 0.0,
+  "ci": [
+   0.0,
+   0.0
+  ],
+  "won": 0,
+  "lost": 0,
+  "tests_among_todays_10": 2.25,
+  "named_test_calls_a_gold_function": 5,
+  "named_test_calls_a_gold_function_cap100": 4,
+  "of_them_gold_not_in_cards": 0,
+  "cards_or_a_named_test_calls_it": 13
+ },
+ "vague-L1|all": {
+  "tasks": 16,
+  "today": 9,
+  "cards": 10,
+  "diff": 1.0,
+  "ci": [
+   0.0,
+   3.0
+  ],
+  "won": 1,
+  "lost": 0,
+  "tests_among_todays_10": 2.5625,
+  "named_test_calls_a_gold_function": 5,
+  "named_test_calls_a_gold_function_cap100": 4,
+  "of_them_gold_not_in_cards": 1,
+  "cards_or_a_named_test_calls_it": 11
+ },
+ "vague-L2|all": {
+  "tasks": 16,
+  "today": 8,
+  "cards": 11,
+  "diff": 3.0,
+  "ci": [
+   0.0,
+   6.0
+  ],
+  "won": 3,
+  "lost": 0,
+  "tests_among_todays_10": 3.1875,
+  "named_test_calls_a_gold_function": 4,
+  "named_test_calls_a_gold_function_cap100": 3,
+  "of_them_gold_not_in_cards": 0,
+  "cards_or_a_named_test_calls_it": 11
+ },
+ "pandas-title|all": {
+  "tasks": 295,
+  "today": 136,
+  "cards": 165,
+  "diff": 29.0,
+  "ci": [
+   17.0,
+   42.0
+  ],
+  "won": 36,
+  "lost": 7,
+  "tests_among_todays_10": 4.4847457627118645,
+  "named_test_calls_a_gold_function": 74,
+  "named_test_calls_a_gold_function_cap100": 48,
+  "of_them_gold_not_in_cards": 1,
+  "cards_or_a_named_test_calls_it": 166
+ },
+ "pandas-title|held": {
+  "tasks": 162,
+  "today": 70,
+  "cards": 80,
+  "diff": 10.0,
+  "ci": [
+   1.0,
+   19.0
+  ],
+  "won": 15,
+  "lost": 5,
+  "tests_among_todays_10": 4.6419753086419755,
+  "named_test_calls_a_gold_function": 37,
+  "named_test_calls_a_gold_function_cap100": 29,
+  "of_them_gold_not_in_cards": 1,
+  "cards_or_a_named_test_calls_it": 81
+ }
+}

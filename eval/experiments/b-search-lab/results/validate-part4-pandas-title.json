@@ -1,0 +1,10 @@
+{
+ "set": "pandas-title",
+ "tasks": 162,
+ "today": 70,
+ "tests_apart": 80,
+ "named_test_calls_gold": 29,
+ "of_them_not_in_cards": 1,
+ "tests_among_todays_10": 4.6419753086419755,
+ "tests_apart_ms_median": 40.54920852649957
+}
