@@ -345,8 +345,10 @@ re-embeds that vector type only.
 
 Before calling the model for a text, codemem looks for `(embedder key, text_hash)`:
 1. in this index (the same text elsewhere in the repo);
-2. in the shared **vector cache**, `$CODEMEM_HOME/cache/vectors.db`, which holds every text ever
-   embedded on this machine and only grows.
+2. in the shared **vector cache**, `$CODEMEM_HOME/cache/vector_cache.db` (§7), which holds the
+   vectors computed on this machine. Past its size cap the least recently used ones are deleted;
+   a text whose vector was deleted goes to the model again. A vector found there and a vector put
+   there both count as used.
 
 `IndexStats` reports `embedded` (vectors written for changed texts), `model_embedded` (of which the
 model computed), `reused` and `cache_hits`; and, for the structure, `chunks_added`,
@@ -392,20 +394,54 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
   index.db                           SQLite (WAL): meta, files, chunks, fts (word lists only, + fts_vocab), calls, edges, vectors,
                                      dirty_texts (the queue)
   vec_code.faiss, vec_code.json      a saved copy of the search index + a note {epoch, dim, count, embedder,
-  vec_usage.faiss, vec_usage.json    backend, file}; another backend saves vec_<type><suffix>, or nothing.
+  vec_usage.faiss, vec_usage.json    database, backend, file}; another backend saves vec_<type><suffix>, or nothing.
+                                     `database` is the `database_id` of the index.db the copy was saved from.
+                                     `backend` is the search index the file holds (`faiss`, `compact` or a
+                                     plugin's name), whether a configuration named it or `auto` picked it.
                                      FAISS files hold an IndexIDMap2 over an fp16 IndexScalarQuantizer
                                      (inner product, 2 bytes per number); a file of 4-byte numbers
                                      (IndexFlatIP) is converted when loaded
+  vec_code.rabitq, vec_usage.rabitq  the compact index's copy, and in its note `options`: the [compact]
+                                     table it was made with. The file is one line of JSON {dim, code_dim,
+                                     bits, count, rotation, index_bytes, crc32}, then `count` vector ids
+                                     (8 bytes each, little-endian), then one FAISS IndexRaBitQ (inner
+                                     product, centre zero) of the 1-bit codes and, when `bits` is above 1,
+                                     a second one of the `bits`-bit codes. Each holds one code per id, in
+                                     the order of the ids, and `index_bytes` lists their sizes. `rotation`
+                                     names the rotation the codes were made after, and `crc32` is the
+                                     checksum of everything after the first line
   write.lock                         one writer at a time (OS file lock)
   worktree.json                      only in the default index folder of a linked git worktree:
                                      {"worktree": its folder, "repository": the git folder its checkouts share};
                                      the folder is deleted once that worktree is gone (decisions.md §6)
-$CODEMEM_HOME/cache/vectors.db       shared vector cache: (embedder key, text_hash) -> float16 vector
+$CODEMEM_HOME/cache/vector_cache.db  shared vector cache: (embedder key, text_hash) -> float16 vector (below)
 $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sha256], so it is read once
 ```
 
+**The vector cache file** is SQLite (WAL) with pages of 32 KB, `auto_vacuum = INCREMENTAL` and
+`user_version` 1. A file whose `user_version` differs is not read or written.
+
+| Table | Columns | Holds |
+|---|---|---|
+| `embedder` | `id`, `key` (unique), `dim` | one row per embedder key (§5.4), with the length of its vectors. A vector of another length is not stored under that key |
+| `entry` (no rowid) | `embedder`, `hash`, `slot`, `used`; primary key (`embedder`, `hash`); index `entry_used` on `used` | one row per cached vector: where it is, and when it was last used (Unix seconds) |
+| `vec_<embedder id>` | `slot` (the rowid), `hash`, `data` | the vectors of one embedder, each as `dim` float16 numbers, in slots 1..n without gaps |
+
+- **`hash`** is the text hash (§5.3) as bytes: its 20 hex characters become 10 bytes. A key that
+  is not lowercase hex in pairs is stored as the text it is.
+- **Slots stay 1..n.** When entries are deleted, the rows in the last slots are written into the
+  freed ones, and `entry.slot` follows in the same transaction. A slot number is therefore only
+  good inside one statement: readers go from key to vector in a single query.
+- **`used`** is set when the entry is put, and again when it is found or marked, at most once per
+  day (UTC).
+- A file `$CODEMEM_HOME/cache/vectors.db` with one table `cache(embedder, text_hash, dim, data)`
+  is imported when the cache is opened, and then deleted, unless rows were added to it during
+  the import.
+
 `meta` keys:
 - `schema_version` (3);
+- `database_id`: a random token that names this database file. The store sets it when it opens a
+  database that has none; a copy made to start another index drops the row and so gets its own;
 - `repo_path`, `indexed_commit`, `indexed_at`;
 - `codemem_version`, `index_settings`, `last_update` (the last `IndexStats`);
 - `coverage`: ignored and non-code counts;
@@ -438,16 +474,43 @@ it doesn't own.
   2. the in-memory index is patched only after the commit, and its epoch is set last;
   3. an index that is behind catches up by vector id: vector rows never change in place (a new
      vector is a new row, and ids are never reused), so the ids missing on either side are the
-     whole difference. This applies to a saved copy (used if its dim, embedder and backend match,
-     whatever epoch it was saved at; a note without `backend` counts as FAISS) and to another
-     process's writes.
+     whole difference. This applies to a saved copy (used if its database, dim, embedder, backend
+     and backend options match, whatever epoch it was saved at; a note without `backend` counts
+     as FAISS) and to another process's writes.
+  4. a saved copy is read only into the database it was saved from. Its note names that
+     database's `database_id`; a note that names another, or none, means a rebuild from the rows.
+     Vector ids start again at 1 in a new `index.db`, so the copy of a deleted one would match
+     other vectors by id.
+- **Which search index** (`vector_backend`): the one a configuration names, or for `auto` the
+  exact index while the exact indexes of every vector type fit the budget together
+  (`vector_memory_mb`), and the compact one for every type when they do not (architecture.md §5).
+  - `auto` picks when the first search index of a process is loaded or built, and the pick holds
+    while the store is open;
+  - an index whose saved copies are compact goes back to exact only under 80% of the budget;
+  - where the installed FAISS cannot make the compact index, `auto` picks the exact one.
+- **Loading the search index:**
+  - a vector type's index is read from its saved copy, or rebuilt from the rows when the copy
+    cannot be used (rule 3 and rule 4, or no copy);
+  - loading holds no lock. One thread loads a type; the others that need it wait for that thread.
+    Rows written meanwhile are applied when the index is installed, by vector id;
+  - a write to a type whose index is not in memory does not load it: the index is loaded at its
+    first use, from rows that include the write. A type's first vectors start its index;
+  - the MCP server loads the search indexes in the background when it starts. A search that
+    comes before they are in memory waits within `catchup_budget_ms`, then answers from keywords
+    alone with a note (§12.1); the CLI and the eval wait for the index.
 - **Saving the search index:**
   - the data file is written first and its note second, each by atomic rename;
   - the MCP server saves lazily (after 30 s idle, on shutdown, on refresh), while the CLI and the
     blocking `update()` save at once;
+  - an update that saves (`update()`, the CLI) first makes the saved copies what the next start
+    reads: `auto` picks again, and a type whose copy is missing, behind the rows or another
+    backend's is loaded or rebuilt, and saved. The saved copy of another backend is removed;
   - the index is copied while holding the lock and written after releasing it, so searches don't
     wait;
-  - a backend that returns no bytes is not saved; it is rebuilt from the rows at each start.
+  - a backend that returns no bytes is not saved; it is rebuilt from the rows at each start;
+  - the compact backend's file is read only if its checksum, its options and its rotation are the
+    ones expected, its ids are in order, and the FAISS indexes inside are the ones its first line
+    describes. Anything else is rebuilt from the rows.
 - **The queue (`dirty_texts`: chunk id, sequence number).** Stage A writes a row for every chunk
   whose texts may have changed, in the same transaction as the change. Stage B rebuilds those
   texts, embeds the changed ones, and deletes a row only if its number is unchanged (a chunk edited
@@ -457,13 +520,15 @@ it doesn't own.
   `Config.index_settings()`. A difference redoes only what that setting affects: vectors (re-embed
   that type), texts (rebuild every text, re-embed the changed ones), links (relink every call), or
   a rebuild (chunker version, file selection, BM25 tokenization, block size; vectors of unchanged
-  texts come back from the cache). `vector_backend` redoes nothing stored: the search index
-  rebuilds itself from the rows. Without this check, a chunker or text change would never reach
-  files that don't change.
+  texts come back from the cache). `vector_backend`, `vector_memory_mb` and the `[compact]`
+  options redo nothing stored: the search index rebuilds itself from the rows. Without this check, a chunker or text
+  change would never reach files that don't change.
 - **What goes wrong, and what happens:**
   - A crash before saving: the saved file is behind and catches up by id at the next load. A corrupt
     or missing file is rebuilt from the rows. No model call, no re-embedding, either way.
   - A process sees an epoch change made by another process: it catches up by id before searching.
+  - Another process deletes vectors while a compact index is searching: the rows it can no longer
+    read are left out of the result, and the search takes more candidates to fill it.
 - **Large deletions** give pages back to the OS (`auto_vacuum = INCREMENTAL`).
 
 ---
@@ -480,7 +545,7 @@ What stays the same when code changes, and what is recomputed:
 | `revoke_session` renamed everywhere (4 files) | old key deleted, new key added | changed files' code texts; the new name's usage; callees' usage (`Table.delete`) | 9 of 33 texts in the sample repo (measured) |
 | file moved | new keys | changed (the header has the path) | the file's chunks, plus what they call (usage) |
 | a block edited | new key (content hash) | changed | that block |
-| `embedding_dim` or `vector_backend` changed | same | same | nothing (the search index is rebuilt) |
+| `embedding_dim`, `vector_backend`, `vector_memory_mb` or a `[compact]` option changed | same | same | nothing (the search index is rebuilt, when the change gives it another form) |
 
 ---
 
@@ -493,7 +558,10 @@ What stays the same when code changes, and what is recomputed:
 | `TEXT_FORMAT_VERSION` (3) | `config.py` | a text builder's output changes | part of `index_settings()`: every text is rebuilt and the changed ones re-embedded, and the eval keeps the indexes apart |
 | embedder key | `embedder.py` | automatic: another model, weights, settings or device | the vector type with a new key is re-embedded |
 | weights version | `config.model_version` | automatic for a local model folder, or set `version` | part of the model id and the embedder key |
-| `vector_backend` | config | another search index | in `index_settings()` only when not `faiss`, so the eval keeps such systems apart; nothing is re-embedded |
+| `vector_backend` | config | another search index | in `index_settings()` only when it is not `auto`: an index built before there was a choice keeps its settings, and the eval keeps systems that name a backend apart; nothing is re-embedded |
+| `[compact]` (`bits`, `dim`, `rescore`) | config | other codes, or another number of candidates | in `index_settings()` as `compact`: only the options that differ from their defaults, and only when the backend is `auto` or `compact`; nothing is re-embedded |
+| `vector_memory_mb` | config | another budget for `auto` | search-time: not in `index_settings()`; the search index is picked again, and rebuilt if the pick changes |
+| the vector cache's `user_version` (1) | `vectorcache.py` | the cache file's tables or page size change | a cache file with another number is left untouched and counts as unavailable: vectors come from the model |
 
 `Config.index_settings()` lists every index-time setting. The eval adapter hashes it, with the
 codemem version and the device, into its `index_key`, so two systems share an index only when
@@ -534,7 +602,7 @@ The tool names stay stable, so other front-ends can be compared.
 |---|---|---|
 | `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding |
 | `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)` |
-| `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
+| `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the search index in use (exact or compact, why, and about how much memory each vector type takes), the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
 
 **A card:**
@@ -563,9 +631,9 @@ The parts it can hold: files saved moments ago that are still being indexed; chu
 embedded (with the files they are in); or that codemem could not confirm it has seen the latest
 saves. `get_chunk` waits for the structure only, so its code, lines and links are current. While
 the embedding model is loading (when the server starts, or again after it was freed for being
-idle, §12.3), a search waits within the same budget, then answers from keywords alone with a note;
-after a load that failed it answers that way at once. The CLI and the eval always wait for the
-model.
+idle, §12.3) or a search index is still loading, a search waits within the same budget, then
+answers from keywords alone with a note; after a model load that failed it answers that way at
+once. The CLI and the eval always wait for both.
 
 **Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
 model of every enabled vector type is in the memory of the process that answers, false when one is
@@ -588,7 +656,12 @@ A change to any of these must be made together with the eval:
   - `.to_dict()`.
 
   It blocks until the index and its saved search index are on disk, because the adapter measures
-  the index folder's size right after.
+  the index folder's size right after. The saved search index is then the one the next start
+  reads: under `auto`, the exact one or the compact one, by the size of the index (§8).
+- The search index belongs to the service, not to a search: systems that share an index share
+  it, and `vector_memory_mb` is read when the service is created. Two systems that should search
+  with different indexes name them (`vector_backend = "faiss"`, `"compact"`), which gives each
+  its own index key.
 - `store.counts()["chunks"]`.
 - `search(store, query, config, k=, signals=, debug=True)`:
   - an unknown signal raises `ValueError`; a configured signal with no stored vectors is skipped,
@@ -625,8 +698,28 @@ A change to any of these must be made together with the eval:
   is refused, and an enabled type needs a text builder (`code` or `usage`). The model id is
   `model[@embedding_dim][#version][+embedder]`: index-time, and unchanged when neither option is
   set.
-- **`vector_backend`:** `faiss` or `"module:Class"` (a `store.VectorStore` subclass). Index-time
-  only so that eval systems with different backends don't share an index.
+- **`vector_backend`:** `auto` (the default: the exact index while it fits `vector_memory_mb`,
+  the compact one when it does not), `faiss` (exact: every vector in memory), `compact` (small
+  codes of each vector in memory, exact scores from the stored vectors) or `"module:Class"` (a
+  `store.VectorStore` subclass). Index-time when it names a backend, only so that eval systems
+  with different backends don't share an index; `auto` is not in `index_settings()`.
+- **`vector_memory_mb`:** search-time. The memory, in MB of 10^6 bytes, that the exact search
+  indexes of one index may take before `auto` uses the compact one. 0, the default, is 2% of the
+  machine's memory, and at least 128 MB. A whole number, 0 or more.
+- **The `[compact]` section** is read when the backend is `compact` or `auto`. An unknown key, or
+  a value outside its range, is refused when the config is read:
+
+  | Key | Default | Range | Meaning |
+  |---|---|---|---|
+  | `bits` | 4 | 1 to 8 | bits per number of the fine code, which ranks the candidates. Every vector also has a 1-bit code, which a search scans; at `bits = 1` that is the only code, and the index is at its smallest |
+  | `dim` | 0 | 0 to 4,096 | how many numbers of each vector the codes cover (the first N); 0 = as many as the index uses, which is `embedding_dim` or the model's length. A code never covers more than 4,096 |
+  | `rescore` | 200 | 1 or more | candidates scored exactly from the stored vectors: at least this many, and at least 4 for each result asked for |
+
+  Those that differ from their defaults are in `index_settings()` as `compact`, for the same
+  reason as `vector_backend`.
+- **`vector_cache`:** `global` or `off`. **`vector_cache_max_gb`:** the cache file's size cap in
+  GB (10⁹ bytes), a number of 0 or more; 0 means no cap; the default is 8. Neither is index-time:
+  the cache changes where a vector comes from, never what an index stores.
 - **`model_idle_minutes`:** a number, 0 or more; 0, the default, keeps the local embedding model
   in memory. Otherwise the model is freed after that many minutes in which nothing was embedded,
   and the next search or save loads it again. It changes no index. A new value in `.codemem.toml`
@@ -718,7 +811,19 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   vector qualifies; only ids in `allowed_ids` when it is given;
 - saving is optional: `to_bytes()` returns the bytes for `vec_<type><suffix>` (`suffix`, a class
   attribute, defaults to `.vec`) or None, and the class method `from_bytes(data)` reads them back;
-- the store calls it under its lock, one call at a time.
+- the class method `bytes_per_vector(dim)` is optional: about how many bytes one vector takes in
+  memory, the 32 bytes the store keeps beside it included, for `codemem status`. The default
+  says nothing;
+- `bind(fetch)` is optional, for an index that does not keep the vectors themselves. The store
+  calls it once, right after it builds or loads the index. `fetch(ids)` reads vectors from SQLite
+  and returns `(found, vectors)`: an int64 array of the ids that still have a row, and a float32
+  array of shape `(len(found), dim)` with their vectors, row for row, exactly as `upsert` got
+  them. An id whose row is gone is left out. `fetch` reads on the thread that calls it, through
+  a connection of that thread: call it from inside `search`. The default `bind` does nothing;
+- the store calls one index from one thread at a time: from the thread that builds or loads it,
+  and under the store's lock once it is in use. The indexes of two vector types can be called at
+  the same time (one loads while the other is searched), so an index keeps its state in itself,
+  not in its class or its module.
 
 **Embedder factories.** `Indexer`, `search()` and `CodememService` take an `embedder_factory`
 called as `factory(spec: VectorConfig, config: Config) -> Embedder`, once per vector type (and

@@ -1,0 +1,127 @@
+# Recipe for vllm-project/vllm. Only tests that run on a CPU count: the containers have no GPU.
+# The fields are described in src/cmeval/generate.py.
+#
+# vllm is installed from source as pure Python: the C++ and CUDA parts are not built, and the Rust
+# frontend is optional and not built either. The version gets the suffix "+cpu", so that vllm
+# selects its CPU platform at every task commit (before 2026-08-14, vllm reads the platform only
+# from that suffix; later, also from VLLM_TARGET_DEVICE). Tests that need a GPU, a compiled kernel,
+# model weights or a server with a model fail or are skipped before and after the fix, so their
+# task is not valid and drops out by itself.
+
+repo = "vllm-project/vllm"
+base_image = "python:3.12-bookworm"
+# The repo also has tags of its Rust crates ("proto-v0.4.0"). The image's commit must get the
+# nearest release tag, because the version of vllm comes from it.
+tag_match = "v[0-9]*"
+
+# Once per repo.
+base_setup = [
+    # The same system libraries as the repo's CPU test image (docker/Dockerfile.cpu): video and image tests load them.
+    "apt-get update && apt-get install -y --no-install-recommends ffmpeg libsm6 libxext6 libgl1 libnuma1 && rm -rf /var/lib/apt/lists/*",
+    "pip install --no-cache-dir uv",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+    # The two tiktoken vocabularies, for the harmony (gpt-oss) tests. Both tiktoken and openai-harmony
+    # keep a file under the SHA-1 of its URL.
+    "mkdir -p $TIKTOKEN_CACHE_DIR && for n in o200k_base cl100k_base; do u=https://openaipublic.blob.core.windows.net/encodings/$n.tiktoken; curl -fsSL -o $TIKTOKEN_CACHE_DIR/$(printf %s $u | sha1sum | cut -d' ' -f1) $u; done && ls -l $TIKTOKEN_CACHE_DIR",
+    # The images and sounds of the test fixtures in tests/conftest.py, from the repo's public bucket,
+    # where vllm.assets looks for them first.
+    "mkdir -p $VLLM_ASSETS_CACHE/vllm_public_assets && cd $VLLM_ASSETS_CACHE/vllm_public_assets && for f in vision_model_images/stop_sign.jpg vision_model_images/cherry_blossom.jpg multimodal_asset/winning_call.ogg multimodal_asset/mary_had_lamb.ogg multimodal_asset/azacinto_foscolo.ogg; do curl -fsSL -o ${f##*/} https://vllm-public-assets.s3.us-west-2.amazonaws.com/$f; done && ls -l",
+    # A fixed list of model repos that many unit tests read: configs, tokenizers and processor files,
+    # no weights. The tests run with HF_HUB_OFFLINE=1 and find them in the cache. facebook/opt-125m is
+    # the model of the test helpers in tests/v1/core and tests/v1/kv_connector/unit; gpt2 is the
+    # tokenizer of tests/tool_parsers/conftest.py. Gated repos (meta-llama) cannot be downloaded.
+    '''HF_HUB_OFFLINE=0 uv run --no-project --with huggingface_hub==1.22.0 python -c 'import sys; from huggingface_hub import snapshot_download as d; [d(r, allow_patterns=["*.json", "*.txt", "*.model", "*.tiktoken", "*.jinja", "*.py"]) for r in sys.argv[1:]]' facebook/opt-125m facebook/opt-350m openai-community/gpt2 Qwen/Qwen3-0.6B Qwen/Qwen1.5-7B Qwen/Qwen2.5-1.5B-Instruct Qwen/Qwen2-VL-2B-Instruct Qwen/Qwen2-Audio-7B-Instruct llava-hf/llava-1.5-7b-hf microsoft/Phi-3.5-vision-instruct deepseek-ai/DeepSeek-V3 deepseek-ai/DeepSeek-V3.1 openai/gpt-oss-20b && du -sh $HF_HOME''',
+]
+
+# The repo's own lock of its CPU test environment: every package at an exact version, with torch
+# for the CPU (it is compiled with "uv pip compile --torch-backend cpu"). The repo's CPU test image
+# installs the same file. So the layer is shared by every task with the same lock, and
+# {exclude_newer} is not used for it: the lock already fixes all versions, and the index of the
+# torch wheels may not give the upload times that the option needs.
+deps_files = ["requirements/test/cpu.txt"]
+deps = [
+    "UV_HTTP_TIMEOUT=500 uv pip install --system --torch-backend cpu --index-strategy unsafe-best-match -r requirements/test/cpu.txt",
+    # Build tools that setup.py imports and that the lock does not have.
+    "uv pip install --system --exclude-newer {exclude_newer} 'setuptools<81' 'setuptools-scm>=8' 'setuptools-rust>=1.9.0' wheel",
+]
+
+# After the source of the task's commit is in /testbed. VLLM_TARGET_DEVICE=empty builds no
+# extension; VLLM_VERSION_OVERRIDE gives the version the "+cpu" suffix that a CPU build has.
+# "--no-cache" is necessary: uv keeps a built package by its path, and every task is built in /testbed.
+build = [
+    "v=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0); VLLM_TARGET_DEVICE=empty VLLM_VERSION_OVERRIDE=\"${v#v}+cpu\" uv pip install --system --no-cache --no-deps --no-build-isolation -e .",
+    "uv pip install --system --no-cache --no-deps --no-build-isolation -e tests/vllm_test_utils",
+    "python -c 'import importlib.metadata as m; from vllm.platforms import current_platform as p; v = m.version(\"vllm\"); print(v, p.device_type); assert v.endswith(\"+cpu\") and p.is_cpu()'",
+]
+
+# The install is editable and pure Python, so a patch needs no rebuild. A patch to the C++ code has
+# no effect: its tests cannot pass, and the task is not valid.
+refresh = ["python -c 'import vllm'"]
+
+# The folders whose tests run on a CPU in the repo's own CI (its "(CPU)" jobs) or that are unit
+# tests with mock objects. Left out: kernels, compile, distributed, quantization, models, lora,
+# samplers, model_executor, v1/worker, v1/attention, v1/sample, v1/spec_decode, v1/e2e, and the
+# server tests in entrypoints (scale_out, llm, cli, launchers, multimodal, offline_mode). Their
+# tests need a GPU, a compiled kernel, model weights, or a server with a model.
+test_files = [
+    "tests/test_*.py",
+    "tests/v1/test_*.py",
+    "tests/v1/core/**/test_*.py",
+    "tests/v1/kv_connector/unit/**/test_*.py",
+    "tests/v1/ec_connector/unit/**/test_*.py",
+    "tests/v1/kv_offload/**/test_*.py",
+    "tests/v1/simple_kv_offload/**/test_*.py",
+    "tests/v1/metrics/**/test_*.py",
+    "tests/v1/structured_output/**/test_*.py",
+    "tests/v1/streaming_input/**/test_*.py",
+    "tests/v1/engine/**/test_*.py",
+    "tests/entrypoints/test_*.py",
+    "tests/entrypoints/openai/**/test_*.py",
+    "tests/entrypoints/anthropic/**/test_*.py",
+    "tests/entrypoints/serve/**/test_*.py",
+    "tests/entrypoints/pooling/**/test_*.py",
+    "tests/entrypoints/unit_tests/**/test_*.py",
+    "tests/entrypoints/cohere/**/test_*.py",
+    "tests/tool_parsers/**/test_*.py",
+    "tests/tool_use/**/test_*.py",
+    "tests/reasoning/**/test_*.py",
+    "tests/renderers/**/test_*.py",
+    "tests/tokenizers_/**/test_*.py",
+    "tests/detokenizer/**/test_*.py",
+    "tests/parser/**/test_*.py",
+    "tests/transformers_utils/**/test_*.py",
+    "tests/config/**/test_*.py",
+    "tests/multimodal/**/test_*.py",
+    "tests/utils_/**/test_*.py",
+]
+# One process: the repo does not use pytest-xdist, and its tests share global state (the platform,
+# the distributed environment). --timeout (pytest-timeout, in the lock) stops a test that waits,
+# for example for a server or a download, so one test cannot use the limit of the whole suite.
+# pytest-rerunfailures is off: it runs a failed test again and hides a test that is not stable.
+# --continue-on-collection-errors: before the fix, a new test file can fail to import. The other files must still run.
+test = "python -m pytest {files} -p no:cacheprovider -p no:rerunfailures --timeout=180 --continue-on-collection-errors --junitxml={junit}"
+parser = "junit"
+timeout_min = 10
+
+# For cmeval resplit. The image installs requirements/test/cpu.txt, a compiled file with a pin for
+# each package. requirements/common.txt and the other files only name ranges.
+dependency_paths = ["requirements/test/cpu.txt"]
+# The repo's CI files are in .buildkite/: no build and no test reads them.
+leave_out = [".github/**", ".buildkite/**", "**/CHANGELOG*", "**/*.rst"]
+
+# For the build and for the tests. The network is off when the tests run; these variables make
+# the Hugging Face libraries read only their cache, and keep vllm off the GPU.
+[env]
+HF_HOME = "/opt/hf"
+HF_HUB_OFFLINE = "1"
+TRANSFORMERS_OFFLINE = "1"
+HF_DATASETS_OFFLINE = "1"
+VLLM_ASSETS_CACHE = "/opt/vllm-assets"
+TIKTOKEN_CACHE_DIR = "/opt/tiktoken"
+TIKTOKEN_RS_CACHE_DIR = "/opt/tiktoken"
+CUDA_VISIBLE_DEVICES = ""
+VLLM_TARGET_DEVICE = "cpu"
+VLLM_NO_USAGE_STATS = "1"
+# torch takes its thread count from the host's processors, not from the limit of the container.
+OMP_NUM_THREADS = "8"

@@ -15,7 +15,7 @@ Freshness (docs/architecture.md §4):
   meanwhile. `get_chunk()` waits for stage A only;
 - a reconcile (a scan of the whole repo) runs at startup, every few minutes, on `refresh()`, and
   when the ignore rules, the config or the git branch change;
-- the FAISS files are written once the index has been quiet for a while, and on close.
+- the search indexes' files are written once the index has been quiet for a while, and on close.
 
 The embedding model (docs/architecture.md §3.5) loads in a background thread, at start-up and
 again after the writer has freed it for being idle (`model_idle_minutes`). The writer and a search
@@ -49,7 +49,7 @@ _LONG_CLASS_LINES = 80
 # Rough share of total work per phase, for a single progress percentage.
 _PHASE_SPAN = {"chunk": (0.0, 0.15), "embed": (0.15, 1.0), "done": (1.0, 1.0)}
 CATCHUP_MAX_CHUNKS = 1000  # beyond this many queued chunks a search embeds only its own keyword results
-SAVE_AFTER_IDLE = 30.0  # write the FAISS files once nothing changed for this long
+SAVE_AFTER_IDLE = 30.0  # write the search indexes' files once nothing changed for this long
 RECONCILE_EVERY = 300.0  # a full scan, in case a file event was missed
 POLL_EVERY = 10.0  # the scan interval when file events don't work
 RETRY_FIRST = 1.0  # a step of the writer that failed is tried again after this long ...
@@ -143,7 +143,8 @@ class CodememService:
         self._embedders: dict[tuple, Embedder] = {}  # every embedder handed out so far, by model
         self.store = Store(
             self.index_dir, bm25_stem=self.config.bm25_stem, bm25_stopwords=self.config.bm25_stopwords,
-            vector_backend=self.config.vector_backend,
+            vector_backend=self.config.vector_backend, vector_options=self.config.vector_options(),
+            vector_memory_mb=self.config.vector_memory_mb,
         )
         self.state = "ready" if self.has_index() else "empty"
         self.progress = 0.0
@@ -200,7 +201,7 @@ class CodememService:
 
     def update(self, *, full: bool = False) -> IndexStats | None:
         """Bring the index up to date now: a full reconcile, then every queued vector, then the
-        FAISS files written. Waits for any update in progress. An error is kept in `last_error`
+        search indexes' files written. Waits for any update in progress. An error is kept in `last_error`
         (the eval adapter relies on that) and gives None."""
         self.state = "indexing" if not self.has_index() or full else "updating"
         self.progress = 0.0
@@ -220,7 +221,7 @@ class CodememService:
     # ---- indexing in the background (MCP server, `codemem watch`)
     def start(self, *, watch: bool = True, prewarm: bool = True) -> None:
         """Keep the index fresh in the background: a catch-up now, then the watcher's batches,
-        a reconcile every few minutes, and lazy saves of the FAISS files."""
+        a reconcile every few minutes, and lazy saves of the search indexes' files."""
         self.request_reconcile()
         self._ensure_worker()
         if watch:
@@ -440,9 +441,10 @@ class CodememService:
             return
         if new != self.config:
             log.info("the config changed; the index follows it")
-            if new.vector_backend != self.store.vector_backend:
+            asked = (new.vector_backend, new.vector_options(), new.vector_memory_mb)
+            if asked != (self.store.vector_backend, self.store.vector_options, self.store.vector_memory_mb):
                 try:
-                    self.store.use_vector_backend(new.vector_backend)
+                    self.store.use_vector_backend(*asked)
                 except Exception:
                     log.exception("could not load vector_backend %r; keeping the current config", new.vector_backend)
                     return
@@ -454,7 +456,7 @@ class CodememService:
 
     def refresh(self, timeout: float = 60.0) -> dict[str, Any]:
         """Reconcile now (after `git checkout` or `git pull`, or when in doubt), embed within
-        `timeout`, and write the FAISS files. Returns what changed."""
+        `timeout`, and write the search indexes' files. Returns what changed."""
         t = time.monotonic()
         stats = IndexStats()
         self._hand_over()
@@ -577,7 +579,11 @@ class CodememService:
 
     def prewarm(self) -> None:
         """Load the embedding models and the search indexes, so the first query doesn't wait. It
-        runs in a thread at start-up, and again when a model that was freed while idle is needed."""
+        runs in a thread at start-up, and again when a model that was freed while idle is needed.
+        The two load side by side: a model takes seconds, and so does a search index that has to
+        be rebuilt from the stored vectors."""
+        indexes = threading.Thread(target=self._load_indexes, name="codemem-indexes", daemon=True)
+        indexes.start()
         specs = {}
         for v in self.config.enabled_vec_types():
             spec = self.config.vectors[v]
@@ -594,6 +600,9 @@ class CodememService:
                 self.last_error = self._load_retry.error
         if not failed:
             self._recovered(self._load_retry)
+        indexes.join()
+
+    def _load_indexes(self) -> None:
         try:
             self.store.load_vectors()
         except Exception:
@@ -631,9 +640,11 @@ class CodememService:
     # ---- queries
     def search(self, query: str, *, wait_for_models: bool = True, **kwargs: Any) -> SearchResponse:
         """Catch up on pending saves, then search. With `wait_for_models=False` (the MCP server), a
-        search waits for a model that is loading (at start-up, or again after an idle unload) only
-        within `catchup_budget_ms` too: if it isn't in memory by then, the search uses keywords
-        alone and says so."""
+        search waits for what is still loading only within `catchup_budget_ms` too: the embedding
+        model (at start-up, or again after an idle unload), and the search indexes (read from their
+        files, or rebuilt from the stored vectors on the first start after the search index changed,
+        which takes half a minute for 200,000 vectors in the compact form, with FAISS on one thread).
+        If they are not in memory by then, or will not be, the search uses keywords alone and says so."""
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
         freshness = Freshness()
         if self._worker is not None or self._watcher is not None:
@@ -644,7 +655,8 @@ class CodememService:
             by_meaning = signals is None or any(s != BM25 for s in signals)
             first = (lambda: self._keyword_results(query, kwargs)) if by_meaning else None
             freshness = self.catch_up(wait_for_models=wait_for_models, first=first)
-        loading = not wait_for_models and "signals" not in kwargs and not self._models_ready(deadline)
+        loading = not wait_for_models and "signals" not in kwargs and not (
+            self._models_ready(deadline) and self._indexes_ready(deadline))
         if loading:
             kwargs["signals"] = ["bm25"]
         resp = search(self.store, query, self.config, embedder_factory=self.embedder_factory, **kwargs)
@@ -679,6 +691,25 @@ class CodememService:
             return None
         embedders = [self._embedders.get((s.model, s.embedder, s.version)) for s in specs]
         return all(e is not None and e.ready for e in embedders)
+
+    def _indexes_ready(self, until: float) -> bool:
+        """Whether the search indexes are in memory, waiting until `until` while they load, but
+        not for a rebuild that will not be done by then. Starts loading them in the background if
+        nothing has yet."""
+        if self.store.vectors_loaded():
+            return True
+        with self._cond:
+            if self._prewarm is None or not self._prewarm.is_alive():
+                self._prewarm = threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True)
+                self._prewarm.start()
+        while (now := time.monotonic()) < until:
+            if self.store.vectors_loaded():
+                return True
+            left = self.store.load_eta()
+            if left is not None and now + left > until:
+                return False
+            time.sleep(0.05)
+        return self.store.vectors_loaded()
 
     def resolve_ref(self, ref: str | int):
         ref_s = str(ref).strip()
@@ -750,6 +781,7 @@ class CodememService:
                 for v in self.config.enabled_vec_types()
             },
             "models_loaded": self._models_loaded(),
+            "search_index": store.search_index_status(),
             "indexed_commit": store.get_meta("indexed_commit"),
             "indexed_at": store.get_meta("indexed_at"),
             "last_update": store.get_meta("last_update"),
@@ -760,6 +792,12 @@ class CodememService:
             "skipped_files": store.skipped_files(),
             "error": self.last_error,
         }
+        cache = self.indexer.vector_cache()
+        if cache is None:
+            info["vector_cache"] = None  # off
+        else:
+            info["vector_cache"] = cache.stats() or {"path": str(cache.path), "entries": None}  # None: unreadable
+            cache.close()
         if check_staleness and self.state not in ("indexing", "updating"):
             scan = self.indexer.scan()
             head = git_head(self.repo_root)

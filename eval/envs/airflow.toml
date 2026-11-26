@@ -1,0 +1,131 @@
+# Recipe for apache/airflow: how to build it at a task's commit and run a task's tests.
+# The fields are described in src/cmeval/generate.py.
+#
+# Airflow is a uv workspace of about 140 distributions: airflow-core, task-sdk, airflow-ctl,
+# shared/*, about 100 providers, and dev tools. The image installs all of them from uv.lock, as the
+# CI image does ("uv sync --all-packages --frozen"). Each test suite runs the tests of one group of
+# distributions with the pytest settings of that group. The React UI has its own suite (vitest).
+
+repo = "apache/airflow"
+# Python 3.11 is allowed over the whole task window (3.10+ in July, 3.11+ from October). It is the
+# default version of the CI at the newest task commits.
+base_image = "python:3.11-bookworm"
+
+# Once per repo.
+base_setup = [
+    # Libraries to build the packages that have no wheel (python-ldap, mysqlclient, kerberos), and
+    # lxml and xmlsec from source, as the CI does. The base image has most of the other headers.
+    "apt-get update && apt-get install -y --no-install-recommends libldap2-dev libsasl2-dev libxmlsec1-dev libxmlsec1-openssl default-libmysqlclient-dev freetds-dev unixodbc-dev libgeos-dev pkgconf graphviz sqlite3 openssh-client && rm -rf /var/lib/apt/lists/*",
+    # The uv version of the CI image at the newest task commits. It reads the older lock files too.
+    "pip install --no-cache-dir uv==0.13.4",
+    # Node.js and pnpm for the UI tests: the versions of the repo's CI workflows and Dockerfile.
+    "a=$(uname -m); case $a in x86_64) t=x64;; aarch64) t=arm64;; esac; curl -fsSL https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-$t.tar.xz | tar xJ -C /usr/local --strip-components=1 && node --version && npm install -g pnpm@10.28.1 && pnpm --version",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+    # A helper that writes the provider dependency file and its hash (see the comments in the file).
+    '''printf '%s\n' '#!/usr/bin/env python' '# Writes generated/provider_dependencies.json and its hash file, as the test plugin of the repo' '# (devel-common/src/tests_common/pytest_plugin.py) expects them. Without them, the plugin calls' '# "uv run" on the script, which needs the network. The hash is the same as in the plugin.' 'import hashlib' 'import pathlib' 'import subprocess' 'import sys' 'root = pathlib.Path.cwd()' 'files = []' 'inside = False' 'for line in (root / "pyproject.toml").read_text(encoding="utf-8").splitlines():' '    text = line.strip()' '    if not inside and text.startswith("[tool.uv.workspace]"):' '        inside = True' '    elif inside:' '        if text.startswith("#"):' '            continue' '        if text.startswith(chr(34)):' '            path = text.split(chr(34))[1]' '            if path.startswith("providers/"):' '                files += [root / path / "pyproject.toml", root / path / "provider.yaml"]' '        elif text.startswith("]"):' '            break' 'hasher = hashlib.sha256()' 'for path in sorted(files):' '    hasher.update(path.read_bytes())' 'digest = hasher.hexdigest()' 'out = root / "generated" / "provider_dependencies.json"' 'mark = root / "generated" / "provider_dependencies.json.sha256sum"' 'if out.exists() and mark.exists() and mark.read_text().strip() == digest:' '    sys.exit(0)' 'subprocess.run([sys.executable, "scripts/ci/prek/update_providers_dependencies.py"], check=True)' 'mark.write_text(digest)' > /usr/local/bin/cmeval-provider-deps && chmod +x /usr/local/bin/cmeval-provider-deps''',
+]
+
+# No shared dependency layer: uv sync needs the pyproject.toml of every workspace member, and
+# uv.lock changes almost every day (79 different lock files for 205 tasks).
+
+# After the source of the task's commit is in /testbed. Everything that needs the network is here.
+build = [
+    # 1. All packages from the lock, without the workspace members. They come from the uv cache.
+    "uv sync --frozen --all-packages --no-install-workspace --no-binary-package lxml --no-binary-package xmlsec",
+    # 2. The workspace members, as editable installs. "--no-cache" is necessary: uv keeps a local
+    # build by its path, and every task is built in /testbed. With the cache, a task can get the
+    # build of another task. The packages of step 1 are installed already and stay.
+    "uv sync --frozen --all-packages --no-cache --no-binary-package lxml --no-binary-package xmlsec",
+    # 3. The test plugin needs generated/provider_dependencies.json (not in git) and its hash.
+    "cmeval-provider-deps",
+    "AIRFLOW_HOME=$(mktemp -d) python -c 'import airflow, airflow.sdk; print(airflow.__version__)'",
+    # 4. The UI packages, from the lock file. The store is in the build cache, so the packages are copied.
+    "cd airflow-core/src/airflow/ui && pnpm install --frozen-lockfile --store-dir /root/.cache/pnpm-store --package-import-method copy",
+]
+
+# After the real fix (or an agent's change) is applied, before the tests run. The installs are
+# editable, so a source change needs nothing. A change to a provider's pyproject.toml or
+# provider.yaml needs a new provider dependency file; else the helper does nothing.
+refresh = ["cmeval-provider-deps"]
+
+timeout_min = 10
+
+# For cmeval resplit. The image installs the Python packages of uv.lock and the UI packages of the
+# UI's pnpm-lock.yaml. The pyproject.toml and package.json files only name ranges: the locks decide.
+dependency_paths = [
+    "uv.lock",
+    "**/pyproject.toml",
+    "airflow-core/src/airflow/ui/pnpm-lock.yaml",
+    "airflow-core/src/airflow/ui/package.json",
+]
+
+# The test commands: fixed worker counts (-n 8 for pytest, --maxWorkers=4 for vitest), never the
+# number of processors of the host. "-p no:rerunfailures": the repo marks some tests "flaky" with
+# reruns, and a rerun hides a failure. --continue-on-collection-errors: before the fix, a test file
+# can fail to import. The other files must still run. Tests that need Postgres, MySQL, Kubernetes,
+# Celery brokers or cloud services are skipped by the repo's markers, or fail, before and after the fix.
+
+[env]
+# The workspace environment is outside /testbed, so it is not one of the repo's files.
+UV_PROJECT_ENVIRONMENT = "/opt/venv"
+VIRTUAL_ENV = "/opt/venv"
+PATH = "/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+UV_PYTHON = "/usr/local/bin/python3.11"
+UV_PYTHON_DOWNLOADS = "never"
+# Never change uv.lock: without the network, a new resolution cannot work.
+UV_FROZEN = "1"
+# The uv cache is a build cache mount on another file system. Copy, do not link.
+UV_LINK_MODE = "copy"
+AIRFLOW_HOME = "/root/airflow"
+# The test plugin runs a test marked for a database backend only when BACKEND names it. Tests
+# for Postgres or MySQL are skipped, before and after the fix.
+BACKEND = "sqlite"
+DEBIAN_FRONTEND = "noninteractive"
+
+[[suite]]
+# airflow-core and the providers, the tests that need no database. The repo's CI runs them like
+# this (xdist and "--skip-db-tests"). Each run has a new AIRFLOW_HOME.
+test_files = ["airflow-core/tests/unit/**/test_*.py", "providers/**/tests/unit/**/test_*.py"]
+test = 'export AIRFLOW_HOME=$(mktemp -d); pytest {files} --skip-db-tests -n 8 -p no:cacheprovider -p no:rerunfailures --disable-capture-warnings --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+# The same files, the tests that need the metadata database (SQLite). The CI runs them without
+# xdist: with xdist, all workers use one SQLite file, and the plugin does not clean the database
+# between modules. A new AIRFLOW_HOME and "--with-db-init" give each run a new database.
+test_files = ["airflow-core/tests/unit/**/test_*.py", "providers/**/tests/unit/**/test_*.py"]
+test = 'export AIRFLOW_HOME=$(mktemp -d); pytest {files} --run-db-tests-only --with-db-init -p no:cacheprovider -p no:rerunfailures --disable-capture-warnings --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+# task-sdk has its own pytest settings (task-sdk/pyproject.toml). Its tests must not use the database.
+test_files = ["task-sdk/tests/**/test_*.py"]
+test = 'export AIRFLOW_HOME=$(mktemp -d); pytest {files} --skip-db-tests -n 8 -p no:cacheprovider -p no:rerunfailures --disable-capture-warnings --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+# airflow-ctl has its own pytest settings. Its tests must not use the database.
+test_files = ["airflow-ctl/tests/**/test_*.py"]
+test = 'export AIRFLOW_HOME=$(mktemp -d); pytest {files} --skip-db-tests -n 8 -p no:cacheprovider -p no:rerunfailures --disable-capture-warnings --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+# The shared libraries. They do not load the repo's test plugin, so its options do not exist here.
+test_files = ["shared/*/tests/**/test_*.py"]
+test = 'pytest {files} -n 8 -p no:cacheprovider -p no:rerunfailures --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+# The breeze tool (dev/breeze/pyproject.toml has its pytest settings).
+test_files = ["dev/breeze/tests/**/test_*.py"]
+test = 'pytest {files} -n 8 -p no:cacheprovider -p no:rerunfailures --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+test_files = ["scripts/tests/**/test_*.py"]
+test = 'pytest {files} -p no:cacheprovider -p no:rerunfailures --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+test_files = ["dev/registry/tests/**/test_*.py"]
+test = 'pytest {files} -p no:cacheprovider -p no:rerunfailures --continue-on-collection-errors --junitxml={junit}'
+
+[[suite]]
+# The React UI: vitest, run from the UI folder with paths relative to that folder, as "pnpm test"
+# does in the CI. vitest is called directly, so pnpm does not look for another pnpm version.
+test_files = ["airflow-core/src/airflow/ui/src/**/*.test.ts", "airflow-core/src/airflow/ui/src/**/*.test.tsx"]
+test = 'cd airflow-core/src/airflow/ui && f=(); for x in {files}; do f+=("${x#airflow-core/src/airflow/ui/}"); done; node_modules/.bin/vitest run "${f[@]}" --maxWorkers=4 --reporter=default --reporter=junit --outputFile.junit={junit}'

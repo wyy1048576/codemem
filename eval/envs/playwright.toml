@@ -23,6 +23,11 @@ refresh = ["npm run build"]
 
 timeout_min = 10
 
+# For cmeval resplit. npm ci installs the packages of the lock files. browsers.json is not here:
+# the image installs Chromium only, and most changes of browsers.json are WebKit or Firefox builds.
+# Its changes go to the weak tag, with the old and new revision, for a person to check.
+dependency_paths = ["**/package.json", "**/package-lock.json"]
+
 # --workers=4 in each test command: without it, Playwright takes the number of workers from the
 # processors of the host, not from the limit of the container. Then test time and load change
 # with the machine. Do not set CI anywhere: it turns on retries, which hide a failing test.

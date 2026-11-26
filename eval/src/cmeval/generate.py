@@ -24,6 +24,16 @@ A recipe is one TOML file for each repo, in eval/envs/. Its fields:
                 test_files and test. It replaces the two fields above
   parser        how results are read. Only "junit" exists
   timeout_min   the limit for one suite in one test run
+  test_paths    globs: files that are tests in this repo (test code, test data, snapshots), in
+                addition to the collector's rule. Default: made from the folders of test_files
+  leave_out     globs: files of a fix that go to neither patch (CI files, change logs)
+  dependency_paths  globs: files that the image installs from (deps_files, lock files, vendored
+                code). A fix that adds or raises a third-party requirement in one is tagged
+                dependency_needed and leaves the pool (in_pool): the image has the dependencies
+                of the base commit, and the tests run with the network off (see deps.py)
+                The last three fields are read by `cmeval resplit` only (see resplit.py)
+  tag_match     a glob for the tag that the image's commit gets (git describe --match), for a
+                repo that also has tags of other things, such as the crates of a part in Rust
 
 A task is valid when at least one test does not pass in any run before the fix (it fails, it is
 skipped, or it is missing) and passes in every run after it, no test that passed before the fix
@@ -57,7 +67,7 @@ from pathlib import Path
 from typing import Callable, NamedTuple
 
 from . import repos
-from .patches import diff_sections, file_paths
+from .patches import classify_path, diff_sections, file_paths
 from .paths import cmeval_home
 from .tasks import Task
 
@@ -107,6 +117,12 @@ class Recipe:
     timeout_min: int = 10
     env: tuple[tuple[str, str], ...] = ()
     suite: tuple[Suite, ...] = ()
+    # Read by `cmeval resplit` only. They change the task data, not the image or the tests, so the
+    # fingerprints leave them out: the task's patches are in the validation fingerprint.
+    test_paths: tuple[str, ...] = ()
+    leave_out: tuple[str, ...] | None = None
+    dependency_paths: tuple[str, ...] | None = None
+    tag_match: str = ""
 
     @property
     def suites(self) -> tuple[Suite, ...]:
@@ -169,11 +185,22 @@ def changed_lines(patch: str) -> int:
                if line[:1] in "+-" and not line.startswith(("+++", "---")))
 
 
+def code_part(patch: str) -> str:
+    """The diffs of the code files of a patch (patches.classify_path), as the collector keeps them."""
+    return "".join(section for section in diff_sections(patch)
+                   if (paths := file_paths(section)) != (None, None)
+                   and classify_path(paths[0] or paths[1])[0] == "code"
+                   and "\nGIT binary patch\n" not in section and "\nBinary files " not in section)
+
+
 def difficulty(patch: str) -> str:
     """Size class of the real fix: easy (1 file, at most 15 changed lines), medium (at most 2
-    files and 100 lines), or hard."""
+    files and 100 lines), or hard. Only code files count, so the class stays the same when
+    `cmeval resplit` adds data or build files to the fix."""
+    patch = code_part(patch)
     files, lines = len(changed_files(patch)), changed_lines(patch)
-    if files == 1 and lines <= 15:
+    # A fix with no code file (a test fixture, or a data-only change) is the smallest class.
+    if files <= 1 and lines <= 15:
         return "easy"
     if files <= 2 and lines <= 100:
         return "medium"
@@ -196,18 +223,96 @@ def task_test_files(recipe: Recipe, task: Task) -> list[str]:
     return sorted({f for suite in recipe.suites for f in suite_files(suite, task)})
 
 
-def admission_sample(recipe: Recipe, tasks: list[Task], n: int = ADMISSION_N, seed: str | None = None) -> list[Task]:
-    """A fixed sample of the repo's tasks with tests: 3 easy, 4 medium, 3 hard for n = 10."""
+def in_pool(task: Task) -> bool:
+    """A task can be drawn: its real fix needs no third-party requirement that the image may not
+    have (the tag dependency_needed of `cmeval resplit`, see deps.py). Such a task cannot be
+    completed, also not by the real fix, because the tests run with the network off."""
+    return not task.tags.get("dependency_needed")
+
+
+def with_tests(recipe: Recipe, tasks: list[Task]) -> dict[str, list[Task]]:
+    """The repo's tasks with a test file that a suite runs, by difficulty level, each sorted by id."""
     pool: dict[str, list[Task]] = {"easy": [], "medium": [], "hard": []}
     for task in sorted(tasks, key=lambda t: t.id):
         if task.repo == recipe.repo and task.test_patch and task_test_files(recipe, task):
             pool[difficulty(task.patch)].append(task)
-    rng = random.Random(seed or f"admission-{recipe.name}-1")
+    return pool
+
+
+def candidates(recipe: Recipe, tasks: list[Task]) -> tuple[dict[str, list[Task]], list[Task]]:
+    """The pool of a repo by difficulty level (with_tests and in_pool), and the tasks with tests
+    that leave it."""
+    every = with_tests(recipe, tasks)
+    pool = {level: [t for t in level_tasks if in_pool(t)] for level, level_tasks in every.items()}
+    return pool, [t for level_tasks in every.values() for t in level_tasks if not in_pool(t)]
+
+
+def _refill(kept: list[Task], drawn: list[Task], population: list[Task], taken: set[str], seed: str) -> list[Task]:
+    """kept, filled up to the size of drawn with tasks of the pool from population that are not
+    drawn and not taken, drawn with their own generator."""
+    if len(kept) >= len(drawn):
+        return kept
+    skip = taken | {t.id for t in drawn}
+    spare = [t for t in population if in_pool(t) and t.id not in skip]
+    return kept + random.Random(seed).sample(spare, min(len(drawn) - len(kept), len(spare)))
+
+
+def _admission_draws(recipe: Recipe, tasks: list[Task], n: int, seed: str | None) -> tuple[list[Task], list[Task]]:
+    """(the admission draw as before the pool filter, the admission sample). The draw takes every
+    task with tests. A drawn task that is not in the pool is replaced by a task of its level, drawn
+    with a second generator. So the filter changes only the tasks that it removes."""
+    every = with_tests(recipe, tasks)
+    seed = seed or f"admission-{recipe.name}-1"
+    rng = random.Random(seed)
+    raw: list[Task] = []
     chosen: list[Task] = []
     for level, share in ADMISSION_MIX:
         want = round(share * n / ADMISSION_N)
-        chosen += rng.sample(pool[level], min(want, len(pool[level])))
-    return chosen
+        drawn = rng.sample(every[level], min(want, len(every[level])))
+        raw += drawn
+        chosen += _refill([t for t in drawn if in_pool(t)], drawn, every[level], set(), f"{seed}-refill-{level}")
+    return raw, chosen
+
+
+def admission_sample(recipe: Recipe, tasks: list[Task], n: int = ADMISSION_N, seed: str | None = None) -> list[Task]:
+    """A fixed sample of the repo's pool: 3 easy, 4 medium, 3 hard for n = 10. Without tasks that
+    leave the pool it is the same as before the filter; with them, only those tasks are replaced."""
+    return _admission_draws(recipe, tasks, n, seed)[1]
+
+
+@dataclass
+class Sample:
+    tasks: list[Task]            # in the order of the task file
+    admission: list[Task]        # the admission sample, which the sample holds
+    levels: dict[str, dict]      # level: pool, want, chosen
+    left_out: list[Task]         # tasks with tests that leave the pool
+
+
+def sample(recipe: Recipe, tasks: list[Task], n: int, seed: str | None = None) -> Sample:
+    """A validation sample of n tasks: the admission sample first, then each difficulty level filled
+    up to its share of n in the admission mix (3 : 4 : 3) from the rest of its pool, with a fixed
+    seed (default b7-<recipe>-1). The draws are made as before the pool filter, and a drawn task
+    that is not in the pool is replaced. So without such tasks it gives the ids of the B7 samples
+    of 2026-11-26, and with them only those tasks change."""
+    tasks = [t for t in tasks if t.repo == recipe.repo]
+    raw_admission, admission = _admission_draws(recipe, tasks, ADMISSION_N, None)
+    every = with_tests(recipe, tasks)
+    pool, left = candidates(recipe, tasks)
+    seed = seed or f"b7-{recipe.name}-1"
+    rng = random.Random(seed)
+    raw_taken = {t.id for t in raw_admission}
+    chosen = {t.id for t in admission}
+    levels = {}
+    for level, share in ADMISSION_MIX:
+        want = round(share * n / ADMISSION_N)
+        have = [t for t in admission if difficulty(t.patch) == level]
+        rest = [t for t in every[level] if t.id not in raw_taken]
+        drawn = rng.sample(rest, min(max(want - len(have), 0), len(rest)))
+        add = _refill([t for t in drawn if in_pool(t) and t.id not in chosen], drawn, every[level], chosen,
+                      f"{seed}-refill-{level}")
+        chosen |= {t.id for t in add}
+        levels[level] = {"pool": len(pool[level]), "want": want, "chosen": len(have) + len(add)}
+    return Sample([t for t in tasks if t.id in chosen], admission, levels, left)
 
 
 # ---- docker
@@ -313,9 +418,13 @@ def _digest(data: dict) -> str:
 
 def image_fingerprint(recipe: Recipe, task: Task) -> str:
     """A short hash of what makes a task image: the recipe fields of the build and the task's commit."""
-    return _digest({"repo": recipe.repo, "base_image": recipe.base_image, "base_setup": recipe.base_setup,
-                    "env": recipe.env, "deps_files": recipe.deps_files, "deps": recipe.deps, "build": recipe.build,
-                    "task_repo": task.repo, "base_commit": task.base_commit})
+    data = {"repo": recipe.repo, "base_image": recipe.base_image, "base_setup": recipe.base_setup,
+            "env": recipe.env, "deps_files": recipe.deps_files, "deps": recipe.deps, "build": recipe.build,
+            "task_repo": task.repo, "base_commit": task.base_commit}
+    # Only when it is set, so that the images of recipes without it keep their fingerprint.
+    if recipe.tag_match:
+        data["tag_match"] = recipe.tag_match
+    return _digest(data)
 
 
 def validation_fingerprint(recipe: Recipe, task: Task, repeats: int | None) -> str:
@@ -345,10 +454,11 @@ def _export_source(repo: str, commit: str, dest: Path) -> None:
         index.unlink(missing_ok=True)
 
 
-def nearest_tag(repo: str, commit: str) -> str | None:
-    """The newest tag that is an ancestor of the commit, or None."""
+def nearest_tag(repo: str, commit: str, match: str = "") -> str | None:
+    """The newest tag that is an ancestor of the commit, or None. With match, only tags that match the glob."""
     repos.ensure_commit(repo, commit)
-    proc = subprocess.run(["git", "describe", "--tags", "--abbrev=0", commit], cwd=repos.clone_path(repo),
+    options = ["--match", match] if match else []
+    proc = subprocess.run(["git", "describe", "--tags", "--abbrev=0", *options, commit], cwd=repos.clone_path(repo),
                           capture_output=True, text=True)
     name = proc.stdout.strip()
     return name if proc.returncode == 0 and re.fullmatch(r"[\w.+/-]+", name) else None
@@ -379,7 +489,7 @@ def build_task_image(recipe: Recipe, task: Task, force: bool = False) -> tuple[s
         commit_time = repos.commit_time(task.repo, task.base_commit)
         # Build tools that read the version from git (versioneer, setuptools-scm) need a tag. The
         # image has no history, so the nearest tag of the real history is put on its one commit.
-        tag_name = nearest_tag(task.repo, task.base_commit)
+        tag_name = nearest_tag(task.repo, task.base_commit, recipe.tag_match)
     deps = context / "deps"
     deps.mkdir(exist_ok=True)
     for name in recipe.deps_files:
@@ -472,6 +582,12 @@ def judge(before: list[dict[str, str]], after: list[dict[str, str]]) -> Verdict:
     return verdict
 
 
+def quote_files(files: list[str]) -> str:
+    """The files as shell words, each in single quotes. A single quote in a path (ruff has snapshot
+    files such as "Tests_for_ty's_...snap") closes the quotes, adds an escaped quote, and opens them again."""
+    return " ".join("'" + f.replace("'", "'\\''") + "'" for f in files)
+
+
 def test_run_line(recipe: Recipe, task: Task, name: str) -> str:
     """One shell line that runs every suite that has files of the task, one after the other.
     Suite k writes /work/<name>.<k>.xml and /work/<name>.<k>.log, and one line to /work/times.txt:
@@ -482,7 +598,7 @@ def test_run_line(recipe: Recipe, task: Task, name: str) -> str:
         files = suite_files(suite, task)
         if not files:
             continue
-        test = suite.test.replace("{files}", " ".join(f"'{f}'" for f in files))
+        test = suite.test.replace("{files}", quote_files(files))
         test = test.replace("{junit}", f"/work/{name}.{k}.xml")
         # The command goes through a shell, so it can start with variables and use pipes.
         parts.append(f"s=$(date +%s%N); timeout -k 30 {limit} bash -c {shlex.quote(test)} > /work/{name}.{k}.log 2>&1; "

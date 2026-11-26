@@ -255,13 +255,13 @@ Turning a text into a vector costs model time, so codemem first looks for one it
                               │ no
                               ▼
                     in the vector cache on this machine? ── yes ──► reuse it
-                              │ no                            (~/.codemem/cache/vectors.db)
+                              │ no                            (~/.codemem/cache/vector_cache.db)
                               ▼
                     the embedding model ──► store it in the index and in the cache
 ```
 
-The cache holds every text ever embedded on the machine, so rebuilds, branch switches and undos
-cost no model calls. The model is local by default (`jinaai/jina-code-embeddings-0.5b`, on the GPU
+The cache holds the vectors of the texts embedded on this machine, up to a size cap (§5), so
+rebuilds, branch switches and undos cost no model calls. The model is local by default (`jinaai/jina-code-embeddings-0.5b`, on the GPU
 when there is one); it can also be any OpenAI-compatible API, or a Python class of your own for
 research models (README).
 
@@ -698,6 +698,7 @@ and reports any difference.
 | two agent sessions on one repo | one writes at a time (a lock file); each picks up the other's vectors without re-embedding |
 | OS file events don't work (network drives, WSL) | a warning, a full check every 10 s, and a full check before each search (0.5 s on vLLM) |
 | a search while the model is loading (when the server starts, or after the model was freed for being idle) | it waits within its 4 s, then answers from keywords alone and says so |
+| a search while a search index is still loading, or is being rebuilt from the stored vectors (§5) | the same: it waits within its 4 s, and not for a rebuild that will take longer; then keywords alone, and the note |
 | a save while the model is loading | it is applied at once (stage A); its vectors follow when the model is in memory |
 | the model can't be loaded (a wrong name, no network for its first download) | saves are still applied and searches answer from keywords, at once: a search does not wait for a load that has failed. The load is tried again after 1 s, then after twice as long each time, up to a minute, and `index_status` shows the error until it works |
 | the embedding API or the `serve-embeddings` server is down | a search waits for its retries, about 31 s, then fails; edits stay queued and are embedded when it is back (decisions.md §2) |
@@ -832,11 +833,14 @@ the worktree.
  │     dirty_texts  the queue between stage A and stage B
  │     meta         the settings the index was built with, the git commit, version counters
  ├── vec_code.faiss ...... saved copies of the in-memory search indexes,  ┐ rebuilt from the
- ├── vec_usage.faiss         one per text type                            ┘ vectors table if lost
+ ├── vec_usage.faiss         one per text type (.rabitq: a compact one)   ┘ vectors table if lost
  ├── write.lock .......... one writer at a time
  └── worktree.json ....... in a git worktree's index: which worktree it serves (§4.6)
 
- ~/.codemem/cache/vectors.db ... the vector cache, shared by every index on the machine
+ ~/.codemem/cache/vector_cache.db ... the vector cache, shared by every index on the machine
+       embedder     one row per embedder key: its id and its vector length
+       entry        (embedder id, text hash) ──► slot, time of last use       the key table
+       vec_<id>     slot ──► text hash, vector       one table per embedder, slots 1..n, no gaps
 ```
 
 **Why SQLite, and not a vector database.** Most of what is stored isn't vectors and needs lookups,
@@ -844,15 +848,305 @@ joins and keyword search; SQLite has them, needs no server, and makes each updat
 transaction. Vectors are stored in it as plain rows, so the search index is only a derived copy,
 which can always be rebuilt without the model (2 s on vLLM).
 
-**The search index** compares a query vector with every stored vector of a type, using FAISS (a
-vector search library) in its exact mode: about 10 ms over 109k vectors. It keeps each number in
-2 bytes, like the stored rows: 196 MB for vLLM's code vectors, against 393 MB at 4 bytes, at the
-same speed. Vectors are scaled back to length 1 as they enter the index and rounded to 2 bytes
-again, so every backend gets the same numbers. Keeping 4 bytes would change scores by at most
-0.0003: on 40 real-model queries, 38 top-10 lists came out in the same order, and the other two
-swapped results that were practically tied. It sits behind a small
-interface (`VectorStore`), so an approximate index (HNSW or IVF, which trade a little accuracy for
-speed on very large repos) can replace it through the config; a switch re-embeds nothing.
+**The times in this section** are from an M1 laptop (8 cores, 16 GB), with FAISS on one thread.
+On macOS codemem keeps FAISS to one thread, because it shares the process with PyTorch
+(`codemem/__init__.py`). On Linux and Windows FAISS uses every core, and none of these times was
+taken that way.
+
+**The search index** is a copy of one vector type's stored vectors, held in memory in a form
+that is fast to search. It is derived from the rows, so it can be rebuilt at any time, and it sits
+behind a small interface (`VectorStore`), so the config chooses it (`vector_backend`) and a change
+re-embeds nothing. Two come with codemem, an exact one and a compact one. The default, `auto`,
+picks between them: **the exact index while it fits a memory budget, the compact one when it
+does not.**
+
+- **Why exact first.** The exact index compares a query with every vector, so it returns exactly
+  the best ones, and it reads nothing from disk. On an index that fits the budget it is also the
+  faster of the two: 6.2 ms a search against 8.5 at 31k vectors.
+- **Why compact for the rest.** The exact index keeps every vector in memory: 1,856 bytes for a
+  vector of 896 numbers, 371 MB for 200,000 of them. The compact index keeps a third of that,
+  returned the same results in every measured search (below), and on a large index is the faster
+  one: 0.92 times the exact index's time at 200,000 vectors.
+- **The rule.** When an index's search indexes are loaded or built, codemem adds up what the
+  exact indexes of all its vector types would take: for each vector, 2 bytes a number and 64
+  bytes beside them (measured: 1,853 bytes a vector of 896 numbers). If the sum fits the budget,
+  every type gets the exact index. If not, every type gets the compact one.
+- **The budget** is `vector_memory_mb`. At 0, the default, it is 2% of the machine's memory, and
+  at least 128 MB:
+
+  | The machine | Its memory, as it reports it | The budget | Vectors of 896 numbers that stay exact |
+  |---|---|---|---|
+  | 6 GB or less | up to 6.4 GB | 128 MB | 69,000 |
+  | 16 GB | 17.2 GB | 344 MB | 185,000 |
+  | 24 GB | 25.8 GB | 515 MB | 278,000 |
+  | 48 GB | 51.5 GB | 1,031 MB | 555,000 |
+
+  So on a laptop of 16 GB an index of pandas (49,770 vectors, 92 MB) or of vLLM (145,000 vectors,
+  269 MB) is exact, and one of 200,000 vectors (371 MB) is compact; from 24 GB up that one is
+  exact too. Memory is read from the operating system; on Linux a lower limit set on the
+  process's container counts. Where it cannot be read, 16 GB is assumed.
+- **When the pick is made.** Once, when the first search index of a process is loaded or built,
+  and it holds while the index is open: an index that grows past the budget while the service
+  runs stays exact until the next start. An update that ends by saving the search indexes (the
+  CLI's, the eval's) applies the rule again first, so a large index is compact, in memory and on
+  disk, when the run that built it ends.
+- **No flapping at the boundary.** An index that is compact goes back to exact only when the
+  exact indexes would take less than 80% of the budget.
+- **When the pick differs from the saved copy,** the search index is rebuilt from the stored
+  vectors, as for any change of backend (see "Loading a search index" below).
+- **`codemem status` says which one is in use and why**, with the memory of each vector type:
+
+  ```
+  search index: exact (faiss)
+    auto: the exact index takes 92 MB, within the budget of 344 MB (2% of this machine's 17.2 GB)
+    code: 43,187 vectors, about 80 MB in memory
+    usage: 6,583 vectors, about 12 MB in memory
+  ```
+- **Naming one.** `vector_backend = "faiss"` is always the exact index, for whoever wants no disk
+  read at search time whatever the size. `"compact"` is always the compact one. `"module:Class"`
+  plugs in another: an approximate index (HNSW or IVF, which trade a little accuracy for speed
+  on very large repos) is a class away.
+- **An older FAISS.** The compact index needs FAISS 1.15.1, which codemem's dependencies ask
+  for. In an environment that still has an older one, `auto` always picks the exact index;
+  `vector_backend = "compact"` is refused with one sentence.
+
+**The exact index** (`faiss`) compares a query vector with every stored vector of a type, using
+FAISS (a vector search library) in its exact mode: about 10 ms over 109k vectors. It keeps each
+number in 2 bytes, like the stored rows: 196 MB for vLLM's code vectors, against 393 MB at 4
+bytes, at the same speed. Vectors are scaled back to length 1 as they enter the index and rounded
+to 2 bytes again, so every backend gets the same numbers. Keeping 4 bytes would change scores by
+at most 0.0003: on 40 real-model queries, 38 top-10 lists came out in the same order, and the
+other two swapped results that were practically tied.
+
+**The compact index** (`compact`) returns what the exact index returns, from a third of the
+memory. Two checks, each against the exact index:
+
+- On 30,977 real code vectors it returned the same top 10 and top 50 in every one of 4,608
+  searches: 268 real questions (the eval's issue texts) and 500 code vectors, each with no filter
+  and with filters that keep 10% and 1% of the chunks, each for 10 and for 50 results.
+- On a whole index of pandas (43,187 code vectors and 6,583 usage vectors, embedded by the real
+  model), with the eval's 352 pandas issue texts as questions: the same top 10 and top 50 for
+  both vector types, and the same 10 results of the whole search in the same order, in 352 of 352
+  searches.
+
+Every score it returns is the exact one. At 200,000 vectors it keeps 131 MB in memory against
+371 MB, and a search takes 0.92 times as long as with the exact index; at 31k vectors, 1.4 to 1.8
+times as long (8.5 ms against 6.2), which is why `auto` leaves a small index exact.
+
+It keeps two codes of each vector in memory instead of the vector, and reads from SQLite only the
+vectors it has to compare exactly. A search has three steps:
+
+```
+ the query vector ("disabled users stay logged in")
+      │
+      ▼  1. scan the 1-bit codes, in memory: 120 bytes a vector        13 ms at 200,000 vectors
+      │     keep the best 4,000 (of the allowed ones, when a filter is given)
+      ▼  2. rank those by their 4-bit codes: 468 bytes a vector         7.5 ms
+      │     keep the best 252
+      ▼  3. read those vectors from SQLite, score them exactly            2 ms
+      │
+      ▼  the best vectors, each with its real similarity
+```
+
+- **The codes** are RaBitQ's, made and compared by FAISS. The vector is scaled to length 1 and
+  turned by a fixed random rotation. The 1-bit code keeps one bit per number (is it above zero?),
+  plus 8 bytes that correct the estimate: 120 bytes for 896 numbers. The fine code keeps `bits`
+  bits per number, 4 by default: 468 bytes. Together 588 bytes, against 1,792 for the vector.
+- **Why two codes.** An estimate from the 1-bit code is cheap (0.07 µs, half an exact
+  comparison) and rough: it can tell the best few thousand vectors from 200,000 others, but it
+  cannot order them. An estimate from the 4-bit code puts the exact top 50 among its best 200,
+  but FAISS takes 1.6 to 2 µs for one on this CPU: 12 times an exact comparison. So the 1-bit
+  codes choose, and the 4-bit codes rank only what was chosen.
+- **Step 3 makes every score exact.** It reads the candidates' stored vectors and computes the
+  real similarity. A score that leaves the index differs from the exact index's by less than
+  0.000001, so result lists can be merged by score.
+- **How many.** Step 1 keeps the best 2,000 codes; one in 50 of the vectors the search may
+  return, when that is more (4,000 at 200,000 vectors); and never fewer than 4 for each candidate
+  of step 2. Step 2 keeps `rescore` (200), and at least 4 for each result asked for. A search
+  asks for the best 50 chunks, which is 51 vectors when every chunk has one, so 204 are read
+  (252 in the index of the picture, whose chunks have 1.25 vectors each).
+- **When steps are skipped.** If no more vectors qualify than step 3 would read (a small index,
+  or a filter that leaves few), all of them are read and scored, and the result is the exact
+  index's. If no more qualify than step 1 would keep, step 2 ranks them all.
+- **Why step 1 keeps 2,000.** For each of the 768 real searches we looked up how far down the
+  1-bit scan's order its exact top 50 lie. The deepest lay at place 1,901. Half the question
+  searches need only the best 206, 99% of them the best 1,356, and a top 10 never lay deeper than
+  place 247. On a random half, quarter and eighth of the vectors the deepest places were 952,
+  1,484 and 533: the depth grows more slowly than the index, so one in 50 leaves a larger index
+  more room.
+- **Why FAISS does not scan the fine codes itself.** FAISS can scan a multi-bit index in one
+  call. It then takes the full estimate of every code whose first bit leaves it a chance against
+  the best found so far: a tenth of the codes when 200 candidates are asked for, a fifth to a
+  quarter for 500. A search took 2.1 and 3.6 times as long as with the exact index on the 31k
+  real vectors, and 3.0 and 3.9 times at 200,000. Rounding the query to 2 or 8 bits instead of
+  4 changes that by about a tenth, and no FAISS setting turns it off. Which codes get the full
+  estimate also depends on the order they are scanned in.
+- **Why the rotation.** How well one bit per number works depends on how a model spreads its
+  numbers. After a random rotation the error of the estimate has the same bound for any vectors.
+  On our real questions the exact top 10 was among the 200 best 1-bit codes in 99.3% of searches
+  with the rotation, and in 96.3% without.
+- **Why the centre is zero.** RaBitQ can subtract an average vector before it takes the bits, and
+  FAISS learns that average from the vectors it is shown. A learned average ties every code to the
+  vectors the index held at that moment: an index patched edit by edit and one rebuilt from its
+  rows would hold different codes, and could return different results. With the centre fixed at
+  zero, a code depends only on its own vector. A learned centre did not help at 896 numbers (98.5%
+  against 99.3%); at 512 numbers it added 3 points.
+- **The order of the codes never matters.** Copies of one vector have the same codes, and so the
+  same estimates. A cut through them, in step 1 or in step 2, takes them all. So the candidates
+  depend only on the vectors an index holds: one patched edit by edit, one rebuilt from its rows
+  and one that holds the same vectors under other ids return the same results (768 searches on
+  two indexes whose ids differ: no difference at any setting). The codes are also kept in the
+  order of their vector ids, so two indexes with the same rows hold the same bytes.
+- **Filters** become one bit per vector, which FAISS tests while it scans.
+- **Deleted rows.** If another process deletes a candidate's row before this process has caught
+  up, the vector is left out and the search takes more candidates.
+
+**What each setting keeps.** The same 30,977 vectors, through `Store.vector_search`, against the
+exact index, with no filter (under a filter every row keeps at least as much). The worst search
+is the one that lost most of its top 50.
+
+| `bits`, `rescore` | Codes, bytes per vector | Questions: searches with the exact top 10 | Their top 50, on average | Their worst search | Code vectors: the worst search |
+|---|---|---|---|---|---|
+| **4, 200** (the defaults) | 588 | 100% | 100% | 50 of 50 | 50 of 50 |
+| 4, 500 | 588 | 100% | 100% | 50 of 50 | 50 of 50 |
+| 8, 200 | 1,036 | 100% | 100% | 50 of 50 | 50 of 50 |
+| 2, 500 | 364 | 100% | 100% | 50 of 50 | 50 of 50 |
+| 2, 200 | 364 | 100% | 99.94% | 48 of 50 | 50 of 50 |
+| 1, 2,000 | 120 | 100% | 100% | 50 of 50 | 50 of 50 |
+| 1, 1,000 | 120 | 100% | 99.96% | 48 of 50 | 50 of 50 |
+| 1, 500 | 120 | 100% | 99.75% | 44 of 50 | 50 of 50 |
+| 1, 200 | 120 | 99.3% | 97.2% | 36 of 50, and 9 of its top 10 | 48 of 50 |
+
+Questions are the hard case. Their best matches score about 0.33 to 0.40, and the 200th best
+0.23: the gap is as small as the error of a 1-bit code. Code vectors find near copies of
+themselves (0.73 to 0.93), which any code keeps.
+
+- **One bit is the small option** (`bits = 1`): 160 bytes per vector in all, 33 MB at 200,000
+  vectors. It has no fine code, so only the count of candidates protects the results: the top
+  10 is safe from 500 candidates up, the whole top 50 at 2,000. Each candidate is a row read from
+  SQLite. 2,000 of them take 12 to 18 ms when the rows are in the system's file cache, which is
+  three times the exact index's whole search at 31k vectors, and about 0.2 s when they are not.
+- **Two bits** need 500 candidates to keep everything.
+- **Eight bits** keep what four keep, at twice the memory, and take three times as long to
+  code.
+
+**The codes cover every number of the vector** (`dim = 0`), because a code of the first numbers
+loses results that no count of candidates brings back. Share of searches with the exact top 10,
+1-bit codes:
+
+| Numbers coded | Bytes per vector | Questions: 100 candidates | 200 | 500 | Code vectors: 100 | 200 | 500 |
+|---|---|---|---|---|---|---|---|
+| 128 | 24 | 13% | 26% | 46% | 90% | 96% | 98% |
+| 256 | 40 | 30% | 49% | 75% | 98% | 99.2% | 100% |
+| 512 | 72 | 65% | 80% | 94% | 100% | 100% | 100% |
+| 896 (all) | 120 | 93% | 99.3% | 100% | 100% | 100% | 100% |
+
+A fine code does not make up for the missing numbers: 256 numbers with a 4-bit code kept the top
+10 in 91% of question searches at 200 candidates, and 512 numbers in 99.3%.
+
+**What it costs**, on an M1 with 16 GB that was running other jobs (so times are medians, n = 50),
+with FAISS on one thread:
+
+| At 200,000 vectors of 896 numbers | Exact | Compact, as `auto` uses it (4 bits, 200 candidates) | Compact, `bits = 1`, `rescore = 500` |
+|---|---|---|---|
+| in memory, per vector: the index | 1,800 bytes | 588 + 8 (its id) | 120 + 8 |
+| in memory, per vector: where it came from | 32 | 32 | 32 |
+| the process's memory after loading (what it keeps) | 371 MB | 131 MB | 33 MB |
+| the saved file, per vector | 1,800 bytes | 596 | 128 |
+| start from the saved file | 0.9 s | 0.5 s | 0.4 s |
+| start from the rows | 2.5 s | 32 s | 4 s |
+| one search, each backend in a process of its own: median (95th percentile) | 32.5 ms (41) | 23.3 ms (29) | 15.5 ms (18) |
+| of which the scan / the ranking / the read | all scan | 13.2 / 7.5 / 2.1 ms | 10.9 / none / 3.7 ms |
+| one search under a filter that keeps 10% | 13.0 ms | 13.8 ms | 11.7 ms |
+| 100 vectors added / deleted | 129 / 27 ms | 33 / 16 ms | 8 / 14 ms |
+| one search, the backends taking turns in one process | 23.9 ms | 22.1 ms, 0.92 times the exact index's | 14.8 ms, 0.61 times |
+| the same at 31k real vectors | 7.1 ms | 12.8 ms, 1.8 times | 8.4 ms, 1.2 times |
+
+In a process of its own each backend meets the load of its own minute. In the last two rows they
+take turns, query by query, so that the load slows them alike; no backend then keeps its codes in
+the processor's cache from one search to the next. Four more things to know about the cost:
+- **On a small index the exact one is faster.** At 31k vectors it answers in 6.2 ms and the
+  compact index in 8.5 (7.1 and 12.8 ms in turns): steps 2 and 3 take 5.4 ms there, and the
+  faster scan before them saves less than that. The two meet somewhere between 60,000 and
+  160,000 vectors, depending on the load.
+- **Coding takes time.** A start from the rows codes every vector: 32 s at 200,000,
+  against 2.5 s for the exact index. The saved file avoids it.
+- **The rows must be in the operating system's file cache.** When they are not (after a restart),
+  a search reads its candidates from the disk: about 30 ms more for 252 rows, for each
+  search, until the pages it needs have been read once. More candidates cost more: 500 took 60
+  ms more, and 2,000 at 1 bit 0.2 s.
+- **The rows are read through a connection of their own**, one per thread, with a page cache of 2
+  MB. Read through the store's main connection they would fill its 64 MB cache: 400 searches at
+  200,000 vectors grew the process by 62 to 80 MB that way, and by 0 to 16 MB this way, at the
+  same speed. That connection is in autocommit mode, so each read sees every committed
+  row and holds no snapshot open between searches; inside a write transaction or a read snapshot
+  of the store, the rows are read through the main connection instead.
+
+**Where it can differ from the exact index.**
+- The measurements above are one model and 31k vectors. On another model's vectors, or on an
+  index several times larger, the best 2,000 (or one in 50) of the 1-bit scan may hold less of a
+  search's top 50. Its top 10 has more room: it never lay deeper than place 458 in any sample.
+- A query with nothing near it. On 200,000 synthetic vectors, queries that have about 100 near
+  neighbours each got the exact top 50 in every search. Queries that have none (their best
+  match scores 0.14 and their 4,000th best 0.07, so a thousand vectors lie within a 1-bit code's
+  error of the 50th) got the exact top 10 in 78% of searches, and 92% of their top 50. With
+  1-bit codes and 500 candidates it is 16% and 59%. FAISS's own scan of the 4-bit codes gets all
+  of it, at 3 to 4 times the exact index's time. A filter can put a query in the same place: one
+  that keeps a tenth of the chunks leaves about 10 of those 100 neighbours, the rest of the top
+  50 is then decided the same way, and 97.6% of it was kept. Real questions are not like this:
+  their best matches score 0.33 to 0.40, the 200th best 0.23, and under the same filters every
+  real search kept its whole top 50.
+
+The compact index is saved as `vec_<type>.rabitq` (the ids and both codes: 596 bytes per vector),
+so a start reads it instead of coding every vector again.
+
+**A mistake in a FAISS call can end the process** instead of raising an error, and that would take
+the MCP server with it. So the compact index checks whatever it hands to FAISS first: the length
+and number type of every array, the size of every filter, that both of its FAISS indexes hold one
+code per vector id, and that no number is a NaN or an infinity (such a vector is coded as zeros
+and never returned). Its saved file carries a checksum, and is given to FAISS only when the
+checksum, the options and the rotation are the expected ones. What FAISS was not checked with is
+refused with a message: a code of more than 4,096 numbers when the config is read, a FAISS older
+than 1.15.1 when the index is opened.
+
+**Loading a search index.** A search index is saved beside `index.db` and read back at the next
+start: 0.9 s for the exact index of 200,000 vectors, 0.5 s for the compact one. It is rebuilt
+from the stored vectors instead when the saved copy cannot be used: there is none, it is another
+backend's (the rule picks the other index, or the config names another), or its note names no
+database. That last case is every index built before saved copies named their database: the
+first start on one rebuilds its search index, once. On an M1 that was running other jobs, an
+exact index took 0.5 to 1.5 s to rebuild at 50,000 vectors and 2.5 to 5 s at 200,000. A compact
+index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000, with FAISS on
+one thread.
+
+Nobody waits for a rebuild:
+- **It runs in the background.** The MCP server loads the model and the search indexes side by
+  side when it starts. A rebuild holds no lock while it reads and codes, so writes, `get_chunk`
+  and `index_status` go on; what was written meanwhile is added at the end, by vector id.
+- **A search that comes first answers from keywords.** It waits for the model and the search
+  indexes only within its 4 s, and not at all for a rebuild that will not end in time (its pace
+  tells). It then returns keyword results and a note that says so, as it does while the model
+  loads. Measured at 200,000 vectors, on the same loaded machine: a search asked 0.2 s after
+  the start returned its keyword results in 0.9 s, while the compact index was being rebuilt;
+  searches used the vectors from the moment it was ready, 83 s after the start. Had the rebuild
+  held the lock, that first search would have waited for all of it (66 s in the same
+  measurement), and so would the commit of a vector written meanwhile. At 50,000 vectors an
+  exact index is rebuilt within the wait: the first search took 1.1 to 1.3 s and already had the
+  vectors.
+- **The CLI and the eval pay it in the update, not in a search.** An update that ends by saving
+  leaves every vector type with the file the next start reads: a type whose file is missing,
+  behind the rows or another backend's is loaded or rebuilt, and written. Their searches wait for
+  an index that is still loading: they return results by meaning, always.
+- **A write does not start one.** Vectors written to a type whose index is not in memory are left
+  for its first use, which reads the file and adds the rows it lacks. Only a type's very first
+  vectors start its index, so that a build's index grows batch by batch.
+
+**Where each vector came from** (its chunk, its part, its lines) is kept in memory as one 32-byte
+row per vector, in an array sorted by vector id: 6.4 MB at 200,000 vectors, for either index. A
+chunk with several vectors scores its best one. When chunks have several vectors, the store asks
+the index for proportionally more vectors, so that the best 50 chunks are complete after one scan.
+An SQLite index over these columns (about 25 bytes per vector on disk) lets a start read them
+without touching the pages that hold the vectors: 0.2 s instead of 0.8 s at 200,000 vectors.
 
 **Keeping the copy in step with SQLite.** The in-memory index changes only after a commit, so it
 never holds a vector that could be rolled back. Every commit that changes a type's vectors also
@@ -860,6 +1154,90 @@ bumps that type's version number in `meta`, and an index that is behind catches 
 vector ids: vectors are never changed in place, only added and deleted, so the ids that differ are
 the whole difference. That covers a saved copy from before a crash, and another process's writes.
 Searches never wait for writes (SQLite's WAL mode lets readers continue while one process writes).
+
+A saved copy is read only into the database it was saved from. Each `index.db` carries a random
+`database_id` in `meta`, and the copy's note names it. A copy whose note names another database,
+or none, is rebuilt from the rows. Vector ids start again at 1 in a new `index.db`, so without the
+name the copy of a deleted one would be matched, id by id, against vectors it was not made from.
+
+**The vector cache** maps (embedder key, text hash) to a vector: 2 bytes per number, at the
+model's full length. It is one SQLite file for the whole machine, and every codemem process
+reads and writes it. Each part of its layout has a reason. The numbers are from 200,000 synthetic
+vectors of 896 numbers unless a line says otherwise. The times are medians of one run on an M1
+that other jobs kept busy (load average 12 to 16 on its 8 cores). Three more runs gave times up
+to twice as long, and up to three times for the eviction of the oldest tenth.
+
+- **One vector table per embedder.** All vectors of an embedder have one length, so the rows of
+  its table have one size and fill their pages: 18 vectors of 896 numbers on a page. On disk a
+  vector of 1,792 bytes takes 1,877 bytes, its key included (31,477 vectors of the default
+  model). A single table with the key as text in every row takes 4,690 bytes for the same vector,
+  because every row spills onto a 4 KB page of its own.
+- **Slots without gaps.** When entries are deleted, the last rows of the table are written into
+  the freed slots, and the pages at the table's end become free. So the file shrinks by what was
+  deleted, wherever the deleted entries were: a tenth of the entries, spread over the whole file,
+  takes it from 377 MB to 339 MB. Without the move a page is free only once every row on it is
+  gone: the same deletion in a plain table of the same rows, 369 MB, gives back nothing.
+- **The time of last use sits in the key table,** not next to the vector. Marking entries as used
+  then rewrites key pages, which hold about a thousand entries each, and never a page of vectors.
+  An index on that time lists the least recently used entries, so eviction does not scan the
+  cache.
+- **A read is one statement:** a lookup in the key table, then one in the vector table, both in
+  one snapshot. A reader therefore never follows a slot that an eviction is moving. A read writes
+  nothing. Marking entries as used is a call of its own (`touch`), and it writes an entry once a
+  day at most.
+- **Pages are read through SQLite's page cache, not a memory map.** A map reads 200 vectors in
+  0.9 ms where the page cache takes 2.2 ms. But an I/O error on a mapped file ends the process,
+  and an error in an ordinary read only costs a cache miss.
+- **Pages of 32 KB.** A page holds a whole number of rows, so the space lost depends on the
+  vector's length. The table shows the bytes on disk above the vector's own bytes, keys included,
+  and the time to read 200 vectors by key (100,000 vectors of 896 numbers; the fastest of 450
+  reads, then the median):
+
+  | Numbers per vector | 16 KB pages | 32 KB pages | 64 KB pages |
+  |---|---|---|---|
+  | 768 | +10.2% | +5.1% | +5.5% |
+  | 896 | +4.6% | +4.8% | +5.0% |
+  | 1,024 | +16.9% | +9.4% | +6.3% |
+  | 2,048 | +34.8% | +15.8% | +8.5% |
+  | 4,096 | +100.9% | +34.3% | +15.6% |
+  | 200 keyed reads | 1.5 ms, 2.7 ms | 1.9 ms, 2.5 ms | 2.9 ms, 3.4 ms |
+
+  At 32 KB the default model's vectors cost what they cost at 16 KB, every other length costs
+  less, and three vectors of 4,096 numbers fit a page where 16 KB holds one. An undisturbed read
+  takes a quarter longer than at 16 KB; on the busy machine the medians did not differ. At 64 KB
+  a read takes half as long again as at 32 KB, and every change writes more, because a page is
+  rewritten whole.
+
+**What the cache costs in time.** Reading 200 random vectors by key takes 2.3 ms (4.3 ms for 19
+reads in 20). A process's first read, which also opens the file, takes 3.1 ms, and 35 ms when
+the file's pages are not in memory yet. A put of 256 vectors takes 5.8 ms. Marking 200 entries as
+used takes 4.6 ms, and 0.4 ms when they were already marked today.
+
+**The size cap** (`vector_cache_max_gb`, 8 GB by default: [decisions.md](decisions.md) §3). When
+the file passes it, the least recently used entries are deleted until the file is under 90% of
+the cap. An entry is used when stage B puts it, finds it, or a caller marks it. Three rules keep
+this out of the way:
+- a put looks at the file's size once per 1% of the cap it has written, not every time;
+- a put that finds the file over the cap evicts for a quarter of a second at most, because a
+  search may be waiting for that put. The next puts go on, and a blocking update (`codemem
+  index`) finishes the job before it returns;
+- an eviction works in transactions of 256 entries, so other processes read and write in between.
+
+Deleting the oldest tenth of 200,000 vectors takes 1.1 s. A tenth spread over the whole file
+takes 2.8 s, because almost every deleted row sits on a page of its own, and that page is
+rewritten. Eviction loses nothing for good: an evicted vector is embedded again when its text
+comes back.
+
+**When the cache file cannot be used** (another program holds it, it is read-only, it is damaged),
+every call answers as an empty cache would. It logs one warning and leaves the file alone for a
+minute. The index update goes on, with vectors from the model.
+
+**A cache file with one row per vector** (`cache/vectors.db`, a single table keyed by text) is
+read into the cache when the cache is first opened: 2,000 rows at a time, in key order,
+skipping what is already there. So an import that was interrupted, or that two processes run at
+once, still ends complete. The file is deleted once everything is committed and synced to disk,
+and only if nothing was added to it meanwhile: while another process still writes it, it stays,
+and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and become 60 MB.
 
 ---
 
@@ -974,15 +1352,16 @@ codemem is for short, vague feature questions. A vague-question eval is the next
 | a language | a spec in `languages/` (which nodes are functions, classes, calls, tests, comments) |
 | a kind of embedded text | a text builder in `texts.py` |
 | an embedding model | nothing, if sentence-transformers can load it; else an embedder class (README) |
-| a search index | a `VectorStore` subclass (README) |
+| a search index | a `VectorStore` subclass (README); `FaissVectorStore` and `CompactVectorStore` in `store.py` are the two that come with codemem |
 | smarter call links | a replacement for `callgraph.resolve_edges` |
 
 ---
 
 ## 10. Performance
 
-On an M1 laptop. vLLM: 6,235 files, 102k chunks, 145k vectors. Update times use a fake model, so
-they show codemem's own work; the real model adds about 0.1 s per changed text.
+On an M1 laptop, where FAISS runs on one thread (§5). vLLM: 6,235 files, 102k chunks, 145k
+vectors. Update times use a fake model, so they show codemem's own work; the real model adds about
+0.1 s per changed text.
 
 | | Measured |
 |---|---|
@@ -997,6 +1376,7 @@ they show codemem's own work; the real model adds about 0.1 s per changed text.
 | the first search after the model was freed, real model (sample repo) | 3.5 s with every signal at a load average of 5; 4.1 s from keywords at 8 to 11 (the model was back 7.0 s after the search began). A search that waits for the model: 2.2 s and 3.8 s |
 | giving a batch's working memory back, real model on the GPU | the call takes 0.1 s; 256 code texts took 84 s right after it and 87 s with nothing given back, and batches of 32 took 10.0 s and 10.4 s (four of each, in turn) |
 | the real model on the CPU, in float32 | 20 short queries in 3.7 s and 32 code texts of about 1,000 characters in 36 s, against 1.9 s and 9.1 s on the GPU |
+| 200 vectors read by key from the vector cache (200,000 vectors) | 2.3 ms |
 
 **Building is almost all embedding.** The local model embeds about 8.5 texts a second on the M1,
 so the first build of a large repo (vLLM: 145k texts, about 5 hours) wants a CUDA GPU or an

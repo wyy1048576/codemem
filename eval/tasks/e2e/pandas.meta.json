@@ -1,0 +1,77 @@
+{
+  "kind": "resplit",
+  "source": "fresh-v1.jsonl",
+  "source_sha256": "9c2ca4591305c55eb5bb96750a6ec502b9ef1ab855b614e7818ae903ff6072a8",
+  "repo": "pandas-dev/pandas",
+  "recipe": "pandas",
+  "test_paths": [
+    "pandas/tests/**"
+  ],
+  "test_paths_from_test_files": true,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "**/requirements*.txt",
+    "**/requirements/*.txt",
+    "**/constraints*.txt",
+    "**/pyproject.toml",
+    "**/setup.cfg",
+    "**/environment*.yml",
+    "**/uv.lock",
+    "**/poetry.lock",
+    "**/package.json",
+    "**/package-lock.json",
+    "**/yarn.lock",
+    "**/pnpm-lock.yaml",
+    "**/Cargo.toml",
+    "**/Cargo.lock",
+    "**/go.mod",
+    "**/go.sum",
+    "**/vendor/modules.txt",
+    "**/vcpkg.json",
+    "**/conanfile.*",
+    "**/browsers.json",
+    "**/.npmrc"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 352,
+  "changed": 7,
+  "unchanged": 345,
+  "not_split": {},
+  "with_test_files_added": 1,
+  "with_fix_files_added": 6,
+  "test_files_added": 2,
+  "fix_files_added": 18,
+  "files_left_out": {
+    "leave_out **/*.rst": 294,
+    "leave_out .github/**": 3
+  },
+  "with_dependency_needed": 0,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 0
+  },
+  "dependency_needed": {},
+  "with_dependency_other": 4,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 2,
+    "hard": 2
+  },
+  "with_test_patch_before": 298,
+  "with_test_patch_after": 298,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "7f1147de74ee59539ef1811f3d0ac5af4820d614",
+    "dirty": false
+  },
+  "created": "2026-11-26T10:39:50+00:00"
+}
