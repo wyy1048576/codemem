@@ -1,7 +1,7 @@
 # Recipe for duckdb/duckdb: how to build it at a task's commit and run a task's tests.
 # The fields are described in src/cmeval/generate.py.
 #
-# Use the task file that `cmeval resplit duckdb` makes (tasks/fresh-cpp-v1-duckdb.jsonl), not
+# Use the task file that `cmeval resplit duckdb` makes (tasks/e2e/duckdb.jsonl), not
 # fresh-cpp-v1.jsonl. The collector did not know duckdb's test files (.test), so in the old file
 # most duckdb tasks have no test change.
 
