@@ -13,6 +13,11 @@ The paths in a codemem index are relative, so the index of src/ also works for /
 The index is tied to the device and number type of the embedder. When codemem opens an index of the GPU
 (float16, cuda) on the CPU, it embeds every text again, which takes hours. So the container of a run gets the GPU.
 
+The build and every run search with the same index, the exact one (CODEMEM_ENV). Left to itself, codemem picks
+the search index by the memory of the place it runs in: all of the host's for a build, the container's limit for
+a run. A large index that the build saved as the exact one would then be rebuilt as the compact one at the start
+of every run, and the agent's first searches would be answered from keywords only.
+
 The codemem program is <codemem checkout>/.venv/bin/codemem (or CMEVAL_CODEMEM_BIN). The runner mounts the
 checkout and the Python install of its environment into the container at their own paths.
 """
@@ -34,6 +39,9 @@ from .paths import e2e_dir
 from .tasks import Task
 
 CODEMEM_BIN_ENV = "CMEVAL_CODEMEM_BIN"
+# What codemem gets in its environment wherever the eval starts it: the build of an index here, and the server
+# of a run (e2e_run.codemem_mcp_config). One search index for both, whatever memory each place has.
+CODEMEM_ENV = {"CODEMEM_VECTOR_BACKEND": "faiss"}
 # eval/src/cmeval/ is three levels below the root of the codemem repo.
 REPO_ROOT = Path(__file__).resolve().parents[3]
 # Folders of the system. A Python install there cannot be mounted: it would hide the container's own files.
@@ -152,7 +160,8 @@ def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None,
         shutil.rmtree(index)
     log.unlink(missing_ok=True)
     t0 = time.monotonic()
-    proc = _run([str(program), "index", str(src), "--index-dir", str(index)], log=log)
+    proc = _run([str(program), "index", str(src), "--index-dir", str(index)], log=log,
+                env={**os.environ, **CODEMEM_ENV})
     seconds = round(time.monotonic() - t0, 1)
     if proc.returncode != 0:
         raise GenerateError(f"{task.id}: codemem index ended with exit code {proc.returncode}; see {log}")

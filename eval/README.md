@@ -110,6 +110,11 @@ The setup `tool` is the agent of `grep` plus codemem's MCP server, loaded before
 - A GPU that Docker can give to a container (`docker run --device nvidia.com/gpu=all`: the NVIDIA container toolkit, and a CDI spec from `nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`). The index is tied to the device and number type of the model that built it. An index built on the GPU is `float16|cuda`; when codemem opens it on the CPU, it embeds every text again, which takes hours. The runner gives the GPU to the containers of every setup, so that the setups differ only in the tool. `CMEVAL_E2E_GPUS=0` turns this off, for example on a Mac; then `tool` cannot run.
 - The index of each task, from `cmeval e2e index`. Each run copies the index to `cmindex/` in its folder and mounts the copy at `/cmindex`, writable, because codemem updates it when the agent edits files. After the run the runner records the size of the copy and deletes it.
 
+The runner sets two things in codemem's environment, so that a run does not depend on where it happens:
+
+- `CODEMEM_VECTOR_BACKEND=faiss`, for the build of an index (`cmeval e2e index`) and for the server of every run: the exact search index in both places. Left to itself, codemem picks the search index by the memory of the place it runs in. The build runs on the host with all its memory; a run's container has 16 GB, where codemem picks the compact index above 185,000 vectors. Such a run would rebuild the search index at its start, for tens of seconds on a large repo, and the agent's searches in that time get keyword results only, with a note that says so.
+- `CODEMEM_MODEL_IDLE_MINUTES=0`, for the server of a run: the embedding model stays in memory for the whole run.
+
 codemem's tool texts have three steering levels (`none`, `light`, `strong`) that say how hard they push the agent to codemem. Set `CMEVAL_CODEMEM_STEERING` to use one of them for a batch; when it is not set, codemem uses its default. Do not mix levels in one run ID.
 
 `run.json` of a `tool` run records the codemem commit, the program, the task's `index.json`, the steering level and the index size before and after the run (`identity.codemem`). `outcome.unexpected_paths` lists files of the agent's patch such as `.codemem*` or `.mcp.json`, which codemem should never write.

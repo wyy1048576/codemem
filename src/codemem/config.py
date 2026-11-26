@@ -465,6 +465,12 @@ def _env_overrides() -> dict[str, Any]:
         raw["vectors"] = {name: {"model": model} for name in _default_vectors()}
     if cache := os.environ.get("CODEMEM_VECTOR_CACHE"):
         raw["vector_cache"] = cache
+    if backend := os.environ.get("CODEMEM_VECTOR_BACKEND"):
+        # For a build and the runs that open its index in another place, without a config file.
+        # `auto` picks by the memory of the place it runs in: a build with all of a host's memory
+        # and a run under a container's limit can pick differently, and the run then rebuilds the
+        # search index at every start. The eval names faiss for both.
+        raw["vector_backend"] = backend
     if idle := os.environ.get("CODEMEM_MODEL_IDLE_MINUTES"):
         # For a run that must never unload its model, without a config file: the eval sets 0.
         try:

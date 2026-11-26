@@ -690,7 +690,8 @@ A change to any of these must be made together with the eval:
   2. `~/.codemem/config.toml`;
   3. `<repo>/.codemem.toml`;
   4. environment variables (`CODEMEM_HOME`, `CODEMEM_DEVICE`, `CODEMEM_MODEL`,
-     `CODEMEM_STEERING`, `CODEMEM_VECTOR_CACHE`, `CODEMEM_MODEL_IDLE_MINUTES`).
+     `CODEMEM_STEERING`, `CODEMEM_VECTOR_CACHE`, `CODEMEM_VECTOR_BACKEND`,
+     `CODEMEM_MODEL_IDLE_MINUTES`).
 - **Two kinds of settings:**
   - **Index-time:** they change what is stored. They are listed by `index_settings()`, and
     changing one redoes what it affects (§8).
@@ -706,6 +707,9 @@ A change to any of these must be made together with the eval:
   codes of each vector in memory, exact scores from the stored vectors) or `"module:Class"` (a
   `store.VectorStore` subclass). Index-time when it names a backend, only so that eval systems
   with different backends don't share an index; `auto` is not in `index_settings()`.
+  `CODEMEM_VECTOR_BACKEND` sets it from the environment, for an index that is built in one place
+  and opened in another: `auto` picks by the memory of the place it runs in, so the two can
+  differ, and every start that begins from the build's files then rebuilds the search index.
 - **`vector_memory_mb`:** search-time. The memory, in MB of 10^6 bytes, that the exact search
   indexes of one index may take before `auto` uses the compact one. 0, the default, is 2% of the
   machine's memory, and at least 128 MB. A whole number, 0 or more.
