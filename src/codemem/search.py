@@ -108,6 +108,7 @@ class SearchResponse:
     # (a model that did not load, an embedding endpoint that does not answer)
     models_error: str | None = None
     more: list[MoreResult] = field(default_factory=list)  # the results after the k cards, by name
+    tests: list[MoreResult] = field(default_factory=list)  # with `tests_apart`: the best test chunks, by name
 
     def to_dict(self) -> dict:
         return {
@@ -116,6 +117,7 @@ class SearchResponse:
             "timings": self.timings,
             "results": [r.to_dict() for r in self.results],
             "more": [asdict(m) for m in self.more],
+            "tests": [asdict(m) for m in self.tests],
         }
 
 
@@ -272,13 +274,15 @@ def search(
     languages: Sequence[str] | None = None,
     test_weight: float | None = None,
     kind_weights: dict[str, float] | None = None,
-    tests: str = "include",
+    tests: str | None = None,
     names: Sequence[str] | None = None,
 ) -> SearchResponse:
-    """`tests`: "include" (default), "exclude" or "only" test code. `names`: function, class, method
-    or file names the caller knows or guesses, ranked by keywords alone as a fourth list (NAMES).
-    Without names (none, or only blanks) the search is what it is without the argument."""
-    if tests not in TEST_FILTERS:
+    """`tests`: "include", "exclude" or "only" test code. Not given, it is "include", unless the
+    config's `tests_apart` is on: test chunks then take no place among the cards, and the best
+    `tests_apart_count` of them are named after the cards (`SearchResponse.tests`). `names`:
+    function, class, method or file names the caller knows or guesses, ranked by keywords alone as
+    a fourth list (NAMES). Without names (none, or only blanks) the search is what it is without them."""
+    if tests is not None and tests not in TEST_FILTERS:
         raise ValueError(f"tests must be one of {'|'.join(TEST_FILTERS)}, got {tests!r}")
     timings: dict[str, float] = {}
     t_total = time.perf_counter()
@@ -293,11 +297,12 @@ def search(
 
     kinds = kinds if kinds is not None else config.kinds
     test_weight = config.test_weight if test_weight is None else test_weight
+    apart = tests is None and config.tests_apart and test_weight > 0  # tests named apart, not among the cards
     flt = ChunkFilter(
         path_prefix=path_prefix or None,
         kinds=tuple(kinds) if kinds is not None else None,
         languages=tuple(languages) if languages else None,
-        exclude_tests=test_weight <= 0 or tests == "exclude",
+        exclude_tests=test_weight <= 0 or tests == "exclude" or apart,
         only_tests=tests == "only",
     )
     allowed = store.filter_ids(flt) if flt.active else None
@@ -305,17 +310,18 @@ def search(
     ranked: dict[str, list[int]] = {}
     best_part: dict[tuple[str, int], VectorHit] = {}
 
+    query_match = names_match = None
     if BM25 in signals:
         t = time.perf_counter()
-        match = bm25_match(store, query, config)
-        ranked[BM25] = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
+        query_match = bm25_match(store, query, config)
+        ranked[BM25] = store.bm25_search(query_match, n, config.bm25_weights5(), flt=flt) if query_match else []
         timings[BM25] = time.perf_counter() - t
     names_text = " ".join(x.strip() for x in names or () if x and x.strip())
     named_list: list[int] | None = None
     if BM25 in signals and names_text and config.rrf_weights.get(NAMES, 1.0) > 0:
         t = time.perf_counter()
-        match = bm25_match(store, names_text, config)
-        named_list = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
+        names_match = bm25_match(store, names_text, config)
+        named_list = store.bm25_search(names_match, n, config.bm25_weights5(), flt=flt) if names_match else []
         timings[NAMES] = time.perf_counter() - t
 
     vec_signals = [s for s in signals if s != BM25]
@@ -373,9 +379,28 @@ def search(
         query_vec = query_vecs[(spec.model, spec.embedder, spec.version)]
         _add_relations(store, results, by_meaning, query_vec, config.card_relations, None if allowed is None else set(allowed))
         timings["relations"] = time.perf_counter() - t
+    named_tests: list[MoreResult] = []
+    if apart and config.tests_apart_count > 0:
+        t = time.perf_counter()
+        only = ChunkFilter(flt.path_prefix, flt.kinds, flt.languages, exclude_tests=False, only_tests=True)
+        lists: dict[str, list[int]] = {}
+        if query_match:
+            lists[BM25] = store.bm25_search(query_match, n, config.bm25_weights5(), flt=only)
+        test_ids = store.filter_ids(only)
+        for vec_type in vec_signals:
+            spec = config.vectors[vec_type]
+            model = (spec.model, spec.embedder, spec.version)
+            if model in query_vecs and test_ids:
+                lists[vec_type] = [h.chunk_id for h in store.vector_search(vec_type, query_vecs[model], n, test_ids)]
+        if names_match and NAMES in ranked:
+            lists[NAMES] = store.bm25_search(names_match, n, config.bm25_weights5(), flt=only)
+        fused_tests = rrf(lists, k=config.rrf_k, weights=config.rrf_weights)
+        named_tests = [MoreResult(c.chunk_id or 0, c.path, c.start_line, c.end_line, c.qualname, c.kind, c.subkind, c.name, s)
+                       for c, s in _pick_top(fused_tests, config.tests_apart_count, store.get_chunks)]
+        timings["tests_apart"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
     used = [*signals, NAMES] if NAMES in ranked else list(signals)
-    return SearchResponse(query=query, signals=used, results=results, timings=timings, more=more)
+    return SearchResponse(query=query, signals=used, results=results, timings=timings, more=more, tests=named_tests)
 
 
 def _add_relations(

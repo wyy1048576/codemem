@@ -434,3 +434,56 @@ def test_every_tool_description_asks_for_names():
     for level in ("none", "light", "strong"):
         text = prompts.tool_description("search_code", level)
         assert "`names`" in text and "guess" in text
+
+
+# ---------------------------------------------------------------- tests named apart (off by default)
+
+
+def test_tests_apart_is_off_by_default_and_changes_nothing_then(index):
+    from codemem.config import Config
+    from codemem.render import TESTS_HEADER
+
+    store, cfg, factory = index
+    assert Config().tests_apart is False and Config().tests_apart_count == 5
+    plain = search(store, "disabled user", cfg, k=10, embedder_factory=factory)
+    given = search(store, "disabled user", cfg, k=10, tests="include", embedder_factory=factory)
+    assert any(r.is_test for r in plain.results) and plain.tests == []
+    assert [(r.key, r.score) for r in plain.results] == [(r.key, r.score) for r in given.results]
+    assert TESTS_HEADER not in _text(plain)
+
+
+def test_tests_apart_names_the_best_tests_after_the_cards(index):
+    from codemem.render import MORE_HEADER, TESTS_HEADER, card_label
+
+    store, cfg, factory = index
+    cfg.tests_apart, cfg.tests_apart_count = True, 2
+    resp = search(store, "disabled user", cfg, k=5, embedder_factory=factory)
+    excluded = search(store, "disabled user", cfg, k=5, tests="exclude", embedder_factory=factory)
+    only = search(store, "disabled user", cfg, k=2, tests="only", embedder_factory=factory)
+    assert not any(r.is_test for r in resp.results)
+    assert [(r.key, r.score) for r in resp.results] == [(r.key, r.score) for r in excluded.results]  # cards as with tests left out
+    assert [(t.path, t.start_line, t.qualname) for t in resp.tests] == [(r.path, r.start_line, r.qualname) for r in only.results]
+    assert len(resp.tests) == 2 and excluded.tests == [] and only.tests == []
+    text = _text(resp).splitlines()
+    block = text.index(TESTS_HEADER)
+    assert text[block + 1 : block + 3] == [f"{t.path}:{t.start_line}  {card_label(t)}" for t in resp.tests]
+    assert text[block - 1] == "" and text.index(MORE_HEADER) > block  # after the cards, before the next results
+    assert resp.to_dict()["tests"][0]["qualname"] == resp.tests[0].qualname
+    # a `tests` argument wins: include gives today's cards and no block
+    given = search(store, "disabled user", cfg, k=5, tests="include", embedder_factory=factory)
+    cfg.tests_apart = False
+    today = search(store, "disabled user", cfg, k=5, embedder_factory=factory)
+    assert [(r.key, r.score) for r in given.results] == [(r.key, r.score) for r in today.results] and given.tests == []
+    cfg.tests_apart, cfg.tests_apart_count = True, 0  # tests out of the cards, none named
+    none_named = search(store, "disabled user", cfg, k=5, embedder_factory=factory)
+    assert none_named.tests == [] and not any(r.is_test for r in none_named.results)
+
+
+def test_tests_apart_settings_are_validated():
+    from codemem.config import config_from_dict
+
+    cfg = config_from_dict({"tests_apart": True, "tests_apart_count": 3})
+    assert cfg.tests_apart is True and cfg.tests_apart_count == 3
+    for bad in ({"tests_apart": 1}, {"tests_apart": "yes"}, {"tests_apart_count": -1}, {"tests_apart_count": 2.0}):
+        with pytest.raises(ValueError, match="tests_apart"):
+            config_from_dict(bad)

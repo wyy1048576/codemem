@@ -1434,7 +1434,12 @@ and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and bec
    scores and vector similarities aren't comparable. Each list contributes its top 50.
 5. **Filters and weights.** A folder (`path_prefix`), kinds (functions only, say), languages and
    tests (include, exclude or only) filter each list. Tests, classes and blocks score like
-   everything else by default, since vague questions often need them; weights can lower them.
+   everything else by default, since vague questions often need them; weights can lower them. An
+   option, off by default (`tests_apart`), keeps test chunks out of the cards when the caller does
+   not choose, and names the best 5 of them after the cards: on the held-out halves a gold function
+   was then in the 10 cards for 103 of 175 vLLM tasks against 99 and 100 of 162 pandas tasks
+   against 94, 11 of 16 vague requests against 8; and a named test calls a gold function for 47 and
+   31 of them. The eval's answers are never tests, so these numbers favour it by construction.
 6. **Cards.** Equal scores are ordered by location, so every machine gives the same order:
 
 ```

@@ -13,6 +13,7 @@ from .search import MoreResult, ResultCard, SearchResponse
 
 
 MORE_HEADER = "More results, by name (ask get_chunk for any of them):"
+TESTS_HEADER = "Tests that match:"
 
 
 def card_label(r: ResultCard | MoreResult) -> str:
@@ -45,6 +46,10 @@ def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool =
             out.extend(f"   | {line}" for line in body[:6])
         if r.related:
             out.append("   related: " + ", ".join(f"{x.qualname} ({x.path}:{x.start_line})" for x in r.related))
+    if resp.tests:
+        out.append("")
+        out.append(TESTS_HEADER)
+        out.extend(f"{m.path}:{m.start_line}  {card_label(m)}" for m in resp.tests)
     if resp.more:
         out.append("")
         out.append(MORE_HEADER)

@@ -355,7 +355,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--path-prefix", help="only results under this repo-relative path")
     sp.add_argument("--kinds", help="comma list of function,method,class,block (default: all)")
     sp.add_argument("--language", help="comma list of languages (default: all)")
-    sp.add_argument("--tests", choices=("include", "exclude", "only"), default="include", help="test code in results")
+    sp.add_argument("--tests", choices=("include", "exclude", "only"), default=None,
+                    help="test code in results (default: include, or named apart with tests_apart)")
     sp.add_argument("--exclude-tests", action="store_true", help="same as --tests exclude")
     sp.add_argument("--names", help="comma list of function, class, method or file names, known or guessed, searched apart from the query")
     sp.add_argument("--repo", help="repository (default: git root of the current directory)")

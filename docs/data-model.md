@@ -667,6 +667,19 @@ no line, and so has every result of a search by keywords alone. In `SearchRespon
 card has `related`: a list of `chunk_id`, `qualname`, `path`, `start_line` and `relation` (`calls`
 or `called by`).
 
+**Tests named apart** (`tests_apart`, off by default). When it is on and the caller passes no
+`tests`, test chunks (`is_test`) take no place among the cards: the cards are those of
+`tests="exclude"`. The best `tests_apart_count` (5) test chunks, the same lists with only tests,
+merged, are named after the cards, before the next results, one line each:
+
+```
+Tests that match:
+tests/test_users.py:12  test_disabled_user_loses_sessions
+```
+
+A `tests` argument wins: `include`, `exclude` and `only` mean what they meant, and name no tests
+apart. `SearchResponse.tests` holds them (`to_dict()`: `tests`, the fields of `more`).
+
 **The next results, by name.** After the cards, a block names the results k+1 to k+M
 (`more_results`, 20 by default; 0 for none), one line each, `path:start line  name`, no preview:
 
@@ -795,6 +808,10 @@ A change to any of these must be made together with the eval:
   the query (§12.1); `names = 0` turns that list off.
 - **`card_relations`:** search-time; a whole number, 0 or more; the default is 3. How many callers
   and callees each card names (§12.1); 0 names none. The ranking does not depend on it.
+- **`tests_apart`:** search-time; true or false; the default is false. **`tests_apart_count`:** a
+  whole number, 0 or more; the default is 5. With `tests_apart`, a search that does not pass `tests`
+  keeps test chunks out of the cards and names the best `tests_apart_count` of them after the cards
+  (§12.1). The default changes nothing.
 - **`more_results`:** search-time; a whole number, 0 or more; the default is 20. How many results
   after the k cards are named, one line each (§12.1); 0 names none. The cards do not depend on it.
 - **`vector_memory_mb`:** search-time. The memory, in MB of 10^6 bytes, that the exact search

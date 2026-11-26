@@ -1034,6 +1034,28 @@ def test_mcp_tools_answer_in_plain_text(service):
     anyio.run(run)
 
 
+def test_mcp_search_names_tests_apart_only_when_set_and_not_overridden(service):
+    from mcp import Client
+
+    from codemem.render import TESTS_HEADER
+    from codemem.server import build_server
+
+    service.update()
+    server = build_server(service)
+
+    async def run():
+        async with Client(server) as client:
+            res = await client.call_tool("search_code", {"query": "disabled user", "k": 5})
+            assert TESTS_HEADER not in res.content[0].text  # off by default
+            service.config.tests_apart = True
+            res = await client.call_tool("search_code", {"query": "disabled user", "k": 5})
+            assert f"\n\n{TESTS_HEADER}\n" in res.content[0].text
+            res = await client.call_tool("search_code", {"query": "disabled user", "k": 5, "tests": "include"})
+            assert TESTS_HEADER not in res.content[0].text  # the caller's `tests` wins
+
+    anyio.run(run)
+
+
 def test_mcp_search_has_no_footer_without_steering(service):
     from mcp import Client
 
