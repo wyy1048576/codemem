@@ -838,7 +838,8 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   already truncated to `embedding_dim` and normalized;
 - `search(query, k, allowed_ids=None)` returns at most `k` `(id, score)` pairs, best first, with
   the real similarity as the score (equal scores are ties); fewer than `k` only when no other
-  vector qualifies; only ids in `allowed_ids` when it is given;
+  vector qualifies; only ids in `allowed_ids` when it is given. The store does not call it for a
+  query of zeros: `Store.vector_search` returns nothing for one;
 - saving is optional: `to_bytes()` returns the bytes for `vec_<type><suffix>` (`suffix`, a class
   attribute, defaults to `.vec`) or None, and the class method `from_bytes(data)` reads them back;
 - the class method `bytes_per_vector(dim)` is optional: about how many bytes one vector takes in

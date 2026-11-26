@@ -244,6 +244,21 @@ def test_an_empty_index_and_more_results_asked_for_than_it_holds(store):
     assert store.vector_search("code", q, 5) == [] and _in_sync(store)
 
 
+def test_a_query_of_zeros_gets_no_results_and_no_index_is_asked(store, monkeypatch):
+    """Every vector scores 0 against it, and ties are taken whole: the search would ask for more
+    and more until it had seen every vector, and the compact index would read every row each time."""
+    ids = _seed(store, 300)
+    backend = store._type_index("code").store
+    usual = store.vector_search("code", _vecs(1, seed=3)[0], 5)
+    assert len(usual) == 5
+    with monkeypatch.context() as m, np.errstate(over="ignore"):
+        m.setattr(backend, "search", lambda *a, **k: pytest.fail("the index must not be asked"))
+        too_long = _vecs(1, seed=3)[0] * np.float32(1e30)  # its squared length overflows: no direction is left
+        for q in (np.zeros(16, dtype=np.float32), np.zeros(16), np.zeros(64), too_long, _vecs(1, seed=3)[0] * 1e-46):
+            assert store.vector_search("code", q, 5) == [] and store.vector_search("code", q, 5, ids[:20]) == []
+    assert store.vector_search("code", _vecs(1, seed=3)[0], 5) == usual
+
+
 def test_copies_of_one_vector_tie_and_are_ordered_by_location(store):
     ids = _add_chunks(store, [f"f{i:02d}" for i in range(12)])
     v = _vecs(12)

@@ -1166,6 +1166,12 @@ the index for proportionally more vectors, so that the best 50 chunks are comple
 An SQLite index over these columns (about 25 bytes per vector on disk) lets a start read them
 without touching the pages that hold the vectors: 0.2 s instead of 0.8 s at 200,000 vectors.
 
+**A query without a direction** (a vector of zeros) gets no results by meaning, from any index.
+Every stored vector scores 0 against it, and equal scores are taken whole, so that their order
+never depends on where a cut falls: the search would go on until it had seen every vector. On
+the pandas index (43,187 code vectors) that took the compact index 4.1 s and 561,431 row reads.
+The store answers such a query with nothing and asks no index.
+
 **Keeping the copy in step with SQLite.** The in-memory index changes only after a commit, so it
 never holds a vector that could be rolled back. Every commit that changes a type's vectors also
 bumps that type's version number in `meta`, and an index that is behind catches up by comparing

@@ -173,7 +173,8 @@ class VectorStore(ABC):
     `search(query, k, allowed_ids)` returns at most k (id, score) pairs, best first, with the real
     similarity as the score (equal scores are ties); fewer than k only when no other vector
     qualifies; only ids in `allowed_ids` when it is given. An approximate index (HNSW, IVF) can
-    miss some, as it does anywhere else.
+    miss some, as it does anywhere else. The store never asks for a query of zeros: it has no
+    direction, every vector would tie, and the store answers it with nothing.
 
     A backend that keeps less than the vectors themselves can read them back to score with:
     `bind(fetch)` hands it the function for that.
@@ -2013,8 +2014,8 @@ class Store:
         self, vec_type: str, query: np.ndarray, n: int, allowed_ids: Sequence[int] | None = None
     ) -> list[VectorHit]:
         """The n best chunks for a query by one vector type. A chunk with several parts scores its
-        best part. Equal scores are ordered by location. A type whose index is not in memory is
-        loaded first: this waits for that."""
+        best part. Equal scores are ordered by location. A query of zeros has no best chunks: it
+        returns nothing. A type whose index is not in memory is loaded first: this waits for that."""
         while True:
             with self._vec_lock:
                 ti = self._loaded(vec_type)
@@ -2034,6 +2035,11 @@ class Store:
         if ti is None or len(ti.store) == 0 or n <= 0:
             return {}, []
         q = prepare(np.asarray(query), ti.dim)[0]
+        if not q.any():
+            # No direction (zeros, or numbers so large that their length overflows): every vector
+            # scores 0. Ties are taken whole, here and in the index, so the search would go on
+            # until it had seen every vector: the compact index read every row a dozen times.
+            return {}, []
         allowed_vids = None
         if allowed_ids is not None:
             allowed = ti.vectors_of(allowed_ids)
