@@ -1,0 +1,103 @@
+# Recipe for microsoft/vscode. Three suites: unit tests of the layers common and node in Node.js,
+# unit tests of the layers browser and electron-* in the Electron test runner, and the unit tests
+# (vitest) of the built-in Copilot extension. Extension tests, integration tests and smoke tests
+# need a running VS Code or a network service, and are not run.
+# The fields are described in src/cmeval/generate.py.
+
+repo = "microsoft/vscode"
+# .nvmrc is 24.17.0 to 24.22.0 in the task window. The repo accepts its .nvmrc version or a newer
+# one with the same major version (build/npm/preinstall.ts), so the newest one serves all tasks.
+base_image = "node:24.22.0-bookworm"
+
+base_setup = [
+    # Build tools for the native modules (the list in the repo's wiki for Linux), the X server for
+    # Electron, the libraries that Electron needs to start, and a font for tests that measure text.
+    "apt-get update && apt-get install -y --no-install-recommends build-essential g++ python-is-python3 pkg-config libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libxss1 libxtst6 libxshmfence1 libdrm2 libatk-bridge2.0-0 libcups2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libpango-1.0-0 libcairo2 libatspi2.0-0 libdbus-1-3 fonts-dejavu-core && rm -rf /var/lib/apt/lists/*",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+    # cmeval-vscode-out: transpile src/ to out/ with the step of the repo's CI unit test job, but only
+    # when src/ differs from the last transpile. The tests load out/, and the validation applies the
+    # test patch with no refresh after it, so each test command calls this first.
+    '''printf '%s\n' \
+    '#!/bin/bash' \
+    'set -eu' \
+    'cd /testbed' \
+    'h=$({ git diff HEAD --binary -- src; git ls-files -z -o --exclude-standard -- src | sort -z | xargs -0 -r sha256sum; } | sha256sum | cut -c1-64)' \
+    'if [ "$(cat out/.cmeval-src 2>/dev/null)" = "$h" ]; then exit 0; fi' \
+    'npm run gulp transpile-client-esbuild' \
+    'echo "$h" > out/.cmeval-src' \
+    > /usr/local/bin/cmeval-vscode-out && chmod +x /usr/local/bin/cmeval-vscode-out''',
+    # cmeval-vscode-test KIND JUNIT FILE...: run test files and write one JUnit file. KIND is node
+    # (mocha in Node.js, as `npm run test-node`), electron (scripts/test.sh, under Xvfb) or copilot
+    # (vitest in extensions/copilot). Each file runs on its own: in the two mocha runners one file
+    # that does not load stops the run of all files. A file with no test result counts as one
+    # failed test "cmeval.load::<file>", so a run before the fix is not empty.
+    # The node runner has no reporter option, so a copy of it gets the JUnit reporter.
+    # --timeout 30000 is the value of the repo's CI. vitest gets a fixed number of workers.
+    '''printf '%s\n' \
+    '#!/bin/bash' \
+    'set -u' \
+    'kind=$1' \
+    'junit=$2' \
+    'shift 2' \
+    'if [ "$kind" = electron ] && [ -z "${DISPLAY:-}" ]; then exec xvfb-run -a -s "-screen 0 1280x1024x24" "$0" "$kind" "$junit" "$@"; fi' \
+    'cd /testbed' \
+    'parts=$(mktemp -d)' \
+    'if [ "$kind" != copilot ]; then cmeval-vscode-out || echo "cmeval: transpile failed"; fi' \
+    'if [ "$kind" = node ]; then sed "s/new Mocha({/new Mocha({ reporter: \"mocha-junit-reporter\", reporterOptions: { mochaFile: process.env.CMEVAL_JUNIT }, timeout: 30000,/" test/unit/node/index.js > test/unit/node/cmeval-index.js; fi' \
+    'i=0' \
+    'for f in "$@"; do' \
+    '  i=$((i + 1))' \
+    '  x=$parts/$i.xml' \
+    '  case $kind in' \
+    '    node) CMEVAL_JUNIT=$x node_modules/.bin/mocha test/unit/node/cmeval-index.js --delay --ui=tdd --exit --timeout 30000 --run "$f" ;;' \
+    '    electron) VSCODE_SKIP_PRELAUNCH=1 ./scripts/test.sh --no-sandbox --disable-gpu --disable-dev-shm-usage --timeout 30000 --reporter mocha-junit-reporter --reporter-options "mochaFile=$x" --run "$f" ;;' \
+    '    copilot) (cd extensions/copilot && node_modules/.bin/vitest run --pool=forks --maxWorkers=4 --reporter=junit --outputFile="$x" "${f#extensions/copilot/}") ;;' \
+    '  esac' \
+    '  echo "cmeval: $f exit $?"' \
+    'done' \
+    'rm -f test/unit/node/cmeval-index.js' \
+    '{' \
+    '  echo "<testsuites>"' \
+    '  i=0' \
+    '  for f in "$@"; do' \
+    '    i=$((i + 1))' \
+    '    if grep -qs "<testcase" "$parts/$i.xml"; then sed "s/<?xml[^>]*?>//" "$parts/$i.xml"' \
+    '    else echo "<testsuite name=\"cmeval.load\"><testcase classname=\"cmeval.load\" name=\"$f\"><failure message=\"no test result\"/></testcase></testsuite>"; fi' \
+    '  done' \
+    '  echo "</testsuites>"' \
+    '} > "$junit"' \
+    > /usr/local/bin/cmeval-vscode-test && chmod +x /usr/local/bin/cmeval-vscode-test''',
+]
+
+# The lock files fix every package version. The root postinstall installs the packages of every
+# folder in build/npm/dirs.ts (build, remote, extensions, test), and builds the native modules
+# against the Electron headers of .npmrc. The npm cache is in /root/.cache (a build cache, not in
+# the image), so it does not make the image larger and later builds reuse it. The Electron and
+# browser downloads of the npm packages are off, as in the repo's CI: scripts/test.sh uses the
+# Electron of `npm run electron` in .build/electron, at the version of .npmrc.
+build = [
+    "ELECTRON_SKIP_BINARY_DOWNLOAD=1 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm_config_cache=/root/.cache/npm npm ci",
+    "npm run electron && test -x .build/electron/code-oss",
+    "cmeval-vscode-out",
+]
+
+# After a patch: transpile again (skipped when src/ did not change, for example for a fix in the
+# Copilot extension).
+refresh = ["cmeval-vscode-out"]
+
+timeout_min = 10
+
+# Do not set CI, GITHUB_WORKSPACE or BUILD_ARTIFACTSTAGINGDIRECTORY: the test runners read them.
+
+[[suite]]
+test_files = ["src/vs/**/test/common/*.test.ts", "src/vs/**/test/node/*.test.ts"]
+test = "cmeval-vscode-test node {junit} {files}"
+
+[[suite]]
+test_files = ["src/vs/**/test/browser/*.test.ts", "src/vs/**/test/electron-*/*.test.ts"]
+test = "cmeval-vscode-test electron {junit} {files}"
+
+[[suite]]
+test_files = ["extensions/copilot/**/*.spec.ts", "extensions/copilot/**/*.spec.tsx"]
+test = "cmeval-vscode-test copilot {junit} {files}"

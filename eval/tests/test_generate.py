@@ -49,6 +49,27 @@ def test_load_recipe_playwright():
     assert all("CI=" not in suite.test for suite in recipe.suites) and "CI" not in dict(recipe.env)
 
 
+def test_load_recipe_vscode():
+    recipe = gen.load_recipe("vscode")
+    assert len(recipe.suites) == 3
+    assert "CI" not in dict(recipe.env)
+
+    class T:
+        test_patch = _patch("src/vs/base/test/common/strings.test.ts", "src/vs/base/test/node/pfs/pfs.test.ts",
+                            "src/vs/editor/test/browser/controller/cursor.test.ts",
+                            "src/vs/platform/x/test/electron-main/y.test.ts",
+                            "extensions/copilot/src/util/common/test/a.spec.ts",
+                            "src/vs/base/test/common/utils.ts", "extensions/git/src/test/git.test.ts")
+
+    # Each test file goes to one suite only.
+    per_suite = [gen.suite_files(suite, T) for suite in recipe.suites]
+    assert per_suite == [
+        ["src/vs/base/test/common/strings.test.ts", "src/vs/base/test/node/pfs/pfs.test.ts"],
+        ["src/vs/editor/test/browser/controller/cursor.test.ts", "src/vs/platform/x/test/electron-main/y.test.ts"],
+        ["extensions/copilot/src/util/common/test/a.spec.ts"],
+    ]
+
+
 def test_load_recipe_rejects_unknown_fields(tmp_path):
     path = tmp_path / "x.toml"
     path.write_text('repo = "a/b"\nbase_image = "i"\ntest = "t"\nsetup = []\n')
