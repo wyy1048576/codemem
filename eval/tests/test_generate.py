@@ -55,6 +55,18 @@ def test_load_recipe_playwright():
     assert all("CI=" not in suite.test for suite in recipe.suites) and "CI" not in dict(recipe.env)
 
 
+def test_load_recipe_vllm():
+    recipe = gen.load_recipe("vllm")
+    env = dict(recipe.env)
+    # The tests run with the network off and without a GPU: the Hugging Face libraries read only their cache.
+    assert env["HF_HUB_OFFLINE"] == "1" and env["VLLM_TARGET_DEVICE"] == "cpu"
+    # A test that waits must not use the limit of the suite, and a failed test must not run again.
+    assert "--timeout=" in recipe.test and "-p no:rerunfailures" in recipe.test
+    assert "--continue-on-collection-errors" in recipe.test
+    # Release tags only: the repo also tags its Rust crates.
+    assert recipe.tag_match == "v[0-9]*"
+
+
 def test_load_recipe_rejects_unknown_fields(tmp_path):
     path = tmp_path / "x.toml"
     path.write_text('repo = "a/b"\nbase_image = "i"\ntest = "t"\nsetup = []\n')
@@ -245,7 +257,7 @@ def test_test_run_line_without_files_does_nothing():
 
 
 IMAGE_FIELDS = {"repo": "c/d", "base_image": "j", "base_setup": ("apt-get x",), "env": (("A", "1"),),
-                "deps_files": ("r.txt",), "deps": ("pip install x",), "build": ("make",)}
+                "deps_files": ("r.txt",), "deps": ("pip install x",), "build": ("make",), "tag_match": "v[0-9]*"}
 TEST_FIELDS = {"test": "u {files}", "test_files": ("x/**",), "refresh": ("make again",), "parser": "other",
                "timeout_min": 20, "suite": (gen.Suite(("t/**",), "s {files}"),)}
 
@@ -411,7 +423,32 @@ def no_source(monkeypatch):
     monkeypatch.setattr(gen, "build_base", lambda recipe: "base")
     monkeypatch.setattr(gen, "_export_source", lambda repo, commit, dest: dest.mkdir(parents=True, exist_ok=True))
     monkeypatch.setattr(gen.repos, "commit_time", lambda repo, commit: 1790553600)
-    monkeypatch.setattr(gen, "nearest_tag", lambda repo, commit: None)
+    monkeypatch.setattr(gen, "nearest_tag", lambda repo, commit, match="": None)
+
+
+def test_nearest_tag_can_match_a_glob(tmp_path, monkeypatch):
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), "-c", "user.email=a@b", "-c", "user.name=a", *args],
+                       check=True, capture_output=True)
+
+    git("init", "-q")
+    git("commit", "-q", "--allow-empty", "-m", "one")
+    git("tag", "v1.0")
+    git("commit", "-q", "--allow-empty", "-m", "two")
+    git("tag", "proto-v0.1")
+    monkeypatch.setattr(gen.repos, "ensure_commit", lambda repo, commit: None)
+    monkeypatch.setattr(gen.repos, "clone_path", lambda repo: tmp_path)
+    assert gen.nearest_tag("a/b", "HEAD") == "proto-v0.1"
+    assert gen.nearest_tag("a/b", "HEAD", "v[0-9]*") == "v1.0"
+    assert gen.nearest_tag("a/b", "HEAD", "x*") is None
+
+
+def test_build_task_image_gives_the_tag_match(make_task, monkeypatch, no_source):
+    seen = []
+    monkeypatch.setattr(gen, "nearest_tag", lambda repo, commit, match="": seen.append(match) or "v1.0")
+    _fake_docker(monkeypatch, labels={})
+    gen.build_task_image(replace(_recipe(), tag_match="v[0-9]*"), make_task())
+    assert seen == ["v[0-9]*"]
 
 
 def test_build_task_image_follows_the_label(make_task, monkeypatch, no_source):

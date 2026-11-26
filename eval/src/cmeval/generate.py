@@ -32,6 +32,8 @@ A recipe is one TOML file for each repo, in eval/envs/. Its fields:
                 dependency_needed and leaves the pool (in_pool): the image has the dependencies
                 of the base commit, and the tests run with the network off (see deps.py)
                 The last three fields are read by `cmeval resplit` only (see resplit.py)
+  tag_match     a glob for the tag that the image's commit gets (git describe --match), for a
+                repo that also has tags of other things, such as the crates of a part in Rust
 
 A task is valid when at least one test does not pass in any run before the fix (it fails, it is
 skipped, or it is missing) and passes in every run after it, no test that passed before the fix
@@ -120,6 +122,7 @@ class Recipe:
     test_paths: tuple[str, ...] = ()
     leave_out: tuple[str, ...] | None = None
     dependency_paths: tuple[str, ...] | None = None
+    tag_match: str = ""
 
     @property
     def suites(self) -> tuple[Suite, ...]:
@@ -414,9 +417,13 @@ def _digest(data: dict) -> str:
 
 def image_fingerprint(recipe: Recipe, task: Task) -> str:
     """A short hash of what makes a task image: the recipe fields of the build and the task's commit."""
-    return _digest({"repo": recipe.repo, "base_image": recipe.base_image, "base_setup": recipe.base_setup,
-                    "env": recipe.env, "deps_files": recipe.deps_files, "deps": recipe.deps, "build": recipe.build,
-                    "task_repo": task.repo, "base_commit": task.base_commit})
+    data = {"repo": recipe.repo, "base_image": recipe.base_image, "base_setup": recipe.base_setup,
+            "env": recipe.env, "deps_files": recipe.deps_files, "deps": recipe.deps, "build": recipe.build,
+            "task_repo": task.repo, "base_commit": task.base_commit}
+    # Only when it is set, so that the images of recipes without it keep their fingerprint.
+    if recipe.tag_match:
+        data["tag_match"] = recipe.tag_match
+    return _digest(data)
 
 
 def validation_fingerprint(recipe: Recipe, task: Task, repeats: int | None) -> str:
@@ -446,10 +453,11 @@ def _export_source(repo: str, commit: str, dest: Path) -> None:
         index.unlink(missing_ok=True)
 
 
-def nearest_tag(repo: str, commit: str) -> str | None:
-    """The newest tag that is an ancestor of the commit, or None."""
+def nearest_tag(repo: str, commit: str, match: str = "") -> str | None:
+    """The newest tag that is an ancestor of the commit, or None. With match, only tags that match the glob."""
     repos.ensure_commit(repo, commit)
-    proc = subprocess.run(["git", "describe", "--tags", "--abbrev=0", commit], cwd=repos.clone_path(repo),
+    options = ["--match", match] if match else []
+    proc = subprocess.run(["git", "describe", "--tags", "--abbrev=0", *options, commit], cwd=repos.clone_path(repo),
                           capture_output=True, text=True)
     name = proc.stdout.strip()
     return name if proc.returncode == 0 and re.fullmatch(r"[\w.+/-]+", name) else None
@@ -480,7 +488,7 @@ def build_task_image(recipe: Recipe, task: Task, force: bool = False) -> tuple[s
         commit_time = repos.commit_time(task.repo, task.base_commit)
         # Build tools that read the version from git (versioneer, setuptools-scm) need a tag. The
         # image has no history, so the nearest tag of the real history is put on its one commit.
-        tag_name = nearest_tag(task.repo, task.base_commit)
+        tag_name = nearest_tag(task.repo, task.base_commit, recipe.tag_match)
     deps = context / "deps"
     deps.mkdir(exist_ok=True)
     for name in recipe.deps_files:
