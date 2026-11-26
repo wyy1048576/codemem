@@ -6,6 +6,7 @@ A card is what an agent reads for one result; the eval harness counts its tokens
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from .search import ResultCard, SearchResponse
@@ -98,7 +99,21 @@ def format_status(info: dict[str, Any]) -> str:
         lines.append(f"  {vec_type}: {m['model']} (dim {m['dim']})")
     emb = info.get("embedding") or {}
     if emb.get("provider", "local") != "local":
-        lines.append(f"embeddings: remote, {emb.get('model')} at {emb.get('host')} (code is sent there to be embedded)")
+        space = f", vector space {emb['space']}" if emb.get("space") else ""
+        lines.append(
+            f"embeddings: remote, {emb.get('model')} at {emb.get('host')}{space} (code is sent there to be embedded)"
+        )
+    if helper := info.get("assist"):
+        lines.append(
+            f"embeddings: local, with {helper.get('model')} at {helper.get('host')} for a share of a build's texts "
+            "(code is sent there to be embedded)"
+        )
+        lines.append(f"  {assist_line(helper)}")
+    if info.get("models_loaded") is not None:
+        lines.append(
+            "embedding model: in memory" if info["models_loaded"]
+            else "embedding model: not in this process's memory (it loads when a search or an update next needs it)"
+        )
     if "vector_cache" in info:
         lines.append(_cache_line(info["vector_cache"]))
     lines.append(f"indexed commit: {info['indexed_commit'] or '-'}")
@@ -116,6 +131,59 @@ def format_status(info: dict[str, Any]) -> str:
     lines.extend(format_coverage(info))
     if info.get("error"):
         lines.append(f"error: {info['error']}")
+    return "\n".join(lines)
+
+
+def assist_line(helper: dict[str, Any]) -> str:
+    """What the assist endpoint is doing, or why it is not used, in one line. A verdict that
+    another codemem process left (`checked_at`) says when it was reached."""
+    state, reason = helper.get("state"), helper.get("reason")
+    when = helper.get("checked_at")
+    as_of = f" (as of {time.strftime('%Y-%m-%d %H:%M', time.localtime(when))})" if when else ""
+    if state == "sharing":
+        texts = helper.get("texts") or {}
+        agreed = f"assist: its vectors agree with the local model's (cosine {helper.get('agreement'):.6f} at worst)"
+        if not texts.get("endpoint"):
+            return agreed + as_of
+        shares = f"{agreed}; it embedded {texts['endpoint']} texts, the local model {texts['local']}"
+        if not texts.get("cut"):
+            return shares
+        return f"{shares} ({texts['cut']} of those are longer than the local model reads and stay with it)"
+    if state == "refused":
+        return f"assist: not used: {reason}{as_of}"
+    if state == "resting":
+        return f"assist: not used for now: {reason}{as_of}"
+    if state == "checking":
+        return "assist: its vectors are being compared with the local model's"
+    return (
+        "assist: not checked yet (its vectors are compared with the local model's when a build has work to share, "
+        "or by `codemem status --check-assist`)"
+    )
+
+
+def format_assist_check(report: dict[str, Any]) -> str:
+    """One comparison of the assist endpoint with a local model (`codemem status --check-assist`):
+    each probe text's numbers, then the verdict as `status` words it."""
+    made = {"remembered": "remembered from an earlier check", "embedded now": "embedded now"}
+    lines = [f"assist: {report['model']} at {report['host']}, compared with the local {report['local_model']}"]
+    if report.get("local_vectors"):
+        lines.append(f"  the local model's vectors for the probe texts: {made[report['local_vectors']]}")
+    if rows := report["probes"]:
+        def number(value: float | None) -> str:
+            return "-" if value is None else f"{value:.6f}"
+
+        width = max(len(row["probe"]) for row in rows)
+        lines.append(f"  {'probe text':<{width}}  characters    cosine  local length  endpoint length")
+        for row in rows:
+            lines.append(
+                f"  {row['probe']:<{width}}  {row['characters']:>10}  {number(row['cosine']):>8}  "
+                f"{number(row['local_length']):>12}  {number(row['endpoint_length']):>15}"
+            )
+        lines.append(
+            f"  needed: a cosine of {report['needed']} or more for every probe text, after the endpoint's vectors "
+            "are scaled to length 1"
+        )
+    lines.append(assist_line(report))
     return "\n".join(lines)
 
 

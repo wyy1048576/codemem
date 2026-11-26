@@ -597,6 +597,9 @@ class Indexer:
         the queued chunk ids, or None when everything was queued."""
         store, cfg = self.store, self.config
         with self._locked():
+            # First, so that a model that cannot run (its packages are not installed) fails before
+            # anything is wiped or scanned.
+            keys = {v: e.key for v, e in self._embedders().items()}
             tiers = self._changed_tiers()
             if full or "rebuild" in tiers:
                 if tiers and not full:
@@ -623,10 +626,9 @@ class Indexer:
             stats.add_time("chunk", time.perf_counter() - t)
 
             t = time.perf_counter()
-            embedders = self._embedders()
             with store.transaction():
                 seq = store.next_dirty_seq()
-                reset = [store.ensure_vec_type(v, e.key, cfg.embedding_dim) for v, e in embedders.items()]
+                reset = [store.ensure_vec_type(v, key, cfg.embedding_dim) for v, key in keys.items()]
                 affected = [s.rel for s, *_ in parsed] + scan.deleted + [s.rel for s, *_ in scan.skipped]
                 old = store.chunks_for_paths(affected)
                 old_by_path: dict[str, list[Chunk]] = defaultdict(list)

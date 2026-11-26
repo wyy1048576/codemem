@@ -3,7 +3,8 @@ import time
 
 import pytest
 
-from codemem.embedder import make_embedder
+from codemem.config import Config
+from codemem.embedder import LocalModelUnavailable, SentenceTransformerEmbedder, make_embedder
 from codemem.indexer import Indexer, walk_source_files
 from codemem.store import Store
 
@@ -317,3 +318,20 @@ def test_language_filter(poly, fake_config, recorder, tmp_path):
     Indexer(repo, store, fake_config, embedder_factory=lambda m, c: recorder).update()
     assert set(store.counts()["chunks_by_language"]) == {"go"}
     store.close()
+
+
+def test_a_model_that_cannot_run_fails_before_the_index_is_touched(sample_repo, tmp_path, fake_config, monkeypatch):
+    """A full rebuild with the local model in an install without PyTorch: the error comes first, so
+    the index keeps its chunks and vectors while the install is fixed."""
+    store = Store(tmp_path / "idx")
+    try:
+        Indexer(sample_repo, store, fake_config).update()
+        before = store.counts()
+        monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+        with pytest.raises(LocalModelUnavailable):
+            Indexer(
+                sample_repo, store, Config(), embedder_factory=lambda spec, cfg: SentenceTransformerEmbedder(spec.model)
+            ).update(full=True)
+        assert store.counts() == before and before["vectors"]["code"] > 0
+    finally:
+        store.close()
