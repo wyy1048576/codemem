@@ -21,7 +21,7 @@ base_setup = [
     "curl -fsSL https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.152/cargo-nextest-0.9.152-$(uname -m)-unknown-linux-musl.tar.gz | tar xz -C /usr/local/cargo/bin && cargo nextest --version",
     # Nextest settings for the default profile, in a tool config file, so no file of the repo
     # changes. The repo config wins over it, but it sets none of these keys. The JUnit file goes to
-    # $CARGO_TARGET_DIR/nextest/default/junit.xml. A test that hangs stops after 5 minutes.
+    # target/nextest/default/junit.xml in the tree (target/ is in .gitignore). A test that hangs stops after 5 minutes.
     '''mkdir -p /opt/cmeval && printf '%s\n' \
   '[profile.default]' \
   'fail-fast = false' \
@@ -174,13 +174,18 @@ base_setup = [
   '# This test writes the inline test files of the parser. It must not change the tree between runs.' \
   'expr="($expr) & not binary_id(=ruff_python_parser::generate_inline_tests)"' \
   'echo "cmeval-ruff-test: filter: $expr"' \
-  'out=${CARGO_TARGET_DIR:-target}/nextest/default/junit.xml' \
-  'rm -f "$out"' \
+  '# Nextest writes the JUnit file below the target folder of the workspace (target/ in the tree),' \
+  '# also when CARGO_TARGET_DIR names another folder. Both places are read.' \
+  'outs="target/nextest/default/junit.xml ${CARGO_TARGET_DIR:-target}/nextest/default/junit.xml"' \
+  'rm -f $outs' \
   'cargo nextest run --workspace --all-features --tool-config-file cmeval:/opt/cmeval/nextest.toml \' \
   '  --no-fail-fast --retries 0 --test-threads 8 --no-tests warn -E "$expr"' \
   'code=$?' \
-  'if [ -s "$out" ] && grep -q "<testcase" "$out"; then' \
+  'out=""' \
+  'for o in $outs; do if [ -s "$o" ] && grep -q "<testcase" "$o"; then out=$o; fi; done' \
+  'if [ -n "$out" ]; then' \
   '  cp "$out" "$junit"' \
+  '  rm -f $outs' \
   'else' \
   '  # The build failed, or no test matched. A failure of its own keeps this run from looking empty.' \
   '  write_failure "the build failed or no test matched (exit code $code)"' \
