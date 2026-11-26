@@ -323,6 +323,14 @@ the model in memory, and 2.8 to 2.95 GB while it embeds a batch of code texts (m
   for the model, so the model cannot leave between that check and the query's embedding. Callers
   that need the model at once load it once. Vector types on the same model share one embedder, so
   they are one model to free.
+- **It runs one call at a time.** Two threads in the model at once (the start-up warm-up, the
+  writer, a search's query) crashed the process on the Apple GPU: each moves its batches to the
+  device through PyTorch's cache of Metal kernels, which is not safe for two threads. And the redo
+  of a text that overflowed in float16 converts the weights that another call would be using. So
+  the local embedder lets one call in at a time, and a search's query waits for the call that is
+  running. In a server that is one of the writer's calls, at most 3,000 characters, or during
+  `refresh_index` one of up to 256 texts. A GPU runs one call at a time anyway. A build by
+  `codemem index` makes the same 256-text calls in a process of its own, where no search waits.
 
 **One model for several codemem processes.** A codemem that runs the local model holds 1.3 GB of
 it in memory on an M1's GPU. Several of them on one machine (one per git worktree, or one per
@@ -357,14 +365,14 @@ Three choices shape it:
   address unless the config gives them a name, `space`; the server prints one that holds its
   model's settings. An index built through one address then opens through another without
   embedding anything again (decisions.md §5).
-- **One thread calls the model.** The local embedder locks its loading and its switch of
-  precision, and nothing guards a model call against a second thread. So requests queue, and the
-  model takes at most `batch_size` texts at a time. Between calls the request with the fewest
-  texts left goes first, so a search's one query waits for a single batch of another process's
-  build, not for the build. While no request waits, the same thread gives the model the quiet
-  moments the writer gives it: what its calls needed goes back after each burst, and the model is
-  freed after `model_idle_minutes` without a request. The next request loads it again and waits
-  for the load.
+- **One thread calls the model.** The local embedder runs one call at a time (above), and the
+  server makes every call from one thread, so that it chooses which request goes next. Requests
+  queue, and the model takes at most `batch_size` texts at a time. Between calls the request with
+  the fewest texts left goes first, so a search's one query waits for a single batch of another
+  process's build, not for the build. While no request waits, the same thread gives the model the
+  quiet moments the writer gives it: what its calls needed goes back after each burst, and the
+  model is freed after `model_idle_minutes` without a request. The next request loads it again and
+  waits for the load.
 
 The server holds no index and no state. When it is down, its clients behave as with any API that
 is down (decisions.md §2).
@@ -919,7 +927,9 @@ transaction. Vectors are stored in it as plain rows, so the search index is only
 which can always be rebuilt without the model (2 s on vLLM).
 
 **The times in this section** are from an M1 laptop (8 cores, 16 GB), with FAISS on one thread.
-On macOS codemem keeps FAISS to one thread, because it shares the process with PyTorch
+On macOS codemem gives OpenMP one thread, and so FAISS and PyTorch, whatever `OMP_NUM_THREADS` or
+`MKL_NUM_THREADS` say: the two each bring their own copy of OpenMP, and on more threads the copies
+crash the process. When this changes a value, codemem says so once on stderr
 (`codemem/__init__.py`). On Linux and Windows FAISS uses every core, and none of these times was
 taken that way.
 

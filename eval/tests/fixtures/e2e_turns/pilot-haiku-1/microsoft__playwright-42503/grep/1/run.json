@@ -1,0 +1,32 @@
+{
+  "run_id": "pilot-haiku-1",
+  "task_id": "microsoft__playwright-42503",
+  "repo": "microsoft/playwright",
+  "setup": "grep",
+  "model": "claude-haiku-5-5",
+  "rep": 1,
+  "end": "finished",
+  "completed": false,
+  "discard": false,
+  "identity": {
+    "gold_files": [
+      "packages/playwright/src/mcp/test/browserBackend.ts"
+    ]
+  },
+  "tokens": {
+    "source": "proxy",
+    "processed_tokens": 343095,
+    "proxy": {
+      "input_tokens": 16,
+      "output_tokens": 2821,
+      "cache_creation_input_tokens": 13489,
+      "cache_read_input_tokens": 326769,
+      "processed_tokens": 343095,
+      "peak_context_tokens": 47670,
+      "requests": 8
+    }
+  },
+  "steps": {
+    "turns": 8
+  }
+}

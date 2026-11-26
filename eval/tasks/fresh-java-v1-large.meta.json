@@ -1,0 +1,157 @@
+{
+  "config": "fresh-java-v1-large.toml",
+  "since": "2026-07-01",
+  "until": "2026-10-22",
+  "settings": {
+    "min_body_chars": 100,
+    "extra_bots": [],
+    "max_code_files": 15,
+    "max_code_lines": 600
+  },
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "13fc033cc54cf097279ca38d159a8bfda1a65311",
+    "dirty": false
+  },
+  "labeler": "cmeval-labels/5",
+  "created": "2026-11-26T18:55:25+00:00",
+  "funnel_steps": [
+    {
+      "key": "merged",
+      "text": "merged into the default branch in the date range"
+    },
+    {
+      "key": "opened_after_cutoff",
+      "text": "the fix PR was opened on or after the start date (its code was not public before)"
+    },
+    {
+      "key": "not_bot",
+      "text": "author is not a bot"
+    },
+    {
+      "key": "one_link",
+      "text": "links exactly one issue in the same repo or a listed issue repo (GitHub's list or the SWE-bench regex)"
+    },
+    {
+      "key": "is_issue",
+      "text": "the link is an issue that exists (not a PR)"
+    },
+    {
+      "key": "issue_before_pr",
+      "text": "the issue was opened before the fix PR (not written after the fix)"
+    },
+    {
+      "key": "body_ok",
+      "text": "body (as of when the fix PR was opened) has the minimum length"
+    },
+    {
+      "key": "no_leak",
+      "text": "query does not name the fix PR or a fix commit"
+    },
+    {
+      "key": "base_found",
+      "text": "base commit found from the merge type (Decision 7)"
+    },
+    {
+      "key": "files_match",
+      "text": "our patch touches exactly the PR's files"
+    },
+    {
+      "key": "test_split",
+      "text": "no file mixes fix code and test code (Rust: changes inside and outside #[cfg(test)] code)"
+    },
+    {
+      "key": "applies",
+      "text": "the code patch applies at the base commit"
+    },
+    {
+      "key": "size_ok",
+      "text": "1 to max_code_files code files and at most max_code_lines changed code lines"
+    },
+    {
+      "key": "labeled",
+      "text": "labeled, with at least one gold file that exists at the base commit"
+    }
+  ],
+  "repos": {
+    "trinodb/trino": {
+      "base_branch": "master",
+      "counts": {
+        "merged": 956,
+        "opened_after_cutoff": 900,
+        "not_bot": 664,
+        "one_link": 115,
+        "is_issue": 114,
+        "issue_before_pr": 109,
+        "body_ok": 108,
+        "no_leak": 108,
+        "base_found": 108,
+        "files_match": 106,
+        "test_split": 106,
+        "applies": 106,
+        "size_ok": 75,
+        "labeled": 75
+      },
+      "link_methods": {
+        "both": 106,
+        "regex": 1,
+        "list": 1
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 56,
+        "no linked issue": 537,
+        "bot author": 236,
+        "several linked issues": 12,
+        "issue opened after the fix PR": 5,
+        "link is a PR, not an issue": 1,
+        "short body": 1,
+        "no code files": 28,
+        "too many code files": 1,
+        "too many changed lines": 2,
+        "more than 100 files": 2
+      },
+      "test_paths": [
+        "**/src/test/**"
+      ]
+    }
+  },
+  "stats": {
+    "tasks": 5,
+    "tasks_per_repo": {
+      "trinodb/trino": 5
+    },
+    "mean_gold_files": 7.6,
+    "mean_gold_classes": 0.0,
+    "mean_gold_functions": 0.0,
+    "share_no_gold_function": 1.0,
+    "share_module_level_change": 0.0,
+    "share_partial_labels": 1.0,
+    "share_identifier_in_query": 0.4,
+    "share_with_unretrievable_functions": 0.0,
+    "tasks_per_split": {
+      "dev": 1,
+      "test": 4
+    },
+    "share_gold_all_python": 0.0,
+    "merge_types": {
+      "rebase": 3,
+      "squash": 2
+    }
+  },
+  "excluded": {
+    "files": [
+      {
+        "name": "fresh-java-v1.jsonl",
+        "sha256": "c5361b25869746a97e53f1085add441995e79d76c11aef42bcf2228c8f8dbafd"
+      }
+    ],
+    "repos": {
+      "trinodb/trino": {
+        "found": 75,
+        "left_out": 70,
+        "kept": 5,
+        "not_found_again": []
+      }
+    }
+  }
+}

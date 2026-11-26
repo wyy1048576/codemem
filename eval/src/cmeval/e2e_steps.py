@@ -73,6 +73,8 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .codemem_gate import KEYWORDS_ONLY_KINDS, NOTE_KINDS, note_kinds
+
 # Raise this number whenever a rule of this module changes. Version 1 was the count_steps of e2e_run, which
 # read only the Read tool and the first word of each shell command.
 STEPS_VERSION = 3
@@ -1452,6 +1454,26 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
     of version 1. They are kept as copies of gold_opened and first_gold_opened_turn, so that e2e_score and
     older readers still work.
     """
+    return _walk(events, gold_files, repo_root)[0]
+
+
+def turn_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT) -> list[dict]:
+    """What the main agent did in each of its turns, with the rules of count_steps. One entry for each turn, in
+    order:
+
+      turn, message_id  the turn number (from 1) and the id of its model answer
+      calls             each tool call of the turn: tool, input (the call's arguments), kinds (the kinds of its
+                        actions, in order; empty for a call that did nothing that counts), blocked
+      subagent_calls    tool calls of subagents that belong to this turn (they run inside its Task call)
+      surfaced, opened, edited
+                        the gold files that the turn surfaced, opened or edited. Unlike the marks of count_steps,
+                        which keep the first turn of each file, a file is listed in every turn that did it
+    """
+    return _walk(events, gold_files, repo_root)[1]
+
+
+def _walk(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT) -> tuple[dict, list[dict]]:
+    """The counts of count_steps and the turns of turn_steps, from one walk through the events."""
     root = repo_root.rstrip("/") or "/"
     gold_list = [_norm_gold(g, root) for g in gold_files]
     patterns = {g: path_pattern(g, root) for g in gold_list}
@@ -1465,9 +1487,17 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
     short: dict[str, dict[str, list[re.Pattern]]] = {}  # call id -> gold file -> patterns of shorter forms
     marks = {"first_edit_turn": None, "first_test_turn": None, "first_mcp_turn": None, "first_codemem_turn": None}
     commands = []
+    per_turn: list[dict] = []
     cwd = root
+
+    def note(turn: int, key: str, g: str) -> None:
+        if 1 <= turn <= len(per_turn) and g not in per_turn[turn - 1][key]:
+            per_turn[turn - 1][key].append(g)
+
     for event in events:
-        counter.feed(event)
+        if counter.feed(event):
+            per_turn.append({"turn": counter.turns, "message_id": (event.get("message") or {}).get("id"),
+                             "calls": [], "subagent_calls": 0, "surfaced": [], "opened": [], "edited": []})
         turn = counter.turns
         is_sub = bool(event.get("parent_tool_use_id"))
         if event.get("type") == "user" and not is_sub:
@@ -1477,9 +1507,10 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
                     text = result_text(block)
                     extra = short.get(block["tool_use_id"], {})
                     for g, pattern in patterns.items():
-                        if gold[g]["surfaced"] is None and (pattern.search(text)
-                                                            or any(p.search(text) for p in extra.get(g, ()))):
-                            gold[g]["surfaced"] = call_turn[block["tool_use_id"]]
+                        if pattern.search(text) or any(p.search(text) for p in extra.get(g, ())):
+                            note(call_turn[block["tool_use_id"]], "surfaced", g)
+                            if gold[g]["surfaced"] is None:
+                                gold[g]["surfaced"] = call_turn[block["tool_use_id"]]
             continue
         if event.get("type") != "assistant":
             continue
@@ -1526,7 +1557,12 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
                     blocked_ids.add(call_id)
             edits_repo = tally.add(actions, name, result)
             if is_sub:
+                if per_turn:
+                    per_turn[-1]["subagent_calls"] += 1
                 continue
+            if per_turn:
+                per_turn[-1]["calls"].append({"tool": name, "input": args, "kinds": [a.kind for a in actions],
+                                              "blocked": not_run})
             if edits_repo:
                 marks["first_edit_turn"] = _first(marks["first_edit_turn"], turn)
             if any(a.kind == "test" for a in actions):
@@ -1544,12 +1580,13 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
                 if marks_of["named_by_agent"] is None and (pattern.search(text) or _any_match(touched, g)):
                     marks_of["named_by_agent"] = turn
                 # The file's content reaches the agent without its path: a view, or a grep in the one file.
-                if marks_of["surfaced"] is None and (_any_match(viewed, g) or g in searched):
-                    marks_of["surfaced"] = turn
-                if marks_of["opened"] is None and _any_match(viewed, g):
-                    marks_of["opened"] = turn
-                if marks_of["edited"] is None and _any_match(edited, g):
-                    marks_of["edited"] = turn
+                hits = {"surfaced": _any_match(viewed, g) or g in searched, "opened": _any_match(viewed, g),
+                        "edited": _any_match(edited, g)}
+                for key, hit in hits.items():
+                    if hit:
+                        note(turn, key, g)
+                        if marks_of[key] is None:
+                            marks_of[key] = turn
 
     def first(key: str) -> int | None:
         turns = [v[key] for v in gold.values() if v[key] is not None]
@@ -1596,4 +1633,56 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
         "first_gold_read_turn": first("opened"),
         "commands": commands,
     }
-    return steps
+    return steps, per_turn
+
+
+# ---- codemem's notes on its search results
+
+CODEMEM_SEARCH = CODEMEM_PREFIX + "search_code"
+
+
+def codemem_fallbacks(events: list[dict]) -> dict:
+    """The search_code results of a run that were not a full search: each one that carries one of codemem's
+    notes (codemem_gate.NOTES), of the main agent and of subagents. A subagent's call has the main turn of its
+    Task call. A call without a result (the run was stopped) is not counted.
+
+      searches        search_code results in the run
+      fell_back       results with a note
+      keywords_only   results from keywords alone (the model was loading, or codemem could not embed)
+      by_note         results for each kind of note
+      calls           the results with a note: turn, subagent, notes
+      first           the first search_code result of the run (turn, subagent, notes), or null
+      first_keywords_only
+                      the first result came from keywords alone: the run did not test codemem's search
+    """
+    counter, turn_of, results = TurnCounter(), {}, {}
+    order: list[str] = []
+    for event in events:
+        counter.feed(event)
+        message = event.get("message") or {}
+        for block in message.get("content") or []:
+            if not isinstance(block, dict):
+                continue
+            if (event.get("type") == "assistant" and block.get("type") == "tool_use"
+                    and block.get("name") == CODEMEM_SEARCH and block.get("id") not in turn_of):
+                turn_of[block.get("id")] = (counter.turns, bool(event.get("parent_tool_use_id")))
+                order.append(block.get("id"))
+            elif (event.get("type") == "user" and block.get("type") == "tool_result"
+                  and block.get("tool_use_id") in turn_of):
+                results.setdefault(block["tool_use_id"], result_text(block))
+    found = []
+    for call_id in order:
+        if call_id in results:
+            turn, sub = turn_of[call_id]
+            found.append({"turn": turn, "subagent": sub, "notes": note_kinds(results[call_id])})
+    with_note = [c for c in found if c["notes"]]
+    first = found[0] if found else None
+    return {
+        "searches": len(found),
+        "fell_back": len(with_note),
+        "keywords_only": sum(1 for c in found if set(c["notes"]) & set(KEYWORDS_ONLY_KINDS)),
+        "by_note": {kind: n for kind in NOTE_KINDS if (n := sum(1 for c in with_note if kind in c["notes"]))},
+        "calls": with_note,
+        "first": first,
+        "first_keywords_only": bool(first and set(first["notes"]) & set(KEYWORDS_ONLY_KINDS)),
+    }

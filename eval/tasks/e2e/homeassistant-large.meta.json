@@ -1,0 +1,86 @@
+{
+  "kind": "resplit",
+  "source": "fresh-v1-large.jsonl",
+  "source_sha256": "e659fd46cfa5d7d37fa50b6e1a9e7b57b7c6dfaf0930cc8aeee0952e146a94d3",
+  "repo": "home-assistant/core",
+  "recipe": "homeassistant",
+  "test_paths": [
+    "tests/**"
+  ],
+  "test_paths_from_test_files": true,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "requirements.txt",
+    "requirements_all.txt",
+    "requirements_test.txt",
+    "requirements_test_pre_commit.txt",
+    "homeassistant/package_constraints.txt"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 43,
+  "changed": 20,
+  "unchanged": 23,
+  "not_split": {},
+  "with_test_files_added": 7,
+  "with_fix_files_added": 19,
+  "test_files_added": 18,
+  "fix_files_added": 32,
+  "files_left_out": {},
+  "with_dependency_needed": 3,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 3
+  },
+  "dependency_needed": {
+    "home-assistant__core-176050": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pycontrol4",
+        "old": "pycontrol4 ==1.5.0",
+        "new": "pycontrol4 ==2.0.2",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-178395": [
+      {
+        "file": "requirements_all.txt",
+        "package": "python-picnic-api2",
+        "old": "python-picnic-api2 ==1.3.4",
+        "new": "python-picnic-api2 ==2.0.1",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-186053": [
+      {
+        "file": "requirements_all.txt",
+        "package": "broadlink-async",
+        "old": null,
+        "new": "broadlink-async ==1.1.0",
+        "kind": "added"
+      }
+    ]
+  },
+  "with_dependency_other": 1,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 1
+  },
+  "with_test_patch_before": 28,
+  "with_test_patch_after": 28,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "0057385f398d68eeb41ff98436a53abb51ba991d",
+    "dirty": false
+  },
+  "created": "2026-11-26T19:17:02+00:00"
+}

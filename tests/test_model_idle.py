@@ -278,6 +278,109 @@ def test_the_allocator_cache_is_emptied_once_after_a_burst_and_never_under_a_cal
     assert not emb.trim() and emptied == ["cpu", "cpu"]
 
 
+
+# ---------------------------------------------------------------- one model call at a time
+
+
+def test_the_local_model_runs_one_call_at_a_time(local_model, monkeypatch):
+    """Two threads in the model at once crashed the process on the Apple GPU (PyTorch's cache of
+    Metal kernels is not safe for two threads): the writer's documents and a search's queries that
+    arrive together take turns."""
+    emb, stub = local_model
+    emb.embed_documents(["load it"])
+    seen = {"inside": 0, "most": 0, "calls": 0}
+    count = threading.Lock()
+
+    def encode(self, texts, **kwargs):
+        with count:
+            seen["inside"] += 1
+            seen["calls"] += 1
+            seen["most"] = max(seen["most"], seen["inside"])
+        time.sleep(0.05)
+        with count:
+            seen["inside"] -= 1
+        return np.ones((len(texts), 8), dtype=np.float32)
+
+    monkeypatch.setattr(stub, "encode", encode)
+    together = threading.Barrier(2)
+
+    def documents():
+        together.wait(10)
+        for i in range(4):
+            emb.embed_documents([f"def f{i}():\n    pass", f"class C{i}: ..."])
+
+    def queries():
+        together.wait(10)
+        for i in range(4):
+            emb.embed_queries([f"where is f{i} defined"])  # each one new: a cached query would not reach the model
+
+    threads = [threading.Thread(target=documents, daemon=True), threading.Thread(target=queries, daemon=True)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(10)
+    assert seen["calls"] == 8 and seen["most"] == 1
+
+
+def test_the_float32_redo_never_runs_beside_another_call(transformer, monkeypatch):
+    """A text that overflows in float16 is embedded again with the weights converted to float32 and
+    back. A call that is in the model holds the redo off, and a call that comes during the redo waits
+    for it (and takes the two locks in the same order, so neither waits forever)."""
+    import torch
+
+    emb = SentenceTransformerEmbedder("stub-model", device="cpu", dtype="float16")
+    emb.embed_documents(["load it"])
+    log, weights = [], {"dtype": torch.float16}
+    query_in, query_go, redo_in, redo_go = (threading.Event() for _ in range(4))
+
+    def to(self, target):
+        if isinstance(target, torch.dtype):
+            weights["dtype"] = target
+            log.append(f"to {target}")
+        return self
+
+    def encode(self, texts, **kwargs):
+        text = texts[0]
+        log.append(f"in {text}")
+        if text == "a query":
+            query_in.set()
+            assert query_go.wait(10)
+        redo = text == "overflows" and weights["dtype"] == torch.float32
+        if redo:
+            redo_in.set()
+            assert redo_go.wait(10)
+        out = np.ones((len(texts), 8), dtype=np.float32)
+        if text == "overflows" and not redo:
+            out[:] = np.nan
+        log.append(f"out {text}")
+        return out
+
+    monkeypatch.setattr(transformer, "to", to)
+    monkeypatch.setattr(transformer, "encode", encode)
+    results = {}
+
+    def run(name, call, text):
+        results[name] = call([text])
+
+    query = threading.Thread(target=run, args=("query", emb.embed_queries, "a query"), daemon=True)
+    query.start()
+    assert query_in.wait(10)
+    overflow = threading.Thread(target=run, args=("overflow", emb.embed_documents, "overflows"), daemon=True)
+    overflow.start()
+    overflow.join(0.3)
+    assert log == ["in a query"]  # neither the call nor its redo starts while the query is in the model
+    query_go.set()
+    assert redo_in.wait(10)
+    later = threading.Thread(target=run, args=("later", emb.embed_queries, "another query"), daemon=True)
+    later.start()
+    later.join(0.3)
+    assert log == ["in a query", "out a query", "in overflows", "out overflows", "to torch.float32", "in overflows"]
+    redo_go.set()
+    for t in (query, overflow, later):
+        t.join(10)
+    assert log[6:] == ["out overflows", "to torch.float16", "in another query", "out another query"]
+    assert np.isfinite(results["overflow"]).all() and set(results) == {"query", "overflow", "later"}
+
 # ---------------------------------------------------------------- plugins and the API
 
 

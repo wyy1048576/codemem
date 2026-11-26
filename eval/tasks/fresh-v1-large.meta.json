@@ -1,0 +1,194 @@
+{
+  "config": "fresh-v1-large.toml",
+  "since": "2026-07-01",
+  "until": "2026-10-22",
+  "settings": {
+    "min_body_chars": 100,
+    "extra_bots": [],
+    "max_code_files": 15,
+    "max_code_lines": 600
+  },
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "0057385f398d68eeb41ff98436a53abb51ba991d",
+    "dirty": false
+  },
+  "labeler": "cmeval-labels/5",
+  "created": "2026-11-26T19:16:37+00:00",
+  "funnel_steps": [
+    {
+      "key": "merged",
+      "text": "merged into the default branch in the date range"
+    },
+    {
+      "key": "opened_after_cutoff",
+      "text": "the fix PR was opened on or after the start date (its code was not public before)"
+    },
+    {
+      "key": "not_bot",
+      "text": "author is not a bot"
+    },
+    {
+      "key": "one_link",
+      "text": "links exactly one issue in the same repo or a listed issue repo (GitHub's list or the SWE-bench regex)"
+    },
+    {
+      "key": "is_issue",
+      "text": "the link is an issue that exists (not a PR)"
+    },
+    {
+      "key": "issue_before_pr",
+      "text": "the issue was opened before the fix PR (not written after the fix)"
+    },
+    {
+      "key": "body_ok",
+      "text": "body (as of when the fix PR was opened) has the minimum length"
+    },
+    {
+      "key": "no_leak",
+      "text": "query does not name the fix PR or a fix commit"
+    },
+    {
+      "key": "base_found",
+      "text": "base commit found from the merge type (Decision 7)"
+    },
+    {
+      "key": "files_match",
+      "text": "our patch touches exactly the PR's files"
+    },
+    {
+      "key": "test_split",
+      "text": "no file mixes fix code and test code (Rust: changes inside and outside #[cfg(test)] code)"
+    },
+    {
+      "key": "applies",
+      "text": "the code patch applies at the base commit"
+    },
+    {
+      "key": "size_ok",
+      "text": "1 to max_code_files code files and at most max_code_lines changed code lines"
+    },
+    {
+      "key": "labeled",
+      "text": "labeled, with at least one gold file that exists at the base commit"
+    }
+  ],
+  "repos": {
+    "home-assistant/core": {
+      "base_branch": "dev",
+      "counts": {
+        "merged": 7828,
+        "opened_after_cutoff": 7530,
+        "not_bot": 7300,
+        "one_link": 1214,
+        "is_issue": 1211,
+        "issue_before_pr": 1202,
+        "body_ok": 1202,
+        "no_leak": 1202,
+        "base_found": 1202,
+        "files_match": 1199,
+        "test_split": 1199,
+        "applies": 1199,
+        "size_ok": 799,
+        "labeled": 799
+      },
+      "link_methods": {
+        "both": 1185,
+        "regex": 5,
+        "list": 12
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 298,
+        "bot author": 230,
+        "no linked issue": 6037,
+        "several linked issues": 49,
+        "link is a PR, not an issue": 3,
+        "issue opened after the fix PR": 9,
+        "no code files": 394,
+        "too many changed lines": 4,
+        "too many code files": 2,
+        "file list differs": 3
+      }
+    },
+    "pandas-dev/pandas": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 1346,
+        "opened_after_cutoff": 1257,
+        "not_bot": 1193,
+        "one_link": 497,
+        "is_issue": 495,
+        "issue_before_pr": 494,
+        "body_ok": 492,
+        "no_leak": 492,
+        "base_found": 492,
+        "files_match": 491,
+        "test_split": 491,
+        "applies": 491,
+        "size_ok": 371,
+        "labeled": 371
+      },
+      "link_methods": {
+        "both": 481,
+        "list": 10,
+        "regex": 1
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 89,
+        "no linked issue": 666,
+        "bot author": 64,
+        "several linked issues": 30,
+        "link is a PR, not an issue": 2,
+        "short body": 2,
+        "issue opened after the fix PR": 1,
+        "no code files": 120,
+        "more than 100 files": 1
+      }
+    }
+  },
+  "stats": {
+    "tasks": 62,
+    "tasks_per_repo": {
+      "home-assistant/core": 43,
+      "pandas-dev/pandas": 19
+    },
+    "mean_gold_files": 5.15,
+    "mean_gold_classes": 3.02,
+    "mean_gold_functions": 8.35,
+    "share_no_gold_function": 0.065,
+    "share_module_level_change": 0.935,
+    "share_partial_labels": 0.081,
+    "share_identifier_in_query": 0.597,
+    "share_with_unretrievable_functions": 0.597,
+    "tasks_per_split": {
+      "dev": 12,
+      "test": 50
+    },
+    "share_gold_all_python": 0.919,
+    "merge_types": {
+      "squash": 62
+    }
+  },
+  "excluded": {
+    "files": [
+      {
+        "name": "fresh-v1.jsonl",
+        "sha256": "9c2ca4591305c55eb5bb96750a6ec502b9ef1ab855b614e7818ae903ff6072a8"
+      }
+    ],
+    "repos": {
+      "home-assistant/core": {
+        "found": 799,
+        "left_out": 756,
+        "kept": 43,
+        "not_found_again": []
+      },
+      "pandas-dev/pandas": {
+        "found": 371,
+        "left_out": 352,
+        "kept": 19,
+        "not_found_again": []
+      }
+    }
+  }
+}

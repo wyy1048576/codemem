@@ -6,6 +6,11 @@ files viewed, the share of runs that opened a gold file, the turn of the first g
 first edit, and, for a setup with codemem or when a run called codemem: the share of runs that called it, its
 mean calls, and the mean turn of the first call.
 
+For a setup with codemem, one more line: the search_code results that carried one of codemem's notes (a search
+that fell back, for example to keywords while the model was loading: integrity.codemem_fallback_searches), over
+the runs that were not discarded, and the runs whose first search came from keywords only, kept and discarded.
+A record made before the count existed gets it from `cmeval e2e recount`.
+
 Discarded runs count only in "runs", "discarded" and the ends. Flagged runs (for example a cross-check that
 disagrees) are counted, and are kept out of every number until someone has looked at them: their measurement
 is in doubt.
@@ -89,6 +94,33 @@ def behaviour(kept: list[dict]) -> dict:
     }
 
 
+def fallbacks(rows: list[dict]) -> dict | None:
+    """The fallback searches of codemem in some runs of one setup, or None when no run has the count."""
+    def count(r):
+        value = (r.get("integrity") or {}).get("codemem_fallback_searches")
+        return value if isinstance(value, dict) else None
+
+    if not any(count(r) for r in rows):
+        return None
+    usable = [r for r in rows if not r.get("discard")]
+    counted = [count(r) for r in usable if count(r)]
+    notes = Counter()
+    for c in counted:
+        notes.update(c.get("by_note") or {})
+    return {
+        "runs": len(counted),
+        "runs_without_count": sum(1 for r in usable if count(r) is None and (r.get("identity") or {}).get("codemem")),
+        "searches": sum(c["searches"] for c in counted),
+        "fell_back": sum(c["fell_back"] for c in counted),
+        "keywords_only": sum(c["keywords_only"] for c in counted),
+        "by_note": dict(sorted(notes.items())),
+        "runs_with_fallback": sum(1 for c in counted if c["fell_back"]),
+        "first_keywords_only_runs": sum(1 for c in counted if c.get("first_keywords_only")),
+        "first_keywords_only_discarded": sum(1 for r in rows if r.get("discard") and (count(r) or {}).get(
+            "first_keywords_only")),
+    }
+
+
 def _median(values: list) -> float | None:
     values = [v for v in values if v is not None]
     return statistics.median(values) if values else None
@@ -121,6 +153,7 @@ def score(run_id: str, screen: CompletionSet | None = None) -> dict:
             "ends": dict(Counter(r["end"] for r in rows)),
             "behaviour": behaviour(kept),
             "codemem": any((r.get("identity") or {}).get("codemem") for r in rows),
+            "codemem_fallbacks": fallbacks(rows),
         }
         if fair is not None:
             setups[name]["completion_runs"] = sum(1 for r in kept if r["task_id"] in fair)
@@ -190,6 +223,14 @@ def format_score(summary: dict) -> str:
                      f"{_fmt(s['tokens_median'], 0):>12} {_fmt(s['seconds_mean']):>8} {_fmt(s['seconds_median']):>8} "
                      f"{_fmt(s['turns_mean']):>6}")
         lines.append("    ends: " + ", ".join(f"{end} {n}" for end, n in sorted(s["ends"].items())))
+        if f := s.get("codemem_fallbacks"):
+            notes = ", ".join(f"{k} {n}" for k, n in f["by_note"].items()) or "none"
+            text = (f"    codemem fallbacks: {f['fell_back']} of {f['searches']} searches had a note ({notes}) in "
+                    f"{f['runs_with_fallback']} of {f['runs']} runs; first search from keywords only: "
+                    f"{f['first_keywords_only_runs']} runs, and {f['first_keywords_only_discarded']} discarded runs")
+            if f["runs_without_count"]:
+                text += f"; {f['runs_without_count']} runs without the count (run cmeval e2e recount)"
+            lines.append(text)
     for p in summary["paired"]:
         over = f" (over {p['completed_tasks']} fair tasks)" if "completed_tasks" in p else ""
         lines.append(f"  {p['setup']} - {p['baseline']} over {p['tasks']} tasks: completed {_fmt(p['completed'], 2)}{over}, "

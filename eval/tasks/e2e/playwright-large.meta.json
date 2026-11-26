@@ -1,0 +1,55 @@
+{
+  "kind": "resplit",
+  "source": "fresh-ts-v1-large.jsonl",
+  "source_sha256": "dbb702fbbb186cccd1dbd19beba4e8456cd08ee6ba734174691590849030ec13",
+  "repo": "microsoft/playwright",
+  "recipe": "playwright",
+  "test_paths": [
+    "tests/**"
+  ],
+  "test_paths_from_test_files": true,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "**/package.json",
+    "**/package-lock.json"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 31,
+  "changed": 24,
+  "unchanged": 7,
+  "not_split": {},
+  "with_test_files_added": 2,
+  "with_fix_files_added": 22,
+  "test_files_added": 2,
+  "fix_files_added": 59,
+  "files_left_out": {},
+  "with_dependency_needed": 0,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 0
+  },
+  "dependency_needed": {},
+  "with_dependency_other": 1,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 1
+  },
+  "with_test_patch_before": 29,
+  "with_test_patch_after": 29,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "0057385f398d68eeb41ff98436a53abb51ba991d",
+    "dirty": false
+  },
+  "created": "2026-11-26T19:09:56+00:00"
+}

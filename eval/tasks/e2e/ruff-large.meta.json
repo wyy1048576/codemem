@@ -1,0 +1,68 @@
+{
+  "kind": "resplit",
+  "source": "fresh-rust-v1-large.jsonl",
+  "source_sha256": "f6dbedf5c2eedc7e1e224ba2e6b9950526eb76f5f8880436719edcd291009bce",
+  "repo": "astral-sh/ruff",
+  "recipe": "ruff",
+  "test_paths": [
+    "crates/*/resources/test/**",
+    "crates/*/resources/mdtest/**",
+    "crates/ty_python_semantic/resources/corpus/**",
+    "crates/ruff_python_parser/resources/valid/**",
+    "crates/ruff_python_parser/resources/invalid/**",
+    "crates/ruff_python_parser/resources/inline/**",
+    "**/tests/**",
+    "**/snapshots/**",
+    "**/*.snap",
+    "**/src/**/tests.rs",
+    "**/property_tests.rs",
+    "**/property_tests/**"
+  ],
+  "test_paths_from_test_files": false,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "Cargo.lock",
+    "**/Cargo.toml"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 48,
+  "changed": 8,
+  "unchanged": 40,
+  "not_split": {},
+  "with_test_files_added": 0,
+  "with_fix_files_added": 8,
+  "test_files_added": 0,
+  "fix_files_added": 25,
+  "files_left_out": {
+    "leave_out .github/**": 3
+  },
+  "with_dependency_needed": 0,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 0
+  },
+  "dependency_needed": {},
+  "with_dependency_other": 0,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 0
+  },
+  "with_test_patch_before": 48,
+  "with_test_patch_after": 48,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "13fc033cc54cf097279ca38d159a8bfda1a65311",
+    "dirty": false
+  },
+  "created": "2026-11-26T18:58:23+00:00"
+}
