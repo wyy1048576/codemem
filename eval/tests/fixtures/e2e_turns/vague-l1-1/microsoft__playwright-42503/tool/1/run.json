@@ -1,0 +1,32 @@
+{
+  "run_id": "vague-l1-1",
+  "task_id": "microsoft__playwright-42503",
+  "repo": "microsoft/playwright",
+  "setup": "tool",
+  "model": "claude-haiku-5-5",
+  "rep": 1,
+  "end": "finished",
+  "completed": false,
+  "discard": false,
+  "identity": {
+    "gold_files": [
+      "packages/playwright/src/mcp/test/browserBackend.ts"
+    ]
+  },
+  "tokens": {
+    "source": "proxy",
+    "processed_tokens": 404601,
+    "proxy": {
+      "input_tokens": 18,
+      "output_tokens": 3179,
+      "cache_creation_input_tokens": 12599,
+      "cache_read_input_tokens": 388805,
+      "processed_tokens": 404601,
+      "peak_context_tokens": 48351,
+      "requests": 9
+    }
+  },
+  "steps": {
+    "turns": 9
+  }
+}

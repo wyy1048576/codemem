@@ -509,3 +509,119 @@ def test_check_task_names_the_build_of_the_image(make_task, monkeypatch):
     assert record["error"] and "tests" not in record
     assert json.loads((e2e.grader_check_dir(recipe, task) / "check.json").read_text())["problem"] == "error: no image"
     assert "tests: -" in e2e.format_check(record)
+
+
+# ---- a saved change (cmeval e2e grade)
+
+def test_diff_problem():
+    assert e2e.diff_problem("") is None and e2e.diff_problem("\n") is None
+    for good in (MODIFY, NEW, DELETE, RENAME, BINARY, MODE, QUOTED, MODIFY + TEST_PATCH):
+        assert e2e.diff_problem(good) is None, good
+    plain = MODIFY.split("\n", 2)[2]  # the same change without its "diff --git" and index lines
+    plain = plain.split("\n", 1)[1]
+    assert "not a git diff" in e2e.diff_problem(plain)
+    no_prefix = MODIFY.replace("a/pkg", "pkg").replace("b/pkg", "pkg")
+    assert "no a/ prefix" in e2e.diff_problem(no_prefix)
+    only_lines = MODIFY.replace("--- a/pkg", "--- pkg")
+    assert "no a/ or b/ prefix" in e2e.diff_problem(only_lines)
+    # A removed line that starts with "-- " (a SQL comment) is inside a hunk, not a file header.
+    sql = MODIFY.replace("-    return 1\n", "--- old comment\n")
+    assert e2e.diff_problem(sql) is None
+
+
+def test_format_grade():
+    record = e2e.verdict({"t::new": PASS, "t::old1": PASS}, TESTS)
+    assert e2e.format_grade("acme__auth-42", "grep", record) == (
+        "acme__auth-42 grep: not completed, tests failed; fail-to-pass 1/1, pass-to-pass 1/2; failed: t::old2")
+    many = {"fail_to_pass": [f"t::new{i}" for i in range(5)], "pass_to_pass": ["t::" + "x" * 100]}
+    line = e2e.format_grade("a", "b", e2e.verdict({}, many, empty=True))
+    assert line.startswith("a b: not completed, empty change; fail-to-pass 0/5, pass-to-pass 0/1; failed: ")
+    assert line.endswith("t::new0, t::new1, t::new2, and 3 more")
+    # Before the tests ran, every test is "failed": the line names none.
+    line = e2e.format_grade("a", "b", e2e.verdict({}, many, failed_step="changes do not apply"))
+    assert line == "a b: not completed, changes do not apply; fail-to-pass 0/5, pass-to-pass 0/1"
+    record = dict(e2e.verdict({"t::new": PASS, "t::old1": PASS, "t::old2": PASS}, TESTS),
+                  dropped_test_files=["pkg/tests/test_core.py"])
+    assert e2e.format_grade("a", "b", record) == (
+        "a b: completed, ok; fail-to-pass 1/1, pass-to-pass 2/2; test files dropped from the diff: "
+        "pkg/tests/test_core.py")
+
+
+def test_grade_saved_locally(make_task, tmp_path, monkeypatch):
+    _local_docker(monkeypatch, tmp_path)
+    recipe, task = _local_task(make_task, monkeypatch)
+    own_test = TEST_PATCH.replace("+def test_f(): assert pkg.f() == 2\n", "+pass\n")
+    diff = tmp_path / "change.diff"
+    diff.write_text(MODIFY + own_test)
+    out = tmp_path / "grades" / task.id / "change"
+
+    record = e2e.grade_saved(recipe, task, diff, out)
+    assert record["completed"] and record["task_id"] == task.id and record["patch_file"] == str(diff.resolve())
+    assert record["dropped_test_files"] == ["pkg/tests/test_core.py"]
+    assert (out / "input.patch").read_text() == MODIFY + own_test
+    assert e2e.patch_files((out / "agent.patch").read_text()) == {"pkg/core.py"}
+    assert json.loads((out / "grade.json").read_text()) == record
+    # A second grade of the same folder is allowed: it is a grade folder.
+    assert e2e.grade_saved(recipe, task, diff, out)["completed"]
+
+    diff.write_text(MODIFY.replace("a/pkg", "pkg").replace("b/pkg", "pkg"))
+    with pytest.raises(gen.GenerateError, match="no a/ prefix"):
+        e2e.grade_saved(recipe, task, diff, out)
+    other = tmp_path / "notes"
+    other.mkdir()
+    (other / "keep.txt").write_text("x")
+    diff.write_text(MODIFY)
+    with pytest.raises(gen.GenerateError, match="not a grade folder"):
+        e2e.grade_saved(recipe, task, diff, other)
+    assert (other / "keep.txt").exists()
+
+
+def test_cli_grade(make_task, tmp_path, monkeypatch, capsys):
+    _local_docker(monkeypatch, tmp_path)
+    recipe, task = _local_task(make_task, monkeypatch)
+    monkeypatch.setattr(gen, "load_recipe", lambda name: recipe)
+    tasks = tmp_path / "tasks.jsonl"
+    save_tasks(tasks, [task, make_task(id="other__repo-42", repo="other/repo")])
+    good = tmp_path / "good.patch"
+    good.write_text(MODIFY)
+
+    assert main(["e2e", "grade", "r", "--tasks", str(tasks), "--patch", str(good), "--id", task.id]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == f"{task.id} good: completed, ok; fail-to-pass 1/1, pass-to-pass 0/0"
+    assert out[1].startswith("r: 1 of 1 graded changes completed, 0 errors; records in ")
+    assert (e2e.grades_dir() / "r" / task.id / "good" / "grade.json").exists()
+
+    # A file needs exactly one --id.
+    assert main(["e2e", "grade", "r", "--tasks", str(tasks), "--patch", str(good)]) == 1
+    assert "exactly one --id" in capsys.readouterr().err
+
+    # A folder: <task id>/<label>.patch files, a change that fails, one of another repo, one of no task.
+    folder = tmp_path / "diffs"
+    (folder / task.id).mkdir(parents=True)
+    (folder / task.id / "grep.diff").write_text(MODIFY)
+    (folder / task.id / "loop.diff").write_text(MODIFY.replace("    return 2", "    return 3"))
+    (folder / "other__repo-42.patch").write_text(MODIFY)
+    (folder / "notes.txt").write_text("not a patch")
+    out_dir = tmp_path / "out"
+    assert main(["e2e", "grade", "r", "--tasks", str(tasks), "--patch", str(folder), "--out", str(out_dir)]) == 3
+    captured = capsys.readouterr()
+    lines = captured.out.splitlines()
+    assert lines[0] == f"{task.id} grep: completed, ok; fail-to-pass 1/1, pass-to-pass 0/0"
+    assert lines[1] == f"{task.id} loop: not completed, tests failed; fail-to-pass 0/1, pass-to-pass 0/0; failed: t::new"
+    assert lines[2] == f"r: 1 of 2 graded changes completed, 0 errors; records in {out_dir}"
+    assert "1 changes skipped: their task is not of acme/auth: other__repo-42" in captured.err
+    assert json.loads((out_dir / task.id / "loop" / "grade.json").read_text())["reason"] == "tests failed"
+
+    # --id picks tasks of a folder; a task that is not in the file and a diff that is not a git diff are errors.
+    (folder / "acme__auth-9.patch").write_text(MODIFY)
+    assert main(["e2e", "grade", "r", "--tasks", str(tasks), "--patch", str(folder), "--id", "acme__auth-9"]) == 1
+    assert "acme__auth-9 acme__auth-9: error: no task acme__auth-9 in" in capsys.readouterr().out
+    bad = tmp_path / "bad.patch"
+    bad.write_text("--- a/pkg/core.py\n+++ b/pkg/core.py\n@@ -1 +1 @@\n-a\n+b\n")
+    assert main(["e2e", "grade", "r", "--tasks", str(tasks), "--patch", str(bad), "--id", task.id]) == 1
+    assert "not a git diff" in capsys.readouterr().out
+
+    # A missing image names the command that builds it again.
+    monkeypatch.setattr(e2e, "image_exists", lambda tag: False)
+    assert main(["e2e", "grade", "r", "--tasks", str(tasks), "--patch", str(good), "--id", task.id]) == 1
+    assert f"--id {task.id} --rebuild" in capsys.readouterr().out
