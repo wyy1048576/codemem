@@ -217,18 +217,96 @@ def task_test_files(recipe: Recipe, task: Task) -> list[str]:
     return sorted({f for suite in recipe.suites for f in suite_files(suite, task)})
 
 
-def admission_sample(recipe: Recipe, tasks: list[Task], n: int = ADMISSION_N, seed: str | None = None) -> list[Task]:
-    """A fixed sample of the repo's tasks with tests: 3 easy, 4 medium, 3 hard for n = 10."""
+def in_pool(task: Task) -> bool:
+    """A task can be drawn: its real fix needs no third-party requirement that the image may not
+    have (the tag dependency_needed of `cmeval resplit`, see deps.py). Such a task cannot be
+    completed, also not by the real fix, because the tests run with the network off."""
+    return not task.tags.get("dependency_needed")
+
+
+def with_tests(recipe: Recipe, tasks: list[Task]) -> dict[str, list[Task]]:
+    """The repo's tasks with a test file that a suite runs, by difficulty level, each sorted by id."""
     pool: dict[str, list[Task]] = {"easy": [], "medium": [], "hard": []}
     for task in sorted(tasks, key=lambda t: t.id):
         if task.repo == recipe.repo and task.test_patch and task_test_files(recipe, task):
             pool[difficulty(task.patch)].append(task)
-    rng = random.Random(seed or f"admission-{recipe.name}-1")
+    return pool
+
+
+def candidates(recipe: Recipe, tasks: list[Task]) -> tuple[dict[str, list[Task]], list[Task]]:
+    """The pool of a repo by difficulty level (with_tests and in_pool), and the tasks with tests
+    that leave it."""
+    every = with_tests(recipe, tasks)
+    pool = {level: [t for t in level_tasks if in_pool(t)] for level, level_tasks in every.items()}
+    return pool, [t for level_tasks in every.values() for t in level_tasks if not in_pool(t)]
+
+
+def _refill(kept: list[Task], drawn: list[Task], population: list[Task], taken: set[str], seed: str) -> list[Task]:
+    """kept, filled up to the size of drawn with tasks of the pool from population that are not
+    drawn and not taken, drawn with their own generator."""
+    if len(kept) >= len(drawn):
+        return kept
+    skip = taken | {t.id for t in drawn}
+    spare = [t for t in population if in_pool(t) and t.id not in skip]
+    return kept + random.Random(seed).sample(spare, min(len(drawn) - len(kept), len(spare)))
+
+
+def _admission_draws(recipe: Recipe, tasks: list[Task], n: int, seed: str | None) -> tuple[list[Task], list[Task]]:
+    """(the admission draw as before the pool filter, the admission sample). The draw takes every
+    task with tests. A drawn task that is not in the pool is replaced by a task of its level, drawn
+    with a second generator. So the filter changes only the tasks that it removes."""
+    every = with_tests(recipe, tasks)
+    seed = seed or f"admission-{recipe.name}-1"
+    rng = random.Random(seed)
+    raw: list[Task] = []
     chosen: list[Task] = []
     for level, share in ADMISSION_MIX:
         want = round(share * n / ADMISSION_N)
-        chosen += rng.sample(pool[level], min(want, len(pool[level])))
-    return chosen
+        drawn = rng.sample(every[level], min(want, len(every[level])))
+        raw += drawn
+        chosen += _refill([t for t in drawn if in_pool(t)], drawn, every[level], set(), f"{seed}-refill-{level}")
+    return raw, chosen
+
+
+def admission_sample(recipe: Recipe, tasks: list[Task], n: int = ADMISSION_N, seed: str | None = None) -> list[Task]:
+    """A fixed sample of the repo's pool: 3 easy, 4 medium, 3 hard for n = 10. Without tasks that
+    leave the pool it is the same as before the filter; with them, only those tasks are replaced."""
+    return _admission_draws(recipe, tasks, n, seed)[1]
+
+
+@dataclass
+class Sample:
+    tasks: list[Task]            # in the order of the task file
+    admission: list[Task]        # the admission sample, which the sample holds
+    levels: dict[str, dict]      # level: pool, want, chosen
+    left_out: list[Task]         # tasks with tests that leave the pool
+
+
+def sample(recipe: Recipe, tasks: list[Task], n: int, seed: str | None = None) -> Sample:
+    """A validation sample of n tasks: the admission sample first, then each difficulty level filled
+    up to its share of n in the admission mix (3 : 4 : 3) from the rest of its pool, with a fixed
+    seed (default b7-<recipe>-1). The draws are made as before the pool filter, and a drawn task
+    that is not in the pool is replaced. So without such tasks it gives the ids of the B7 samples
+    of 2026-11-26, and with them only those tasks change."""
+    tasks = [t for t in tasks if t.repo == recipe.repo]
+    raw_admission, admission = _admission_draws(recipe, tasks, ADMISSION_N, None)
+    every = with_tests(recipe, tasks)
+    pool, left = candidates(recipe, tasks)
+    seed = seed or f"b7-{recipe.name}-1"
+    rng = random.Random(seed)
+    raw_taken = {t.id for t in raw_admission}
+    chosen = {t.id for t in admission}
+    levels = {}
+    for level, share in ADMISSION_MIX:
+        want = round(share * n / ADMISSION_N)
+        have = [t for t in admission if difficulty(t.patch) == level]
+        rest = [t for t in every[level] if t.id not in raw_taken]
+        drawn = rng.sample(rest, min(max(want - len(have), 0), len(rest)))
+        add = _refill([t for t in drawn if in_pool(t) and t.id not in chosen], drawn, every[level], chosen,
+                      f"{seed}-refill-{level}")
+        chosen |= {t.id for t in add}
+        levels[level] = {"pool": len(pool[level]), "want": want, "chosen": len(have) + len(add)}
+    return Sample([t for t in tasks if t.id in chosen], admission, levels, left)
 
 
 # ---- docker

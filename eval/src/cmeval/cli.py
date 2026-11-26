@@ -356,13 +356,22 @@ def cmd_generate(args) -> int:
     try:
         recipe = gen.load_recipe(args.recipe)
         tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        if not args.id:
+            left = gen.candidates(recipe, tasks)[1]
+            say(f"{recipe.repo}: {len(left)} tasks with tests leave the pool (tag dependency_needed: the real fix "
+                f"needs a dependency that the image may not have){': ' if left else ''}{' '.join(t.id for t in left)}")
         if args.id:
             wanted = set(args.id)
             tasks = [t for t in tasks if t.id in wanted]
         elif args.admission:
             tasks = gen.admission_sample(recipe, tasks, seed=args.seed)
+        elif args.sample:
+            drawn = gen.sample(recipe, tasks, args.sample, seed=args.seed)
+            say(f"{recipe.repo}: a sample of {len(drawn.tasks)} tasks, {len(drawn.admission)} of them the admission sample; "
+                + ", ".join(f"{level} {v['chosen']} of {v['want']} wanted (pool {v['pool']})" for level, v in drawn.levels.items()))
+            tasks = drawn.tasks
         else:
-            tasks = [t for t in tasks if t.test_patch and gen.task_test_files(recipe, t)]
+            tasks = [t for t in tasks if t.test_patch and gen.task_test_files(recipe, t) and gen.in_pool(t)]
             if args.split:
                 tasks = [t for t in tasks if t.split == args.split]
             if args.limit:
@@ -370,6 +379,10 @@ def cmd_generate(args) -> int:
         if not tasks:
             print(f"generate: no task of {recipe.repo} with tests in {args.tasks}", file=sys.stderr)
             return 1
+        if args.list:
+            for task in tasks:
+                print(task.id)
+            return 0
         say(f"{recipe.repo}: {len(tasks)} tasks, {args.jobs} at a time")
         records = gen.generate(recipe, tasks, jobs=args.jobs, repeats=args.repeats, cpus=args.cpus,
                                force=args.force, progress=say)
@@ -708,7 +721,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
     p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
     p.add_argument("--admission", action="store_true", help="the admission check: a fixed sample of 10 tasks")
-    p.add_argument("--seed", help="seed of the admission sample (default: admission-<recipe>-1)")
+    p.add_argument("--sample", type=int, metavar="N",
+                   help="a sample of N tasks: the admission sample, filled up per difficulty level in its mix")
+    p.add_argument("--seed", help="seed of the admission sample (default: admission-<recipe>-1), or with --sample "
+                                  "the seed that fills it up (default: b7-<recipe>-1)")
     p.add_argument("--id", action="append", help="only this task; can be given more than once")
     p.add_argument("--split", choices=("dev", "test"))
     p.add_argument("--limit", type=int, help="at most this number of tasks")
@@ -716,6 +732,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cpus", type=int, default=8, help="processors for one validation container (default 8)")
     p.add_argument("--repeats", type=int, default=3, help="test runs before and after the fix (default 3)")
     p.add_argument("--force", action="store_true", help="build the image and validate again, also when a record is saved")
+    p.add_argument("--list", action="store_true", help="only print the ids of the chosen tasks; build nothing")
     p.set_defaults(func=cmd_generate)
 
     p = sub.add_parser("resplit", help="split each task's change again, with the test paths of the repo's recipe")
