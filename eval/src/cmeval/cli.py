@@ -519,7 +519,11 @@ def cmd_e2e_score(args) -> int:
     try:
         screen = None
         if args.screen:
-            tasks = [t for path in args.tasks or [] for t in load_tasks(path)] if args.tasks else None
+            if not args.tasks:
+                # Without the tasks no hash can be checked, and a stale read would count.
+                raise ScreenError("--screen needs --tasks FILE (every task file of the run), so that a read of a "
+                                  "changed or reopened task is not counted")
+            tasks = [t for path in args.tasks for t in load_tasks(path)]
             screen = completion_set(args.screen, tasks, load_facts(args.facts))
         elif args.tasks or args.facts:
             raise ScreenError("--tasks and --facts are used only with --screen")
@@ -578,6 +582,9 @@ def cmd_e2e_screen_table(args) -> int:
     except (ScreenError, FileNotFoundError, TaskError) as exc:
         print(f"e2e screen-table: {exc}", file=sys.stderr)
         return 1
+    if not args.tasks and not args.packets:
+        print("Note: no --tasks and no --packets, so stale reads (of a changed or reopened task) cannot be seen in "
+              "this table; they count as if they were current.")
     print(format_table(result, [p.name for p in args.screen]))
     return 0
 
@@ -785,7 +792,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--screen", type=Path, action="append",
                    help="screen file (tasks/screen/*.jsonl): completion counts only fair tasks; can be given more than once")
     p.add_argument("--tasks", type=Path, action="append",
-                   help="with --screen: task file, to check that each read is of the task as it is now")
+                   help="needed with --screen: every task file of the run, to check that each read is of the task "
+                        "as it is now")
     p.add_argument("--facts", type=Path, help="with --tasks: facts file (default tasks/screen/facts.jsonl)")
     p.set_defaults(func=cmd_e2e_score)
     p = e2e_sub.add_parser("screen-pack", help="write the reading material of the unfair-test screen for each valid task")

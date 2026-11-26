@@ -488,8 +488,9 @@ def test_score_with_a_screen(make_task, tmp_path, capsys):
     assert "conservative (no unfair read at all): completion over 1 tasks: grep 0.00, tool 1.00" in text
     assert "completed 0.00 (over 2 fair tasks), tokens -500" in text
 
-    assert main(["e2e", "score", "sc", "--screen", str(screen)]) == 0
-    assert "completion counts 2 of 4 tasks" in capsys.readouterr().out
+    # Without the task files a stale read could count, so the command line refuses it.
+    assert main(["e2e", "score", "sc", "--screen", str(screen)]) == 1
+    assert "--screen needs --tasks FILE" in capsys.readouterr().err
     assert main(["e2e", "score", "sc", "--tasks", str(screen)]) == 1
     assert "only with --screen" in capsys.readouterr().err
     assert main(["e2e", "score", "sc", "--screen", str(tmp_path / "none.jsonl")]) == 1
@@ -515,8 +516,13 @@ def test_score_screen_checks_hashes_with_the_task_file(make_task, tmp_path, caps
     assert main(["e2e", "score", "sh", "--screen", str(screen), "--tasks", str(path), "--facts", str(facts)]) == 0
     assert "1 left out (not screened 1)" in capsys.readouterr().out
     assert main(["e2e", "screen-table", "--screen", str(screen), "--tasks", str(path), "--facts", str(facts)]) == 0
-    assert "Reads left out because the task or its facts changed after the read: acme__auth-42" in \
-        capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Reads left out because the task or its facts changed after the read: acme__auth-42" in out
+    assert not out.startswith("Note:")
+    # Without --tasks and --packets the table still works, with a note first.
+    assert main(["e2e", "screen-table", "--screen", str(screen)]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("Note: no --tasks and no --packets, so stale reads") and "| acme/auth | easy | 1 | 1 |" in out
 
 
 # ---- command line
