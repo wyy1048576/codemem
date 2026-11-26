@@ -466,7 +466,10 @@ def cmd_e2e_grader_check(args) -> int:
         print(f"e2e: {exc}", file=sys.stderr)
         return 1
     passed = sum(1 for r in records if r["passed"])
-    print(f"{recipe.name}: {passed} of {len(records)} tasks pass the grader check")
+    differ = sum(1 for r in records if "tests" in r and not r["tests"]["equal"])
+    errors = sum(1 for r in records if r.get("error"))
+    print(f"{recipe.name}: {passed} of {len(records)} tasks pass the grader check; {differ} differ from tests.json, "
+          f"{errors} errors")
     if any(r.get("error") for r in records):
         return 1
     return 0 if passed == len(records) else 3

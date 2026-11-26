@@ -13,7 +13,10 @@ Both lists come from the task's validation (tests.json). Everything else is not 
 changes that do not apply, a build that breaks, a failing test, an empty change.
 
 The grader check runs the grader on the real fix and on an empty change of each task. The real
-fix must complete the task, and the empty change must not.
+fix must complete the task, and the empty change must not. It also compares each saved test with
+its result now, on the image as it is: with the real fix every fail_to_pass and pass_to_pass test
+must pass, and with the empty change no fail_to_pass test may pass. A task image can be built
+again after its validation, so this check on the image of the runs is the one that counts.
 """
 
 from __future__ import annotations
@@ -26,9 +29,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from .generate import (PASS, GenerateError, Recipe, image_exists, image_fingerprint, image_label, read_results,
-                       read_times, refresh_lines, run_in_container, task_tag, test_run_line, tests_path,
-                       validation_fingerprint)
+from .generate import (PASS, GenerateError, Recipe, build_number, image_exists, image_fingerprint, image_id,
+                       image_label, read_results, read_times, refresh_lines, run_in_container, task_tag, test_run_line,
+                       tests_path, validation_fingerprint)
 from .patches import diff_sections as _sections, file_paths
 from .paths import e2e_dir
 from .tasks import Task
@@ -183,17 +186,46 @@ def grader_check_dir(recipe: Recipe, task: Task) -> Path:
     return e2e_dir() / "grader-check" / recipe.name / task.id
 
 
+def compare_tests(results: dict[str, str], tests: dict, *, empty: bool) -> list[dict]:
+    """The saved tests whose result now is not the one of the validation. With the real fix
+    (empty=False) every fail_to_pass and pass_to_pass test must pass. With an empty change no
+    fail_to_pass test may pass: before the fix the validation saw it fail, skip, or be missing
+    in every run. Each entry: the test, its list, its saved state, and its new state."""
+    if empty:
+        return [{"test": t, "list": "fail_to_pass", "saved": "not pass", "new": PASS}
+                for t in tests.get("fail_to_pass", []) if results.get(t) == PASS]
+    return [{"test": t, "list": name, "saved": PASS, "new": results.get(t, "missing")}
+            for name in ("fail_to_pass", "pass_to_pass") for t in tests.get(name, []) if results.get(t) != PASS]
+
+
+def _test_check(tests: dict, gold_results: dict[str, str], empty_results: dict[str, str]) -> dict:
+    """The per-test comparison of one task, as the grader-check record keeps it. The list of
+    differences is cut at MAX_FAILED_SHOWN; the counts are whole."""
+    gold = [{"change": "real fix", **d} for d in compare_tests(gold_results, tests, empty=False)]
+    empty = [{"change": "empty", **d} for d in compare_tests(empty_results, tests, empty=True)]
+    f2p, p2p = len(tests.get("fail_to_pass", [])), len(tests.get("pass_to_pass", []))
+    return {"equal": not gold and not empty, "checked": 2 * f2p + p2p, "differ": len(gold) + len(empty),
+            "real_fix_differ": len(gold), "empty_differ": len(empty), "differences": (gold + empty)[:MAX_FAILED_SHOWN]}
+
+
 def check_task(recipe: Recipe, task: Task, cpus: int = 8) -> dict:
-    """Grade the real fix and an empty change of one task."""
+    """Grade the real fix and an empty change of one task, and compare each saved test with its
+    result. The record is also written to check.json in the task's grader-check folder."""
     folder = grader_check_dir(recipe, task)
     start = time.monotonic()
     record: dict = {"id": task.id, "passed": False}
     try:
+        tag = task_tag(recipe, task)
+        image = image_id(tag)
+        record.update(image_id=image, image_build=build_number(recipe, task, image))
         gold = grade(recipe, task, task.patch, folder / "gold", cpus=cpus)
         empty = grade(recipe, task, "", folder / "empty", cpus=cpus)
+        tests = load_tests(recipe, task)
     except (GenerateError, subprocess.TimeoutExpired, OSError) as exc:
         record.update(problem=f"error: {exc}", error=True, seconds=round(time.monotonic() - start, 1))
+        _save_check(folder, record)
         return record
+    check = _test_check(tests, read_results(folder / "gold", "grade"), read_results(folder / "empty", "grade"))
     problems = []
     if not gold["completed"]:
         problems.append("the real fix does not complete the task")
@@ -201,9 +233,17 @@ def check_task(recipe: Recipe, task: Task, cpus: int = 8) -> dict:
         problems.append("the tests pass without a change")
     elif empty["completed"]:
         problems.append("the empty change completes the task")
-    record.update(passed=not problems, problem="; ".join(problems) or "ok", gold=gold, empty=empty,
+    if not check["equal"]:
+        problems.append(f"{check['differ']} tests differ from tests.json")
+    record.update(passed=not problems, problem="; ".join(problems) or "ok", tests=check, gold=gold, empty=empty,
                   seconds=round(time.monotonic() - start, 1))
+    _save_check(folder, record)
     return record
+
+
+def _save_check(folder: Path, record: dict) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "check.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
 
 def grader_check(recipe: Recipe, tasks: list[Task], *, jobs: int = 1, cpus: int = 8,
@@ -221,9 +261,26 @@ def grader_check(recipe: Recipe, tasks: list[Task], *, jobs: int = 1, cpus: int 
         return list(pool.map(one, tasks))
 
 
+SHOWN_IN_LINE = 3  # differences of tests named in the printed line of a task
+
+
+def format_tests(check: dict | None) -> str:
+    """The per-test comparison in a few words: "equal", or the count and the first differences."""
+    if not check:
+        return "-"
+    if check["equal"]:
+        return f"equal ({check['checked']} checked)"
+    shown = ", ".join(f"{d['test']} ({d['change']}) {d['saved']} -> {d['new']}"
+                      for d in check["differences"][:SHOWN_IN_LINE])
+    more = check["differ"] - min(SHOWN_IN_LINE, len(check["differences"]))
+    return (f"{check['differ']} differ (real fix {check['real_fix_differ']}, empty {check['empty_differ']}): {shown}"
+            + (f", and {more} more" if more > 0 else ""))
+
+
 def format_check(record: dict) -> str:
     gold = record.get("gold", {}).get("reason", "-")
     empty = record.get("empty", {}).get("reason", "-")
     if record.get("empty", {}).get("passes_without_change"):
         empty += " (tests pass)"
-    return f"{record['id']}  {record['problem']}  gold: {gold}  empty: {empty}  {record['seconds']} s"
+    return (f"{record['id']}  {record['problem']}  gold: {gold}  empty: {empty}  "
+            f"tests: {format_tests(record.get('tests'))}  {record['seconds']} s")
