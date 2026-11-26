@@ -45,7 +45,7 @@ agent with codemem added.
 **A repetition** is the same run again, from the start. An agent's run has chance in it: in the
 pilot, two runs of one task that used the same tools differed by up to 8 times in tokens (2.14
 million against 0.25 million). One run per task cannot tell codemem's effect from luck. Three
-runs per task even that out.
+runs per task guard against that noise, and the paper states this as their reason.
 
 **One run** is therefore: one task, at one prompt level, in one setup, by one model, one time.
 
@@ -115,8 +115,9 @@ Every model runs a part of the same sample, so that models are compared on the s
 | **Open models, a probe** | 3: numbers 1 to 3 of hard | L0 | `grep`, `tool` | 1 | 6 for each model |
 
 - The three Claude models are for the presentation. Codex is considered for the paper.
-- The open models run in their own harness and on their own machine. They use none of the
-  Claude seats.
+- **The Claude runs go on Andrew's PC, and they come first there.**
+- **The open models run on a rented GPU** (Nebius), in their own harness, started by Andre. They
+  use none of the Claude seats and nothing of the PC.
 
 **What every run records:** whether the hidden tests pass; tokens; time; and the turn at which
 the agent first sees a gold file in a result, first opens one, and first edits one. The last
@@ -124,81 +125,113 @@ three answer "did it reach the right place, and how fast", for the small models 
 
 ---
 
-## 5. The repos
+## 5. The repos, ranked
 
 All ten repos on `main` can carry tasks: each has enough candidates at every difficulty and a
-written recipe. They are not equally worth the seats.
+written recipe. They are not equally worth the seats. The rank says in which order they run and
+how far. Three things decide it:
 
-**For the presentation: six repos, five languages.**
+- **the language:** Rust, Python, C++ and TypeScript come first;
+- **how vague the issues are:** the share of issues that name the code that has to change. The
+  lower it is, the more a task needs search by meaning, even at L0;
+- **the size of the repo, and what its environment costs.**
 
-| # | Repo | Language | Why it is worth running | What it costs |
-|---|---|---|---|---|
-| 1 | pandas | Python | a medium-size repo; its tasks are ready | little |
-| 2 | playwright | TypeScript | a second language; its tasks are ready | little |
-| 3 | ruff | Rust | a third language. Only 8% of its issues name the code that has to change, so even L0 is vague here | a Rust build |
-| 4 | kubernetes | Go | a fourth language, in a very large repo | the smallest pool: 86 candidates, and 12 hard ones in the test split. If hard falls short of 5, tasks of the dev split fill it and are marked |
-| 5 | duckdb | C++ | a fifth language; 21% of its issues name the code | a long C++ build for each image |
-| 6 | home-assistant | Python | very large, 18,700 Python files: where an index should matter most. The largest pool | a long install, and a large index |
+| Rank | Repo | Language | Issues that name the code | Why this rank | How far |
+|---|---|---|---|---|---|
+| 1 | pandas | Python | 57% | medium size; its tasks are ready; the check run (§6) starts here | fully |
+| 2 | ruff | Rust | 8% | the vaguest issues of all: even L0 gives little to grep for | fully |
+| 3 | duckdb | C++ | 21% | vague issues, in C++ | fully |
+| 4 | playwright | TypeScript | 64% | its tasks are ready; medium size | fully |
+| 5 | vscode | TypeScript | 26% | very large and vague, with the most hard tasks: where an index should show most. Fifth only because its environment is the costliest: a long build, and tests that need a display | fully |
+| 6 | home-assistant | Python | 54% | very large, 18,700 Python files; the largest pool | fully |
+| 7 | kubernetes | Go | 55% | a fifth language, very large. The smallest pool of these: 86 candidates, 12 hard ones in the test split | Sonnet, once |
+| 8 | trino | Java | 27% | a sixth language. A small pool: 64 candidates, 13 hard | Sonnet, once |
+| 9 | airflow | Python | 60% | a third Python repo | reserve |
+| 10 | vllm | Python | 76% | a fourth Python repo, with the issues that name the code most often | reserve |
 
-**For the paper, if seats are left:**
+- **fully:** every row of §4, with the three Sonnet repetitions.
+- **Sonnet, once:** one Sonnet repetition, so that the language is in the table.
+- **reserve:** runs only in place of a repo above it that cannot be built.
 
-| Repo | Language | Why | What it costs |
-|---|---|---|---|
-| vscode | TypeScript | very large; 26% of its issues name the code; the most hard tasks | the costliest environment: a long build, and tests that need a display |
-| trino | Java | a sixth language | a small pool: 64 candidates, 13 hard |
-
-**Least worth running: airflow and vllm.** They would be the third and fourth Python repos, and
-vllm's issues name the code more often than any other repo's (76%). They stay as the reserve if
-one of the six cannot be built.
-
-For comparison, the share of issues that name the code: pandas 57%, playwright 64%, kubernetes
-55%, home-assistant 54%, airflow 60%.
+If a hard level falls short of 5 fair tasks in the test split (kubernetes, trino), tasks of the
+dev split fill it and are marked.
 
 Every fix in every pool was merged between July 1 and October 22, 2026.
 
 ---
 
-## 6. The order
+## 6. First, a check run
 
-A repo is run as soon as its sample is ready. For what is ready:
+Before the batches are automated, one small batch shows that the whole chain works with the
+locked codemem, and that the agent calls codemem.
 
-1. Sonnet, repetition 1;
-2. Haiku;
-3. Opus;
-4. Sonnet, repetitions 2 and 3.
+**What runs.** On pandas and on one more repo that is ready (playwright, or ruff if it is): the
+three tasks numbered 1, one of each difficulty, at L0 and at L2, in both setups, with Sonnet,
+once. That is 24 runs, about an hour on three seats.
 
-A batch that is cut short then leaves a complete table with fewer repetitions, never a table
-with holes. The `grep` run and the `tool` run of a task go turn about in the same batch, so that
-their times can be compared. The open models run beside all of this.
+**It passes when:**
+
+1. every run has a record and a grade, and none is discarded;
+2. the proxy's token count equals the agent's own in every run;
+3. **codemem is called:** `search_code` is called in at least 5 of the 6 `tool` runs at L2. In
+   the pilot it was 17 of 18. At L0 the number is reported and not required: with a name to
+   grep for, an agent often greps;
+4. **every search is a search by meaning:** no `search_code` result holds `still loading` or
+   `codemem cannot embed right now`, and `index_status` in one container says `watching: true`;
+5. a person has read two `tool` transcripts: the search's result reaches the agent, and the
+   agent uses it.
+
+**What it also gives:** the first numbers for Sonnet: minutes and tokens per run, and how much
+of a seat's limit 24 runs used. §8 is corrected from them.
+
+**After it.** If it passes, its 24 runs are the first runs of the plan, not extra ones. If point
+3 or 4 fails, the batches wait: track B fixes the wording that makes the agent call codemem, or
+track C the index, before any more seats are spent.
 
 ---
 
-## 7. How long
+## 7. The order
 
-| | Runs, six repos | On three seats, at 5 to 7 minutes a run |
+1. the check run (§6);
+2. Sonnet, repetition 1, on repos 1 to 6 in the order of their rank;
+3. Haiku, then Opus, on repos 1 to 6;
+4. Sonnet, repetition 1, on kubernetes and trino;
+5. Sonnet, repetitions 2 and 3, on repos 1 to 6 in the order of their rank.
+
+A repo that is not ready when its turn comes is passed over and taken up when it is. A batch
+that is cut short leaves a complete table with fewer repetitions, never a table with holes. The
+`grep` run and the `tool` run of a task go turn about in the same batch, so that their times
+can be compared.
+
+---
+
+## 8. How long
+
+| | Runs | On three seats, at 5 to 7 minutes a run |
 |---|---|---|
 | steps 1 to 3 | 828 (Sonnet 540, Haiku 216, Opus 72) | 23 to 32 hours |
-| step 4 | 1,080 | 30 to 42 hours |
-| all Claude runs | 1,908 | 2.2 to 3.1 days without a pause |
-| the open models | 612 for each model | about half a day for each model, if a run takes as long as a Claude run and six run at once on one GPU |
+| step 4 | 180 | 5 to 7 hours |
+| step 5 | 1,080 | 30 to 42 hours |
+| all Claude runs | 2,088 | 2.4 to 3.4 days without a pause |
+| the open models, on the rented GPU | 612 for each model | about half a day for each model, if a run takes as long as a Claude run and six run at once |
 
 - **The 5 to 7 minutes are an assumption.** The pilot measured 4.3 to 5.5 minutes for Haiku at
-  L0. Nobody has measured Sonnet or Opus, and vague prompts took more tokens in the pilot.
-- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 3 are
-  what the presentation counts on, and step 4 fills the time that is left until Nov 30, 23:59.
+  L0. Nobody has measured Sonnet or Opus, and vague prompts took more tokens in the pilot. The
+  check run measures it.
+- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 4 are
+  what the presentation counts on, and step 5 fills the time that is left until Nov 30, 23:59.
 - Checking candidates, writing the L1 and L2 prompts and building the indexes come before a
   repo's runs and are not in these numbers.
 
 ---
 
-## 8. What track A is asked to do
+## 9. What track A is asked to do
 
-1. **For each repo, in the order of §5:** draw 20 candidates of each difficulty, validate and
-   screen them, and stop a level at 7 fair tasks. Post the table of fair tasks per repo and
-   level as each repo ends.
+1. **For each repo, in the order of its rank (§5):** draw 20 candidates of each difficulty,
+   validate and screen them, and stop a level at 7 fair tasks. Post the table of fair tasks per
+   repo and level as each repo ends.
 2. **Draw the sample** (§3), write its L1 and L2 prompts, and commit the list.
-3. **Build each task's index** with the locked codemem, and run in the order of §6.
-4. **After the first Sonnet batch,** post tokens and minutes per run, and how much of a seat's
-   limit it used. The numbers of §7 are corrected from it.
-5. **Say whether the PC's GPU can serve the open models** beside the embedding model: the 9B
-   needs about 7 to 10 GB, the 27B about 18 GB. If not, Andre rents a GPU.
+3. **Build each task's index** with the locked codemem.
+4. **Run the check run** (§6) and post its five points and the first Sonnet numbers. Go on only
+   when it has passed.
+5. **Then run in the order of §7.**
