@@ -1,0 +1,77 @@
+# Recipe for home-assistant/core: how to build it at a task's commit and run a task's tests.
+# The fields are described in src/cmeval/generate.py.
+#
+# The environment follows the repo's own CI (.github/workflows/ci.yaml, job "base"; from October
+# 2026 the action .github/actions/restore-or-build-venv): the same system packages, the same
+# requirement files, the same editable install, and the English translations before pytest.
+
+repo = "home-assistant/core"
+# Every task commit asks for Python >= 3.14.2 (pyproject.toml). .python-version moves from 3.14.5
+# to 3.14.8 in the window; 3.14.8 satisfies both ends. Debian trixie has glibc 2.41: some
+# packages have binary wheels only for it, so fewer packages build from source.
+base_image = "python:3.14.8-trixie"
+
+# Once per repo. The system packages are the set of the CI job that installs requirements_all.txt,
+# plus libpcap-dev, cmake and autoconf from the repo's Dockerfile.dev. ffmpeg and libturbojpeg0
+# are needed at run time by camera, stream and image tests. The base image has the C and C++
+# compilers and the common -dev libraries for the packages that build from source.
+base_setup = [
+    "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bluez ffmpeg libturbojpeg0 libxml2-utils libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev libudev-dev libpcap-dev cmake autoconf && rm -rf /var/lib/apt/lists/*",
+    "pip install --no-cache-dir uv",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+]
+
+# Dependencies: the requirements of every integration, as CI installs them (about 1,700 packages;
+# about 150 of them build from source). So a test of any integration can import its library, also
+# when it imports helpers of other integrations. requirements_all.txt changes almost every day, so
+# tasks share this layer only when they have the same files and the same week. The -r and -c files
+# are read through relative paths, so they keep their place under /deps.
+# The requirement files pin uv itself. That install replaces the uv of base_setup, as in a
+# developer's virtual environment.
+deps_files = [
+    "requirements.txt",
+    "requirements_all.txt",
+    "requirements_test.txt",
+    "requirements_test_pre_commit.txt",
+    "homeassistant/package_constraints.txt",
+]
+deps = [
+    "uv pip install --system --exclude-newer {exclude_newer} -r requirements.txt",
+    "uv pip install --system --exclude-newer {exclude_newer} -r requirements_all.txt -r requirements_test.txt",
+]
+
+# After the source of the task's commit is in /testbed.
+# 1. The editable install, as in CI. From 2026-10-17 the shared test fixtures are a package of the
+#    repo (packages/pytest-home-assistant). Its pytest plugin is found through its entry point, so
+#    it must be installed too. "--no-cache": uv keeps a local build by its path, and every task is
+#    built in /testbed, so with the cache a task can get the metadata of another task.
+# 2. The English translation files (translations/en.json, ignored by git) are made from the
+#    strings.json files. CI makes them before pytest, and tests read them.
+build = [
+    "set -- -e .; if [ -d packages/pytest-home-assistant ]; then set -- \"$@\" -e packages/pytest-home-assistant; fi; uv pip install --system --no-cache --no-deps --config-settings editable_mode=compat \"$@\"",
+    "python -m script.translations develop --all > /dev/null",
+    "python -c 'import homeassistant.const as c; print(c.__version__)'",
+]
+
+# After the real fix (or an agent's change) is applied, before the tests run. A change to a
+# strings.json file needs new translation files. New modules need nothing: the install is editable.
+# Its output goes to the refresh log.
+refresh = ["python -m script.translations develop --all"]
+
+# Only test modules go to pytest. The other files of the test change (conftest.py, helper modules)
+# are applied with it.
+test_files = ["tests/**/test_*.py"]
+# The options of CI's pytest jobs: "-b -X dev", the timeout of 9 s for each test (pytest-timeout),
+# no pytest-sugar. A fixed worker count instead of "auto". No --snapshot-update: syrupy then fails
+# a test whose snapshot is missing or different, and writes nothing. pytest-socket in the repo's
+# conftest blocks the network.
+# --continue-on-collection-errors: before the fix, a new test file can fail to import. The other files must still run.
+test = "python -b -X dev -m pytest {files} -p no:cacheprovider -p no:sugar -n 8 --timeout=9 --continue-on-collection-errors --junitxml={junit}"
+parser = "junit"
+timeout_min = 10
+
+# The uv cache is a build cache mount on another file system, so uv cannot make hard links into
+# the image. This says so, instead of a warning for each install.
+[env]
+UV_LINK_MODE = "copy"
