@@ -1,0 +1,17 @@
+diff --git a/pandas/core/tools/datetimes.py b/pandas/core/tools/datetimes.py
+index ea436da..897cc99 100644
+--- a/pandas/core/tools/datetimes.py
++++ b/pandas/core/tools/datetimes.py
+@@ -293,6 +293,12 @@ def _maybe_cache(
+         if not isinstance(arg, (np.ndarray, ExtensionArray, Index, ABCSeries)):
+             arg = np.array(arg)
+ 
++        from pandas import CategoricalDtype
++
++        if isinstance(getattr(arg, "dtype", None), CategoricalDtype):
++            # keep the cache index non-categorical so mapping yields datetimes
++            arg = np.asarray(arg)
++
+         unique_dates = unique(arg)
+         if len(unique_dates) < len(arg):
+             cache_dates = convert_listlike(unique_dates, format)

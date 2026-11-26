@@ -20,7 +20,8 @@ import time
 from pathlib import Path
 
 from codemem.config import load_config
-from codemem.search import _pick_top, make_card
+from codemem.render import format_results
+from codemem.search import SearchResponse, _pick_top, make_card
 from codemem.service import CodememService
 
 import llm
@@ -32,6 +33,12 @@ MAX_FIX_CHUNKS = 8
 MAX_CODE_CHARS = 60000
 SHOWN = int(os.environ.get("LOOP_N", LOOP_SHOWN))  # results shown per round (default 50)
 TAG = os.environ.get("LOOP_TAG", "loop")  # output file prefix
+# LOOP_FULL=1: the judge sees each result's raw code from the index (header line + chunk source), not a
+# 500-character preview. A chunk longer than CODE_CAP characters is cut; a class that long is shown as its
+# skeleton (class line, attributes, method signatures), since its methods are results of their own.
+FULL = os.environ.get("LOOP_FULL") == "1"
+CODE_CAP = 20000
+ROUND_CAP = 200000  # characters of code per round; past it, the remaining results get 500-character previews
 
 tasks_file, task_id, repo_arg, out_dir = sys.argv[1:5]
 task = next(t for t in (json.loads(x) for x in Path(tasks_file).read_text(encoding="utf8").split("\n") if x.strip())
@@ -65,6 +72,32 @@ def code_for(chunk_ids: list[int]) -> str:
     return "\n\n".join(parts)
 
 
+def show_full(cards) -> tuple[str, list[bool]]:
+    """Numbered results with each chunk's raw code from the index; also, per result, whether it was shown whole."""
+    chunks = store.get_chunks([c.chunk_id for c in cards])
+    parts, whole, total = [], [], 0
+    for i, card in enumerate(cards, start=1):
+        text = format_results(SearchResponse("", ["llm"], [card]))
+        text = f"{i}." + text[2:] if text.startswith("1.") else text
+        head = text.split("\n", 1)[0]
+        chunk = chunks.get(card.chunk_id)
+        if total > ROUND_CAP:
+            parts.append(text[:500])
+            whole.append(False)
+            continue
+        code = chunk.code if chunk else ""
+        ok = len(code) <= CODE_CAP
+        if not ok:
+            if chunk.kind == "class" and chunk.skeleton:
+                code = "[class too long to show whole: its skeleton; its methods are results of their own]\n" + chunk.skeleton[:CODE_CAP]
+            else:
+                code = code[:CODE_CAP] + f"\n[... cut at {CODE_CAP} characters]"
+        parts.append(head + "\n" + code)
+        whole.append(ok)
+        total += len(code)
+    return "\n\n".join(parts), whole
+
+
 def apply(edits: list[dict]) -> tuple[bool, str]:
     """All or nothing: every old text must occur exactly once in its file."""
     planned: dict[Path, str] = {}
@@ -90,12 +123,14 @@ def verbatim(values, source: str) -> list[str]:
 
 
 start = time.time()
-first = llm.clean(llm.extract("oneshot", llm.oneshot_input(task["repo"], task["query"]))["output"], task["query"])
+first_record = llm.extract("oneshot", llm.oneshot_input(task["repo"], task["query"]))
+oneshot_cost = first_record.get("cost_usd") or 0.0  # the query-writing call; counted in cost_usd
+first = llm.clean(first_record["output"], task["query"])
 cards, _ = searcher._retrieve(store, task["query"], first, False, SHOWN)
 query = {key: first[key] for key in ("intent", "symptom", "anchors")} | {"look_in": []}
 history = [{"round": 1, "query": query}]
 seen: set[int] = set()
-seen_text, picks, cost, calls, fixed = "", [], 0.0, C.Counter(), None
+seen_text, picks, cost, calls, fixed = "", [], oneshot_cost, C.Counter(), None
 for round_no in range(1, MAX_ROUNDS + 1):
     if round_no > 1:
         fused = searcher._round_fused(store, query)
@@ -104,11 +139,15 @@ for round_no in range(1, MAX_ROUNDS + 1):
     calls["codemem_rounds"] += 1
     if not cards:
         break
-    shown = searcher._show(cards)
+    if FULL:
+        shown, whole = show_full(cards)
+        history[-1]["shown_whole"] = whole
+    else:
+        shown = searcher._show(cards)
     seen.update(c.chunk_id for c in cards)
     history[-1]["shown"] = [[c.path, c.start_line, c.end_line] for c in cards]
     seen_text += "\n" + shown
-    record = llm.extract("loop", llm.loop_input(task["repo"], task["query"], history, round_no, shown))
+    record = llm.extract("loop_full" if FULL else "loop", llm.loop_input(task["repo"], task["query"], history, round_no, shown))
     cost += record.get("cost_usd") or 0.0
     calls["judge"] += 1
     judged = llm.clean_loop(record["output"], task["query"], seen_text, len(cards))
@@ -145,7 +184,8 @@ for round_no in range(1, MAX_ROUNDS + 1):
 service.close()
 patch = subprocess.run(["git", "diff"], cwd=repo, capture_output=True, text=True, encoding="utf8").stdout
 (out / f"{TAG}.diff").write_text(patch, encoding="utf8")
-summary = {"arm": "codemem-loop", "shown_per_round": SHOWN, "task": task_id, "fixed": fixed, "rounds": len(history), "calls": dict(calls),
+summary = {"arm": "codemem-loop", "shown_per_round": SHOWN, "judge_sees": "raw code" if FULL else "500-character previews",
+           "oneshot_cost_usd": round(oneshot_cost, 4), "task": task_id, "fixed": fixed, "rounds": len(history), "calls": dict(calls),
            "sonnet_calls": calls["judge"] + calls["fix"], "cost_usd": round(cost, 4), "seconds": round(time.time() - start),
            "diff_stat": subprocess.run(["git", "diff", "--stat"], cwd=repo, capture_output=True, text=True).stdout.strip(),
            "history": history}

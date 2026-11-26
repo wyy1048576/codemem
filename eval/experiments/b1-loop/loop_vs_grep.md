@@ -31,6 +31,8 @@ anchors and BM25 / dense on the whole issue. The top 50 is the result.
   chunks, 60,000 characters) and returns exact edits. Edits apply only if each `old` text occurs once in its
   file. If it cannot fix, its explanation and next query go into the next round. Cap: 10 rounds or $3.
 - `LOOP_N` (env, default 50) sets N; outputs go to `<LOOP_TAG>.summary.json` / `.diff` (added for the n sweep).
+  `LOOP_FULL=1` makes the end-to-end judge see raw code instead of previews (section 4b), and the summary now
+  counts the one-shot query call in `cost_usd` (`oneshot_cost_usd`). Sections 3 and 4 ran before that change.
 
 **Grep agent** (`e2e_run.py ... grep`). Headless Claude Code (`claude -p`, Sonnet 5.5, medium effort) with Read,
 Edit, Write, Grep, Glob; no shell, no build; budget $5. A fresh copy of the repo at the base commit, git history
@@ -98,6 +100,38 @@ run each); n = 50 is the run of section 3. `e2e_topn_score.py` scores the four a
 - Cost accounting: loop costs are the judge and fix calls; the one-shot query call (about $0.01) is not
   counted, except in the two pandas-70107 n = 10 / 25 runs, which used a newer `e2e_loop.py` (same previews)
   that adds it ($0.0125 each). Grep's cost is Claude Code's `total_cost_usd`.
+
+## 4b. The full-code judge end to end: 3 fair pandas pilot tasks (2026-11-26)
+
+`e2e_loop.py` with `LOOP_FULL=1`: the judge sees each result's raw code from the index (header line + chunk
+source, cut at 20,000 characters; a class that long is shown as its skeleton) instead of a 500-character preview.
+Runs `fullN` (n = 5, 10, 25) by `run_pilot3_full.py` on pandas 68195, 68945, 68090 (the same tasks as the README's
+result 1), one run each; scored by `score_pilot3.py` (`out/e2e-pilot3/score.json`).
+
+The scorer is **stricter than in sections 3 and 4**: a gold function is *seen* only when at least half its lines
+reached Sonnet as raw code (results shown whole, the fix call's code, or grep's Read / Grep lines); a preview
+does not count. Costs now include the one-shot query call for every loop arm (about $0.013-0.016 per task).
+loop-50 is left out of this comparison. 6 gold functions over the 3 tasks.
+
+| Arm | Cost, 3 tasks | Turns / rounds | Gold functions seen (raw code) | Gold functions edited | Tasks with a change |
+|---|---:|---:|---:|---:|---:|
+| grep agent | $0.14 | 22 | 3/6 | **4/6** | 3/3 |
+| loop, previews, n=25 | $0.32 | 4 | 3/6 | 2/6 | 3/3 |
+| loop, previews, n=10 | $0.31 | 4 | 4/6 | 3/6 | 3/3 |
+| loop, full code, n=25 | $0.45 | 3 | **6/6** | 3/6 | 3/3 |
+| loop, full code, n=10 | $0.77 | 13 | 6/6 | 2/6 | 2/3 |
+| loop, full code, n=5 | $0.35 | 5 | 4/6 | 2/6 | 3/3 |
+
+- Full code gets every gold function in front of Sonnet at n = 10 and 25, but no loop arm edits more gold
+  functions than grep (4 of 6).
+- full10's cost is one task: on 68090 the fix call said "could not fix" in round 1 (it judged `get_indexer_dict`
+  and `BaseGrouper.indices` self-consistent), and the next 9 rounds found nothing ($0.55). This is the same
+  failure as the 7 no-change tasks of section 4.
+- 3 tasks and one run each: this cannot rank the full-code arms against each other.
+
+**Running, no results yet:** `run_vague8.py` / `score_vague8.py` run grep and the full-code loop (n = 5, 10, 25,
+50) on the 8 contamination-free, validated, fair pilot tasks with vague prompts (L1 / L2 of
+`eval/tasks/vague-pilot18-v2.jsonl` on `main`), outputs `out/e2e-vague8/<level>/<task>/`.
 
 ## 5. Case study: duckdb-25101 (LIMIT 0 in a TopN under a LEFT_DELIM_JOIN)
 
@@ -189,3 +223,5 @@ the 23 finished grep transcripts in `out/e2e-all/` (output `grep_memory.json`). 
 | `why25101.py` | ranks of the 25101 gold code for the loop's lists and single queries (needs the 25101 index) |
 | `grep_memory.py`, `grep_memory.json` | the grep "memory" test of section 6 |
 | `out/e2e-25101/` | the four agent / loop runs on duckdb-25101 |
+| `e2e_loop.py` (`LOOP_FULL=1`), `run_pilot3_full.py`, `score_pilot3.py` | the full-code judge end to end and its stricter scorer (section 4b; `out/e2e-pilot3/<task>/full{5,10,25}.*`) |
+| `run_vague8.py`, `score_vague8.py` | grep vs the full-code loop on 8 vague-prompt pilot tasks (running; outputs not yet in git) |

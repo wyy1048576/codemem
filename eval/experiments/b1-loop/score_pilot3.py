@@ -1,19 +1,24 @@
 """Score grep agent vs codemem loop+fix on the 3 fair pandas pilot tasks (out/e2e-pilot3).
 
-Same rules as e2e_score.py: a gold function is SEEN when at least half its lines were shown to the model,
-EDITED when the final diff touches a line inside it. Gold functions come from the task's gold labels.
+A gold function is SEEN when at least half its lines reached the model as raw code (grep: lines returned by
+Read or printed by Grep; loops: results shown whole and the fix call's code, not previews), EDITED when the
+final diff touches a line inside it. Gold functions come from the task's gold labels.
 """
 import collections as C
 import json
 import re
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(r"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/b1-links/llm_query")
 OUT = HERE / "out" / "e2e-pilot3"
-TASKS = HERE.parent.parent / "tasks" / "fresh-v1.jsonl"
+TASKS = HERE.parent.parent / "codemem-7c24558" / "eval" / "tasks" / "fresh-v1.jsonl"
 IDS = ["pandas-dev__pandas-68195", "pandas-dev__pandas-68945", "pandas-dev__pandas-68090"]
 NL = chr(10)
-ARMS = ("grep", "loop", "loop25", "loop10")  # loop = 50 results per round
+# loopN: the judge sees N 500-character previews per round; fullN: N results as raw code from the index.
+# loop (50 previews) is still on disk but left out of the comparison.
+ARMS = ("grep", "loop25", "loop10", "full25", "full10", "full5")
+# The query-writing call before round 1. Summaries from before 2026-11-26 13:30 did not count it.
+ONESHOT_COST = {"pandas-dev__pandas-68090": 0.0159487, "pandas-dev__pandas-68945": 0.0124387, "pandas-dev__pandas-68195": 0.015018}
 
 src = (HERE / "e2e_score.py").read_text(encoding="utf8")
 helpers = src[src.index("def add_range"):src.index("import sys\nCOMMON")]
@@ -37,11 +42,14 @@ for tid in IDS:
             turns = s.get("turns")
             calls = sum((s.get("tool_calls") or {}).values())
         else:
+            # Seen = raw code that reached Sonnet: results shown whole (full arms), and the fix call's code.
+            # A 500-character preview does not count.
             seen = C.defaultdict(set)
             for h in s["history"]:
-                for p, a, b in h.get("shown", []):
-                    add_range(seen, p, a, b)
-                for x in h.get("fix_shown", []):
+                for (p, a, b), whole in zip(h.get("shown", []), h.get("shown_whole", [])):
+                    if whole:
+                        add_range(seen, p, a, b)
+                for x in h.get("fix_shown") or []:
                     m = re.match(r"(.+?) lines (\d+)-(\d+)", x)
                     if m:
                         add_range(seen, *m.groups())
@@ -49,7 +57,8 @@ for tid in IDS:
             calls = s.get("sonnet_calls")
         edited = diff_lines((d / f"{arm}.diff").read_text(encoding="utf8"))
         hits = [found(g, seen, edited) for g in gold]
-        rows.append({"task": tid, "arm": arm, "cost": s.get("cost_usd") or 0, "turns": turns, "calls": calls,
+        cost = (s.get("cost_usd") or 0) + (0 if arm == "grep" or "oneshot_cost_usd" in s else ONESHOT_COST[tid])
+        rows.append({"task": tid, "arm": arm, "cost": cost, "turns": turns, "calls": calls,
                      "seconds": s.get("seconds"), "gold": len(gold), "seen": sum(a for a, _ in hits),
                      "edited": sum(b for _, b in hits), "changed": bool(s.get("diff_stat")),
                      "gold_files": sorted({g.path for g in gold}), "diff_stat": s.get("diff_stat", "")})

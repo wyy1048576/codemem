@@ -21,6 +21,11 @@ All Sonnet calls are Sonnet 5.5 (`llm.py`). Prompts: `system_loop.txt`, `system_
 
 ## Result 1: the 3 fair pandas pilot tasks (2026-11-26)
 
+> **Updated later the same day:** `score_pilot3.py` now counts only raw code as seen (not previews), adds the
+> one-shot query call to the loops' cost, and covers the full-code arms (`full5`, `full10`, `full25`).
+> `out/e2e-pilot3/score.json` is from that version; the table below is from the first one. The new table is in
+> [`loop_vs_grep.md`](loop_vs_grep.md), section 4b.
+
 Tasks: pandas 68195 (easy), 68945 (easy), 68090 (hard) from `eval/tasks/fresh-v1.jsonl`: valid on Andrew's
 PC and fair by both screen reads (`eval/tasks/screen/pilot18.jsonl`). pandas 70742 is left out while its screen
 is reopened. One run per arm and task. Drivers: `run_pilot3.py` (grep, loop-50), `run_pilot3_n.py`

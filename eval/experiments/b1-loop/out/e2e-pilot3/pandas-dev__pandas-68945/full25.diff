@@ -1,0 +1,19 @@
+diff --git a/pandas/core/tools/datetimes.py b/pandas/core/tools/datetimes.py
+index ea436da..074ec85 100644
+--- a/pandas/core/tools/datetimes.py
++++ b/pandas/core/tools/datetimes.py
+@@ -1209,6 +1209,14 @@ def to_datetime(
+             else:
+                 return arg  # type: ignore[return-value]
+ 
++    from pandas.core.dtypes.dtypes import CategoricalDtype
++
++    if isinstance(getattr(arg, "dtype", None), CategoricalDtype):
++        # Mapping a categorical through the cache keeps the categorical
++        # dtype, giving inconsistent results (CategoricalIndex) for >= 50
++        # values; parse directly instead.
++        cache = False
++
+     convert_listlike = partial(
+         _convert_listlike_datetimes,
+         utc=utc,

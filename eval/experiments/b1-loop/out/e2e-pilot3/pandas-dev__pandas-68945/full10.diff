@@ -1,0 +1,18 @@
+diff --git a/pandas/core/tools/datetimes.py b/pandas/core/tools/datetimes.py
+index ea436da..64497cb 100644
+--- a/pandas/core/tools/datetimes.py
++++ b/pandas/core/tools/datetimes.py
+@@ -358,7 +358,13 @@ def _convert_and_box_cache(
+     """
+     from pandas import Series
+ 
++    from pandas.core.dtypes.dtypes import CategoricalDtype
++
+     result = Series(arg, dtype=cache_array.index.dtype).map(cache_array)
++    if isinstance(result.dtype, CategoricalDtype):
++        # mapping a categorical keeps it categorical; unwrap to the
++        # converted categories dtype so we box as DatetimeIndex
++        result = result.astype(result.dtype.categories.dtype)
+     return _box_as_indexlike(result._values, utc=False, name=name)
+ 
+ 

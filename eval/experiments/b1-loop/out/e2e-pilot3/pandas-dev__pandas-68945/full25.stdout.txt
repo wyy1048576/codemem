@@ -1,0 +1,34 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0124,
+ "task": "pandas-dev__pandas-68945",
+ "fixed": {
+  "round": 1,
+  "explanation": "With 50 or more values, the cache path maps the categorical input through the cache. A one-to-one mapping on a categorical keeps the categorical dtype, so the result is boxed as a CategoricalIndex or categorical Series. With fewer values the cache is skipped, and the direct parse returns a DatetimeIndex. The edit sets cache=False for categorical-dtype input. Every size then takes the direct parse path and returns datetime results. The cost is that categorical input no longer gets the cache speedup.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1903,
+ "seconds": 35,
+ "diff_stat": "pandas/core/tools/datetimes.py | 8 ++++++++\n 1 file changed, 8 insertions(+)"
+}
+round 1: found=True picked=['pandas/core/tools/datetimes.py:to_datetime', 'pandas/core/tools/datetimes.py:_convert_and_box_cache']
+  fix: applied: With 50 or more values, the cache path maps the categorical input through the cache. A one-to-one mapping on a categorical keeps the categorical dtype, so the result is boxed as a CategoricalIndex or categorical Series. With fewer values the cache is skipped, and the direct parse returns a DatetimeIndex. The edit sets cache=False for categorical-dtype input. Every size then takes the dire
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  15%|█▌        | 44/290 [00:00<00:00, 421.15it/s]
+Loading weights:  42%|████▏     | 123/290 [00:00<00:00, 624.42it/s]
+Loading weights:  64%|██████▍   | 187/290 [00:00<00:00, 630.57it/s]
+Loading weights:  87%|████████▋ | 251/290 [00:00<00:00, 581.22it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 630.74it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.
