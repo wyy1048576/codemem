@@ -50,3 +50,23 @@ def find_links(pr: dict, repo: str) -> dict[int, str]:
     by_list, by_regex = list_links(pr, repo), regex_links(pr, repo)
     return {number: "both" if number in by_list and number in by_regex else "list" if number in by_list else "regex"
             for number in sorted(by_list | by_regex)}
+
+
+def other_repo_regex_links(pr: dict, issue_repo: str) -> set[int]:
+    """SWE-bench's rule for an issue in another repo: a closing word, white space, then
+    `owner/name#N` or that repo's issue URL. A bare "#N" always means the PR's own repo."""
+    markers = [re.escape(f"{issue_repo}#"), re.escape(f"https://github.com/{issue_repo}/issues/")]
+    pattern = re.compile(rf"(\w+)\s+(?:{'|'.join(markers)})(\d+)", re.IGNORECASE)
+    return {int(number) for word, number in pattern.findall(pr_text(pr)) if word.lower() in PR_KEYWORDS}
+
+
+def find_all_links(pr: dict, repo: str, issue_repos: tuple[str, ...] | list[str] = ()) -> dict[tuple[str, int], str]:
+    """(issue repo, number) -> "list", "regex", or "both", for the PR's own repo and for each repo
+    in issue_repos: repos whose issues are about this repo's code (astral-sh/ty for astral-sh/ruff)."""
+    found = {(repo, number): method for number, method in find_links(pr, repo).items()}
+    for other in issue_repos:
+        by_list, by_regex = list_links(pr, other), other_repo_regex_links(pr, other)
+        for number in sorted(by_list | by_regex):
+            found[(other, number)] = ("both" if number in by_list and number in by_regex
+                                      else "list" if number in by_list else "regex")
+    return found

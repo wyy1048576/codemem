@@ -1,0 +1,461 @@
+{
+  "kind": "resplit",
+  "source": "fresh-v1.jsonl",
+  "source_sha256": "9c2ca4591305c55eb5bb96750a6ec502b9ef1ab855b614e7818ae903ff6072a8",
+  "repo": "home-assistant/core",
+  "recipe": "homeassistant",
+  "test_paths": [
+    "tests/**"
+  ],
+  "test_paths_from_test_files": true,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "requirements.txt",
+    "requirements_all.txt",
+    "requirements_test.txt",
+    "requirements_test_pre_commit.txt",
+    "homeassistant/package_constraints.txt"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 756,
+  "changed": 248,
+  "unchanged": 508,
+  "not_split": {},
+  "with_test_files_added": 91,
+  "with_fix_files_added": 182,
+  "test_files_added": 149,
+  "fix_files_added": 273,
+  "files_left_out": {},
+  "with_dependency_needed": 40,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 19,
+    "medium": 11,
+    "hard": 10
+  },
+  "dependency_needed": {
+    "home-assistant__core-175897": [
+      {
+        "file": "requirements_all.txt",
+        "package": "ha-iotawattpy",
+        "old": "ha-iotawattpy ==0.1.2",
+        "new": "ha-iotawattpy ==0.2.1",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-177096": [
+      {
+        "file": "requirements_all.txt",
+        "package": "aiohomekit",
+        "old": "aiohomekit ==3.2.20",
+        "new": "aiohomekit ==4.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-176889": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pypaperless",
+        "old": "pypaperless ==4.1.1",
+        "new": "pypaperless ==5.2.3",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-176869": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pyintesishome",
+        "old": "pyintesishome ==1.8.8",
+        "new": "pyintesishome ==2.0.3",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-177631": [
+      {
+        "file": "requirements_all.txt",
+        "package": "aiohue",
+        "old": "aiohue ==4.8.1",
+        "new": "aiohue ==4.8.2",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-177899": [
+      {
+        "file": "requirements_all.txt",
+        "package": "solaredge-web",
+        "old": "solaredge-web ==0.0.1",
+        "new": "solaredge-web ==0.3.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-177405": [
+      {
+        "file": "requirements_all.txt",
+        "package": "py-opendisplay",
+        "old": "py-opendisplay ==7.2.3",
+        "new": "py-opendisplay ==7.15.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-177685": [
+      {
+        "file": "requirements_all.txt",
+        "package": "lyngdorf",
+        "old": "lyngdorf ==1.3.3",
+        "new": "lyngdorf ==1.4.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-178588": [
+      {
+        "file": "requirements_all.txt",
+        "package": "evohome-async",
+        "old": "evohome-async ==2.0.1",
+        "new": "evohome-async ==2.1.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-178502": [
+      {
+        "file": "requirements_all.txt",
+        "package": "vizaio",
+        "old": "vizaio ==0.3.2",
+        "new": "vizaio ==0.4.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-179581": [
+      {
+        "file": "requirements_all.txt",
+        "package": "bleak-esphome",
+        "old": "bleak-esphome ==3.9.7",
+        "new": "bleak-esphome ==4.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-179673": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pyenphase",
+        "old": "pyenphase ==3.2.1",
+        "new": "pyenphase ==4.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-179985": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pynintendoparental",
+        "old": "pynintendoparental ==2.5.0",
+        "new": "pynintendoparental ==2.6.2",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-177499": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pyanglianwater",
+        "old": "pyanglianwater ==3.2.4",
+        "new": "pyanglianwater ==3.3.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-180820": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pytrafikverket",
+        "old": "pytrafikverket ==1.1.1",
+        "new": "pytrafikverket ==2.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-180614": [
+      {
+        "file": "homeassistant/package_constraints.txt",
+        "package": "grpcio",
+        "old": "grpcio ==1.78.0",
+        "new": "grpcio ==1.83.1",
+        "kind": "raised"
+      },
+      {
+        "file": "homeassistant/package_constraints.txt",
+        "package": "grpcio-reflection",
+        "old": "grpcio-reflection ==1.78.0",
+        "new": "grpcio-reflection ==1.83.1",
+        "kind": "raised"
+      },
+      {
+        "file": "homeassistant/package_constraints.txt",
+        "package": "grpcio-status",
+        "old": "grpcio-status ==1.78.0",
+        "new": "grpcio-status ==1.83.1",
+        "kind": "raised"
+      },
+      {
+        "file": "homeassistant/package_constraints.txt",
+        "package": "protobuf",
+        "old": "protobuf ==6.33.6",
+        "new": "protobuf ==7.36.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements_test.txt",
+        "package": "types-protobuf",
+        "old": "types-protobuf ==6.32.1.20260221",
+        "new": "types-protobuf ==7.35.1.20260827",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-181405": [
+      {
+        "file": "requirements_all.txt",
+        "package": "midea-local",
+        "old": "midea-local ==10.1.0",
+        "new": "midea-local ==11.0.1",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-181238": [
+      {
+        "file": "requirements_all.txt",
+        "package": "openhomedevice",
+        "old": "openhomedevice ==2.2.0",
+        "new": "openhomedevice ==2.5",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-182144": [
+      {
+        "file": "requirements_all.txt",
+        "package": "midea-local",
+        "old": "midea-local ==11.0.1",
+        "new": "midea-local ==12.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-182224": [
+      {
+        "file": "requirements_all.txt",
+        "package": "asyncsleepiq",
+        "old": "asyncsleepiq ==1.7.1",
+        "new": "asyncsleepiq ==1.7.2",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-179723": [
+      {
+        "file": "requirements_all.txt",
+        "package": "energyflip-api-client",
+        "old": null,
+        "new": "energyflip-api-client ==0.3.0",
+        "kind": "added"
+      }
+    ],
+    "home-assistant__core-182334": [
+      {
+        "file": "requirements_all.txt",
+        "package": "aioipp",
+        "old": "aioipp ==0.19.0",
+        "new": "aioipp ==0.19.3",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-182402": [
+      {
+        "file": "requirements_all.txt",
+        "package": "ourgroceries",
+        "old": "ourgroceries ==1.5.4",
+        "new": "ourgroceries ==1.6.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-183009": [
+      {
+        "file": "requirements_all.txt",
+        "package": "lifx-async",
+        "old": "lifx-async ==6.5.1",
+        "new": "lifx-async ==7.4.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-183001": [
+      {
+        "file": "requirements_all.txt",
+        "package": "victron-vrm",
+        "old": "victron-vrm ==0.1.12",
+        "new": "victron-vrm ==0.1.13",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-183665": [
+      {
+        "file": "requirements_all.txt",
+        "package": "zha",
+        "old": "zha ==2.2.2",
+        "new": "zha ==2.3.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements_all.txt",
+        "package": "zha-quirks",
+        "old": "zha-quirks ==2.2.2",
+        "new": "zha-quirks ==2.3.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-183923": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pywaze",
+        "old": "pywaze ==1.2.1",
+        "new": "pywaze ==1.2.3",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-183912": [
+      {
+        "file": "homeassistant/package_constraints.txt",
+        "package": "av",
+        "old": "av ==17.0.1",
+        "new": "av ==19.0.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements_all.txt",
+        "package": "av",
+        "old": "av ==17.0.1",
+        "new": "av ==19.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-183141": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pydrawise",
+        "old": "pydrawise ==2026.9.0",
+        "new": "pydrawise ==2026.9.1",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-184290": [
+      {
+        "file": "requirements_all.txt",
+        "package": "solaredged",
+        "old": "solaredged ==0.4.0",
+        "new": "solaredged ==0.5.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-184728": [
+      {
+        "file": "requirements_all.txt",
+        "package": "pyicloud",
+        "old": "pyicloud ==2.6.5",
+        "new": "pyicloud ==2.7.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-184955": [
+      {
+        "file": "requirements_all.txt",
+        "package": "aioimmich",
+        "old": "aioimmich ==0.17.0",
+        "new": "aioimmich ==0.18.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-185639": [
+      {
+        "file": "requirements_all.txt",
+        "package": "tailscale",
+        "old": "tailscale ==0.7.0",
+        "new": "tailscale ==1.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-185699": [
+      {
+        "file": "requirements_all.txt",
+        "package": "surepy",
+        "old": "surepy ==0.9.0",
+        "new": "surepy ==0.10.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-185694": [
+      {
+        "file": "requirements_all.txt",
+        "package": "evohome-async",
+        "old": "evohome-async ==2.1.0",
+        "new": "evohome-async ==3.0.0",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-186164": [
+      {
+        "file": "homeassistant/package_constraints.txt",
+        "package": "pycares",
+        "old": null,
+        "new": "pycares ==5.0.1",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-186917": [
+      {
+        "file": "requirements_all.txt",
+        "package": "energyzero",
+        "old": "energyzero ==5.1.0",
+        "new": "energyzero ==5.1.1",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-187097": [
+      {
+        "file": "requirements_all.txt",
+        "package": "qnapstats",
+        "old": "qnapstats ==0.4.0",
+        "new": "qnapstats ==0.6.2",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-185160": [
+      {
+        "file": "requirements_all.txt",
+        "package": "py-unifi-access",
+        "old": "py-unifi-access ==1.6.1",
+        "new": "py-unifi-access ==1.6.2",
+        "kind": "raised"
+      }
+    ],
+    "home-assistant__core-186799": [
+      {
+        "file": "requirements_all.txt",
+        "package": "aioshelly",
+        "old": "aioshelly ==13.35.0",
+        "new": "aioshelly ==14.0.1",
+        "kind": "raised"
+      }
+    ]
+  },
+  "with_dependency_other": 6,
+  "with_dependency_other_by_difficulty": {
+    "easy": 3,
+    "medium": 0,
+    "hard": 3
+  },
+  "with_test_patch_before": 618,
+  "with_test_patch_after": 637,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "7f1147de74ee59539ef1811f3d0ac5af4820d614",
+    "dirty": false
+  },
+  "created": "2026-11-26T10:41:01+00:00"
+}

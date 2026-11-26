@@ -1,0 +1,72 @@
+# Recipe for kubernetes/kubernetes: Go unit tests, run per package.
+# The fields are described in src/cmeval/generate.py.
+
+repo = "kubernetes/kubernetes"
+# The Go of this image only starts the set-up. The dependency step puts the task's own Go version in /usr/local/go.
+base_image = "golang:1.27.3-bookworm"
+
+base_setup = [
+    # gotestsum writes the JUnit file. v1.13.0 is the version that hack/tools/go.mod pins in the whole task window.
+    "a=$(dpkg --print-architecture); curl -fsSL https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_1.13.0_linux_$a.tar.gz | tar xz -C /usr/local/bin gotestsum && gotestsum --version",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+]
+
+# The Go version of the task's commit. The repo pins it in .go-version, and it changes in the
+# window (1.26.4 to 1.27.3). Tasks with the same version share this layer.
+deps_files = [".go-version"]
+deps = [
+    "v=$(cat .go-version) && a=$(dpkg --print-architecture) && rm -rf /usr/local/go && curl -fsSL https://go.dev/dl/go$v.linux-$a.tar.gz | tar xz -C /usr/local && go version | grep -F \"go$v \"",
+]
+
+# The repo vendors all modules of its Go workspace (go.work and vendor/modules.txt), so no
+# module download is necessary. This step fills the build cache: every non-test package that a
+# unit test of the repo can import (e2e and integration tests left out). Then the first test
+# run of a package compiles only the package itself and links. The step does not stop the image
+# when a package does not build: the tests show it.
+build = [
+    "go list -e -f '{{.ImportPath}}' $(go list -m -f '{{.Path}}/...') | grep -vE '^k8s.io/kubernetes/test/(e2e|e2e_node|e2e_kubeadm|e2e_dra|integration)(/|$)|/test/integration(/|$)' > /tmp/roots.txt && go list -e -deps -test -f '{{if and (not .ForTest) (not .Standard) (ne .Name \"main\") .GoFiles}}{{.ImportPath}}{{end}}' $(cat /tmp/roots.txt) | sort -u > /tmp/warm.txt && wc -l < /tmp/warm.txt && (xargs go build < /tmp/warm.txt || echo 'some packages did not build') && rm /tmp/roots.txt /tmp/warm.txt && du -sh $GOCACHE",
+]
+
+# Go compiles changed packages when the tests start, so no step is necessary after a patch.
+refresh = []
+
+# Unit tests only: *_test.go beside the code. test/integration needs etcd and a control plane;
+# test/e2e*, test/e2e_node and cmd/kubeadm/test need a cluster or built binaries.
+test_files = [
+    "pkg/**/*_test.go",
+    "cmd/**/*_test.go",
+    "plugin/**/*_test.go",
+    "staging/src/k8s.io/**/*_test.go",
+    "test/utils/**/*_test.go",
+    "test/declarative_validation/**/*_test.go",
+]
+# Each test file goes to its package directory, and each package runs once. A path under
+# test/integration (also in staging) or cmd/kubeadm/test is dropped. "go test ./dir" from the
+# repo root also works for a staging module, because go.work lists the staging modules.
+# -count=1: no test cache. -p 8 and -parallel 8: fixed for 8 processors. -vet=off: no vet
+# step, which is not part of a test verdict. -timeout=450s for each package: the repo's own
+# 180s is too short here (k8s.io/apiserver/pkg/storage/cacher took 132 s on a fast machine), and
+# 450 s stays below the suite limit, so a test that hangs is named in the JUnit file.
+# No -race: it slows the tests several times and is not necessary for a verdict.
+# A package that does not compile (before the fix, a new test can use a name that the fix adds)
+# is one failed test "TestMain" in the JUnit file, and its tests are missing.
+test = '''pkgs=$(for f in {files}; do case $f in (*/test/integration/*|cmd/kubeadm/test/*) ;; (*) echo "./${f%/*}" ;; esac; done | sort -u); [ -n "$pkgs" ] || { echo 'no package to test'; exit 1; }; gotestsum --junitfile {junit} --format pkgname-and-test-fails -- -count=1 -p 8 -parallel 8 -vet=off -timeout=450s $pkgs'''
+parser = "junit"
+timeout_min = 10
+
+# For cmeval resplit: the test files of the repo whatever their extension, as the collector's
+# configs/fresh-go-v1.toml has them (golden files and test inputs in testdata/).
+test_paths = ["**/*_test.go", "**/testdata/**", "test/**", "staging/src/k8s.io/*/test/**"]
+# The third-party modules are vendored: vendor/modules.txt has their versions, and each go.mod
+# (also those of staging/) names them. Modules of staging/ are the repo's own.
+dependency_paths = ["go.mod", "go.work", "**/go.mod", "vendor/modules.txt"]
+
+[env]
+# The build cache must be in the image. /root/.cache is a build-time cache mount.
+GOCACHE = "/opt/gocache"
+# Use the Go in /usr/local/go and never download another one.
+GOTOOLCHAIN = "local"
+# hack/make-rules/test.sh sets these two for every unit test run.
+KUBE_CACHE_MUTATION_DETECTOR = "true"
+KUBE_PANIC_WATCH_DECODE_ERROR = "true"

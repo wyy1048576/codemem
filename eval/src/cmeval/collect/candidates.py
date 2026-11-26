@@ -19,7 +19,7 @@ from ..files import write_json, write_text_atomic
 from ..github import GitHub
 from ..tasks import clean_query
 from .issues import body_at, build_query, fetch_issues, hints_before, leak, title_at
-from .links import find_links
+from .links import find_all_links
 from .repo_stats import Candidate as RepoEntry
 from .repo_stats import RepoStatsError, load_candidates
 from .search import is_bot, search_merged_prs
@@ -28,7 +28,7 @@ GITHUB_STEPS = (
     ("merged", "merged into the default branch in the date range"),
     ("opened_after_cutoff", "the fix PR was opened on or after the start date (its code was not public before)"),
     ("not_bot", "author is not a bot"),
-    ("one_link", "links exactly one issue in the same repo (GitHub's list or the SWE-bench regex)"),
+    ("one_link", "links exactly one issue in the same repo or a listed issue repo (GitHub's list or the SWE-bench regex)"),
     ("is_issue", "the link is an issue that exists (not a PR)"),
     ("issue_before_pr", "the issue was opened before the fix PR (not written after the fix)"),
     ("body_ok", "body (as of when the fix PR was opened) has the minimum length"),
@@ -38,6 +38,7 @@ GITHUB_STEPS = (
 GIT_STEPS = (
     ("base_found", "base commit found from the merge type (Decision 7)"),
     ("files_match", "our patch touches exactly the PR's files"),
+    ("test_split", "no file mixes fix code and test code (Rust: changes inside and outside #[cfg(test)] code)"),
     ("applies", "the code patch applies at the base commit"),
     ("size_ok", "1 to max_code_files code files and at most max_code_lines changed code lines"),
     ("labeled", "labeled, with at least one gold file that exists at the base commit"),
@@ -143,7 +144,9 @@ def collect_candidates(gh: GitHub, repo: str, settings: Settings, *,
     counts = funnel.counts
     counts["merged"] = len(prs)
 
-    linked: list[tuple[dict, int, str]] = []
+    entry = next((r for r in settings.repos if r.name.lower() == repo.lower()), None)
+    issue_repos = entry.issue_repos if entry else []
+    linked: list[tuple[dict, str, int, str]] = []  # (PR, issue repo, issue number, link method)
     opened = people = 0
     since = settings.since.isoformat()
     for pr in prs:
@@ -155,25 +158,29 @@ def collect_candidates(gh: GitHub, repo: str, settings: Settings, *,
             funnel.drop(pr, "not_bot", f"bot author ({pr['author']['login']})")
             continue
         people += 1
-        links = find_links(pr, repo)
+        links = find_all_links(pr, repo, issue_repos)
         if not links:
             funnel.drop(pr, "one_link", "no linked issue")
         elif len(links) > 1:
-            funnel.drop(pr, "one_link", f"several linked issues ({', '.join(f'#{n}' for n in links)})")
+            names = ", ".join(f"#{n}" if r == repo else f"{r}#{n}" for r, n in links)
+            funnel.drop(pr, "one_link", f"several linked issues ({names})")
         else:
-            (number, method), = links.items()
-            linked.append((pr, number, method))
+            ((issue_repo, number), method), = links.items()
+            linked.append((pr, issue_repo, number, method))
     counts["opened_after_cutoff"] = opened
     counts["not_bot"] = people
     counts["one_link"] = len(linked)
 
     progress(f"{repo}: fetching {len(linked)} linked issues")
-    issues = fetch_issues(gh, repo, [number for _, number, _ in linked])
+    issues: dict[tuple[str, int], dict | None] = {}
+    for issue_repo in sorted({r for _, r, _, _ in linked}):
+        found = fetch_issues(gh, issue_repo, [n for _, r, n, _ in linked if r == issue_repo])
+        issues.update({(issue_repo, n): issue for n, issue in found.items()})
     candidates: list[Candidate] = []
     for key in ("is_issue", "issue_before_pr", "body_ok", "no_leak"):
         counts[key] = 0
-    for pr, number, method in linked:
-        issue = issues.get(number)
+    for pr, issue_repo, number, method in linked:
+        issue = issues.get((issue_repo, number))
         if issue is None:
             funnel.drop(pr, "is_issue", f"issue not found (#{number})")
             continue
@@ -210,7 +217,8 @@ def collect_candidates(gh: GitHub, repo: str, settings: Settings, *,
             commits_total=commits.get("totalCount", 0), changed_files=pr["changedFiles"],
             issue_number=number, issue_url=issue["url"], issue_created_at=issue["createdAt"],
             query=query, hints=hints_before(issue, pr["createdAt"], settings.extra_bots), link_method=method,
-            tags={"body_edited_after_fix": body_after, "title_edited_after_fix": title_after},
+            tags={"body_edited_after_fix": body_after, "title_edited_after_fix": title_after,
+                  "issue_repo": issue_repo},
         ))
     funnel.link_methods = dict(Counter(c.link_method for c in candidates))
     progress(f"{repo}: {len(candidates)} candidates")

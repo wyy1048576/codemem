@@ -202,6 +202,7 @@ dependencies = [
     { name = "tree-sitter-c" },
     { name = "tree-sitter-cpp" },
     { name = "tree-sitter-python" },
+    { name = "tree-sitter-rust" },
     { name = "tree-sitter-typescript" },
     { name = "unidiff" },
 ]
@@ -225,6 +226,7 @@ requires-dist = [
     { name = "tree-sitter-c", specifier = ">=0.24,<0.25" },
     { name = "tree-sitter-cpp", specifier = ">=0.23,<0.24" },
     { name = "tree-sitter-python", specifier = ">=0.25,<0.26" },
+    { name = "tree-sitter-rust", specifier = ">=0.24,<0.25" },
     { name = "tree-sitter-typescript", specifier = ">=0.23,<0.24" },
     { name = "unidiff", specifier = ">=1.0" },
 ]

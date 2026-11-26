@@ -1,0 +1,501 @@
+# Recipe for trinodb/trino (Java, Maven): unit tests and in-JVM query tests of the modules that the
+# candidate tasks change. The fields are described in src/cmeval/generate.py.
+#
+# The build installs a fixed list of 15 modules and the modules that they need (about 50 of the 110
+# modules of the repo) into a local Maven repository in the image. Tests run offline with "-o".
+# The script cmeval-trino-test (written in base_setup) maps the test files of a task to test classes
+# and test methods, and runs them with "-am", so Maven compiles every changed module that the tests
+# need first. Modules that the build leaves out hold tests that need Docker (Testcontainers), cloud
+# accounts, or both: mongodb, mysql, postgresql, druid, redshift, bigquery. Their files are not in
+# test_files. Tests that need Docker in a built module fail in every run, before and after the fix,
+# so they are in neither test list.
+
+repo = "trinodb/trino"
+# Every task commit of the window asks for Java 25 (.java-version, project.build.targetJdk). The CI
+# of the newest task commits uses 25.0.4.
+base_image = "eclipse-temurin:25.0.4_7-jdk-noble"
+
+# Once per repo.
+base_setup = [
+    "apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git python3 unzip && rm -rf /var/lib/apt/lists/*",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+    # The test command. Each line of the script is one argument of printf.
+    '''printf '%s\n' \
+  '#!/usr/bin/env python3' \
+  '# cmeval-trino-test: choose and run the trino tests of a list of test files.' \
+  '#   cmeval-trino-test JUNIT FILE...   run the tests, write one JUnit XML file to JUNIT' \
+  '#   cmeval-trino-test --select FILE...   print the choice and run nothing' \
+  '#   cmeval-trino-test --refresh   compile the changed modules and the modules that they need' \
+  '# Run it in the root of the repo. A module is built when it has a target folder.' \
+  '# A changed test class runs as a whole. A base class (abstract, or without a test name) runs through' \
+  '# its concrete subclasses in built modules. A connector test runs through the same choice of' \
+  '# methods as a base class, because it inherits hundreds of tests. The choice of methods: the test' \
+  '# methods that the diff touches, and the test methods that call a touched helper method. If there' \
+  '# are none, the test methods of the class and its superclasses that name an identifier of the' \
+  '# changed lines. If there are none either, all methods. A helper class or a resource runs the test' \
+  '# classes of its module that name it, when no other file of the module chose a test.' \
+  '# The choice reads the test files in the work tree and their diff against HEAD. The fix does not' \
+  '# change test files, so the choice is the same before and after the fix.' \
+  'import glob' \
+  'import os' \
+  'import re' \
+  'import shutil' \
+  'import socket' \
+  'import subprocess' \
+  'import sys' \
+  'import xml.etree.ElementTree as ET' \
+  '' \
+  'MAVEN = ["./mvnw", "-o", "-B", "--no-transfer-progress", "-T", "8", "-Dair.check.skip-all=true",' \
+  '         "-Dmaven.javadoc.skip=true", "-Dmaven.source.skip=true"]' \
+  '# The web UI module needs the network to build. Its jar is in the local repository, so it is left' \
+  '# out of each build. Maven refuses to leave out a module that the build does not need.' \
+  'WEB_UI = "core/trino-web-ui"' \
+  '# -fn: with -am, surefire also runs in each module that the chosen modules need. Those modules have no' \
+  '# chosen test, and the pom of the repo sets failIfNoTests, so they fail. The build must go on.' \
+  'TEST_OPTIONS = ["-fn", "-Dmaven.test.failure.ignore=true", "-Dsurefire.failIfNoSpecifiedTests=false",' \
+  '                "-Dsurefire.rerunFailingTestsCount=0",' \
+  '                "-Djunit.jupiter.execution.parallel.config.strategy=fixed",' \
+  '                "-Djunit.jupiter.execution.parallel.config.fixed.parallelism=8"]' \
+  'TEST_ANNOTATION = re.compile(r"@(?:org\.junit\.jupiter\.api\.)?(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b")' \
+  'LARGE = ("ConnectorTest", "ConnectorSmokeTest")' \
+  'QUOTE = chr(39)' \
+  '' \
+  '' \
+  'def git(*args):' \
+  '    return subprocess.run(["git", *args], capture_output=True, text=True).stdout' \
+  '' \
+  '' \
+  'def module_of(path):' \
+  '    folder = os.path.dirname(path)' \
+  '    while folder and not os.path.exists(os.path.join(folder, "pom.xml")):' \
+  '        folder = os.path.dirname(folder)' \
+  '    return folder' \
+  '' \
+  '' \
+  'def built(module):' \
+  '    return bool(module) and os.path.isdir(os.path.join(module, "target"))' \
+  '' \
+  '' \
+  'def blank(text):' \
+  '    return re.sub(r"[^\n]", " ", text)' \
+  '' \
+  '' \
+  'def strip_java(text):' \
+  '    """The source with comments and the content of literals as spaces. Line breaks stay."""' \
+  '    out = []' \
+  '    i, n = 0, len(text)' \
+  '    while i < n:' \
+  '        if text.startswith("//", i):' \
+  '            j = text.find("\n", i)' \
+  '            j = n if j < 0 else j' \
+  '        elif text.startswith("/*", i):' \
+  '            j = text.find("*/", i + 2)' \
+  '            j = n if j < 0 else j + 2' \
+  '        elif text.startswith(3 * chr(34), i):' \
+  '            j = text.find(3 * chr(34), i + 3)' \
+  '            j = n if j < 0 else j + 3' \
+  '        elif text[i] in (chr(34), QUOTE):' \
+  '            j = i + 1' \
+  '            while j < n and text[j] not in (text[i], "\n"):' \
+  '                j += 2 if text[j] == chr(92) else 1' \
+  '            j = min(j + 1, n)' \
+  '            out.append(text[i] + blank(text[i + 1:j - 1]) + text[i])' \
+  '            i = j' \
+  '            continue' \
+  '        else:' \
+  '            j = i + 1' \
+  '            while j < n and text[j] not in "/" + chr(34) + QUOTE:' \
+  '                j += 1' \
+  '            out.append(text[i:j])' \
+  '            i = j' \
+  '            continue' \
+  '        out.append(blank(text[i:j]))' \
+  '        i = j' \
+  '    return "".join(out)' \
+  '' \
+  '' \
+  'def collapse(text):' \
+  '    """The text with the content of each pair of parentheses removed, and no generic arguments."""' \
+  '    while True:' \
+  '        new = re.sub(r"\([^()]*\)", "()", text)' \
+  '        new = re.sub(r"<[^<>]*>", "", new)' \
+  '        if new == text:' \
+  '            return text' \
+  '        text = new' \
+  '' \
+  '' \
+  'class JavaType:' \
+  '    def __init__(self, path):' \
+  '        self.path = path' \
+  '        self.name = os.path.basename(path)[:-len(".java")]' \
+  '        self.text = ""' \
+  '        self.abstract = False' \
+  '        self.supers = []' \
+  '        self.body = -1' \
+  '        try:' \
+  '            with open(path, encoding="utf-8", errors="replace") as source:' \
+  '                self.text = strip_java(source.read())' \
+  '        except OSError:' \
+  '            return' \
+  '        decl = re.search(r"((?:\b(?:public|protected|private|abstract|final|static|sealed|non-sealed|strictfp)\s+)*)"' \
+  '                         r"\b(class|interface|enum|record)\s+" + re.escape(self.name) + r"\b", self.text)' \
+  '        if not decl:' \
+  '            return' \
+  '        self.body = self.text.find("{", decl.end())' \
+  '        header = collapse(self.text[decl.end():self.body])' \
+  '        for keyword in ("extends", "implements"):' \
+  '            found = re.search(r"\b" + keyword + r"\s+(.*?)(?:\bimplements\b|\bpermits\b|$)", header, re.S)' \
+  '            if found:' \
+  '                self.supers += [part.strip().split(".")[-1] for part in found.group(1).split(",") if part.strip()]' \
+  '        self.abstract = "abstract" in decl.group(1).split() or decl.group(2) == "interface"' \
+  '' \
+  '    def is_test(self):' \
+  '        """A class that surefire runs: a concrete class under src/test/java with a test name."""' \
+  '        name = self.name' \
+  '        test_name = (name.startswith("Test") and not name.startswith("Testing")) or name.endswith("Test")' \
+  '        return self.body >= 0 and not self.abstract and test_name and "/src/test/java/" in self.path' \
+  '' \
+  '    def fqcn(self):' \
+  '        return self.path.split("/src/test/java/", 1)[1][:-len(".java")].replace("/", ".")' \
+  '' \
+  '    def methods(self):' \
+  '        """(name, is a test, first line, last line, body) of each method of the class body."""' \
+  '        text, found = self.text, []' \
+  '        if self.body < 0:' \
+  '            return found' \
+  '        depth = parens = 0' \
+  '        start = self.body + 1' \
+  '        header_end = 0' \
+  '        for i in range(self.body, len(text)):' \
+  '            c = text[i]' \
+  '            if c == "(":' \
+  '                parens += 1' \
+  '            elif c == ")":' \
+  '                parens -= 1' \
+  '            elif parens:' \
+  '                continue' \
+  '            elif c == "{":' \
+  '                depth += 1' \
+  '                if depth == 2:' \
+  '                    header_end = i' \
+  '            elif c == "}":' \
+  '                depth -= 1' \
+  '                if depth == 1:' \
+  '                    header = text[start:header_end]' \
+  '                    flat = collapse(header)' \
+  '                    method = re.search(r"(\w+)\s*\(\)\s*(?:throws\s+[\w.,\s]+)?$", flat.strip())' \
+  '                    nested = re.search(r"\b(?:class|interface|enum|record)\s+\w+", flat)' \
+  '                    if method and not nested and "=" not in flat:' \
+  '                        first = start + len(header) - len(header.lstrip())' \
+  '                        found.append((method.group(1), bool(TEST_ANNOTATION.search(header)),' \
+  '                                      text.count("\n", 0, first) + 1, text.count("\n", 0, i) + 1, text[header_end:i]))' \
+  '                    start = i + 1' \
+  '                elif depth == 0:' \
+  '                    break' \
+  '            elif c == ";" and depth == 1:' \
+  '                start = i + 1' \
+  '        return found' \
+  '' \
+  '' \
+  'def changed_lines(path):' \
+  '    """The line numbers that the diff against HEAD adds or changes. None for a new file: all lines."""' \
+  '    if subprocess.run(["git", "ls-files", "--error-unmatch", path], capture_output=True).returncode:' \
+  '        return None' \
+  '    lines = set()' \
+  '    for hunk in re.finditer(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", git("diff", "-U0", "HEAD", "--", path), re.M):' \
+  '        first, count = int(hunk.group(1)), 1 if hunk.group(2) is None else int(hunk.group(2))' \
+  '        lines.update(range(first, first + count) if count else (first, first + 1))' \
+  '    return lines' \
+  '' \
+  '' \
+  'def touched_tests(java):' \
+  '    """The test methods that the diff touches, and the test methods that call a touched helper method."""' \
+  '    members = java.methods()' \
+  '    lines = changed_lines(java.path)' \
+  '    if lines is None:' \
+  '        return {name for name, test, _, _, _ in members if test}' \
+  '    hit = [(name, test) for name, test, first, last, _ in members if any(first <= line <= last for line in lines)]' \
+  '    names = {name for name, test in hit if test}' \
+  '    helpers = {name for name, test in hit if not test}' \
+  '    for name, test, _, _, body in members:' \
+  '        if test and any(re.search(r"\b" + re.escape(helper) + r"\s*\(", body) for helper in helpers):' \
+  '            names.add(name)' \
+  '    return names' \
+  '' \
+  '' \
+  'def superclass_chain(java):' \
+  '    """The class and its superclasses that are in built modules, nearest first."""' \
+  '    chain, current = [java], java' \
+  '    while current.supers:' \
+  '        paths = git("ls-files", "--cached", "--others", "--exclude-standard", "*/" + current.supers[0] + ".java").splitlines()' \
+  '        paths = [path for path in paths if built(module_of(path)) and os.path.exists(path)]' \
+  '        if not paths:' \
+  '            break' \
+  '        current = JavaType(paths[0])' \
+  '        chain.append(current)' \
+  '    return chain' \
+  '' \
+  '' \
+  'def related_tests(java):' \
+  '    """For a change outside test methods (for example a flag in a helper that inherited tests read):' \
+  '    the test methods of the class and its superclasses that name an identifier of the changed lines.' \
+  '    An identifier that ten or more test methods name says nothing and is not used."""' \
+  '    diff = git("diff", "-U0", "HEAD", "--", java.path).splitlines()' \
+  '    changed = [line[1:] for line in diff if line[:1] in "+-" and not line.startswith(("+++", "---"))]' \
+  '    words = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]{3,}\b", strip_java("\n".join(changed))))' \
+  '    tests = [(name, body) for part in superclass_chain(java) for name, test, _, _, body in part.methods() if test]' \
+  '    names = set()' \
+  '    for word in words:' \
+  '        users = {name for name, body in tests if re.search(r"\b" + re.escape(word) + r"\b", body)}' \
+  '        if len(users) < 10:' \
+  '            names |= users' \
+  '    return names' \
+  '' \
+  '' \
+  'def grep(word, paths, fixed=False):' \
+  '    args = ["grep", "--untracked", "-l", "-w" if not fixed else "-F", "-e", word, "--", *paths]' \
+  '    return [line for line in git(*args).splitlines() if line.endswith(".java")]' \
+  '' \
+  '' \
+  'def subclasses(name):' \
+  '    """The concrete test classes in built modules that extend the named class, also through other classes."""' \
+  '    found, queue, seen = {}, [name], {name}' \
+  '    while queue:' \
+  '        current = queue.pop()' \
+  '        for path in grep(current, ["*/src/test/java/*.java", "testing/*/src/main/java/*.java"]):' \
+  '            if not built(module_of(path)):' \
+  '                continue' \
+  '            java = JavaType(path)' \
+  '            if current in java.supers and java.name not in seen:' \
+  '                seen.add(java.name)' \
+  '                queue.append(java.name)' \
+  '                if java.is_test():' \
+  '                    found[path] = java' \
+  '    return found' \
+  '' \
+  '' \
+  'def select(files):' \
+  '    """fully qualified test class -> [module, set of methods, or None for the whole class]."""' \
+  '    chosen, helpers = {}, []' \
+  '' \
+  '    def add(java, methods):' \
+  '        module = module_of(java.path)' \
+  '        entry = chosen.setdefault(java.fqcn(), [module, set()])' \
+  '        entry[1] = None if methods is None or entry[1] is None else entry[1] | methods' \
+  '' \
+  '    for path in files:' \
+  '        module = module_of(path)' \
+  '        if not built(module) or not os.path.exists(path):' \
+  '            print(f"cmeval-trino-test: no test for {path}")' \
+  '            continue' \
+  '        java = JavaType(path) if path.endswith(".java") else None' \
+  '        if java is None or java.body < 0:' \
+  '            helpers.append((module, os.path.basename(path), True))' \
+  '        elif java.is_test():' \
+  '            add(java, (touched_tests(java) or related_tests(java) or None) if java.name.endswith(LARGE) else None)' \
+  '        else:' \
+  '            subs = subclasses(java.name)' \
+  '            methods = (touched_tests(java) or related_tests(java) or None) if subs else None' \
+  '            for sub in subs.values():' \
+  '                add(sub, methods)' \
+  '            if not subs:' \
+  '                helpers.append((module, java.name, False))' \
+  '    for module, word, fixed in helpers:' \
+  '        if any(entry[0] == module for entry in chosen.values()):' \
+  '            continue' \
+  '        for path in grep(word, [module + "/src/test/java"], fixed):' \
+  '            java = JavaType(path)' \
+  '            if java.is_test():' \
+  '                add(java, None)' \
+  '    return chosen' \
+  '' \
+  '' \
+  'def spec(chosen):' \
+  '    return ",".join(name if methods is None else name + "#" + "+".join(sorted(methods))' \
+  '                    for name, (_, methods) in sorted(chosen.items()))' \
+  '' \
+  '' \
+  'def merge(junit, chosen):' \
+  '    """One JUnit file from the surefire reports of the chosen modules. A chosen class without any' \
+  '    result becomes one failed test, so a run in which Maven stopped before the tests is not empty."""' \
+  '    root = ET.Element("testsuites")' \
+  '    classes = set()' \
+  '    for module in sorted({module for module, _ in chosen.values()}):' \
+  '        for report in sorted(glob.glob(os.path.join(module, "target", "surefire-reports", "TEST-*.xml"))):' \
+  '            try:' \
+  '                suite = ET.parse(report).getroot()' \
+  '            except ET.ParseError:' \
+  '                print(f"cmeval-trino-test: {report} does not parse")' \
+  '                continue' \
+  '            for element in suite.iter():' \
+  '                for child in list(element):' \
+  '                    if child.tag in ("properties", "system-out", "system-err"):' \
+  '                        element.remove(child)' \
+  '            classes.update(case.get("classname", "") for case in suite.iter("testcase"))' \
+  '            root.append(suite)' \
+  '    missing = [name for name in sorted(chosen)' \
+  '               if not any(found == name or found.startswith(name + "$") for found in classes)]' \
+  '    if missing or not chosen:' \
+  '        suite = ET.SubElement(root, "testsuite", name="cmeval")' \
+  '        for name in missing or ["selection"]:' \
+  '            case = ET.SubElement(suite, "testcase", classname="cmeval", name="no-results " + name)' \
+  '            ET.SubElement(case, "failure", message="no test result")' \
+  '    ET.ElementTree(root).write(junit, encoding="utf-8", xml_declaration=True)' \
+  '' \
+  '' \
+  'def resolvable_host():' \
+  '    """Some tests look up the local host name. A container without a network may not know it."""' \
+  '    try:' \
+  '        socket.gethostbyname(socket.gethostname())' \
+  '    except OSError:' \
+  '        try:' \
+  '            with open("/etc/hosts", "a") as hosts:' \
+  '                hosts.write(f"127.0.0.1 {socket.gethostname()}\n")' \
+  '        except OSError:' \
+  '            pass' \
+  '' \
+  '' \
+  'def maven(goals, modules, extra=()):' \
+  '    """Run Maven on the modules and the modules that they need. Returns the exit code."""' \
+  '    for skip in ([] if WEB_UI in modules else ["!" + WEB_UI], []):' \
+  '        command = MAVEN + goals + ["-pl", ",".join(modules + skip), "-am", *extra]' \
+  '        print(" ".join(command), flush=True)' \
+  '        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)' \
+  '        refused = False' \
+  '        for line in proc.stdout:' \
+  '            sys.stdout.write(line)' \
+  '            refused |= "Could not find the selected project in the reactor: " + WEB_UI in line' \
+  '        code = proc.wait()' \
+  '        if not (skip and refused):' \
+  '            return code' \
+  '    return code' \
+  '' \
+  '' \
+  'def refresh():' \
+  '    paths = git("diff", "--name-only", "HEAD").splitlines() + git("ls-files", "--others", "--exclude-standard").splitlines()' \
+  '    modules = sorted({module_of(path) for path in paths} - {WEB_UI, "docs"})' \
+  '    modules = [module for module in modules if built(module)]' \
+  '    if not modules:' \
+  '        print("cmeval-trino-test: no built module changed")' \
+  '        return 0' \
+  '    return maven(["test-compile"], modules)' \
+  '' \
+  '' \
+  'def main(args):' \
+  '    if args[:1] == ["--refresh"]:' \
+  '        return refresh()' \
+  '    if args[:1] == ["--select"]:' \
+  '        chosen = select(args[1:])' \
+  '        for name, (module, methods) in sorted(chosen.items()):' \
+  '            print(module, name, "all" if methods is None else " ".join(sorted(methods)))' \
+  '        return 0' \
+  '    junit, files = args[0], args[1:]' \
+  '    chosen = select(files)' \
+  '    if not chosen:' \
+  '        merge(junit, chosen)' \
+  '        return 1' \
+  '    resolvable_host()' \
+  '    modules = sorted({module for module, _ in chosen.values()})' \
+  '    for module in modules:' \
+  '        shutil.rmtree(os.path.join(module, "target", "surefire-reports"), ignore_errors=True)' \
+  '    code = maven(["test"], modules, ["-Dtest=" + spec(chosen), *TEST_OPTIONS])' \
+  '    merge(junit, chosen)' \
+  '    return code' \
+  '' \
+  '' \
+  'if __name__ == "__main__":' \
+  '    sys.exit(main(sys.argv[1:]))' \
+  > /usr/local/bin/cmeval-trino-test && chmod +x /usr/local/bin/cmeval-trino-test && cmeval-trino-test --select''',
+]
+
+# A dependency layer that all tasks share. It holds no file of the task: it builds a fixed commit of
+# the middle of the window (2026-09-10) with the same module list, so the local repository gets the
+# Maven distribution, the plugins and the third-party dependencies of that time. Then it removes the
+# trino artifacts. Each task build downloads only what its own poms add.
+deps = [
+    "mkdir -p /opt/cmeval/ref && cd /opt/cmeval/ref && curl -fsSL https://codeload.github.com/trinodb/trino/tar.gz/1b125e015470664cf4edc289e0498f7f6bfb514a | tar xz --strip-components=1 && git init -q && git add -A && git commit -qm ref && ./mvnw -B --no-transfer-progress -T 8 install -DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -pl core/trino-main,lib/trino-plugin-toolkit,lib/trino-parquet,lib/trino-filesystem-gcs,client/trino-jdbc,plugin/trino-iceberg,plugin/trino-delta-lake,plugin/trino-hive,plugin/trino-memory,plugin/trino-base-jdbc,plugin/trino-clickhouse,plugin/trino-ranger,plugin/trino-resource-group-managers,plugin/trino-exchange-filesystem,testing/trino-tests -am && ./mvnw -B --no-transfer-progress test -pl lib/trino-matching -Dair.check.skip-all=true -Dmaven.test.failure.ignore=true && cd / && rm -rf /opt/cmeval/ref && find /opt/m2/repository/io/trino -mindepth 2 -maxdepth 2 -type d -name '*-SNAPSHOT' -exec rm -rf {} + && chmod -R a+rwX /opt/m2 && du -sh /opt/m2",
+]
+
+build = [
+    # The modules of the candidate tasks and every module that they need, as in the CI of the repo
+    # (MAVEN_FAST_INSTALL). The web UI module runs bun to build its pages: it needs the network here.
+    "./mvnw -B --no-transfer-progress -T 8 install -DskipTests -Dair.check.skip-all=true -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -pl core/trino-main,lib/trino-plugin-toolkit,lib/trino-parquet,lib/trino-filesystem-gcs,client/trino-jdbc,plugin/trino-iceberg,plugin/trino-delta-lake,plugin/trino-hive,plugin/trino-memory,plugin/trino-base-jdbc,plugin/trino-clickhouse,plugin/trino-ranger,plugin/trino-resource-group-managers,plugin/trino-exchange-filesystem,testing/trino-tests -am",
+    # Surefire downloads its JUnit and TestNG providers only when a test runs. Two small test runs
+    # with the network put them in the local repository.
+    "./mvnw -B --no-transfer-progress test -pl lib/trino-matching -Dair.check.skip-all=true -Dmaven.test.failure.ignore=true && ./mvnw -B --no-transfer-progress test -pl client/trino-jdbc -Dtest=io.trino.jdbc.TestTrinoDriverUri -Dsurefire.failIfNoSpecifiedTests=false -Dair.check.skip-all=true -Dmaven.test.failure.ignore=true",
+    # The same paths offline, as the tests use them: one test run, and a build with -am and without the
+    # web UI module that has nothing left to compile. A missing artifact stops the image here.
+    "./mvnw -o -B --no-transfer-progress test -pl lib/trino-matching -Dair.check.skip-all=true -Dmaven.test.failure.ignore=true && ./mvnw -o -B --no-transfer-progress -T 8 test-compile -pl core/trino-main,plugin/trino-iceberg,!core/trino-web-ui -am -Dair.check.skip-all=true",
+    # The tests do not need the node modules and the bun binary of the web UI build. The agent runs
+    # as another user, and Maven writes lock files into the local repository. A chmod of a file of the
+    # dependency layer would copy it, so only new files change.
+    "rm -rf core/trino-web-ui/src/main/resources/webapp/node_modules core/trino-web-ui/src/main/resources/webapp-legacy/src/node_modules .bun && find /opt/m2 ! -perm -a+rw -exec chmod a+rwX {} + && du -sh /opt/m2 /testbed",
+]
+
+# After a patch: compile the changed modules, the test modules and every module between them, so
+# that a test run has nothing left to compile.
+refresh = ["cmeval-trino-test --refresh"]
+
+# The test sources of each module that the build compiles at every task commit, and the base classes
+# of trino-testing (src/main), which tests of other modules extend.
+test_files = [
+    "client/trino-client/src/test/**",
+    "client/trino-jdbc/src/test/**",
+    "core/trino-grammar/src/test/**",
+    "core/trino-main/src/test/**",
+    "core/trino-parser/src/test/**",
+    "core/trino-spi/src/test/**",
+    "lib/trino-array/src/test/**",
+    "lib/trino-cache/src/test/**",
+    "lib/trino-filesystem/src/test/**",
+    "lib/trino-filesystem-azure/src/test/**",
+    "lib/trino-filesystem-gcs/src/test/**",
+    "lib/trino-filesystem-manager/src/test/**",
+    "lib/trino-filesystem-s3/src/test/**",
+    "lib/trino-geospatial-epsg/src/test/**",
+    "lib/trino-geospatial-toolkit/src/test/**",
+    "lib/trino-hdfs/src/test/**",
+    "lib/trino-hive-formats/src/test/**",
+    "lib/trino-matching/src/test/**",
+    "lib/trino-memory-context/src/test/**",
+    "lib/trino-metastore/src/test/**",
+    "lib/trino-orc/src/test/**",
+    "lib/trino-parquet/src/test/**",
+    "lib/trino-plugin-toolkit/src/test/**",
+    "plugin/trino-base-jdbc/src/test/**",
+    "plugin/trino-blackhole/src/test/**",
+    "plugin/trino-clickhouse/src/test/**",
+    "plugin/trino-delta-lake/src/test/**",
+    "plugin/trino-exchange-filesystem/src/test/**",
+    "plugin/trino-geospatial/src/test/**",
+    "plugin/trino-hive/src/test/**",
+    "plugin/trino-iceberg/src/test/**",
+    "plugin/trino-jmx/src/test/**",
+    "plugin/trino-memory/src/test/**",
+    "plugin/trino-password-authenticators/src/test/**",
+    "plugin/trino-ranger/src/test/**",
+    "plugin/trino-resource-group-managers/src/test/**",
+    "plugin/trino-spooling-filesystem/src/test/**",
+    "plugin/trino-tpcds/src/test/**",
+    "plugin/trino-tpch/src/test/**",
+    "testing/trino-testing-services/src/test/**",
+    "testing/trino-tests/src/test/**",
+    "testing/trino-testing/src/main/**",
+]
+test = "cmeval-trino-test {junit} {files}"
+parser = "junit"
+timeout_min = 10
+
+# For `cmeval resplit`. Test code and test resources are under src/test of each module.
+test_paths = ["**/src/test/**"]
+# The image installs from the poms and the Maven wrapper's settings.
+dependency_paths = ["pom.xml", "**/pom.xml", ".mvn/**"]
+
+[env]
+# The Maven distribution of the wrapper and the local repository must be in the image, and readable
+# by the agent, who has another home folder. /root/.cache is a build-time cache mount.
+MAVEN_USER_HOME = "/opt/m2"
+MAVEN_OPTS = "-Dmaven.repo.local=/opt/m2/repository"
+# The package cache of bun (web UI build) stays in the cache mount and out of the image.
+BUN_INSTALL_CACHE_DIR = "/root/.cache/bun"

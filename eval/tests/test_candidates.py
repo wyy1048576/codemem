@@ -179,3 +179,46 @@ def test_load_settings_rejects_bad_configs(tmp_path, collect, problem):
 def test_fresh_v1_config_loads():
     s = load_settings(FIXTURES.parents[1] / "configs" / "fresh-v1.toml")
     assert s.name == "fresh-v1" and len(s.repos) == 7 and s.since == date(2026, 7, 1)
+
+
+def test_issue_in_a_listed_other_repo(tmp_path):
+    base = next(p for p in RECORDED["prs"] if p["number"] == CASES["both"])
+    number = next(iter(base["closingIssuesReferences"]["nodes"]))["number"]
+    pr = json.loads(json.dumps(base))
+    pr["title"], pr["body"] = "Fix a crash", f"Fixes pandas-dev/tracker#{number}"
+    for node in pr["commits"]["nodes"]:
+        node["commit"]["message"] = "fix"
+    pr["closingIssuesReferences"] = {"nodes": [{"number": number, "repository": {"nameWithOwner": "pandas-dev/tracker"}}]}
+    asked = []
+
+    class Tracker(RecordedGitHub):
+        def __call__(self, args, stdin):
+            query = json.loads(stdin)["query"] if stdin else ""
+            asked.extend(re.findall(r'repository\(owner: "([^"]+)", name: "([^"]+)"\)', query))
+            return super().__call__(args, stdin)
+
+    runner = Tracker(prs=[pr], issues={str(number): RECORDED["issues"][str(number)]})
+    candidates, funnel = run(tmp_path, runner)
+    assert candidates == [] and funnel.drops[0]["reason"] == "no linked issue"  # not listed: dropped
+    candidates, funnel = run(tmp_path / "b", runner, repos=[RepoEntry(REPO, issue_repos=["pandas-dev/tracker"])])
+    assert [c.issue_number for c in candidates] == [number] and candidates[0].link_method == "both"
+    assert candidates[0].tags["issue_repo"] == "pandas-dev/tracker" and ("pandas-dev", "tracker") in asked
+
+
+def test_rust_and_go_configs_load():
+    configs = FIXTURES.parents[1] / "configs"
+    rust = load_settings(configs / "fresh-rust-v1.toml").repos[0]
+    assert rust.name == "astral-sh/ruff" and "**/*.snap" in rust.test_paths
+    go = load_settings(configs / "fresh-go-v1.toml").repos[0]
+    assert go.name == "kubernetes/kubernetes" and "**/testdata/**" in go.test_paths
+
+
+@pytest.mark.parametrize("row, problem", [
+    ('test_paths = "tests/**"', "test_paths must be a list of globs"),
+    ('issue_repos = ["tracker"]', "issue_repos must be a list of owner/name"),
+])
+def test_repo_settings_are_checked(tmp_path, row, problem):
+    path = tmp_path / "c.toml"
+    path.write_text(f'[collect]\nsince = "2026-07-01"\nuntil = "2026-08-01"\n\n[[repo]]\nname = "acme/demo"\n{row}\n')
+    with pytest.raises(CollectError, match=re.escape(problem)):
+        load_settings(path)

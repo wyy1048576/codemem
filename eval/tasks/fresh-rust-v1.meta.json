@@ -1,0 +1,155 @@
+{
+  "config": "fresh-rust-v1.toml",
+  "since": "2026-07-01",
+  "until": "2026-10-22",
+  "settings": {
+    "min_body_chars": 100,
+    "extra_bots": [],
+    "max_code_files": 5,
+    "max_code_lines": 200
+  },
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "9d65214cf0093b8e7344dedc03bb5b6c29408180",
+    "dirty": false
+  },
+  "labeler": "cmeval-labels/5",
+  "created": "2026-11-26T09:50:56+00:00",
+  "funnel_steps": [
+    {
+      "key": "merged",
+      "text": "merged into the default branch in the date range"
+    },
+    {
+      "key": "opened_after_cutoff",
+      "text": "the fix PR was opened on or after the start date (its code was not public before)"
+    },
+    {
+      "key": "not_bot",
+      "text": "author is not a bot"
+    },
+    {
+      "key": "one_link",
+      "text": "links exactly one issue in the same repo or a listed issue repo (GitHub's list or the SWE-bench regex)"
+    },
+    {
+      "key": "is_issue",
+      "text": "the link is an issue that exists (not a PR)"
+    },
+    {
+      "key": "issue_before_pr",
+      "text": "the issue was opened before the fix PR (not written after the fix)"
+    },
+    {
+      "key": "body_ok",
+      "text": "body (as of when the fix PR was opened) has the minimum length"
+    },
+    {
+      "key": "no_leak",
+      "text": "query does not name the fix PR or a fix commit"
+    },
+    {
+      "key": "base_found",
+      "text": "base commit found from the merge type (Decision 7)"
+    },
+    {
+      "key": "files_match",
+      "text": "our patch touches exactly the PR's files"
+    },
+    {
+      "key": "test_split",
+      "text": "no file mixes fix code and test code (Rust: changes inside and outside #[cfg(test)] code)"
+    },
+    {
+      "key": "applies",
+      "text": "the code patch applies at the base commit"
+    },
+    {
+      "key": "size_ok",
+      "text": "1 to max_code_files code files and at most max_code_lines changed code lines"
+    },
+    {
+      "key": "labeled",
+      "text": "labeled, with at least one gold file that exists at the base commit"
+    }
+  ],
+  "repos": {
+    "astral-sh/ruff": {
+      "base_branch": "main",
+      "counts": {
+        "merged": 1690,
+        "opened_after_cutoff": 1641,
+        "not_bot": 1393,
+        "one_link": 337,
+        "is_issue": 334,
+        "issue_before_pr": 325,
+        "body_ok": 321,
+        "no_leak": 321,
+        "base_found": 321,
+        "files_match": 321,
+        "test_split": 291,
+        "applies": 291,
+        "size_ok": 230,
+        "labeled": 230
+      },
+      "link_methods": {
+        "both": 316,
+        "list": 5
+      },
+      "drop_reasons": {
+        "fix PR opened before the start date": 49,
+        "bot author": 248,
+        "no linked issue": 1040,
+        "several linked issues": 16,
+        "link is a PR, not an issue": 3,
+        "issue opened after the fix PR": 9,
+        "short body": 3,
+        "body version not stored by GitHub": 1,
+        "fix and test code in one file": 30,
+        "too many changed lines": 34,
+        "too many code files": 21,
+        "no code files": 6
+      },
+      "note": "The standard rule (an issue in the same repo) gives 65 tasks: tag issue_repo = astral-sh/ruff. With issues of astral-sh/ty too, 230 tasks. ty keeps its issue tracker in the separate repo astral-sh/ty, and its code lives in astral-sh/ruff. Whether the 165 tasks with a ty issue enter the reported set is Andrew's decision.",
+      "issue_repos": [
+        "astral-sh/ty"
+      ],
+      "test_paths": [
+        "crates/*/resources/test/**",
+        "crates/*/resources/mdtest/**",
+        "crates/ty_python_semantic/resources/corpus/**",
+        "crates/ruff_python_parser/resources/valid/**",
+        "crates/ruff_python_parser/resources/invalid/**",
+        "crates/ruff_python_parser/resources/inline/**",
+        "**/tests/**",
+        "**/snapshots/**",
+        "**/*.snap",
+        "**/src/**/tests.rs",
+        "**/property_tests.rs",
+        "**/property_tests/**"
+      ]
+    }
+  },
+  "stats": {
+    "tasks": 230,
+    "tasks_per_repo": {
+      "astral-sh/ruff": 230
+    },
+    "mean_gold_files": 1.69,
+    "mean_gold_classes": 0.0,
+    "mean_gold_functions": 0.02,
+    "share_no_gold_function": 0.991,
+    "share_module_level_change": 0.009,
+    "share_partial_labels": 0.987,
+    "share_identifier_in_query": 0.078,
+    "share_with_unretrievable_functions": 0.0,
+    "tasks_per_split": {
+      "dev": 36,
+      "test": 194
+    },
+    "share_gold_all_python": 0.013,
+    "merge_types": {
+      "squash": 230
+    }
+  }
+}

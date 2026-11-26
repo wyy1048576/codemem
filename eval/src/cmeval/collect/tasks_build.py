@@ -14,12 +14,13 @@ from pathlib import Path
 from .. import __version__, repos
 from ..github import GitHub
 from ..labels import LABELER_VERSION, LabelError, identifier_in_query, label_at_commit
-from ..patches import classify_path, parse_patch, split_lines, split_patch
+from ..patches import classify_path, parse_patch, split_lines
 from ..repos import RepoError
 from ..status import NullStatus
 from ..files import now, write_json
 from ..tasks import Fix, Issue, Task, assign_split, save_tasks, validate
 from .candidates import FUNNEL_STEPS, GIT_STEPS, Candidate, Funnel, Settings
+from .test_split import split_for_repo
 
 GIT_KEYS = tuple(key for key, _ in GIT_STEPS)
 BATCH_SIZE = 50
@@ -31,7 +32,11 @@ PR_FILES_FIELDS = "files(first: %d) { totalCount nodes { path } }" % MAX_PR_FILE
 CPP_FAMILY = ("c", "cpp")
 TYPESCRIPT_FAMILY = ("typescript", "tsx")
 FAMILIES = {"python": ("python",), "c": CPP_FAMILY, "cpp": CPP_FAMILY, "typescript": TYPESCRIPT_FAMILY,
-            "tsx": TYPESCRIPT_FAMILY}
+            "tsx": TYPESCRIPT_FAMILY, "rust": ("rust",), "go": ("go",), "java": ("java",),
+            "javascript": ("javascript",)}
+# Languages with no definition finder in labels.py: their tasks have gold files only
+# (partial_labels is true). End-to-end tasks are graded by tests and need no more.
+FILE_ONLY_LANGUAGES = ("rust", "go", "java", "javascript")
 
 
 class Skip(Exception):
@@ -78,6 +83,11 @@ def merge_base(repo: str, cand: Candidate) -> tuple[str, str]:
         except RepoError:
             raise Skip("base_found", "rebase base not found") from None
     return found[0], "squash"
+
+
+def test_paths(settings: Settings, repo: str) -> list[str]:
+    """The repo's test_paths globs from the collect config (none if the repo is not listed)."""
+    return next((entry.test_paths for entry in settings.repos if entry.name.lower() == repo.lower()), [])
 
 
 def patch_paths(patch: str) -> set[str]:
@@ -132,7 +142,11 @@ def _candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] 
     ours = patch_paths(full)
     if ours != set(pr_files):
         raise Skip("files_match", f"file list differs ({len(ours ^ set(pr_files))} paths)")
-    parts = split_patch(full)
+    step[0] = "test_split"
+    split = split_for_repo(full, test_paths(settings, repo), lambda path: repos.read_file(repo, base, path))
+    if split.mixed:
+        raise Skip("test_split", f"fix and test code in one file ({', '.join(split.mixed[:3])})")
+    parts = split.parts
     code = parts["code"]
     step[0] = "applies"
     if code and (message := repos.apply_check(repo, base, code)):
@@ -179,6 +193,9 @@ def _candidate_to_task(cand: Candidate, settings: Settings, pr_files: list[str] 
             "gold_all_python": languages == ["python"],
             "gold_all_cpp": bool(languages) and set(languages) <= set(CPP_FAMILY),
             "gold_all_typescript": bool(languages) and set(languages) <= set(TYPESCRIPT_FAMILY),
+            **{f"gold_all_{name}": languages == [name] for name in FILE_ONLY_LANGUAGES},
+            # Rust files that hold code but whose changes are all in #[cfg(test)] code: in test_patch
+            "test_files_by_content": split.moved,
             # codemem skips files over its max_file_size (1 MB today); these find the tasks it affects
             "max_gold_file_bytes": biggest_bytes,
             "max_gold_file_lines": biggest_lines,
@@ -240,6 +257,15 @@ def build_tasks(gh: GitHub, candidates: list[Candidate], settings: Settings, fun
     return tasks
 
 
+def _repo_rules(settings: Settings, repo: str) -> dict:
+    """The repo's own collect settings for the meta file, when it has any."""
+    entry = next((r for r in settings.repos if r.name.lower() == repo.lower()), None)
+    if entry is None:
+        return {}
+    rules = {"note": entry.note, "issue_repos": entry.issue_repos, "test_paths": entry.test_paths}
+    return {key: value for key, value in rules.items() if value}
+
+
 def write_task_set(out: Path, tasks: list[Task], funnels: list[Funnel], settings: Settings, config: Path) -> None:
     """The task file (all repos, oldest fix first within a repo) and its meta file next to it."""
     from ..importers.swebench import label_stats
@@ -261,6 +287,6 @@ def write_task_set(out: Path, tasks: list[Task], funnels: list[Funnel], settings
         "cmeval_version": __version__, "cmeval_git": _eval_git(), "labeler": LABELER_VERSION, "created": now(),
         "funnel_steps": [{"key": k, "text": text} for k, text in FUNNEL_STEPS],
         "repos": {f.repo: {"base_branch": f.base_branch, "counts": f.counts, "link_methods": f.link_methods,
-                           "drop_reasons": f.drop_reasons()} for f in funnels},
+                           "drop_reasons": f.drop_reasons(), **_repo_rules(settings, f.repo)} for f in funnels},
         "stats": stats,
     })
