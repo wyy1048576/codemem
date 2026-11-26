@@ -47,9 +47,11 @@ from .patches import TEST_DIRS, TOP_TEST_DIRS, classify_path, diff_sections, fil
 from .tasks import Task, load_tasks, save_tasks
 
 KIND = "resplit"
-# CI files and change logs: no build and no test reads them.
+# CI files, change logs and reStructuredText documentation: no build and no test reads them in
+# the repos so far (pandas: doc/source/whatsnew/*.rst). Markdown stays: playwright builds its
+# types from docs/src/api/*.md.
 DEFAULT_LEAVE_OUT = (".github/**", ".circleci/**", ".azure-pipelines/**", ".gitlab-ci.yml", "**/CHANGELOG*",
-                     "**/newsfragments/**")
+                     "**/newsfragments/**", "**/*.rst")
 # Files that name a repo's dependencies.
 DEFAULT_DEPENDENCY_PATHS = ("**/requirements*.txt", "**/requirements/*.txt", "**/constraints*.txt", "**/pyproject.toml",
                             "**/setup.cfg", "**/environment*.yml", "**/uv.lock", "**/poetry.lock", "**/package.json",
