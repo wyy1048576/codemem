@@ -353,6 +353,9 @@ def cmd_generate(args) -> int:
     from .repos import RepoError
 
     say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    if args.rebuild and args.force:
+        print("generate: give --rebuild or --force, not both", file=sys.stderr)
+        return 1
     try:
         recipe = gen.load_recipe(args.recipe)
         tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
@@ -383,6 +386,8 @@ def cmd_generate(args) -> int:
             for task in tasks:
                 print(task.id)
             return 0
+        if args.rebuild:
+            return _rebuild(gen, recipe, tasks, args.jobs, say)
         say(f"{recipe.repo}: {len(tasks)} tasks, {args.jobs} at a time")
         records = gen.generate(recipe, tasks, jobs=args.jobs, repeats=args.repeats, cpus=args.cpus,
                                force=args.force, progress=say)
@@ -397,6 +402,19 @@ def cmd_generate(args) -> int:
               + ("admitted" if result["admitted"] else "not admitted"))
         return 0 if result["admitted"] else 3
     return 0
+
+
+def _rebuild(gen, recipe, tasks, jobs: int, say) -> int:
+    """generate --rebuild: build the missing images of valid tasks, without a new validation."""
+    say(f"{recipe.repo}: images of {len(tasks)} tasks built again where they are missing, {jobs} at a time")
+    records = gen.rebuild(recipe, tasks, jobs=jobs, progress=say)
+    count = {status: [r for r in records if r["status"] == status]
+             for status in ("built", "exists", "skipped", "refused", "failed")}
+    minutes = sum(r["build_s"] for r in count["built"]) / 60
+    print(f"{recipe.repo}: {len(count['built'])} built ({minutes:.1f} min of builds), {len(count['exists'])} exist, "
+          f"{len(count['skipped'])} skipped (no valid record), {len(count['refused'])} refused, "
+          f"{len(count['failed'])} failed. Check the built images with cmeval e2e grader-check")
+    return 3 if count["refused"] or count["failed"] else 0
 
 
 def cmd_resplit(args) -> int:
@@ -797,6 +815,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cpus", type=int, default=8, help="processors for one validation container (default 8)")
     p.add_argument("--repeats", type=int, default=3, help="test runs before and after the fix (default 3)")
     p.add_argument("--force", action="store_true", help="build the image and validate again, also when a record is saved")
+    p.add_argument("--rebuild", action="store_true",
+                   help="build the image again for each valid task whose image is missing, and do not validate again "
+                        "(the saved test lists stay; check them with cmeval e2e grader-check). Refuses a task whose "
+                        "saved record has another fingerprint. --repeats is not used")
     p.add_argument("--list", action="store_true", help="only print the ids of the chosen tasks; build nothing")
     p.set_defaults(func=cmd_generate)
 
