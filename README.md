@@ -134,6 +134,7 @@ skip_generated = true        # skip files marked "Code generated ... DO NOT EDIT
 languages = ["python", "go"] # default: every supported language
 code_header = true           # put the path and enclosing class above the embedded code
 vector_cache = "global"      # global = reuse vectors across indexes on this machine | off
+vector_cache_max_gb = 8      # that cache's size cap in GB; past it the least recently used vectors go; 0 = no cap
 vector_backend = "faiss"     # the in-memory search index; a plugin class can replace it (below)
 kinds = ["function", "method"]  # search-time filter; default: every kind
 test_weight = 1.0            # search-time: lower it to rank tests lower
@@ -376,8 +377,9 @@ version = "run-7"                            # optional label for the weights
 ## Where things are stored
 
 An index lives in `~/.codemem/indexes/<repo-name>-<hash of its path>/` (`CODEMEM_HOME` moves
-`~/.codemem`), and every vector computed on the machine in `~/.codemem/cache/vectors.db`. What each
-file holds and what is safe to delete: [decisions.md §6](docs/decisions.md).
+`~/.codemem`), and the vectors computed on the machine in `~/.codemem/cache/vector_cache.db`, up to
+`vector_cache_max_gb`. `codemem status` shows that cache's size. What each file holds and what is
+safe to delete: [decisions.md §6](docs/decisions.md).
 
 Each git worktree is a checkout with an index of its own: run codemem inside it. The index starts
 as a copy of another checkout's index, so it is ready in seconds, and it is deleted after the

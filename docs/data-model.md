@@ -345,8 +345,10 @@ re-embeds that vector type only.
 
 Before calling the model for a text, codemem looks for `(embedder key, text_hash)`:
 1. in this index (the same text elsewhere in the repo);
-2. in the shared **vector cache**, `$CODEMEM_HOME/cache/vectors.db`, which holds every text ever
-   embedded on this machine and only grows.
+2. in the shared **vector cache**, `$CODEMEM_HOME/cache/vector_cache.db` (§7), which holds the
+   vectors computed on this machine. Past its size cap the least recently used ones are deleted;
+   a text whose vector was deleted goes to the model again. A vector found there and a vector put
+   there both count as used.
 
 `IndexStats` reports `embedded` (vectors written for changed texts), `model_embedded` (of which the
 model computed), `reused` and `cache_hits`; and, for the structure, `chunks_added`,
@@ -400,9 +402,29 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
   worktree.json                      only in the default index folder of a linked git worktree:
                                      {"worktree": its folder, "repository": the git folder its checkouts share};
                                      the folder is deleted once that worktree is gone (decisions.md §6)
-$CODEMEM_HOME/cache/vectors.db       shared vector cache: (embedder key, text_hash) -> float16 vector
+$CODEMEM_HOME/cache/vector_cache.db  shared vector cache: (embedder key, text_hash) -> float16 vector (below)
 $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sha256], so it is read once
 ```
+
+**The vector cache file** is SQLite (WAL) with pages of 32 KB, `auto_vacuum = INCREMENTAL` and
+`user_version` 1. A file whose `user_version` differs is not read or written.
+
+| Table | Columns | Holds |
+|---|---|---|
+| `embedder` | `id`, `key` (unique), `dim` | one row per embedder key (§5.4), with the length of its vectors. A vector of another length is not stored under that key |
+| `entry` (no rowid) | `embedder`, `hash`, `slot`, `used`; primary key (`embedder`, `hash`); index `entry_used` on `used` | one row per cached vector: where it is, and when it was last used (Unix seconds) |
+| `vec_<embedder id>` | `slot` (the rowid), `hash`, `data` | the vectors of one embedder, each as `dim` float16 numbers, in slots 1..n without gaps |
+
+- **`hash`** is the text hash (§5.3) as bytes: its 20 hex characters become 10 bytes. A key that
+  is not lowercase hex in pairs is stored as the text it is.
+- **Slots stay 1..n.** When entries are deleted, the rows in the last slots are written into the
+  freed ones, and `entry.slot` follows in the same transaction. A slot number is therefore only
+  good inside one statement: readers go from key to vector in a single query.
+- **`used`** is set when the entry is put, and again when it is found or marked, at most once per
+  day (UTC).
+- A file `$CODEMEM_HOME/cache/vectors.db` with one table `cache(embedder, text_hash, dim, data)`
+  is imported when the cache is opened, and then deleted, unless rows were added to it during
+  the import.
 
 `meta` keys:
 - `schema_version` (3);
@@ -494,6 +516,7 @@ What stays the same when code changes, and what is recomputed:
 | embedder key | `embedder.py` | automatic: another model, weights, settings or device | the vector type with a new key is re-embedded |
 | weights version | `config.model_version` | automatic for a local model folder, or set `version` | part of the model id and the embedder key |
 | `vector_backend` | config | another search index | in `index_settings()` only when not `faiss`, so the eval keeps such systems apart; nothing is re-embedded |
+| the vector cache's `user_version` (1) | `vectorcache.py` | the cache file's tables or page size change | a cache file with another number is left untouched and counts as unavailable: vectors come from the model |
 
 `Config.index_settings()` lists every index-time setting. The eval adapter hashes it, with the
 codemem version and the device, into its `index_key`, so two systems share an index only when
@@ -627,6 +650,9 @@ A change to any of these must be made together with the eval:
   set.
 - **`vector_backend`:** `faiss` or `"module:Class"` (a `store.VectorStore` subclass). Index-time
   only so that eval systems with different backends don't share an index.
+- **`vector_cache`:** `global` or `off`. **`vector_cache_max_gb`:** the cache file's size cap in
+  GB (10⁹ bytes), a number of 0 or more; 0 means no cap; the default is 8. Neither is index-time:
+  the cache changes where a vector comes from, never what an index stores.
 - **`model_idle_minutes`:** a number, 0 or more; 0, the default, keeps the local embedding model
   in memory. Otherwise the model is freed after that many minutes in which nothing was embedded,
   and the next search or save loads it again. It changes no index. A new value in `.codemem.toml`
