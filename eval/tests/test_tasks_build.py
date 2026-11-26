@@ -6,6 +6,7 @@ import pytest
 
 from cmeval import repos
 from cmeval.collect.candidates import Candidate, Funnel, Settings
+from cmeval.collect.repo_stats import Candidate as RepoEntry
 from cmeval.collect.tasks_build import (
     MAX_PR_FILES,
     Skip,
@@ -247,6 +248,12 @@ def test_build_tasks_fills_the_git_steps_and_writes_the_set(history, tmp_path):
     meta = json.loads(out.with_suffix(".meta.json").read_text())
     assert meta["repos"][REMOTE_REPO]["counts"]["labeled"] == 1 and meta["stats"]["share_gold_all_python"] == 1.0
     assert meta["stats"]["merge_types"] == {"squash": 1} and meta["config"] == "fresh-t.toml"
+    assert "test_paths" not in meta["repos"][REMOTE_REPO]  # no repo settings: nothing added
+    s.repos = [RepoEntry(REMOTE_REPO, note="why", test_paths=["**/snapshots/**"], issue_repos=["acme/tracker"])]
+    write_task_set(out, tasks, [funnel], s, tmp_path / "fresh-t.toml")
+    meta = json.loads(out.with_suffix(".meta.json").read_text())
+    assert {k: meta["repos"][REMOTE_REPO][k] for k in ("note", "test_paths", "issue_repos")} == \
+        {"note": "why", "test_paths": ["**/snapshots/**"], "issue_repos": ["acme/tracker"]}
 
 
 def test_build_tasks_reports_candidates_checked(history, tmp_path):
@@ -292,3 +299,32 @@ def test_a_git_error_drops_only_that_candidate(history, tmp_path, monkeypatch):
     assert [t.id for t in tasks] == ["acme__demo-7"]
     assert funnel.drops == [{"pr": 9, "step": "files_match", "reason": "git error (git diff failed: bad object)"}]
     assert funnel.counts["base_found"] == 2 and funnel.counts["files_match"] == 1
+
+
+RUST_LIB = "pub mod a;\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn one() {\n        assert_eq!(crate::a::f(), 1);\n    }\n}\n"
+
+
+def test_rust_task_has_file_gold_and_cfg_test_changes_in_the_test_patch(history):
+    remote, _ = history
+    remote.commit({"src/lib.rs": RUST_LIB, "src/a.rs": "pub fn f() -> i32 {\n    1\n}\n"}, "add rust")
+    tested = RUST_LIB.replace("    }\n}\n", "    }\n\n    #[test]\n    fn two() {\n        assert_eq!(crate::a::f(), 2);\n    }\n}\n")
+    fixed = remote.commit({"src/lib.rs": tested, "src/a.rs": "pub fn f() -> i32 {\n    2\n}\n",
+                           "src/snapshots/a.snap": "2\n"}, "fix f (#7)")
+    paths = ["src/lib.rs", "src/a.rs", "src/snapshots/a.snap"]
+    s = settings(repos=[RepoEntry(REMOTE_REPO, test_paths=["**/snapshots/**"])])
+    task = candidate_to_task(candidate(fixed), s, paths)
+    assert task.language == "rust" and task.gold.files == ["src/a.rs"] and task.gold.functions == []
+    assert task.tags["partial_labels"] is True and task.tags["gold_all_rust"] is True
+    assert task.tags["test_files_by_content"] == ["src/lib.rs"]
+    assert "src/lib.rs" in task.test_patch and "a.snap" in task.test_patch and "src/lib.rs" not in task.patch
+    assert task.tags["repo_code_files"] == 2
+
+
+def test_rust_file_with_fix_and_test_code_drops_the_task(history):
+    remote, _ = history
+    remote.commit({"src/lib.rs": "pub fn f() -> i32 {\n    1\n}\n" + RUST_LIB.replace("pub mod a;\n", "")}, "add")
+    mixed = remote.commit({"src/lib.rs": "pub fn f() -> i32 {\n    2\n}\n"
+                           + RUST_LIB.replace("pub mod a;\n", "").replace("), 1)", "), 2)")}, "fix (#7)")
+    with pytest.raises(Skip) as info:
+        candidate_to_task(candidate(mixed), settings(), ["src/lib.rs"])
+    assert info.value.args[0] == "test_split" and "src/lib.rs" in info.value.args[1]

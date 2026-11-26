@@ -1,0 +1,85 @@
+{
+  "kind": "resplit",
+  "source": "fresh-ts-v1.jsonl",
+  "source_sha256": "5061a8ac8f3f48f6fcc7d7171505bde74ee7458790321f9b30579a12172f0bce",
+  "repo": "microsoft/vscode",
+  "recipe": "vscode",
+  "test_paths": [
+    "src/vs/**/test/**",
+    "test/**"
+  ],
+  "test_paths_from_test_files": false,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "**/package.json",
+    "**/package-lock.json",
+    "**/.npmrc"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 771,
+  "changed": 167,
+  "unchanged": 604,
+  "not_split": {},
+  "with_test_files_added": 29,
+  "with_fix_files_added": 152,
+  "test_files_added": 121,
+  "fix_files_added": 239,
+  "files_left_out": {
+    "leave_out .github/**": 14
+  },
+  "with_dependency_needed": 2,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 1,
+    "medium": 1,
+    "hard": 0
+  },
+  "dependency_needed": {
+    "microsoft__vscode-328245": [
+      {
+        "file": "extensions/markdown-language-features/package-lock.json",
+        "package": "@vscode/markdown-editor",
+        "old": "0.0.2-37",
+        "new": "0.0.2-40",
+        "kind": "raised"
+      }
+    ],
+    "microsoft__vscode-336697": [
+      {
+        "file": ".npmrc",
+        "package": "electron",
+        "old": "43.6.0",
+        "new": "43.7.3",
+        "kind": "raised"
+      },
+      {
+        "file": "remote/.npmrc",
+        "package": "node",
+        "old": "24.20.0",
+        "new": "24.21.0",
+        "kind": "raised"
+      }
+    ]
+  },
+  "with_dependency_other": 11,
+  "with_dependency_other_by_difficulty": {
+    "easy": 1,
+    "medium": 4,
+    "hard": 6
+  },
+  "with_test_patch_before": 644,
+  "with_test_patch_after": 646,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "7f1147de74ee59539ef1811f3d0ac5af4820d614",
+    "dirty": false
+  },
+  "created": "2026-11-26T10:41:04+00:00"
+}

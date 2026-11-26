@@ -1,6 +1,9 @@
 """Build and validate: the parts that need no Docker."""
 
 import json
+import os
+import shlex
+import shutil
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -22,6 +25,12 @@ def test_difficulty_classes():
     assert gen.difficulty(_patch("a.py", "b.py", lines=50)) == "medium"
     assert gen.difficulty(_patch("a.py", "b.py", lines=51)) == "hard"
     assert gen.difficulty(_patch("a.py", "b.py", "c.py")) == "hard"
+
+
+def test_difficulty_counts_code_files_only():
+    data = "diff --git a/t/x.csv b/t/x.csv\n--- a/t/x.csv\n+++ b/t/x.csv\n@@ -1 +1 @@\n" + "+x\n" * 50
+    build = "diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt\n--- a/src/CMakeLists.txt\n+++ b/src/CMakeLists.txt\n@@ -1 +1 @@\n+x\n"
+    assert gen.difficulty(_patch("a.py", lines=15) + data + build) == "easy"
 
 
 def test_exclude_newer_is_the_sunday_of_the_week():
@@ -49,6 +58,124 @@ def test_load_recipe_playwright():
     assert all("CI=" not in suite.test for suite in recipe.suites) and "CI" not in dict(recipe.env)
 
 
+def test_load_recipe_vllm():
+    recipe = gen.load_recipe("vllm")
+    env = dict(recipe.env)
+    # The tests run with the network off and without a GPU: the Hugging Face libraries read only their cache.
+    assert env["HF_HUB_OFFLINE"] == "1" and env["VLLM_TARGET_DEVICE"] == "cpu"
+    # A test that waits must not use the limit of the suite, and a failed test must not run again.
+    assert "--timeout=" in recipe.test and "-p no:rerunfailures" in recipe.test
+    assert "--continue-on-collection-errors" in recipe.test
+    # Release tags only: the repo also tags its Rust crates.
+    assert recipe.tag_match == "v[0-9]*"
+
+
+def test_load_recipe_ruff():
+    recipe = gen.load_recipe("ruff")
+    assert recipe.repo == "astral-sh/ruff"
+    env = dict(recipe.env)
+    # A missing or changed snapshot must fail, and the test run must not write one.
+    assert env["INSTA_UPDATE"] == "no"
+    # The build output must be in the image, and not in /testbed, which the agent run gives away with chown.
+    assert env["CARGO_TARGET_DIR"].startswith("/opt/") and "CI" not in env
+    # The same cargo selection in build, refresh and test, so a test run builds no dependency again.
+    selection = "cargo nextest run --workspace --all-features"
+    assert any(step.startswith(selection + " --no-run") for step in recipe.build)
+    assert recipe.refresh == (selection + " --no-run",)
+    assert selection in _ruff_script_text(recipe)
+
+
+def _ruff_script_text(recipe) -> str:
+    return next(step for step in recipe.base_setup if "cmeval-ruff-test" in step)
+
+
+@pytest.fixture
+def ruff_wrapper(tmp_path):
+    """The test script of the ruff recipe, written as the base image writes it, with a cargo that
+    records its arguments and writes a JUnit file."""
+    if not (shutil.which("bash") and shutil.which("git")):
+        pytest.skip("needs bash and git")
+    script = tmp_path / "cmeval-ruff-test"
+    # Docker joins a line that ends with a backslash with the next line.
+    command = _ruff_script_text(gen.load_recipe("ruff")).replace("\\\n", "")
+    subprocess.run(["bash", "-c", command.replace("/usr/local/bin/cmeval-ruff-test", str(script))], check=True)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "cargo").write_text(
+        '#!/bin/bash\nmkdir -p "$CARGO_TARGET_DIR/nextest/default"\necho "$@" > "$CARGO_TARGET_DIR/args"\n'
+        'echo \'<testsuites><testcase classname="c" name="n"/></testsuites>\' > "$CARGO_TARGET_DIR/nextest/default/junit.xml"\n')
+    (bin_dir / "cargo").chmod(0o755)
+    repo = tmp_path / "repo"
+    for path in ("crates/ruff_linter/src/lib.rs", "crates/ruff_linter/src/rules/pyflakes/mod.rs",
+                 "crates/ty/tests/cli/main.rs", "crates/ty_python_semantic/resources/mdtest/narrow/isinstance.md"):
+        (repo / path).parent.mkdir(parents=True, exist_ok=True)
+        (repo / path).write_text("x\n")
+    subprocess.run("git init -q && git add -A && git -c user.name=t -c user.email=t@t commit -qm base",
+                   shell=True, cwd=repo, check=True)
+    target = tmp_path / "target"
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CARGO_TARGET_DIR": str(target)}
+
+    def run(*files):
+        proc = subprocess.run(["bash", str(script), str(tmp_path / "out.xml"), *files], cwd=repo, env=env,
+                              capture_output=True, text=True)
+        filters = [line.split("filter: ", 1)[1] for line in proc.stdout.splitlines() if "filter: " in line]
+        return proc, (filters or [""])[0], tmp_path / "out.xml"
+
+    return repo, run
+
+
+def test_ruff_wrapper_maps_files_to_filters(ruff_wrapper):
+    repo, run = ruff_wrapper
+    (repo / "crates/ty/tests/cli/rule.rs").write_text("#[test]\nfn a() {}\n")
+    snapshot = "crates/ty_python_semantic/resources/mdtest/snapshots/isinstance.md_-_Narrowing_(1a2b).snap"
+    (repo / snapshot).parent.mkdir(parents=True)
+    (repo / snapshot).write_text("x\n")
+    proc, expr, junit = run("crates/ty_python_semantic/resources/mdtest/narrow/isinstance.md", snapshot,
+                            "crates/ruff_linter/resources/test/fixtures/pyflakes/F401_0.py",
+                            "crates/ruff_linter/resources/test/fixtures/new_group/X.py",
+                            "crates/ruff_linter/src/rules/pyflakes/snapshots/ruff_linter__rules__pyflakes__tests__F401.snap",
+                            "crates/ruff_linter/src/rules/pyflakes/mod.rs", "crates/ty/tests/cli/rule.rs")
+    assert proc.returncode == 0 and gen.parse_junit(junit) == {"c::n": PASS}
+    args = (repo.parent / "target" / "args").read_text()
+    assert "--no-fail-fast --retries 0 --test-threads 8" in args and "cmeval:/opt/cmeval/nextest.toml" in args
+    # Two files of one markdown test give one filter. So do a fixture, a snapshot and mod.rs of one rule group.
+    assert expr.count("(binary_id(=ty_python_semantic::mdtest) & test(=mdtest::narrow/isinstance.md))") == 1
+    assert expr.count("(package(=ruff_linter) & kind(lib) & test(/^rules::pyflakes::/))") == 1
+    # A rule group that does not exist at the task commit: all tests of the crate.
+    assert "|(package(=ruff_linter) & kind(lib))|" in expr
+    assert "(binary_id(=ty::cli) & test(/^rule::/))" in expr
+    assert expr.endswith("& not binary_id(=ruff_python_parser::generate_inline_tests)")
+
+
+def test_ruff_wrapper_writes_a_failure_without_results(ruff_wrapper):
+    _, run = ruff_wrapper
+    proc, _, junit = run("README.md")
+    assert proc.returncode == 1
+    # One failing test, so the run does not count as a run without results.
+    assert gen.parse_junit(junit) == {"cmeval::no-results": FAIL}
+
+
+def test_load_recipe_vscode():
+    recipe = gen.load_recipe("vscode")
+    assert len(recipe.suites) == 3
+    assert "CI" not in dict(recipe.env)
+
+    class T:
+        test_patch = _patch("src/vs/base/test/common/strings.test.ts", "src/vs/base/test/node/pfs/pfs.test.ts",
+                            "src/vs/editor/test/browser/controller/cursor.test.ts",
+                            "src/vs/platform/x/test/electron-main/y.test.ts",
+                            "extensions/copilot/src/util/common/test/a.spec.ts",
+                            "src/vs/base/test/common/utils.ts", "extensions/git/src/test/git.test.ts")
+
+    # Each test file goes to one suite only.
+    per_suite = [gen.suite_files(suite, T) for suite in recipe.suites]
+    assert per_suite == [
+        ["src/vs/base/test/common/strings.test.ts", "src/vs/base/test/node/pfs/pfs.test.ts"],
+        ["src/vs/editor/test/browser/controller/cursor.test.ts", "src/vs/platform/x/test/electron-main/y.test.ts"],
+        ["extensions/copilot/src/util/common/test/a.spec.ts"],
+    ]
+
+
 def test_load_recipe_rejects_unknown_fields(tmp_path):
     path = tmp_path / "x.toml"
     path.write_text('repo = "a/b"\nbase_image = "i"\ntest = "t"\nsetup = []\n')
@@ -74,6 +201,24 @@ def test_recipe_with_suites_and_env(tmp_path):
     assert """bash -c 'one '"'"'t/one/a.ts'"'"' /work/before-1.0.xml'""" in script
     assert """bash -c 'two '"'"'t/two/b.ts'"'"' /work/after-1.1.xml'""" in script
     assert 'echo "before-1 0 $r ' in script and 'echo "after-1 1 $r ' in script
+
+
+def test_recipe_resplit_fields_do_not_change_fingerprints(tmp_path, make_task):
+    path = tmp_path / "x.toml"
+    path.write_text('repo = "a/b"\nbase_image = "i"\ntest = "t"\ntest_paths = ["test/**"]\nleave_out = []\n'
+                    'dependency_paths = ["go.mod"]\n')
+    recipe = gen.load_recipe(path)
+    assert recipe.test_paths == ("test/**",) and recipe.leave_out == () and recipe.dependency_paths == ("go.mod",)
+    plain = replace(recipe, test_paths=(), leave_out=None, dependency_paths=None)
+    task = make_task()
+    assert gen.image_fingerprint(recipe, task) == gen.image_fingerprint(plain, task)
+    assert gen.validation_fingerprint(recipe, task, 3) == gen.validation_fingerprint(plain, task, 3)
+
+
+def test_quote_files_keeps_quotes_in_paths():
+    files = ["a/b.md", "s/x_-_Tests_for_ty's_`inst…_(98b5).snap", "c d.py"]
+    assert gen.quote_files(files[:1]) == "'a/b.md'"
+    assert shlex.split(gen.quote_files(files)) == files
 
 
 def test_recipe_needs_test_or_suites(tmp_path):
@@ -214,7 +359,7 @@ def test_test_files_leave_out_deleted_files():
                                               "pkg/tests/test_c.py"]
     # The fix's size still counts a deleted file.
     assert gen.changed_files(DELETE_TEST + _patch("a.py")) == ["a.py", "pkg/tests/test_old.py"]
-    assert gen.difficulty(DELETE_TEST) == "easy"
+    assert gen.difficulty(DELETE_TEST.replace("pkg/tests/test_old.py", "pkg/old.py")) == "easy"
 
 
 def test_test_run_line_without_files_does_nothing():
@@ -227,7 +372,7 @@ def test_test_run_line_without_files_does_nothing():
 
 
 IMAGE_FIELDS = {"repo": "c/d", "base_image": "j", "base_setup": ("apt-get x",), "env": (("A", "1"),),
-                "deps_files": ("r.txt",), "deps": ("pip install x",), "build": ("make",)}
+                "deps_files": ("r.txt",), "deps": ("pip install x",), "build": ("make",), "tag_match": "v[0-9]*"}
 TEST_FIELDS = {"test": "u {files}", "test_files": ("x/**",), "refresh": ("make again",), "parser": "other",
                "timeout_min": 20, "suite": (gen.Suite(("t/**",), "s {files}"),)}
 
@@ -236,7 +381,9 @@ def test_every_recipe_field_changes_the_right_fingerprint(make_task):
     recipe = gen.Recipe(name="r", repo="a/b", base_image="i", test="t {files} {junit}")
     task = make_task(test_patch=_patch("t/test_a.py"))
     image, validation = gen.image_fingerprint(recipe, task), gen.validation_fingerprint(recipe, task, 3)
-    assert set(IMAGE_FIELDS) | set(TEST_FIELDS) == set(gen.Recipe.__dataclass_fields__) - {"name"}
+    # test_paths, leave_out and dependency_paths only shape the task data (cmeval resplit); the patches are in the fingerprint.
+    data_fields = {"name", "test_paths", "leave_out", "dependency_paths"}
+    assert set(IMAGE_FIELDS) | set(TEST_FIELDS) == set(gen.Recipe.__dataclass_fields__) - data_fields
     for name, value in IMAGE_FIELDS.items():
         other = replace(recipe, **{name: value})
         assert gen.image_fingerprint(other, task) != image, name
@@ -391,7 +538,32 @@ def no_source(monkeypatch):
     monkeypatch.setattr(gen, "build_base", lambda recipe: "base")
     monkeypatch.setattr(gen, "_export_source", lambda repo, commit, dest: dest.mkdir(parents=True, exist_ok=True))
     monkeypatch.setattr(gen.repos, "commit_time", lambda repo, commit: 1790553600)
-    monkeypatch.setattr(gen, "nearest_tag", lambda repo, commit: None)
+    monkeypatch.setattr(gen, "nearest_tag", lambda repo, commit, match="": None)
+
+
+def test_nearest_tag_can_match_a_glob(tmp_path, monkeypatch):
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), "-c", "user.email=a@b", "-c", "user.name=a", *args],
+                       check=True, capture_output=True)
+
+    git("init", "-q")
+    git("commit", "-q", "--allow-empty", "-m", "one")
+    git("tag", "v1.0")
+    git("commit", "-q", "--allow-empty", "-m", "two")
+    git("tag", "proto-v0.1")
+    monkeypatch.setattr(gen.repos, "ensure_commit", lambda repo, commit: None)
+    monkeypatch.setattr(gen.repos, "clone_path", lambda repo: tmp_path)
+    assert gen.nearest_tag("a/b", "HEAD") == "proto-v0.1"
+    assert gen.nearest_tag("a/b", "HEAD", "v[0-9]*") == "v1.0"
+    assert gen.nearest_tag("a/b", "HEAD", "x*") is None
+
+
+def test_build_task_image_gives_the_tag_match(make_task, monkeypatch, no_source):
+    seen = []
+    monkeypatch.setattr(gen, "nearest_tag", lambda repo, commit, match="": seen.append(match) or "v1.0")
+    _fake_docker(monkeypatch, labels={})
+    gen.build_task_image(replace(_recipe(), tag_match="v[0-9]*"), make_task())
+    assert seen == ["v[0-9]*"]
 
 
 def test_build_task_image_follows_the_label(make_task, monkeypatch, no_source):

@@ -1,0 +1,78 @@
+{
+  "kind": "resplit",
+  "source": "fresh-rust-v1.jsonl",
+  "source_sha256": "b2339d3d9bc5c6e7556b150bae824e3fc802663115775bb99ad5a12616e80121",
+  "repo": "astral-sh/ruff",
+  "recipe": "ruff",
+  "test_paths": [
+    "crates/*/resources/test/**",
+    "crates/*/resources/mdtest/**",
+    "crates/ty_python_semantic/resources/corpus/**",
+    "crates/ruff_python_parser/resources/valid/**",
+    "crates/ruff_python_parser/resources/invalid/**",
+    "crates/ruff_python_parser/resources/inline/**",
+    "**/tests/**",
+    "**/snapshots/**",
+    "**/*.snap",
+    "**/src/**/tests.rs",
+    "**/property_tests.rs",
+    "**/property_tests/**"
+  ],
+  "test_paths_from_test_files": false,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "Cargo.lock",
+    "**/Cargo.toml"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 230,
+  "changed": 19,
+  "unchanged": 211,
+  "not_split": {},
+  "with_test_files_added": 0,
+  "with_fix_files_added": 19,
+  "test_files_added": 0,
+  "fix_files_added": 37,
+  "files_left_out": {
+    "leave_out .github/**": 1
+  },
+  "with_dependency_needed": 1,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 1
+  },
+  "dependency_needed": {
+    "astral-sh__ruff-27230": [
+      {
+        "file": "Cargo.lock",
+        "package": "gen-lsp-types",
+        "old": "0.10.0",
+        "new": "0.11.0",
+        "kind": "raised"
+      }
+    ]
+  },
+  "with_dependency_other": 1,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 1
+  },
+  "with_test_patch_before": 213,
+  "with_test_patch_after": 213,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "7f1147de74ee59539ef1811f3d0ac5af4820d614",
+    "dirty": false
+  },
+  "created": "2026-11-26T10:39:30+00:00"
+}
