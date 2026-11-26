@@ -9,7 +9,8 @@ Part 1, the replay. For each run of a codemem setup:
   1. find the first search_code call of the main agent in stream.jsonl: the query and every other argument
   2. start the codemem program as an MCP server on the task's base commit (the src/ worktree that `cmeval e2e
      index` made) with a private copy of the task's index, as a run starts it (see replay_task)
-  3. wait until the index is ready and the embedding model is loaded
+  3. wait until the index is ready and the embedding model is loaded (codemem_gate.wait_ready, the wait of a
+     run's gate)
   4. call search_code with the same arguments at each number of results k. Only k changes
   5. read the result list from the text and match it to the task's gold files and functions
 
@@ -39,19 +40,18 @@ from __future__ import annotations
 
 import json
 import os
-import queue
 import re
 import shutil
 import statistics
 import subprocess
 import tempfile
-import threading
 import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from .codemem_gate import McpClient, McpError, full_search, notes_of, tool_texts, unwrap, wait_ready  # noqa: F401
 from .e2e_index import CODEMEM_ENV, REPO_ROOT, codemem_checkout, codemem_commit
 from .e2e_steps import TurnCounter, parse_stream, result_text
 from .files import write_json, write_text_atomic
@@ -68,10 +68,7 @@ TOOL_DEFAULT_K = 10  # the default of search_code when the agent gives no k
 MAX_K = 50  # search_code takes k from 1 to 50
 DEFAULT_IOU = 0.5
 MESSAGES_PATH = "/v1/messages"
-# Texts of codemem's notes (prompts.py and render.py of codemem). A note says that the result is not the full search.
-KEYWORDS_ONLY_MARK = "the embedding model is still loading"
-INDEXING_MARK = "the codemem index is still being built"
-NOT_FRESH_MARK = "Search again in a few seconds, or use grep for those files."
+# The texts of codemem's notes, and notes_of, are in codemem_gate.py: the runner reads them too.
 # One result: "3. path/to/file.py:120-137  Class.method  [id 4711]", and "  best 125-130" for a long chunk.
 _HEAD = re.compile(r"^(\d+)\. (.+?):(\d+)-(\d+)  (.*?)  \[id (\d+)\](?:  best (\d+)-(\d+))?[ \t]*$", re.MULTILINE)
 LEVELS = ("L0", "L1", "L2")
@@ -130,33 +127,10 @@ def run_k(args: dict) -> int:
 
 # ---- the text of a search_code result
 
-def unwrap(text: str) -> str:
-    """The rendered text of a result. The MCP server of codemem 041124e answered {"result": "<text>"}, and
-    Claude Code gave the model that JSON. A plain text stays as it is."""
-    try:
-        data = json.loads(text)
-    except (TypeError, ValueError):
-        return text
-    if isinstance(data, dict) and set(data) == {"result"} and isinstance(data["result"], str):
-        return data["result"]
-    return text
-
-
 def parse_results(text: str) -> list[dict]:
     """The result list of a rendered search_code text: rank, path, start and end line, name, chunk id."""
     return [{"rank": int(m[1]), "path": m[2], "start": int(m[3]), "end": int(m[4]), "name": m[5],
              "chunk_id": int(m[6])} for m in _HEAD.finditer(text)]
-
-
-def notes_of(text: str) -> dict:
-    """Which of codemem's notes a result has. keywords_only: the model was loading. indexing: the index was
-    being built. not_fresh: some edits were not in the index yet."""
-    return {"keywords_only": KEYWORDS_ONLY_MARK in text, "indexing": INDEXING_MARK in text,
-            "not_fresh": NOT_FRESH_MARK in text}
-
-
-def full_search(notes: dict) -> bool:
-    return not any(notes.values())
 
 
 # ---- gold
@@ -416,8 +390,9 @@ def check_summary(entries: list[dict], skipped: Counter) -> str:
     for e in entries:
         for name, on in (e["in_run"]["notes"] or {}).items():
             notes[name] += bool(on)
-    lines.append(f"- First search in the run answered from keywords only (model loading): {notes['keywords_only']}; "
-                 f"index being built: {notes['indexing']}; edits not yet indexed: {notes['not_fresh']}.")
+    lines.append(f"- First search in the run answered from keywords only (model loading, or codemem could not "
+                 f"embed): {notes['keywords_only']}; index being built: {notes['indexing']}; edits not yet indexed: "
+                 f"{notes['not_fresh']}.")
     checks = Counter()
     for e in entries:
         check = e.get("check") or {}
@@ -432,149 +407,11 @@ def check_summary(entries: list[dict], skipped: Counter) -> str:
 
 # ---- the replay through codemem's MCP server
 
-class ReplayError(Exception):
+class ReplayError(McpError):
     pass
 
 
-class McpClient:
-    """A small MCP client over stdio: one JSON-RPC message per line. The server's log goes to a file."""
-
-    PROTOCOL = "2025-11-25"
-
-    def __init__(self, argv: list[str], env: dict, log_path: Path):
-        self._log = open(log_path, "ab")
-        self.proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self._log, env=env)
-        self._lines: queue.Queue = queue.Queue()
-        self._next = 0
-        threading.Thread(target=self._read, name="mcp-reader", daemon=True).start()
-
-    def _read(self) -> None:
-        for line in self.proc.stdout:
-            self._lines.put(line)
-        self._lines.put(None)
-
-    def _send(self, message: dict) -> None:
-        try:
-            self.proc.stdin.write((json.dumps(message) + "\n").encode("utf-8"))
-            self.proc.stdin.flush()
-        except (BrokenPipeError, OSError) as exc:
-            raise ReplayError(f"the MCP server stopped (exit code {self.proc.poll()}): {exc}") from None
-
-    def notify(self, method: str, params: dict | None = None) -> None:
-        self._send({"jsonrpc": "2.0", "method": method, **({"params": params} if params is not None else {})})
-
-    def request(self, method: str, params: dict, timeout: float) -> dict:
-        self._next += 1
-        rid = self._next
-        self._send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
-        deadline = time.monotonic() + timeout
-        while True:
-            left = deadline - time.monotonic()
-            if left <= 0:
-                raise ReplayError(f"no answer to {method} after {timeout:.0f} s")
-            try:
-                line = self._lines.get(timeout=left)
-            except queue.Empty:
-                continue
-            if line is None:
-                raise ReplayError(f"the MCP server stopped (exit code {self.proc.wait(timeout=10)}) during {method}")
-            try:
-                message = json.loads(line)
-            except ValueError:
-                continue
-            if not isinstance(message, dict):
-                continue
-            if "method" in message and "id" in message:  # a request of the server, for example ping
-                if message["method"] == "ping":
-                    self._send({"jsonrpc": "2.0", "id": message["id"], "result": {}})
-                else:
-                    self._send({"jsonrpc": "2.0", "id": message["id"],
-                                "error": {"code": -32601, "message": "not supported by this client"}})
-                continue
-            if message.get("id") != rid:
-                continue
-            if "error" in message:
-                raise ReplayError(f"{method}: {message['error']}")
-            return message.get("result") or {}
-
-    def initialize(self, timeout: float) -> dict:
-        result = self.request("initialize", {"protocolVersion": self.PROTOCOL, "capabilities": {},
-                                             "clientInfo": {"name": "cmeval-replay", "version": "1"}}, timeout)
-        self.notify("notifications/initialized")
-        return result
-
-    def call_tool(self, name: str, args: dict, timeout: float) -> dict:
-        return self.request("tools/call", {"name": name, "arguments": args}, timeout)
-
-    def close(self) -> int | None:
-        """End the server: close its input, then wait; stop it when it does not end."""
-        try:
-            self.proc.stdin.close()
-        except OSError:
-            pass
-        try:
-            code = self.proc.wait(timeout=60)
-        except subprocess.TimeoutExpired:
-            self.proc.terminate()
-            try:
-                code = self.proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
-                code = self.proc.wait()
-        self._log.close()
-        return code
-
-
-def tool_texts(result: dict) -> tuple[str, str]:
-    """The text of a tool result, and the text as Claude Code gives it to the model: the JSON of the structured
-    content when the server sends one (codemem 041124e sends {"result": "<text>"}), else the text."""
-    text = "\n".join(str(c.get("text", "")) for c in result.get("content") or []
-                     if isinstance(c, dict) and c.get("type") == "text")
-    structured = result.get("structuredContent")
-    if isinstance(structured, dict):
-        return unwrap(text), json.dumps(structured, ensure_ascii=False, separators=(",", ":"))
-    return unwrap(text), text
-
-
-def _status_json(text: str) -> dict | None:
-    """The JSON line at the end of index_status: state, progress, chunks, vectors, stale."""
-    try:
-        data = json.loads(text.rsplit("\n\n", 1)[-1])
-    except ValueError:
-        return None
-    return data if isinstance(data, dict) else None
-
-
-WARMUP_QUERY = "load the embedding model"
 READY_POLL_S = 2.0
-
-
-def wait_ready(client: McpClient, timeout: float, call_timeout: float, poll: float | None = None) -> dict:
-    """Wait until index_status says ready, then until a search is a full search: no note that the model is
-    loading, that the index is being built, or that edits are not indexed yet."""
-    poll = READY_POLL_S if poll is None else poll
-    deadline = time.monotonic() + timeout
-    t0 = time.monotonic()
-    while True:
-        text, _ = tool_texts(client.call_tool("index_status", {}, call_timeout))
-        status = _status_json(text)
-        if status and status.get("state") == "ready":
-            break
-        if time.monotonic() > deadline:
-            state = status.get("state") if status else None
-            raise ReplayError(f"the index was not ready after {timeout:.0f} s (state {state}). A long state of "
-                              "indexing or updating can mean that codemem embeds the repo again, for example "
-                              "because the index was built on another device")
-        time.sleep(poll)
-    warmups = 0
-    while True:
-        text, _ = tool_texts(client.call_tool("search_code", {"query": WARMUP_QUERY, "k": 1}, call_timeout))
-        warmups += 1
-        if full_search(notes_of(text)):
-            return {"status": status, "warmup_searches": warmups, "ready_s": round(time.monotonic() - t0, 1)}
-        if time.monotonic() > deadline:
-            raise ReplayError(f"searches were not full searches after {timeout:.0f} s: {notes_of(text)}")
-        time.sleep(poll)
 
 
 def server_env(steering: str | None, home: Path) -> dict:
@@ -651,7 +488,8 @@ def replay_task(entries: list[dict], *, program: Path, program_commit: str | Non
     client = McpClient([str(program), "mcp", str(src), "--index-dir", str(copy)], env, log)
     try:
         init = client.initialize(call_timeout)
-        ready = wait_ready(client, ready_timeout, call_timeout)
+        ready = wait_ready(client, ready_timeout, call_timeout, poll=READY_POLL_S)
+        ready.pop("status_text", None)
         for entry in entries:
             gold = _gold_from_entry(entry)
             by_k = {}
@@ -677,7 +515,7 @@ def replay_task(entries: list[dict], *, program: Path, program_commit: str | Non
             try:
                 bm25 = cli_search(program, src, copy, env, entry["call"]["args"], entry["call"]["k"], call_timeout,
                                   signals="bm25")
-            except (ReplayError, OSError, ValueError, subprocess.SubprocessError) as exc:
+            except (McpError, OSError, ValueError, subprocess.SubprocessError) as exc:
                 entry["check"] = {"verdict": "not checked: keyword search failed", "error": str(exc)}
                 continue
         same_commits = same and entry["run_codemem_commit"] == program_commit \
@@ -779,7 +617,7 @@ def replay_entries(entries: list[dict], *, program: Path, ks: list[int], index_r
                             call_timeout=call_timeout, bm25_check=bm25_check)
                 env_shown = env_shown or {k: v for k, v in server_env(steering, work / "home").items()
                                           if k.startswith(("CODEMEM_", "HF_", "TRANSFORMERS_"))}
-            except (ReplayError, OSError, ValueError, subprocess.SubprocessError, shutil.Error) as exc:
+            except (McpError, OSError, ValueError, subprocess.SubprocessError, shutil.Error) as exc:
                 error = str(exc)
             finally:
                 shutil.rmtree(work, ignore_errors=True)

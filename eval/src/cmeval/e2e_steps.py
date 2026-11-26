@@ -73,6 +73,8 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from .codemem_gate import KEYWORDS_ONLY_KINDS, NOTE_KINDS, note_kinds
+
 # Raise this number whenever a rule of this module changes. Version 1 was the count_steps of e2e_run, which
 # read only the Read tool and the first word of each shell command.
 STEPS_VERSION = 3
@@ -1632,3 +1634,55 @@ def _walk(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT)
         "commands": commands,
     }
     return steps, per_turn
+
+
+# ---- codemem's notes on its search results
+
+CODEMEM_SEARCH = CODEMEM_PREFIX + "search_code"
+
+
+def codemem_fallbacks(events: list[dict]) -> dict:
+    """The search_code results of a run that were not a full search: each one that carries one of codemem's
+    notes (codemem_gate.NOTES), of the main agent and of subagents. A subagent's call has the main turn of its
+    Task call. A call without a result (the run was stopped) is not counted.
+
+      searches        search_code results in the run
+      fell_back       results with a note
+      keywords_only   results from keywords alone (the model was loading, or codemem could not embed)
+      by_note         results for each kind of note
+      calls           the results with a note: turn, subagent, notes
+      first           the first search_code result of the run (turn, subagent, notes), or null
+      first_keywords_only
+                      the first result came from keywords alone: the run did not test codemem's search
+    """
+    counter, turn_of, results = TurnCounter(), {}, {}
+    order: list[str] = []
+    for event in events:
+        counter.feed(event)
+        message = event.get("message") or {}
+        for block in message.get("content") or []:
+            if not isinstance(block, dict):
+                continue
+            if (event.get("type") == "assistant" and block.get("type") == "tool_use"
+                    and block.get("name") == CODEMEM_SEARCH and block.get("id") not in turn_of):
+                turn_of[block.get("id")] = (counter.turns, bool(event.get("parent_tool_use_id")))
+                order.append(block.get("id"))
+            elif (event.get("type") == "user" and block.get("type") == "tool_result"
+                  and block.get("tool_use_id") in turn_of):
+                results.setdefault(block["tool_use_id"], result_text(block))
+    found = []
+    for call_id in order:
+        if call_id in results:
+            turn, sub = turn_of[call_id]
+            found.append({"turn": turn, "subagent": sub, "notes": note_kinds(results[call_id])})
+    with_note = [c for c in found if c["notes"]]
+    first = found[0] if found else None
+    return {
+        "searches": len(found),
+        "fell_back": len(with_note),
+        "keywords_only": sum(1 for c in found if set(c["notes"]) & set(KEYWORDS_ONLY_KINDS)),
+        "by_note": {kind: n for kind in NOTE_KINDS if (n := sum(1 for c in with_note if kind in c["notes"]))},
+        "calls": with_note,
+        "first": first,
+        "first_keywords_only": bool(first and set(first["notes"]) & set(KEYWORDS_ONLY_KINDS)),
+    }

@@ -12,13 +12,23 @@ One run (run_one) has these steps:
      reaches the proxy and nothing else. A thread follows the stream of events and stops the agent after
      the turn limit
   4. in the container, as root: remove files that would configure the agent, make a user that is not
-     root, then start Claude Code as that user with the time limit. After it stops, save its changes as a
-     patch
+     root. For a codemem setup, start codemem's MCP server through the gate (codemem_gate.py) and wait until
+     its model and search index are in memory and a search has no note. Then start Claude Code as that user
+     with the time limit; its codemem server is the gate's bridge to that warm server. After it stops, save
+     its changes as a patch
   5. read the stream, the proxy log and the clocks, check the setup, and grade the patch with e2e.grade
   6. write run.json
 
-A run that hit a usage limit or failed the setup check is discarded: it is not graded, and a batch does it
-again. A run that ended at the time or turn limit is graded like any other.
+The wait for codemem happens before the agent's clock starts (mark codemem_warm in prep.txt), so it is not part
+of the agent's time, and the setup grep has no such wait. Without it, the agent's first search often came while
+the model was still loading, and codemem answered it from keywords only.
+
+A run is discarded when it hit a usage limit or failed the setup check. The setup check reads the init event
+of the stream (check_setup), and for a codemem setup also the gate's ready file and the first search_code
+result (codemem_checks): a warm-up that failed, or a first search answered from keywords only, fails it. A
+discarded run is not graded, and the next batch does it again. When the warm-up fails, Claude Code does not
+start, and the run ends in an error: three of them in a row stop the batch. A run that ended at the time or
+turn limit is graded like any other.
 
 The login token goes to the container only through the environment of the docker client (docker run -e NAME
 with no value). It is never written to a file or put on a command line. Before anything is read from the
@@ -40,7 +50,10 @@ run.json has these fields:
                       level, and the bytes of the index copy before and after the run
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
                       network, the removed configuration files, the files where the token was found and replaced,
-                      gpus (the container had the GPU)
+                      gpus (the container had the GPU). codemem setups only, else null: codemem_warm (the gate's
+                      ready file: ok, seconds, warmup_searches, the index_status answer, or the error) and
+                      codemem_fallback_searches (e2e_steps.codemem_fallbacks: the search_code results with one
+                      of codemem's notes, with their turns; `cmeval e2e recount` computes it again)
   result_event        subtype, is_error, num_turns, duration_ms, duration_api_ms, total_cost_usd
   usage_limit         the evidence of a usage limit (429 answers and their reset headers, the result text), or null
   turn_limit          the turn at which the runner stopped the agent, and how, or null
@@ -50,7 +63,8 @@ run.json has these fields:
                       the agent's sums, and the agent's modelUsage as it is
   proxy_errors        the errors of the proxy log
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
-                      preparation step, container_start_s, collect_s, container_s, grade_s
+                      preparation step, codemem_warm_s (the wait for codemem, a part of prep_s; null without
+                      codemem), container_start_s, collect_s, container_s, grade_s
   steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
                       command), and num_turns_result from the result event. `cmeval e2e recount` computes it again
   outcome             completed, the grader's record, the patch's files and changed lines, status_lines, and
@@ -77,10 +91,11 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Callable
 
+from . import codemem_gate
 from .e2e import grade, patch_files
 from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_python_root, hf_cache, \
     index_root, index_state, read_index_meta
-from .e2e_steps import TurnCounter, count_steps, parse_stream
+from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
 from .files import write_json
 from .generate import GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
 from .paths import cmeval_home, e2e_dir
@@ -114,6 +129,16 @@ INDEX_MOUNT = "/cmindex"
 GPU_DEVICE = "nvidia.com/gpu=all"
 HF_MOUNT = "/hf"
 CODEMEM_SEARCH_TOOL = "mcp__codemem__search_code"
+# The gate in the container (codemem_gate.py): its folder belongs to the agent's user, who runs the server.
+GATE_DIR = "/tmp/cmgate"
+GATE_SOCKET = f"{GATE_DIR}/codemem.sock"
+# The longest wait for a warm codemem. A start reads the saved search index in seconds; a longer wait means
+# that codemem builds or embeds again, and the run would not measure the codemem of the other runs.
+GATE_TIMEOUT_S = 600
+# Files of the run's folder that the gate writes (copied from GATE_DIR by agent.sh).
+WARM_FILE = "codemem-warm.json"
+GATE_LOGS = (f"cp {GATE_DIR}/gate.log /out/codemem-gate.log 2>/dev/null; "
+             f"cp {GATE_DIR}/server.log /out/codemem-server.log 2>/dev/null")
 # Files of the agent's patch that codemem could have written. `codemem mcp` should write none.
 UNEXPECTED_PATTERNS = (".codemem*", ".mcp.json")
 
@@ -388,6 +413,31 @@ def codemem_mcp_config(codemem: dict, settings: RunSettings) -> dict:
                                        "env": env, "alwaysLoad": True}}}
 
 
+def codemem_python(codemem: dict) -> str:
+    """The Python of codemem's environment, at its path on the host (the container has it at the same path)."""
+    return str(Path(codemem["bin"]).parent / "python")
+
+
+def gate_config(codemem: dict, settings: RunSettings) -> dict:
+    """The config of the gate's server (codemem_gate.serve): codemem's command and environment from
+    codemem_mcp_config, and the gate's own files and limits."""
+    server = codemem_mcp_config(codemem, settings)["mcpServers"]["codemem"]
+    return {"argv": [server["command"], *server["args"]], "env": server["env"], "cwd": "/testbed",
+            "socket": GATE_SOCKET, "ready_file": f"{GATE_DIR}/warm.json", "log": f"{GATE_DIR}/server.log",
+            "timeout_s": GATE_TIMEOUT_S, "call_timeout_s": MCP_TIMEOUT_MS / 1000, "poll_s": 0.5,
+            "accept_timeout_s": settings.time_limit_s}
+
+
+def gated_mcp_config(codemem: dict, settings: RunSettings) -> dict:
+    """The MCP config that Claude Code gets in a codemem setup: the gate's bridge to the warm server. The
+    environment is the server's, the one that the gate gives codemem; the bridge itself does not use it. It
+    stays here so that mcp.json shows what codemem got."""
+    direct = codemem_mcp_config(codemem, settings)["mcpServers"]["codemem"]
+    return {"mcpServers": {"codemem": {"command": codemem_python(codemem),
+                                       "args": [f"{GATE_DIR}/cmgate.py", "connect", GATE_SOCKET],
+                                       "env": direct["env"], "alwaysLoad": True}}}
+
+
 def codemem_mounts(codemem: dict, index_copy: Path) -> list[str]:
     """The docker run arguments of a codemem setup. The checkout and the Python install keep their paths, so
     that the program's links and its editable install work."""
@@ -446,8 +496,29 @@ def keep_bodies() -> bool:
     return os.environ.get(BODIES_ENV, "0") == "1"
 
 
-def agent_script(model: str, settings: RunSettings) -> str:
-    """The shell script that runs in the task's container, as root. It reads and writes /out."""
+def gate_script(python: str) -> str:
+    """The lines of agent.sh that start codemem through the gate and wait until it is warm. The gate runs as the
+    agent's user, without the login token. When it is not warm, the script stops before Claude Code."""
+    py = shlex.quote(python)
+    return (
+        f"mkdir -p {GATE_DIR} && cp /out/cmgate.py /out/cmgate.json {GATE_DIR}/ && "
+        f"chmod 644 {GATE_DIR}/cmgate.py {GATE_DIR}/cmgate.json && chown agent {GATE_DIR}\n"
+        f"runuser -u agent -- env -u {TOKEN_ENV} -u ANTHROPIC_BASE_URL HOME=/home/agent {py} {GATE_DIR}/cmgate.py "
+        f"serve {GATE_DIR}/cmgate.json > {GATE_DIR}/gate.log 2>&1 < /dev/null &\n"
+        "gate=$!\n"
+        f'while [ ! -e {GATE_DIR}/warm.json ] && kill -0 "$gate" 2>/dev/null; do sleep 0.2; done\n'
+        f"cp {GATE_DIR}/warm.json /out/{WARM_FILE} 2>/dev/null\n"
+        "mark codemem_warm\n"
+        f"if ! grep -q '\"ok\": true' /out/{WARM_FILE} 2>/dev/null; then\n"
+        f"  {GATE_LOGS}\n"
+        "  exit 3\n"
+        "fi\n"
+    )
+
+
+def agent_script(model: str, settings: RunSettings, gate_python: str | None = None) -> str:
+    """The shell script that runs in the task's container, as root. It reads and writes /out. With gate_python
+    (a codemem setup), it starts codemem through the gate and waits for it before the agent's clock starts."""
     specs = " ".join(shlex.quote(p) for p in CONFIG_PATHSPECS)
     # MCP_TIMEOUT and MCP_TOOL_TIMEOUT are the same in every setup, so that the setups differ only in the server.
     env = ("env -u ANTHROPIC_API_KEY HOME=/home/agent CLAUDE_CONFIG_DIR=/run/claude-empty "
@@ -478,6 +549,7 @@ def agent_script(model: str, settings: RunSettings) -> str:
         "mark chown\n"
         "mkdir -p /run/claude-empty && chown agent /run/claude-empty\n"
         "cp /out/mcp.json /tmp/mcp.json && chmod 644 /tmp/mcp.json\n"
+        + (gate_script(gate_python) if gate_python else "") +
         "mark ready\n"
         # The run's time: from right before Claude Code starts to right after it ends.
         "s=$(date +%s%N)\n"
@@ -488,6 +560,7 @@ def agent_script(model: str, settings: RunSettings) -> str:
         "printf 'agent_start %s\\nagent_end %s\\nexit_code %s\\n' \"$s\" \"$e\" \"$rc\" > /out/clock.txt\n"
         # Stop what the agent left running, so that the working tree does not change while it is read.
         f"runuser -u agent -- bash -c '{KILL_AGENT}' > /dev/null 2>&1\n"
+        + (GATE_LOGS + "\n" if gate_python else "") +
         "runuser -u agent -- git add -A > /out/git-add.log 2>&1\n"
         "runuser -u agent -- git diff --cached --binary HEAD > /out/agent.patch\n"
         'echo "status_lines $(runuser -u agent -- git status --short | wc -l)" > /out/after.txt\n'
@@ -520,6 +593,30 @@ def check_setup(init: dict | None, setup: Setup, model: str) -> list[str]:
         failed.append(f"web tools are loaded: {', '.join(web)}")
     for check in setup.checks:
         failed += check(init)
+    return failed
+
+
+def read_warm(out: Path) -> dict | None:
+    """The gate's ready file (codemem-warm.json), or None when there is none or it is not JSON."""
+    try:
+        data = json.loads((out / WARM_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def codemem_checks(warm: dict | None, fallbacks: dict) -> list[str]:
+    """The checks of a codemem setup that fail: the gate was not warm, or the first search_code result came from
+    keywords only. Either way the run did not test codemem's search."""
+    failed = []
+    if warm is None:
+        failed.append(f"codemem warm-up: no {WARM_FILE}")
+    elif not warm.get("ok"):
+        failed.append(f"codemem warm-up failed: {warm.get('error')}")
+    first = fallbacks.get("first")
+    if fallbacks.get("first_keywords_only") and first:
+        failed.append(f"the first search_code result (turn {first['turn']}) came from keywords only "
+                      f"({', '.join(first['notes'])})")
     return failed
 
 
@@ -689,9 +786,13 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     out = out.resolve()
     prompt = make_prompt(task, prompts)
     (out / "prompt.txt").write_text(prompt, encoding="utf-8")
-    mcp_config = codemem_mcp_config(codemem, settings) if codemem else spec.mcp_config
+    mcp_config = gated_mcp_config(codemem, settings) if codemem else spec.mcp_config
     (out / "mcp.json").write_text(json.dumps(mcp_config) + "\n", encoding="utf-8")
-    (out / "agent.sh").write_text(agent_script(model, settings), encoding="utf-8")
+    if codemem:
+        (out / "cmgate.py").write_bytes(Path(codemem_gate.__file__).read_bytes())
+        write_json(out / "cmgate.json", gate_config(codemem, settings))
+    (out / "agent.sh").write_text(agent_script(model, settings, codemem_python(codemem) if codemem else None),
+                                  encoding="utf-8")
     image_id = _run(["docker", "image", "inspect", "-f", "{{.Id}}", ready["tag"]]).stdout.strip() or None
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     name = f"cmeval-run-{uuid.uuid4().hex[:12]}"
@@ -757,6 +858,10 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     end = classify_end(result, clock.get("exit_code"), agent_s=clock.get("agent_s"),
                        time_limit_s=settings.time_limit_s, turn_limited=bool(turn_limit), usage_evidence=evidence)
     failed = check_setup(init, spec, model)
+    warm = read_warm(out) if codemem else None
+    fallbacks = codemem_fallbacks(stream["events"]) if codemem else None
+    if codemem:
+        failed += codemem_checks(warm, fallbacks)
     usage = (result or {}).get("modelUsage")
     cross = cross_check(summary, usage) if summary and usage else None
     tokens = token_block(summary, result)
@@ -842,6 +947,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "host_timeout": host_timeout,
             "docker_exit_code": docker_exit,
             "gpus": settings.gpus,
+            "codemem_warm": warm,
+            "codemem_fallback_searches": fallbacks,
         },
         "result_event": {k: (result or {}).get(k) for k in ("subtype", "is_error", "num_turns", "duration_ms",
                                                              "duration_api_ms", "total_cost_usd")},
@@ -856,6 +963,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "duration_api_ms": (result or {}).get("duration_api_ms"),
             "prep_s": prep["prep_s"],
             "prep_steps_s": prep["steps_s"],
+            "codemem_warm_s": prep["steps_s"].get("codemem_warm"),
             # From the docker command to the first mark in the container. Both clocks are the host's on Linux.
             "container_start_s": (round((prep["marks_ns"]["start"] - host_start_ns) / 1e9, 3)
                                   if "start" in prep["marks_ns"] else None),
@@ -892,9 +1000,19 @@ def _recount_values(steps: dict) -> tuple:
             before + 1 if before is not None else None, None, steps.get("steps_version"))
 
 
+def _fallback_value(fallbacks: dict | None) -> str | None:
+    """The fallback searches of a run for a line of recount: "2 of 5", and "first" when the first one came from
+    keywords only."""
+    if not fallbacks:
+        return None
+    text = f"{fallbacks['fell_back']} of {fallbacks['searches']}"
+    return text + (" (first from keywords)" if fallbacks.get("first_keywords_only") else "")
+
+
 def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str], None] = print) -> int:
     """Compute `steps` of each run of a run id again from its stream.jsonl, with the rules of today, and write
-    it into run.json. Nothing else in the record changes. The gold files come from the record (identity), or
+    it into run.json. For a codemem setup also integrity.codemem_fallback_searches. Nothing else in the record
+    changes: a run is not discarded after the fact. The gold files come from the record (identity), or
     from the task file for records that do not have them. Returns the number of runs counted again."""
     root = e2e_dir() / "runs" / run_id
     if not root.is_dir():
@@ -913,14 +1031,22 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
             progress(f"{where}: no stream.jsonl; not counted again")
             continue
         old = record.get("steps") or {}
-        steps = count_steps(parse_stream(path.parent / "stream.jsonl")["events"], gold)
+        events = parse_stream(path.parent / "stream.jsonl")["events"]
+        steps = count_steps(events, gold)
         steps["num_turns_result"] = old.get("num_turns_result", (record.get("result_event") or {}).get("num_turns"))
         record["steps"] = steps
+        fallbacks, old_fallbacks = None, None
+        if (record.get("identity") or {}).get("codemem"):
+            integrity = record.setdefault("integrity", {})
+            old_fallbacks = integrity.get("codemem_fallback_searches")
+            fallbacks = integrity["codemem_fallback_searches"] = codemem_fallbacks(events)
         write_json(path, record)
         done += 1
         names = ("content searches", "files viewed", "gold opened", "first edit turn", "first gold surfaced turn",
                  "steps version")
-        pairs = zip(names, _recount_values(old), _recount_values(steps))
+        pairs = list(zip(names, _recount_values(old), _recount_values(steps)))
+        if fallbacks is not None:
+            pairs.append(("codemem fallback searches", _fallback_value(old_fallbacks), _fallback_value(fallbacks)))
         progress(f"{where}: " + ", ".join(f"{name} {'-' if a is None else a} -> {'-' if b is None else b}"
                                           for name, a, b in pairs))
     return done

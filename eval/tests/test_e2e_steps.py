@@ -996,3 +996,66 @@ def test_score_behaviour_table():
     _scored("sb1", "t1", "tool", {**steps, "codemem_calls": 3})
     text = format_score(score("sb1"))
     assert "codemem" in text and score("sb1")["setups"]["tool"]["behaviour"]["codemem_share"] == 1.0
+
+
+# ---- codemem's notes on search_code results
+
+# The notes as codemem writes them (prompts.py and render.py of codemem at 09c4ef0, and prompts.py at 041124e).
+LOADING_NEW = ("Note: codemem is still loading its embedding model or its search index (the first searches after it "
+               "starts); these results come from keyword matching only. Search again shortly for results by meaning.")
+LOADING_OLD = ("Note: the embedding model is still loading (the first search after codemem starts); these results "
+               "come from keyword matching only. Search again in a few seconds for results by meaning.")
+CANNOT_EMBED = ("Note: codemem cannot embed right now (CUDA out of memory), so these results come from keyword "
+                "matching only. It tries again by itself; search again later for results by meaning.")
+NOT_FRESH = ("Note: 1 file saved moments ago are still being indexed, so results may miss their latest edits. "
+             "Search again in a few seconds, or use grep for those files.")
+HIT = "1. auth/sessions.py:33-40  SessionManager.revoke_session  [id 7]"
+
+
+def _search_stream(results, *, sub_at=None):
+    """A stream with one search_code call in each main turn and the given result texts. A result of None: the call
+    has no result (the run was stopped). sub_at: the index of a call that a subagent makes."""
+    events = []
+    for i, text in enumerate(results):
+        parent = "task-1" if i == sub_at else None
+        events.append({"type": "assistant", "parent_tool_use_id": parent, "message": {"id": f"m{i}", "content": [
+            {"type": "tool_use", "id": f"s{i}", "name": "mcp__codemem__search_code", "input": {"query": "q"}}]}})
+        if text is not None:
+            events.append({"type": "user", "parent_tool_use_id": parent, "message": {"content": [
+                {"type": "tool_result", "tool_use_id": f"s{i}", "content": text}]}})
+    return events
+
+
+def test_codemem_fallbacks_of_the_first_search():
+    # codemem 09c4ef0 and later: plain text
+    found = e2e_steps.codemem_fallbacks(_search_stream([HIT + "\n\n" + LOADING_NEW, HIT]))
+    assert found["searches"] == 2 and found["fell_back"] == 1 and found["keywords_only"] == 1
+    assert found["first"] == {"turn": 1, "subagent": False, "notes": ["loading"]} and found["first_keywords_only"]
+    assert found["by_note"] == {"loading": 1} and found["calls"] == [found["first"]]
+    # codemem 041124e: {"result": "<text>"}, and the older note
+    wire = json.dumps({"result": HIT + "\n\n" + LOADING_OLD})
+    found = e2e_steps.codemem_fallbacks(_search_stream([wire]))
+    assert found["first_keywords_only"] and found["first"]["notes"] == ["loading"]
+    # codemem could not embed: keywords only as well
+    found = e2e_steps.codemem_fallbacks(_search_stream([HIT + "\n\n" + CANNOT_EMBED]))
+    assert found["first_keywords_only"] and found["by_note"] == {"cannot_embed": 1}
+
+
+def test_codemem_fallbacks_of_a_later_search():
+    texts = [HIT, HIT + "\n\n" + NOT_FRESH, None, json.dumps({"result": HIT + "\n\n" + LOADING_OLD}),
+             "The codemem index is not available yet."]
+    found = e2e_steps.codemem_fallbacks(_search_stream(texts, sub_at=3))
+    assert found["searches"] == 4  # the call without a result is not counted
+    assert found["first"] == {"turn": 1, "subagent": False, "notes": []} and not found["first_keywords_only"]
+    assert found["fell_back"] == 3 and found["keywords_only"] == 1
+    assert found["by_note"] == {"loading": 1, "not_fresh": 1, "not_available": 1}
+    # the subagent's call has the main turn of its Task call (turn 3: its own message is not a main turn)
+    assert found["calls"] == [{"turn": 2, "subagent": False, "notes": ["not_fresh"]},
+                              {"turn": 3, "subagent": True, "notes": ["loading"]},
+                              {"turn": 4, "subagent": False, "notes": ["not_available"]}]
+
+
+def test_codemem_fallbacks_without_a_search():
+    found = e2e_steps.codemem_fallbacks([{"type": "system", "subtype": "init"}])
+    assert found == {"searches": 0, "fell_back": 0, "keywords_only": 0, "by_note": {}, "calls": [], "first": None,
+                     "first_keywords_only": False}
