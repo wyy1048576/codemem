@@ -1199,6 +1199,11 @@ index with a flipped bit as it is. In a test with 2,500 vectors the damaged vect
 up to 2,427 (a similarity cannot pass 1), and a flipped bit in a size field made the start
 allocate past 500 MB for a file of 0.3 MB.
 
+A note never chooses a file. Whoever can write to the index folder can write a note, and the
+file a note describes is read at a start and deleted when a save replaces it. So that file is
+always `vec_<type><suffix>` in the index folder, with the suffix of the note's backend. A note
+that names anything else, a path among them, counts as no note.
+
 **The vector cache** maps (embedder key, text hash) to a vector: 2 bytes per number, at the
 model's full length. It is one SQLite file for the whole machine, and every codemem process
 reads and writes it. Each part of its layout has a reason. The numbers are from 200,000 synthetic

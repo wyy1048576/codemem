@@ -1481,13 +1481,25 @@ class Store:
 
     def _read_note(self, vec_type: str) -> dict[str, Any] | None:
         try:
-            return json.loads(self._note_path(vec_type).read_text("utf-8"))
+            note = json.loads(self._note_path(vec_type).read_text("utf-8"))
         except (OSError, ValueError):
             return None
+        return note if isinstance(note, dict) else None
 
     def _noted_file(self, vec_type: str, note: dict[str, Any] | None) -> Path | None:
-        """The saved index a note describes (notes from before backends were pluggable: FAISS)."""
-        return self.index_dir / note.get("file", f"vec_{vec_type}.faiss") if note else None
+        """The saved index a note describes: this folder's `vec_<type>` file of the backend the
+        note names (none: a note from before backends were pluggable, so FAISS). A note is a file
+        that whoever can write to the folder can write, and the file it names is read by a start
+        and deleted by a save. So its `file` counts only when it is that very name. With a path,
+        or the name of anything else in the folder, it is no note: None."""
+        if not note:
+            return None
+        use, backend = self._search_index(), note.get("backend", "faiss")
+        for name, cls in ((use.name, use.cls), ("faiss", FaissVectorStore), ("compact", CompactVectorStore)):
+            if backend == name:
+                path = self.index_dir / f"vec_{vec_type}{cls.suffix}"
+                return path if note.get("file", path.name) == path.name else None
+        return None  # a plugin that is not the one in use: the suffix of its files is not known here
 
     def database_id(self) -> str:
         """This database's identity: a random token set when it is created. A saved search index
@@ -1918,11 +1930,12 @@ class Store:
         the same `save_id` (save_vectors)."""
         use = self._search_index()
         note = self._read_note(vec_type)
-        if (note is None or note.get("database") != self.database_id()
+        path = self._noted_file(vec_type, note)
+        if (note is None or path is None or note.get("database") != self.database_id()
                 or not note.get("save_id") or note.get("save_id") != self.get_meta(f"vec.{vec_type}.save_id")
                 or note.get("backend", "faiss") != use.name or note.get("options", {}) != use.options
                 or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder")
-                or type(note.get("crc32")) is not int or not self._noted_file(vec_type, note).is_file()):
+                or type(note.get("crc32")) is not int or not path.is_file()):
             return None
         return note
 

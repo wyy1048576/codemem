@@ -491,3 +491,74 @@ def test_two_processes_that_save_in_turn_each_leave_a_file_a_start_reads(tmp_pat
         assert all(_finds_each(start, *vectors) for vectors in held) and rebuilds == []
         start.close()
     a.close(), b.close()
+
+
+# ---------------------------------------------------------------- the file a note names
+
+
+@pytest.mark.parametrize("backend, options", SAVED)
+@pytest.mark.parametrize("named, of_this_database", [
+    ("../outside.bin", True), ("../outside.bin", False), ("{absolute}", True), ("sub/inside.bin", True),
+    ("index.db", True), ("vec_usage{suffix}", True), ("vec_code.json", True), (7, True), (["vec_code{suffix}"], True),
+    (None, True),
+])
+def test_a_note_names_no_file_but_its_own_index(tmp_path, monkeypatch, backend, options, named, of_this_database):
+    """A note is a file in the index folder, and what it names is read by a start and deleted by
+    a save and by `drop_vec_type`. Only the name a save gives that vector type's index counts.
+    Any other note is no note: the index is rebuilt, and no file but the type's own is touched."""
+    idx, outside = tmp_path / "idx", tmp_path / "outside.bin"
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    ids = _seed(s, 40)
+    with s.transaction():
+        s.ensure_vec_type("usage", EMBEDDER)
+    s.put_vectors("usage", EMBEDDER, [VectorRow(c, 0, 1, 0, 1, f"u{c}") for c in ids], _vecs(40, seed=1))
+    s.save_vectors()
+    s.close()
+    note = json.loads((idx / "vec_code.json").read_text())
+    suffix = note["file"][len("vec_code"):]
+    (idx / "sub").mkdir()
+    for copy in (outside, idx / "sub" / "inside.bin"):  # an index that could be read, where no note may reach
+        shutil.copy(idx / note["file"], copy)
+    if isinstance(named, str):
+        named = named.format(suffix=suffix, absolute=outside)
+    elif isinstance(named, list):
+        named = [name.format(suffix=suffix) for name in named]
+    bad = json.dumps({**note, "file": named, "database": note["database"] if of_this_database else "0" * 32})
+    others = [outside, idx / "sub" / "inside.bin", idx / "index.db", idx / f"vec_usage{suffix}", idx / "vec_usage.json"]
+
+    (idx / "vec_code.json").write_text(bad)
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    assert _finds_each(s, ids, _vecs(40)) and [a[0] for a in rebuilds] == ["code"]  # the file it names is not read
+    _more(s, 5, "new", seed=3)
+    s.save_vectors()  # a save removes the file an earlier note described, when it is another backend's
+    assert all(path.is_file() for path in others)
+    assert json.loads((idx / "vec_code.json").read_text())["file"] == f"vec_code{suffix}"
+    s.close()
+
+    (idx / "vec_code.json").write_text(bad)
+    s = Store(idx, vector_backend=backend, vector_options=options)
+    with s.transaction():
+        s.drop_vec_type("code")  # and so does dropping the type
+    assert all(path.is_file() for path in others) and not list(idx.glob("vec_code*"))
+    assert s.counts()["vectors"] == {"usage": 40}
+    s.close()
+
+
+@pytest.mark.parametrize("text", ["[1, 2]", '"vec_code.faiss"', "3", "null", "{}", '{"backend": ["compact"], "file": 3}', ""])
+def test_a_note_that_is_not_what_a_save_writes_is_no_note(tmp_path, monkeypatch, text):
+    idx = tmp_path / "idx"
+    s = Store(idx, vector_backend="auto")
+    ids = _seed(s, 5)
+    s.save_vectors()
+    s.close()
+    (idx / "vec_code.json").write_text(text)
+    rebuilds = _count_rebuilds(monkeypatch)
+    s = Store(idx, vector_backend="auto")  # `auto` reads every note to see what the index was saved as
+    assert s.search_index_status()["index"] == "faiss"
+    assert s.vector_search("code", _vecs(5)[2], 1)[0].chunk_id == ids[2] and len(rebuilds) == 1
+    s.save_vectors()
+    with s.transaction():
+        s.drop_vec_type("code")
+    assert not list(idx.glob("vec_code*"))
+    s.close()

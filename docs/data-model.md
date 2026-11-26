@@ -401,6 +401,8 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
                                      `crc32` is the checksum of the copy's file, whatever the backend.
                                      `backend` is the search index the file holds (`faiss`, `compact` or a
                                      plugin's name), whether a configuration named it or `auto` picked it.
+                                     `file` is the copy's name: vec_<type><suffix> of that backend, and
+                                     nothing else (§8).
                                      FAISS files hold an IndexIDMap2 over an fp16 IndexScalarQuantizer
                                      (inner product, 2 bytes per number); a file of 4-byte numbers
                                      (IndexFlatIP) is converted when loaded
@@ -497,6 +499,10 @@ it doesn't own.
      or a note without one, means a rebuild from the rows. That is the case after `index.db` was
      put back from a copy, or lost its last commits in a power cut: such a database hands out
      again the vector ids of the rows it lost, and its epoch counts up again.
+  7. a note never chooses a file. A start reads, and a save or the removal of a vector type
+     deletes, only `vec_<type><suffix>` in the index folder, the suffix being that of the note's
+     backend. A note whose `file` is anything else (a path, another file of the folder), or one
+     that is not a JSON object, counts as no note.
 - **Which search index** (`vector_backend`): the one a configuration names, or for `auto` the
   exact index while the exact indexes of every vector type fit the budget together
   (`vector_memory_mb`), and the compact one for every type when they do not (architecture.md §5).
@@ -506,7 +512,7 @@ it doesn't own.
   - where the installed FAISS cannot make the compact index, `auto` picks the exact one.
 - **Loading the search index:**
   - a vector type's index is read from its saved copy, or rebuilt from the rows when the copy
-    cannot be used (rules 3 to 6, or no copy);
+    cannot be used (rules 3 to 7, or no copy);
   - loading holds no lock. One thread loads a type; the others that need it wait for that thread.
     Rows written meanwhile are applied when the index is installed, by vector id;
   - a write to a type whose index is not in memory does not load it: the index is loaded at its
