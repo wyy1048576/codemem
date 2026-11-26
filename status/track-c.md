@@ -2,7 +2,7 @@
 
 **Owner:** Andre, who also leads the project: ask him, in the log, when a decision or a priority is unclear.
 **Plan:** `docs/plan/track-c-memory.md` on `main`.
-**Updated:** 2026-11-26 11:20 UTC, by Andre (with Claude Code).
+**Updated:** 2026-11-26 11:32 UTC, by Andre (with Claude Code).
 
 | | |
 |---|---|
@@ -10,7 +10,7 @@
 | Done | pushed: `andre/embedding-endpoints`, `andre/model-idle-unload`, `andre/worktree-start`, `andre/embedding-assist` (stacked in that order), `andre/vector-cache-cap`, `andre/compact-store`, `andre/compact-default`, and `andre/track-c-all` for testing (619 tests). The compact index returned the true top 10 in every real search measured (768 on 31,000 vectors, 1,640 on a pandas index of 49,770, 1,466 on a vLLM index of 144,729); two of those searches, both with questions about another repo, lost one result of their top 50. The default will be the exact index while it fits 2% of the machine's memory, the compact one beyond |
 | Next | 1. The pull request for `andre/track-c-defaults`: idle unload at 60 minutes, a 30-day limit for the vector cache, a first scan of 4,000 (entry of 2026-11-26 11:20). 2. The audit fixes, on `andre/saved-index-integrity` and `andre/worktree-freshness` (in work). 3. The results doc merged (Andre). 4. One run of `main` on Linux and on Windows (entry of 2026-11-26 10:37). 5. The evaluation with open models: the survey is done, mini-SWE-agent first |
 | Blocked on | nothing |
-| Needs from other tracks | A and B: `uv sync` on `main`, and word at once if it fails (an Apple-silicon Mac on macOS 14 has no FAISS 1.16.0 build); one run of `uv run pytest -q` on Linux and on Windows (entry of 2026-11-26 10:37). B: whether the graph work touches `store.py`'s vector part, the indexer's stages or the watcher |
+| Needs from other tracks | A: the four runs on the PC of the entry of 2026-11-26 11:32 (the tests on Linux, each repo's vector count, cost against size up to 2 million vectors, the check on real indexes): Andre's decisions on speed at scale and on the compact index's second code wait for runs 2 and 3. A and B: `uv sync` on `main`, and word at once if it fails. B: whether the graph work touches `store.py`'s vector part, the indexer's stages or the watcher |
 | Gives to other tracks | for A: nothing to set; indexes keep their keys; on the PC every repo stays on the exact index. `codemem serve-embeddings` if containers should share one model. For B: `Store.vector_search` unchanged; `ti.find()` and `ti.vectors_of()` replace the two bookkeeping dicts |
 | Open | The number of results a search returns (entry of 2026-11-26 07:58). Whether the exact index keeps its saved file. The embedding model and the vector length: decided later (Andre, Nov 25). Whether a hosted API passes the assist's check: needs a key and one trial. One shared embedding model for every codemem process on a machine, started on demand: not before the lock (Andre and Claude Code, Nov 26) |
 | Dates | Nov 27, noon Pacific at the latest: codemem's design is locked; the aim is the night of Nov 26 (Andre, entry of 2026-11-26 09:56). Nov 27 to Nov 30: the runs. Nov 30, 23:59: everything frozen. Dec 1, 14:00: the presentation. Dec 8: the paper (team meeting of Nov 25) |
