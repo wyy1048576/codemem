@@ -49,6 +49,18 @@ def test_load_recipe_playwright():
     assert all("CI=" not in suite.test for suite in recipe.suites) and "CI" not in dict(recipe.env)
 
 
+def test_load_recipe_vllm():
+    recipe = gen.load_recipe("vllm")
+    env = dict(recipe.env)
+    # The tests run with the network off and without a GPU: the Hugging Face libraries read only their cache.
+    assert env["HF_HUB_OFFLINE"] == "1" and env["VLLM_TARGET_DEVICE"] == "cpu"
+    # A test that waits must not use the limit of the suite, and a failed test must not run again.
+    assert "--timeout=" in recipe.test and "-p no:rerunfailures" in recipe.test
+    assert "--continue-on-collection-errors" in recipe.test
+    # Release tags only: the repo also tags its Rust crates.
+    assert recipe.tag_match == "v[0-9]*"
+
+
 def test_load_recipe_rejects_unknown_fields(tmp_path):
     path = tmp_path / "x.toml"
     path.write_text('repo = "a/b"\nbase_image = "i"\ntest = "t"\nsetup = []\n')
