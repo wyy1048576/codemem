@@ -272,10 +272,13 @@ def known_ids(files: list[Path]) -> dict[str, set[str]]:
     """Repo -> the task ids in these task files (an earlier collection, for example)."""
     found: dict[str, set[str]] = {}
     for path in files:
-        for line in Path(path).read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                row = json.loads(line)
-                found.setdefault(row["repo"], set()).add(row["id"])
+        # Line by line as load_tasks reads: str.splitlines also splits at characters such as
+        # U+2028, which a task file holds unescaped inside its strings.
+        with Path(path).open(encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    row = json.loads(line)
+                    found.setdefault(row["repo"], set()).add(row["id"])
     return found
 
 

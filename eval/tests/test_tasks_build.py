@@ -338,8 +338,9 @@ def test_drop_known_keeps_new_tasks_and_records_the_rest(history, tmp_path):
     row = task.to_dict()
     other = Task.from_dict({**row, "id": "acme__demo-9", "fix": {**row["fix"], "pr_number": 9}})
     first = tmp_path / "first.jsonl"  # only id and repo are read
-    first.write_text("".join(json.dumps({"id": i, "repo": r}) + "\n" for i, r in
-                             ((task.id, REMOTE_REPO), ("acme__demo-3", REMOTE_REPO), ("acme__other-7", "acme/other"))))
+    first.write_text("".join(json.dumps({"id": i, "repo": r, "query": "a\u2028b\x0cc"}, ensure_ascii=False) + "\n"
+                             for i, r in ((task.id, REMOTE_REPO), ("acme__demo-3", REMOTE_REPO),
+                                          ("acme__other-7", "acme/other"))), encoding="utf-8")
 
     kept, record = drop_known([task, other], [first], [REMOTE_REPO])
     assert [t.id for t in kept] == ["acme__demo-9"]
