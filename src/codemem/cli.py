@@ -412,8 +412,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 1
     except RuntimeError as e:
-        from .embedder import LocalModelUnavailable  # here, not at the top: see the note there
+        from .embedder import EmbeddingUnavailable, LocalModelUnavailable  # here, not at the top: see the note there
 
+        if isinstance(e, EmbeddingUnavailable):
+            print(
+                f"error: {e}\nThe embedding endpoint gave no vectors after every retry: start it again (`codemem "
+                "serve-embeddings`) or check `[embedding] base_url`. `codemem search --signals bm25` and `codemem "
+                "status` work without it.", file=sys.stderr,
+            )
+            return 1
         if not isinstance(e, LocalModelUnavailable):
             raise
         print(f"error: {e}", file=sys.stderr)

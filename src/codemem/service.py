@@ -37,7 +37,7 @@ from urllib.parse import urlparse
 
 from . import assist
 from .config import Config, VectorConfig, default_index_dir, find_repo_root, load_config
-from .embedder import Embedder, make_embedder, release_idle
+from .embedder import Embedder, EmbeddingUnavailable, make_embedder, release_idle
 from .indexer import IndexStats, Indexer, git_head
 from .search import BM25, SearchResponse, make_card, search
 from .store import Store
@@ -683,7 +683,10 @@ class CodememService:
                 self.embedder_factory(spec, self.config).embed_documents(["warmup"])
             except Exception as e:
                 failed = True
-                self._load_retry.failed(f"loading the embedding model {spec.model}", e)
+                what = f"loading the embedding model {spec.model}"
+                if isinstance(e, EmbeddingUnavailable):  # an embedding API: the vector type's own model is not in use
+                    what = "reaching the embedding endpoint"
+                self._load_retry.failed(what, e)
                 self.last_error = self._load_retry.error
         if not failed:
             self._recovered(self._load_retry)
@@ -733,7 +736,12 @@ class CodememService:
         200,000 vectors in the compact form, with FAISS on one thread). If they are not in memory
         by then, or will not be, the search uses keywords alone and says so. A model that was
         freed for being idle is waited for longer (`IDLE_RELOAD_WAIT`): the first search after an
-        idle time then costs the reload, not the vectors' part of its results."""
+        idle time then costs the reload, not the vectors' part of its results.
+
+        The same holds when the vectors cannot be had at all: a model whose load failed, or an
+        embedding endpoint that does not answer. Such a search answers from keywords and says why
+        (`models_error`), at once while that is known, and after its own request's retries if it
+        is the first to find out. A search that waits (the CLI's) fails with the reason instead."""
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
         freshness = Freshness()
         if self._worker is not None or self._watcher is not None:
@@ -744,20 +752,52 @@ class CodememService:
             freshness = self.catch_up(wait_for_models=wait_for_models, first=first)
         elif self.copy_unchecked():
             freshness = Freshness(unchecked_copy=True)  # no writer here makes its first full check: say what it is
-        loading = not wait_for_models and "signals" not in kwargs and not (
-            self._models_ready(deadline, after_idle=True) and self._indexes_ready(deadline))
-        if loading:
-            kwargs["signals"] = ["bm25"]
-        resp = search(self.store, query, self.config, embedder_factory=self.embedder_factory, **kwargs)
-        resp.freshness, resp.models_loading = freshness, loading
+
+        def run(options: dict[str, Any]) -> SearchResponse:
+            return search(self.store, query, self.config, embedder_factory=self.embedder_factory, **options)
+
+        may_fall_back = not wait_for_models and "signals" not in kwargs  # to keywords, with a note that says so
+        by_keywords = {**kwargs, "signals": [BM25]}
+        loading, why = False, None
+        if may_fall_back:
+            if not self._models_ready(deadline, after_idle=True):
+                loading, why = True, self._models_error()
+            else:
+                loading = not self._indexes_ready(deadline)
+        try:
+            resp = run(by_keywords if loading else kwargs)
+        except EmbeddingUnavailable as e:
+            if not may_fall_back:
+                raise
+            # The endpoint stopped answering under this very search, which has waited out its
+            # request's retries. The next try starts in the background; `index_status` shows the
+            # error until one works, and the searches before that answer from keywords at once.
+            self._models_ready(0.0)
+            loading, why = True, str(e)
+            resp = run(by_keywords)
+        resp.freshness, resp.models_loading, resp.models_error = freshness, loading, why
         return resp
+
+    def _models_error(self) -> str | None:
+        """Why the embedding models cannot be used, when the last try failed: a request to an
+        embedding endpoint that has stopped answering, or a model's load. None while nothing
+        failed: a first load is running."""
+        for vec_type in self.config.enabled_vec_types():
+            if why := self.embedder_factory(self.config.vectors[vec_type], self.config).unreachable:
+                return why
+        return self._load_retry.error
 
     def _models_ready(self, until: float, *, after_idle: bool = False) -> bool:
         """Whether the embedding models are in memory, waiting until `until` while they load.
         Starts loading them in the background if nothing is and a try is due (`_Retry`). It does
         not wait for a load that has failed: there is nothing to wait for until the next try.
         With `after_idle`, a model that was freed for being idle is waited for until
-        `IDLE_RELOAD_WAIT` from now, however near `until` is."""
+        `IDLE_RELOAD_WAIT` from now, however near `until` is.
+
+        An embedding endpoint counts as a model here: not ready from a request that got no
+        vectors after every retry until one gets them again (`Embedder.unreachable`). A caller
+        that would wait (a search) has it asked again whatever the schedule says: one request,
+        sent once, tells whether it is back."""
         embedders = [self.embedder_factory(self.config.vectors[v], self.config) for v in self.config.enabled_vec_types()]
         for e in embedders:
             e.touch()  # first, so that an idle unload cannot fall between this check and the embedding
@@ -765,8 +805,9 @@ class CodememService:
             return True
         if after_idle and any(e.freed_idle for e in embedders):
             until = max(until, time.monotonic() + IDLE_RELOAD_WAIT)
+        asked = until > time.monotonic() and any(e.unreachable for e in embedders)
         with self._cond:
-            if (self._prewarm is None or not self._prewarm.is_alive()) and self._load_retry.due:
+            if (self._prewarm is None or not self._prewarm.is_alive()) and (asked or self._load_retry.due):
                 self._prewarm = threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True)
                 self._prewarm.start()
             loader = self._prewarm

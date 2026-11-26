@@ -706,8 +706,8 @@ and reports any difference.
 | a search while the model is loading (when the server starts, or after the model was freed for being idle) | it waits within its 4 s, then answers from keywords alone and says so |
 | a search while a search index is still loading, or is being rebuilt from the stored vectors (§5) | the same: it waits within its 4 s, and not for a rebuild that will take longer; then keywords alone, and the note |
 | a save while the model is loading | it is applied at once (stage A); its vectors follow when the model is in memory |
-| the model can't be loaded (a wrong name, no network for its first download) | saves are still applied and searches answer from keywords, at once: a search does not wait for a load that has failed. The load is tried again after 1 s, then after twice as long each time, up to a minute, and `index_status` shows the error until it works |
-| the embedding API or the `serve-embeddings` server is down | a search waits for its retries, about 31 s, then fails; edits stay queued and are embedded when it is back (decisions.md §2) |
+| the model can't be loaded (a wrong name, no network for its first download) | saves are still applied and searches answer from keywords, at once: a search does not wait for a load that has failed, and its note says why. The load is tried again after 1 s, then after twice as long each time, up to a minute, and `index_status` shows the error until it works |
+| the embedding API or the `serve-embeddings` server is down | the same as a model that can't be loaded: searches answer from keywords and their note names the address that does not answer; edits stay queued and are embedded when it is back. Only the first search to find the endpoint down waits for its request's retries, about 31 s. After that each search asks the endpoint once, and the writer on the schedule above, so the first search after it is back ranks by meaning again. `codemem index` and `codemem search` stop after the retries with one line that names the address (decisions.md §2) |
 
 ### 4.6 Branch switches and worktrees
 

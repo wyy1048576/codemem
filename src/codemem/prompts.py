@@ -167,6 +167,15 @@ def models_loading_notice() -> str:
     )
 
 
+def vectors_unavailable_notice(why: str) -> str:
+    """After results that are by keywords only because codemem could not embed, and not for a load
+    in progress: `why` is the error of the model's load or of the embedding endpoint."""
+    return (
+        f"Note: codemem cannot embed right now ({why}), so these results come from keyword matching only. It tries "
+        "again by itself; search again later for results by meaning."
+    )
+
+
 def copy_notice() -> str:
     """Before an answer read from a new checkout's index that is still a copy of another
     checkout's: its first full check did not end within the time the tool waits."""

@@ -19,7 +19,7 @@ import pytest
 
 from codemem import embedserver
 from codemem.config import Config, VectorConfig, config_from_dict
-from codemem.embedder import Embedder, FakeEmbedder, OpenAIEmbedder, SentenceTransformerEmbedder
+from codemem.embedder import Embedder, EmbeddingUnavailable, FakeEmbedder, OpenAIEmbedder, SentenceTransformerEmbedder
 from codemem.embedserver import EmbeddingServer, ModelQueue, local_embedder, served_space
 from codemem.indexer import Indexer
 from codemem.search import search
@@ -237,6 +237,149 @@ def test_a_server_that_is_down_fails_with_its_address(server, monkeypatch):
     monkeypatch.setattr(OpenAIEmbedder, "RETRIES", 2)
     with pytest.raises(RuntimeError, match=f"embedding request to 127.0.0.1:{server.httpd.server_address[1]} failed"):
         OpenAIEmbedder(cfg.embedding).embed_queries(["revoke session"])
+
+
+def test_a_server_that_is_down_is_asked_once_until_it_answers_again(monkeypatch):
+    """A request that got no vectors after every retry leaves the embedder not ready, as a model
+    that is not in memory is, and says why. Until the endpoint answers again each request is sent
+    once: whoever asks next learns at once whether it is back."""
+    first = EmbeddingServer(FakeEmbedder(64), port=0).start()
+    port = first.httpd.server_address[1]
+    client = OpenAIEmbedder(_client(first).embedding)
+    assert client.ready and client.unreachable is None
+    first.close()
+    sent = []
+    attempt = OpenAIEmbedder.attempt
+    monkeypatch.setattr(OpenAIEmbedder, "attempt", lambda self, texts: (sent.append(texts), attempt(self, texts))[1])
+    with pytest.raises(EmbeddingUnavailable, match=f"embedding request to 127.0.0.1:{port} failed"):
+        client.embed_documents(["down"])
+    assert len(sent) == OpenAIEmbedder.RETRIES and not client.ready
+    assert client.unreachable.startswith(f"embedding request to 127.0.0.1:{port} failed")
+    with pytest.raises(EmbeddingUnavailable):
+        client.embed_queries(["still down"])
+    assert len(sent) == OpenAIEmbedder.RETRIES + 1  # one try, no waiting
+
+    again = EmbeddingServer(FakeEmbedder(64), port=port).start()
+    try:
+        assert client.embed_queries(["back"]).shape == (1, 64)
+        assert client.ready and client.unreachable is None and len(sent) == OpenAIEmbedder.RETRIES + 2
+    finally:
+        again.close()
+
+
+def test_the_command_line_names_the_endpoint_that_is_down_and_prints_no_traceback(server, sample_repo, tmp_path,
+                                                                                    isolated_home, capsys, monkeypatch):
+    """Fixed bug: with the server down, `codemem index` and `codemem search` ended in a traceback
+    of more than 100 lines. They say which address gave no vectors and what to do, and exit with 1."""
+    from codemem.cli import main
+
+    isolated_home.mkdir(parents=True, exist_ok=True)
+    (isolated_home / "config.toml").write_text(server.client_config())  # a client, as the server prints it
+    index = ["--index-dir", str(tmp_path / "idx")]
+    assert main(["index", str(sample_repo), *index]) == 0
+    capsys.readouterr()
+    assert main(["search", "revoke session", "--repo", str(sample_repo), *index, "-k", "3"]) == 0
+    assert capsys.readouterr().out.startswith("1. auth/sessions.py:19-20  revoke_session")
+    address = f"127.0.0.1:{server.httpd.server_address[1]}"
+    server.close()
+    monkeypatch.setattr("codemem.embedder._CACHE", {})  # every command is a process of its own: no client is kept
+
+    assert main(["search", "revoke session", "--repo", str(sample_repo), *index]) == 1
+    out, err = capsys.readouterr()
+    assert out == "" and "Traceback" not in err
+    assert err.startswith(f"error: embedding request to {address} failed: ")
+    assert "start it again (`codemem serve-embeddings`) or check `[embedding] base_url`" in err
+    assert len(err.strip().splitlines()) == 2
+
+    assert main(["search", "revoke session", "--repo", str(sample_repo), *index, "--signals", "bm25", "-k", "3"]) == 0
+    out, err = capsys.readouterr()
+    assert out.startswith("1. auth/sessions.py:19-20  revoke_session") and err == ""  # keywords need no endpoint
+    assert main(["status", str(sample_repo), *index]) == 0
+    assert f"embeddings: remote, fake:64 at {address}" in capsys.readouterr().out
+
+    (sample_repo / "auth" / "extra.py").write_text("def extra_helper():\n    return 1\n")
+    assert main(["search", "extra helper", "--repo", str(sample_repo), *index, "--signals", "bm25", "-k", "1"]) == 0
+    out, err = capsys.readouterr()  # a keyword search follows the files without the endpoint, too
+    assert out.startswith("1. auth/extra.py:1-2  extra_helper") and "updating it first" in err and "error" not in err
+    assert main(["index", str(sample_repo), *index]) == 1
+    err = capsys.readouterr().err
+    assert f"error: embedding request to {address} failed: " in err and "Traceback" not in err
+
+
+def test_an_mcp_search_answers_from_keywords_while_the_embedding_server_is_down(sample_repo, tmp_path):
+    """Fixed bug: with the server down, `search_code` ended as "Error executing tool search_code",
+    after the request's retries, every time. A search that has a budget now answers from
+    keywords and says why, as it does while a model loads: after the retries if it is the first
+    to find the endpoint down, and at once from then on. `index_status` shows the error until
+    the endpoint answers again, and the next search after that ranks by meaning."""
+    import anyio
+    from mcp import Client
+
+    from codemem.server import build_server
+    from codemem.service import CodememService
+
+    first = EmbeddingServer(FakeEmbedder(64), port=0).start()
+    port = first.httpd.server_address[1]
+    reason = f"embedding request to 127.0.0.1:{port} failed"
+    service = CodememService(sample_repo, index_dir=tmp_path / "idx", config=_client(first))
+    client = OpenAIEmbedder(service.config.embedding)
+    sent = []
+    attempt = client.attempt
+    client.attempt = lambda texts: (sent.append(texts), attempt(texts))[1]
+    service._make_embedder = lambda spec, config: client
+    again = None
+    try:
+        assert service.update() is not None
+        service.start(watch=False, prewarm=False)
+        first.close()
+        # A server that stops takes its connections with it. This one's threads live on in the
+        # test's own process, so the client's open connection is closed by hand.
+        client._http().close()
+        client._client = None
+        with pytest.raises(EmbeddingUnavailable, match=reason):
+            service.search("who revokes a session", k=3)  # the kind of search that waits (the CLI's) fails with the reason
+        client._unreachable = None  # as in a server that has not met the outage yet
+        del sent[:]
+        tools = build_server(service)
+
+        async def call(tool, **arguments):
+            async with Client(tools) as mcp:
+                return (await mcp.call_tool(tool, arguments)).content[0].text
+
+        found = anyio.run(lambda: call("search_code", query="revoke session", k=3))
+        assert "auth/sessions.py:19-20  revoke_session" in found  # an answer, from keywords
+        assert f"Note: codemem cannot embed right now ({reason}" in found and "keyword matching only" in found
+        assert len(sent) >= OpenAIEmbedder.RETRIES  # the first search to meet the outage waited out its retries
+        assert _wait_for(lambda: reason in (service.last_error or ""))
+        assert f"error: EmbeddingUnavailable: {reason}" in anyio.run(lambda: call("index_status"))
+
+        # From here on a search asks the endpoint once, whatever the writer's schedule says, and
+        # does not wait: no retries, and the answer says why it is by keywords.
+        service._load_retry.at = time.monotonic() + 3600
+        del sent[:]
+        found = anyio.run(lambda: call("search_code", query="revoke session", k=3))
+        assert sent == [["warmup"]]  # one request, sent once: not the query, and no retry
+        assert "revoke_session" in found and f"cannot embed right now ({reason}" in found
+
+        again = EmbeddingServer(FakeEmbedder(64), port=port).start()  # back: the very next search finds out
+        found = anyio.run(lambda: call("search_code", query="revoke session", k=3))
+        assert "revoke_session" in found and "cannot embed" not in found and "keyword matching only" not in found
+        assert client.ready and _wait_for(lambda: service.last_error is None)
+        assert "error:" not in anyio.run(lambda: call("index_status"))
+    finally:
+        service.close()
+        first.close()
+        if again is not None:
+            again.close()
+
+
+def _wait_for(pred, timeout=10.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if pred():
+            return True
+        time.sleep(0.05)
+    return False
 
 
 # ---------------------------------------------------------------- the key

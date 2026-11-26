@@ -653,6 +653,13 @@ keywords alone with a note; after a model load that failed it answers that way a
 that was freed for being idle (§12.3) is waited for longer, up to 20 s: the first search after an
 idle time is slower and has the same results. The CLI and the eval always wait for both.
 
+**When codemem cannot embed.** A model that did not load, or an embedding endpoint that does not
+answer, is not a load in progress: the note then says why, `Note: codemem cannot embed right now
+(embedding request to 127.0.0.1:8791 failed: ...), so these results come from keyword matching
+only. ...`. `CodememService.search()` reports the reason as `models_error`, beside
+`models_loading`. A search that waits (`wait_for_models`, the CLI's) raises the error instead:
+`embedder.EmbeddingUnavailable` for an endpoint.
+
 **Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
 model of every enabled vector type is in the memory of the process that answers, false when one is
 not, null when embeddings come from an API. `codemem status --json` prints it, and `index_status`

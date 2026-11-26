@@ -435,7 +435,12 @@ def test_cli_without_pytorch_names_the_remedy_and_status_still_works(sample_repo
 def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sample_repo, tmp_path, monkeypatch):
     """The MCP server's service in an environment built without PyTorch, with a config that asks
     for the local model: no update is applied, nothing is dropped, and a search answers from
-    keywords once its wait for the model is over."""
+    keywords once its wait for the model is over. Its note says why, not that the model is
+    still loading."""
+    from mcp import Client
+
+    from codemem.server import build_server
+
     monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
     built = CodememService(sample_repo, index_dir=tmp_path / "idx")
     built.update()
@@ -451,8 +456,19 @@ def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sa
         assert _wait_for(lambda: "pip install torch" in (svc.last_error or ""))
         resp = svc.search("revoke session", k=3, wait_for_models=False)
         assert resp.signals == ["bm25"] and resp.models_loading
+        assert resp.models_error.startswith("LocalModelUnavailable: The local embedding model cannot run")
         assert resp.results[0].qualname == "revoke_session"
         assert svc.store.counts()["vectors"] == vectors and sum(vectors.values()) > 0
+        server = build_server(svc)
+
+        async def run():
+            async with Client(server) as client:
+                text = (await client.call_tool("search_code", {"query": "revoke session", "k": 3})).content[0].text
+                assert "revoke_session" in text and "still loading" not in text
+                assert "Note: codemem cannot embed right now (LocalModelUnavailable: The local embedding model" in text
+                assert "pip install torch sentence-transformers" in text and "keyword matching only" in text
+
+        anyio.run(run)
     finally:
         svc.close()
 
