@@ -1,0 +1,241 @@
+# Recipe for astral-sh/ruff (Rust): the ruff linter and formatter, and the ty type checker.
+# The fields are described in src/cmeval/generate.py.
+#
+# Tests run with cargo-nextest, which writes JUnit XML. The wrapper cmeval-ruff-test (written in
+# base_setup) gives each test file of a task a nextest filter: one markdown test file of ty, the
+# rule group of a ruff_linter fixture or snapshot, the module of a source file with test code, or
+# one integration test binary. The build is always the whole workspace with all features, as in
+# the CI of the repo ("cargo insta test --all-features"). So a test run never builds the
+# dependencies again. It only builds the crates that a patch changed since the last build.
+
+repo = "astral-sh/ruff"
+# This image also has Rust 1.99.0. Each task installs the toolchain of its own rust-toolchain.toml.
+base_image = "rust:1.99.0-bookworm"
+
+# Once per repo.
+base_setup = [
+    # python3: uv needs a Python for the tests that use uv (feature test-uv).
+    "apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*",
+    # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
+    "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+    "curl -fsSL https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.152/cargo-nextest-0.9.152-$(uname -m)-unknown-linux-musl.tar.gz | tar xz -C /usr/local/cargo/bin && cargo nextest --version",
+    # Nextest settings for the default profile, in a tool config file, so no file of the repo
+    # changes. The repo config wins over it, but it sets none of these keys. The JUnit file goes to
+    # $CARGO_TARGET_DIR/nextest/default/junit.xml. A test that hangs stops after 5 minutes.
+    '''mkdir -p /opt/cmeval && printf '%s\n' \
+  '[profile.default]' \
+  'fail-fast = false' \
+  'retries = 0' \
+  'slow-timeout = { period = "60s", terminate-after = 5 }' \
+  '[profile.default.junit]' \
+  'path = "junit.xml"' \
+  > /opt/cmeval/nextest.toml''',
+    # The test command. Each line of the script is one argument of printf.
+    '''printf '%s\n' \
+  '#!/bin/bash' \
+  '# cmeval-ruff-test JUNIT FILE...' \
+  '# Runs the ruff tests that hold the given test files and writes JUnit XML to JUNIT.' \
+  '# Each file becomes a cargo-nextest filter. The build is always the whole workspace with all' \
+  '# features, as in the CI of the repo, so a test run never builds the dependencies again.' \
+  '# A choice that reads a source file of a crate reads it at HEAD (the task commit), not in the work' \
+  '# tree. So the real fix or a change by the agent cannot change which tests run. Test files are read' \
+  '# in the work tree: the test change is applied in every run.' \
+  'set -u' \
+  'junit=$1' \
+  'shift' \
+  'exprs=()' \
+  'add() {' \
+  '  local e' \
+  '  for e in "${exprs[@]+"${exprs[@]}"}"; do [ "$e" = "($1)" ] && return; done' \
+  '  exprs+=("($1)")' \
+  '}' \
+  'at_base() { git cat-file -e "HEAD:$1" 2>/dev/null; }' \
+  'has_tests() { grep -qE "#\[(tokio::)?test|#\[test_case|harness!" "$1" 2>/dev/null; }' \
+  'lib_kind() { if at_base "crates/$1/src/lib.rs"; then echo lib; else echo bin; fi; }' \
+  'for f in "$@"; do' \
+  '  c=${f#crates/}' \
+  '  c=${c%%/*}' \
+  '  case $f in' \
+  '    crates/ty_python_semantic/resources/mdtest/snapshots/*)' \
+  '      # The name starts with the markdown file name, cut to 20 characters and an ellipsis.' \
+  '      p=${f##*/}' \
+  '      p=${p%%_-_*}' \
+  '      p=${p%…}' \
+  '      n=0' \
+  '      while IFS= read -r m; do' \
+  '        add "binary_id(=ty_python_semantic::mdtest) & test(=mdtest::${m#crates/ty_python_semantic/resources/mdtest/})"' \
+  '        n=1' \
+  '      done < <(find crates/ty_python_semantic/resources/mdtest -path "*/snapshots" -prune -o -name "$p*" -name "*.md" -print)' \
+  '      [ $n = 1 ] || add "binary_id(=ty_python_semantic::mdtest)" ;;' \
+  '    crates/ty_python_semantic/resources/mdtest/*.md)' \
+  '      add "binary_id(=ty_python_semantic::mdtest) & test(=mdtest::${f#crates/ty_python_semantic/resources/mdtest/})" ;;' \
+  '    crates/ty_python_semantic/resources/mdtest/*)' \
+  '      # For example the lock file of a test with external packages.' \
+  '      m=${f%.*}.md' \
+  '      if [ -e "$m" ]; then' \
+  '        add "binary_id(=ty_python_semantic::mdtest) & test(=mdtest::${m#crates/ty_python_semantic/resources/mdtest/})"' \
+  '      else' \
+  '        add "binary_id(=ty_python_semantic::mdtest)"' \
+  '      fi ;;' \
+  '    crates/ty_python_semantic/resources/lint_docs/*.md)' \
+  '      add "binary_id(=ty_python_semantic::mdtest) & test(=lint_doc::${f#crates/ty_python_semantic/resources/lint_docs/})" ;;' \
+  '    crates/ty_python_semantic/resources/corpus/*)' \
+  '      add "binary_id(=ty_python_semantic::corpus)" ;;' \
+  '    crates/ruff_linter/resources/mdtest/*.md)' \
+  '      add "binary_id(=ruff_mdtest::mdtest) & test(=mdtest::${f#crates/ruff_linter/resources/mdtest/})" ;;' \
+  '    crates/ruff_linter/resources/mdtest/*)' \
+  '      add "binary_id(=ruff_mdtest::mdtest)" ;;' \
+  '    crates/ruff_linter/resources/test/fixtures/*/*)' \
+  '      # A fixture folder has the name of its rule group, when such a group exists.' \
+  '      d=${f#crates/ruff_linter/resources/test/fixtures/}' \
+  '      d=${d%%/*}' \
+  '      if at_base "crates/ruff_linter/src/rules/$d/mod.rs"; then' \
+  '        add "package(=ruff_linter) & kind(lib) & test(/^rules::$d::/)"' \
+  '      else' \
+  '        add "package(=ruff_linter) & kind(lib)"' \
+  '      fi ;;' \
+  '    crates/ruff_linter/resources/*)' \
+  '      add "package(=ruff_linter) & kind(lib)" ;;' \
+  '    crates/ruff_python_parser/resources/* | crates/ruff_python_formatter/resources/*)' \
+  '      add "package(=$c) & kind(test)" ;;' \
+  '    "crates/$c/src/snapshots/"*)' \
+  '      add "package(=$c) & kind($(lib_kind "$c"))" ;;' \
+  '    "crates/$c/src/"*/snapshots/*)' \
+  '      # insta keeps a snapshot beside the module that has the test.' \
+  '      d=${f#crates/$c/src/}' \
+  '      d=${d%%/snapshots/*}' \
+  '      add "package(=$c) & kind($(lib_kind "$c")) & test(/^${d//\//::}::/)" ;;' \
+  '    "crates/$c/src/"*.rs)' \
+  '      # A source file with test code only.' \
+  '      d=${f#crates/$c/src/}' \
+  '      d=${d%.rs}' \
+  '      d=${d%/mod}' \
+  '      case $d in' \
+  '        lib | main) add "package(=$c) & kind($(lib_kind "$c"))" ;;' \
+  '        *) add "package(=$c) & kind($(lib_kind "$c")) & test(/^${d//\//::}::/)" ;;' \
+  '      esac ;;' \
+  '    "crates/$c/tests/"*)' \
+  '      r=${f#crates/$c/tests/}' \
+  '      case $r in' \
+  '        snapshots/*)' \
+  '          b=${r#snapshots/}' \
+  '          b=${b%%__*}' \
+  '          if [ -e "crates/$c/tests/$b.rs" ] || [ -e "crates/$c/tests/$b/main.rs" ]; then' \
+  '            add "binary_id(=$c::$b)"' \
+  '          else' \
+  '            add "package(=$c) & kind(test)"' \
+  '          fi ;;' \
+  '        */*)' \
+  '          b=${r%%/*}' \
+  '          rest=${r#*/}' \
+  '          if [ -e "crates/$c/tests/$b/main.rs" ]; then' \
+  '            m=""' \
+  '            case $rest in' \
+  '              snapshots/*)' \
+  '                # The name is <binary>__<module>__<test>.snap.' \
+  '                s=${rest#snapshots/}' \
+  '                s=${s#*__}' \
+  '                s=${s%%__*}' \
+  '                if [ -e "crates/$c/tests/$b/$s.rs" ]; then m=$s; fi ;;' \
+  '              main.rs | */mod.rs) ;;' \
+  '              *.rs)' \
+  '                if has_tests "$f"; then m=${rest%.rs}; m=${m//\//::}; fi ;;' \
+  '            esac' \
+  '            if [ -n "$m" ]; then' \
+  '              add "binary_id(=$c::$b) & test(/^$m::/)"' \
+  '            else' \
+  '              add "binary_id(=$c::$b)"' \
+  '            fi' \
+  '          else' \
+  '            add "package(=$c) & kind(test)"' \
+  '          fi ;;' \
+  '        *.rs)' \
+  '          if has_tests "$f"; then add "binary_id(=$c::${r%.rs})"; else add "package(=$c) & kind(test)"; fi ;;' \
+  '        *)' \
+  '          add "package(=$c) & kind(test)" ;;' \
+  '      esac ;;' \
+  '    crates/*/*)' \
+  '      add "package(=$c)" ;;' \
+  '    *)' \
+  '      echo "cmeval-ruff-test: no test for $f" ;;' \
+  '  esac' \
+  'done' \
+  '' \
+  'write_failure() {' \
+  '  echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" > "$junit"' \
+  '  echo "<testsuites><testsuite name=\"cmeval\"><testcase classname=\"cmeval\" name=\"no-results\"><failure message=\"$1\"/></testcase></testsuite></testsuites>" >> "$junit"' \
+  '}' \
+  '' \
+  'if [ ${#exprs[@]} = 0 ]; then' \
+  '  write_failure "no test filter"' \
+  '  exit 1' \
+  'fi' \
+  'expr=$(IFS="|"; echo "${exprs[*]}")' \
+  '# This test writes the inline test files of the parser. It must not change the tree between runs.' \
+  'expr="($expr) & not binary_id(=ruff_python_parser::generate_inline_tests)"' \
+  'echo "cmeval-ruff-test: filter: $expr"' \
+  'out=${CARGO_TARGET_DIR:-target}/nextest/default/junit.xml' \
+  'rm -f "$out"' \
+  'cargo nextest run --workspace --all-features --tool-config-file cmeval:/opt/cmeval/nextest.toml \' \
+  '  --no-fail-fast --retries 0 --test-threads 8 --no-tests warn -E "$expr"' \
+  'code=$?' \
+  'if [ -s "$out" ] && grep -q "<testcase" "$out"; then' \
+  '  cp "$out" "$junit"' \
+  'else' \
+  '  # The build failed, or no test matched. A failure of its own keeps this run from looking empty.' \
+  '  write_failure "the build failed or no test matched (exit code $code)"' \
+  'fi' \
+  'exit $code' \
+  > /usr/local/bin/cmeval-ruff-test && chmod +x /usr/local/bin/cmeval-ruff-test''',
+]
+
+# The toolchain of the task, from its rust-toolchain.toml. Tasks with the same file share this layer.
+# rustfmt and clippy are for the agent, as on a developer's machine. No test uses them.
+deps_files = ["rust-toolchain.toml"]
+deps = ["rustup toolchain install && rustup component add rustfmt clippy && rustc --version"]
+
+build = [
+    # uv at the version that the CI of the commit uses (first "version:" in ci.yaml).
+    "v=$(grep -m1 -oE 'version: \"0\\.[0-9]+\\.[0-9]+\"' .github/workflows/ci.yaml | grep -oE '0\\.[0-9]+\\.[0-9]+'); v=${v:-0.13.4}; curl -fsSL https://github.com/astral-sh/uv/releases/download/$v/uv-$(uname -m)-unknown-linux-gnu.tar.gz | tar xz -C /tmp && install /tmp/uv-$(uname -m)-unknown-linux-gnu/uv /usr/local/bin/uv && rm -rf /tmp/uv-* && uv --version",
+    # Cargo downloads the crates here. They go to CARGO_HOME, which is in the image.
+    # The agent runs as another user, so cargo must be able to write its lock files there. Each
+    # step changes the mode only of files that need it: a chmod of a file of an older layer copies it.
+    "CARGO_NET_OFFLINE=false cargo fetch --locked && find /usr/local/cargo ! -perm -a+rw -exec chmod a+rwX {} +",
+    # All test binaries of the workspace, offline. This clean build takes most of the build time.
+    "cargo nextest run --workspace --all-features --no-run && find /opt/target /usr/local/cargo ! -perm -a+rw -exec chmod a+rwX {} +",
+    # The CI of the repo runs the ty markdown tests with external packages (MDTEST_EXTERNAL=1).
+    # Such a test runs "uv sync --locked" with the lock file beside it. One run here, with the
+    # network, puts the packages and Pythons in the uv folders of the image. Tests then use them
+    # offline. A test may fail here: this run is only for the downloads.
+    "env -u UV_OFFLINE cargo nextest run --workspace --all-features --no-fail-fast --test-threads 8 -E 'binary_id(=ty_python_semantic::mdtest) & test(~mdtest::external)' || true; mkdir -p /opt/uv && find /opt/target /opt/uv /usr/local/cargo ! -perm -a+rw -exec chmod a+rwX {} +",
+]
+
+# An incremental build of the test binaries after a patch. The same command as in build, so
+# cargo only builds the crates that the patch changes and the crates that depend on them.
+refresh = ["cargo nextest run --workspace --all-features --no-run"]
+
+# A file of the test change under crates/ goes to the test command: rule fixtures, markdown
+# tests, snapshots, integration tests, and source files with test code only.
+test_files = ["crates/*/resources/**", "crates/*/tests/**", "crates/*/src/**"]
+test = "cmeval-ruff-test {junit} {files}"
+parser = "junit"
+timeout_min = 10
+
+[env]
+# The target folder is in the image, and outside /testbed: the agent run gives /testbed to
+# another user with chown, and a chown of the build output would copy all of it.
+CARGO_TARGET_DIR = "/opt/target"
+# Tests and agent runs have no network.
+CARGO_NET_OFFLINE = "true"
+# As in the CI of the repo: no optimization in the dev profile. No debug information: it makes the
+# image smaller and does not change a test result.
+CARGO_PROFILE_DEV_OPT_LEVEL = "0"
+CARGO_PROFILE_DEV_DEBUG = "0"
+# A missing or different snapshot fails the test, and insta writes no file.
+INSTA_UPDATE = "no"
+# Run the markdown tests with external packages, as the CI of the repo does. uv works offline from
+# folders in the image. A test patch that changes a lock file can need packages that are not there.
+MDTEST_EXTERNAL = "1"
+UV_CACHE_DIR = "/opt/uv/cache"
+UV_PYTHON_INSTALL_DIR = "/opt/uv/python"
+UV_OFFLINE = "1"
