@@ -556,6 +556,10 @@ class AssistedEmbedder(Embedder):
     def cut(self, texts: Sequence[str]) -> list[bool]:
         return self.inner.cut(texts)
 
+    @property
+    def freed_idle(self) -> bool:
+        return self.inner.freed_idle
+
     def touch(self) -> None:
         self._uses.touch()
         self.inner.touch()

@@ -309,11 +309,11 @@ the model in memory, and 2.8 to 2.95 GB while it embeds a batch of code texts (m
   never under a running call: calls less than 5 s apart are one burst. Emptying takes 0.1 s, and
   the batch after it was no slower. The writer's own calls hold at most 3,000 characters and need
   under 20 MB; the 1.2 GB comes from the calls of 16 texts that a build or `refresh_index` makes.
-- **It can leave when idle.** With `model_idle_minutes` set, the writer frees the model once
-  nothing has been embedded for that long: it drops the model, collects what reference cycles kept
-  of it, and empties the GPU allocator's cache. The process is back at 0.5 to 0.7 GB within a
-  second. The next search or save pays the load again, which is why the model stays by default
-  ([decisions.md](decisions.md) §3).
+- **It leaves when idle.** The writer frees the model once nothing has been embedded for
+  `model_idle_minutes` (60 by default; 0 keeps it): it drops the model, collects what reference
+  cycles kept of it, and empties the GPU allocator's cache. The process is back at 0.5 to 0.7 GB
+  within a second. The next search or save pays the load again, and a search waits for it, so an
+  idle time costs that search time and not results ([decisions.md](decisions.md) §3).
 - **Giving memory back is safe against a use that starts at the same moment.** Each embedder
   counts the calls in progress and remembers when the last one ended. It gives memory back only
   when no call is running and the last use is older than the idle time asked for: 5 s for the
@@ -360,9 +360,9 @@ Three choices shape it:
   model takes at most `batch_size` texts at a time. Between calls the request with the fewest
   texts left goes first, so a search's one query waits for a single batch of another process's
   build, not for the build. While no request waits, the same thread gives the model the quiet
-  moments the writer gives it: what its calls needed goes back after each burst, and with
-  `model_idle_minutes` set the model is freed after that long without a request. The next request
-  loads it again and waits for the load.
+  moments the writer gives it: what its calls needed goes back after each burst, and the model is
+  freed after `model_idle_minutes` without a request. The next request loads it again and waits
+  for the load.
 
 The server holds no index and no state. When it is down, its clients behave as with any API that
 is down (decisions.md §2).

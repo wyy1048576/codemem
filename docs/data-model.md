@@ -630,10 +630,11 @@ those files.
 The parts it can hold: files saved moments ago that are still being indexed; chunks still being
 embedded (with the files they are in); or that codemem could not confirm it has seen the latest
 saves. `get_chunk` waits for the structure only, so its code, lines and links are current. While
-the embedding model is loading (when the server starts, or again after it was freed for being
-idle, §12.3) or a search index is still loading, a search waits within the same budget, then
-answers from keywords alone with a note; after a model load that failed it answers that way at
-once. The CLI and the eval always wait for both.
+the embedding model is loading when the server starts, or a search index is still loading, a
+search waits within the same budget, then answers from keywords alone with a note; after a model
+load that failed it answers that way at once. A model that was freed for being idle (§12.3) is
+waited for longer, up to 20 s: the first search after an idle time is slower and has the same
+results. The CLI and the eval always wait for both.
 
 **Whether the model is in memory.** `CodememService.status()` has `models_loaded`: true when the
 model of every enabled vector type is in the memory of the process that answers, false when one is
@@ -687,7 +688,7 @@ A change to any of these must be made together with the eval:
   2. `~/.codemem/config.toml`;
   3. `<repo>/.codemem.toml`;
   4. environment variables (`CODEMEM_HOME`, `CODEMEM_DEVICE`, `CODEMEM_MODEL`,
-     `CODEMEM_STEERING`, `CODEMEM_VECTOR_CACHE`).
+     `CODEMEM_STEERING`, `CODEMEM_VECTOR_CACHE`, `CODEMEM_MODEL_IDLE_MINUTES`).
 - **Two kinds of settings:**
   - **Index-time:** they change what is stored. They are listed by `index_settings()`, and
     changing one redoes what it affects (§8).
@@ -720,9 +721,9 @@ A change to any of these must be made together with the eval:
 - **`vector_cache`:** `global` or `off`. **`vector_cache_max_gb`:** the cache file's size cap in
   GB (10⁹ bytes), a number of 0 or more; 0 means no cap; the default is 8. Neither is index-time:
   the cache changes where a vector comes from, never what an index stores.
-- **`model_idle_minutes`:** a number, 0 or more; 0, the default, keeps the local embedding model
-  in memory. Otherwise the model is freed after that many minutes in which nothing was embedded,
-  and the next search or save loads it again. It changes no index. A new value in `.codemem.toml`
+- **`model_idle_minutes`:** a number, 0 or more; the default is 60. The local embedding model is
+  freed after that many minutes in which nothing was embedded, and the next search or save loads
+  it again; 0 keeps it in memory. `CODEMEM_MODEL_IDLE_MINUTES` sets it from the environment. It changes no index. A new value in `.codemem.toml`
   applies from the next full check. `codemem serve-embeddings` reads it when it starts, for the
   model it serves (§12.5).
 - **The `[embedding]` section** has `provider` (`local` or `openai`), `model`, `base_url`, `space`,
@@ -866,9 +867,9 @@ served.
 - **The key.** When `CODEMEM_SERVE_KEY` is set in the server's environment, every request but
   `GET /health` needs the header `Authorization: Bearer <key>`.
 - **The model's memory.** After 5 s without a request the server gives back what its model calls
-  needed besides the model. With `model_idle_minutes` set in its config it also frees the model
-  after that many minutes without a request; the next request loads it again and is answered
-  when it is loaded. Without the setting the model stays in memory for as long as the server runs.
+  needed besides the model. It also frees the model after `model_idle_minutes` without a request
+  (60 by default); the next request loads it again and is answered when it is loaded. With 0 the
+  model stays in memory for as long as the server runs.
 
 **Errors** are `{"error": {"message", "type", "param": null, "code"}}`, with `type`
 `invalid_request_error` below 500 and `server_error` from 500.

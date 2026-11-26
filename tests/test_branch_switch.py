@@ -14,6 +14,7 @@ import pytest
 from conftest import RecordingEmbedder
 from gitrepo import ONLY_ON_A, ONLY_ON_B, TO_A, TO_B, UNCHANGED, add_worktree, git, needs_git, two_commits
 
+from codemem import service as service_module
 from codemem.embedder import FakeEmbedder
 from codemem.indexer import Indexer, IndexStats
 from codemem.service import CodememService
@@ -436,12 +437,14 @@ def test_a_search_embeds_its_keyword_results_before_the_rest_of_a_short_queue(sw
 # --------------------------------------------------------------------------- ... while the model is not in memory
 
 
-def test_a_search_with_a_budget_does_not_load_the_model_for_its_keyword_results(switched_with_a_model_that_can_leave):
+def test_a_search_with_a_budget_does_not_load_the_model_for_its_keyword_results(
+        switched_with_a_model_that_can_leave, monkeypatch):
     """The model was freed for being idle, and loading it again takes longer than a search may
     wait. The MCP server's search waits for the load within its budget, in the loader's thread,
     and then answers from keywords: its keyword results are embedded under the same rule as the
     rest of the queue, not in a model call of its own that would wait out the load."""
     service, model, _ = switched_with_a_model_that_can_leave
+    monkeypatch.setattr(service_module, "IDLE_RELOAD_WAIT", 0.05)  # the load outlasts the longer wait too
     assert model.unload() and not model.ready
     model.gate.clear()
     service.catch_up(budget=30, embed=False)  # the switch is applied: 11 chunks are queued

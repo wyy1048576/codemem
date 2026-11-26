@@ -16,7 +16,8 @@ import numpy as np
 import pytest
 
 from codemem import embedserver
-from codemem.config import Config, config_from_dict
+from codemem import service as service_module
+from codemem.config import Config, config_from_dict, load_config
 from codemem.embedder import (
     TRIM_AFTER_IDLE, Embedder, FakeEmbedder, OpenAIEmbedder, PluginEmbedder, SentenceTransformerEmbedder,
 )
@@ -429,12 +430,27 @@ def test_zero_idle_minutes_keeps_the_model(service, model, clock):
 
 
 def test_the_idle_time_is_a_setting_that_no_index_depends_on():
-    assert Config().model_idle_minutes == 0  # the model stays unless asked otherwise
+    assert Config().model_idle_minutes == 60  # an hour without embedding, and the model's memory goes back
     cfg = config_from_dict({"model_idle_minutes": 2.5})
     assert cfg.model_idle_minutes == 2.5 and cfg.index_settings() == Config().index_settings()
+    assert config_from_dict({"model_idle_minutes": 0}).model_idle_minutes == 0  # 0 keeps the model
     for bad in (-1, "ten"):
         with pytest.raises(ValueError, match="model_idle_minutes"):
             config_from_dict({"model_idle_minutes": bad})
+
+
+def test_a_run_that_must_not_unload_sets_the_idle_time_in_its_environment(tmp_path, monkeypatch):
+    """The eval runs codemem without a config file of its own: one variable keeps the model."""
+    monkeypatch.setenv("CODEMEM_HOME", str(tmp_path))
+    monkeypatch.delenv("CODEMEM_MODEL_IDLE_MINUTES", raising=False)
+    assert load_config().model_idle_minutes == 60
+    monkeypatch.setenv("CODEMEM_MODEL_IDLE_MINUTES", "0")
+    assert load_config().model_idle_minutes == 0
+    monkeypatch.setenv("CODEMEM_MODEL_IDLE_MINUTES", "7.5")
+    assert load_config().model_idle_minutes == 7.5
+    monkeypatch.setenv("CODEMEM_MODEL_IDLE_MINUTES", "never")
+    with pytest.raises(ValueError, match="CODEMEM_MODEL_IDLE_MINUTES"):
+        load_config()
 
 
 def test_the_writer_gives_working_memory_back_once_after_each_burst(service, model, clock):
@@ -490,10 +506,40 @@ def test_a_model_that_cannot_be_freed_does_not_stop_the_writer(service, model, c
 # ---------------------------------------------------------------- the next use loads it again
 
 
-def test_a_search_after_an_unload_answers_from_keywords_while_the_model_loads(service, model, clock):
+def test_a_search_after_an_unload_waits_for_the_model_beyond_its_budget(service, model, clock):
+    """The model was freed for being idle and its reload takes longer than a search's budget. The
+    search waits for it: an idle time costs the next search time, not the vectors' part of its
+    results."""
     service.config.catchup_budget_ms = 50
     _idle_out(service, model, clock)
-    model.gate.clear()  # the reload takes longer than the search may wait
+    assert model.freed_idle
+    model.gate.clear()
+    threading.Timer(0.4, model.gate.set).start()  # eight budgets later the model is back
+    started = time.monotonic()
+    resp = service.search("revoke session", k=3, wait_for_models=False)
+    assert time.monotonic() - started >= 0.35
+    assert not resp.models_loading and resp.signals == EVERY_SIGNAL
+    assert model.ready and model.loads == 1 and not model.freed_idle
+
+
+def test_a_search_does_not_wait_longer_for_a_model_that_was_never_in_memory(service, model, clock):
+    """At start-up the budget rule holds: the longer wait is for a model that was freed only."""
+    service.config.catchup_budget_ms = 50
+    model._loaded = False  # as at a start: not loaded yet, and never freed
+    assert not model.freed_idle
+    model.gate.clear()
+    started = time.monotonic()
+    resp = service.search("revoke session", k=3, wait_for_models=False)
+    assert time.monotonic() - started < 2
+    assert resp.models_loading and resp.signals == ["bm25"]
+    model.gate.set()
+
+
+def test_a_search_after_an_unload_answers_from_keywords_when_the_model_stays_away(service, model, clock, monkeypatch):
+    monkeypatch.setattr(service_module, "IDLE_RELOAD_WAIT", 0.05)
+    service.config.catchup_budget_ms = 50
+    _idle_out(service, model, clock)
+    model.gate.clear()  # the reload takes longer than even the longer wait
     resp = service.search("revoke session", k=3, wait_for_models=False)
     assert resp.models_loading and resp.signals == ["bm25"]
     assert "revoke_session" in [r.qualname for r in resp.results]
@@ -828,11 +874,12 @@ def test_status_says_whether_the_model_is_in_memory(service, model, clock, sampl
         remote.close()
 
 
-def test_an_agent_sees_the_unloaded_model_in_index_status_and_in_the_search_note(service, model, clock):
+def test_an_agent_sees_the_unloaded_model_in_index_status_and_in_the_search_note(service, model, clock, monkeypatch):
     from mcp import Client
 
     from codemem.server import build_server
 
+    monkeypatch.setattr(service_module, "IDLE_RELOAD_WAIT", 0.05)
     service.config.catchup_budget_ms = 50
     _idle_out(service, model, clock)
     model.gate.clear()

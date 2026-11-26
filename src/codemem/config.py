@@ -211,8 +211,9 @@ class Config:
     debounce_max_wait_ms: int = 2000  # ... or at the latest this long after the first save
     catchup_budget_ms: int = 4000  # a search first applies and embeds pending edits for at most this long
     # The local embedding model leaves memory after this many minutes without embedding, and the
-    # next search or edit loads it again; 0 keeps it in memory (docs/decisions.md §3)
-    model_idle_minutes: float = 0.0
+    # next search or edit loads it again: that search waits for the load. 0 keeps it in memory
+    # (docs/decisions.md §3)
+    model_idle_minutes: float = 60.0
 
     def enabled_vec_types(self) -> list[str]:
         return [name for name, v in self.vectors.items() if v.enabled]
@@ -462,6 +463,12 @@ def _env_overrides() -> dict[str, Any]:
         raw["vectors"] = {name: {"model": model} for name in _default_vectors()}
     if cache := os.environ.get("CODEMEM_VECTOR_CACHE"):
         raw["vector_cache"] = cache
+    if idle := os.environ.get("CODEMEM_MODEL_IDLE_MINUTES"):
+        # For a run that must never unload its model, without a config file: the eval sets 0.
+        try:
+            raw["model_idle_minutes"] = float(idle)
+        except ValueError:
+            raise ValueError(f"CODEMEM_MODEL_IDLE_MINUTES must be a number of minutes, got {idle!r}") from None
     return raw
 
 
