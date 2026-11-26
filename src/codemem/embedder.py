@@ -216,6 +216,12 @@ class Embedder(ABC):
         """Can embed now, without loading a model first."""
         return True
 
+    @property
+    def freed_idle(self) -> bool:
+        """The model was in memory, `unload` freed it, and nothing has loaded it again. What the
+        next call waits for is then a reload, which a search waits out (service.py)."""
+        return False
+
     def touch(self) -> None:
         """Count as used now. A caller that will embed only if the model is in memory calls this
         before it checks `ready`: a model it then finds stays for its idle time, so `unload`
@@ -270,6 +276,7 @@ class FakeEmbedder(Embedder):
         self.loads = 0  # loads after an unload
         self.trims = 0  # times its calls' working memory was given back
         self._loaded = True
+        self._freed = False  # `unload` has dropped it at least once
         self._lock = threading.Lock()
         self._uses = _Uses(clock)
 
@@ -285,6 +292,10 @@ class FakeEmbedder(Embedder):
     def ready(self) -> bool:
         return self._loaded
 
+    @property
+    def freed_idle(self) -> bool:
+        return self._freed and not self._loaded
+
     def touch(self) -> None:
         self._uses.touch()
 
@@ -297,6 +308,7 @@ class FakeEmbedder(Embedder):
 
     def _drop(self) -> bool:
         had, self._loaded = self._loaded, False
+        self._freed = self._freed or had
         return had
 
     def trim(self, idle_seconds: float = 0.0) -> bool:
@@ -397,10 +409,15 @@ class SentenceTransformerEmbedder(Embedder):
         self._device: str | None = None
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
         self._uses = _Uses()
+        self._freed = False  # `unload` has freed a loaded model at least once
 
     @property
     def ready(self) -> bool:
         return self._model is not None
+
+    @property
+    def freed_idle(self) -> bool:
+        return self._freed and self._model is None
 
     def touch(self) -> None:
         self._uses.touch()
@@ -419,6 +436,7 @@ class SentenceTransformerEmbedder(Embedder):
 
     def _drop(self) -> bool:
         had, self._model, self._counter = self._model is not None, None, None
+        self._freed = self._freed or had
         return had
 
     def trim(self, idle_seconds: float = 0.0) -> bool:
@@ -731,6 +749,7 @@ class PluginEmbedder(Embedder):
         self.inner, self.spec, self.model_name, self.version = inner, spec, model_name, version
         self._settings = f"L{config.max_seq_length}|{config.dtype}|{config.device}"
         self._uses = _Uses()
+        self._freed = False  # `unload` has freed the plugin's model at least once
 
     @property
     def dim(self) -> int:
@@ -745,11 +764,17 @@ class PluginEmbedder(Embedder):
     def ready(self) -> bool:
         return self.inner.ready
 
+    @property
+    def freed_idle(self) -> bool:
+        return self._freed and not self.inner.ready
+
     def touch(self) -> None:
         self._uses.touch()
 
     def unload(self, idle_seconds: float = 0.0) -> bool:
-        return self._uses.drop_if_idle(idle_seconds, self.inner.unload)
+        freed = self._uses.drop_if_idle(idle_seconds, self.inner.unload)
+        self._freed = self._freed or freed
+        return freed
 
     def trim(self, idle_seconds: float = 0.0) -> bool:
         return self._uses.trim_if_idle(idle_seconds, self.inner.trim)

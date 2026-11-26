@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import subprocess
 import tempfile
 import threading
@@ -45,7 +46,8 @@ from .languages import EXTENSIONS, LANGUAGES, language_for_path
 from .schema import CALLABLE_KINDS, Chunk, text_hash
 from .store import FileRow, IndexLock, Store, VectorRow, diff_snapshots
 from .texts import BuildContext, build_parts
-from .vectorcache import VectorCache, cap_bytes, machine_cache
+from .vectorcache import VectorCache, age_seconds, cap_bytes, machine_cache
+from .vectorcache import day as cache_day
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +59,7 @@ _MINIFIABLE = frozenset({"javascript", "typescript", "tsx"})
 _EMBED_GROUP = 256  # texts per model call in a build; the model batches inside it
 _BATCH_CHUNKS = 512  # queued chunks per stage-B batch
 _RACY_SECONDS = 2.0  # a file this close to the last scan may have changed again within its mtime tick
+_CACHE_MARKED = "cache_marked_day"  # meta: the day this index last marked its vectors as used in the vector cache
 
 # How much of an index a change of each index-time setting (Config.index_settings()) invalidates.
 # Anything not listed (chunker version, file selection, BM25 tokenization, block size) rebuilds it.
@@ -581,13 +584,37 @@ class Indexer:
         return bool(head) and head != self.store.get_meta("indexed_commit")
 
     def vector_cache(self) -> VectorCache | None:
-        """The machine's vector cache, under the cap the config has now; None when it is off."""
+        """The machine's vector cache, under the cap and the age limit the config has now; None
+        when it is off."""
         if self.config.vector_cache == "off":
             return None
         if self._cache is None:
             self._cache = machine_cache(self.config)
         self._cache.max_bytes = cap_bytes(self.config)
+        self._cache.max_age = age_seconds(self.config)
         return self._cache
+
+    def cache_upkeep(self, max_seconds: float | None = None) -> bool:
+        """What the vector cache needs done while nothing waits for it. With an age limit, the
+        vectors this index holds count as used, once a day (the index remembers the day), and what
+        nothing has used for that long goes. Then the cap: a put evicts only for a moment, so here
+        a cache over its cap is trimmed fully. With `max_seconds`, deleting stops after about that
+        long each for the age limit and the cap; False then says that work is left for the next call."""
+        cache = self.vector_cache()
+        if cache is None:
+            return True
+        if cache.max_age:
+            today = cache_day()
+            if self.store.get_meta(_CACHE_MARKED) != today:
+                for key, hashes in self.store.vector_hashes().items():
+                    cache.touch(key, hashes)
+                try:
+                    self.store.set_meta(_CACHE_MARKED, today)
+                except sqlite3.Error:  # another process is writing the index: it is marked again at the next call
+                    log.debug("could not note the day the vector cache was marked", exc_info=True)
+            cache.expire(max_seconds)
+        cache.evict(max_seconds)
+        return not cache.behind
 
     # ---- stage A: structure
     def structure(
@@ -977,9 +1004,7 @@ class Indexer:
                 t = time.perf_counter()
                 self.store.save_vectors(stale=True)
                 stats.add_time("write_vectors", time.perf_counter() - t)
-            cache = self.vector_cache()
-            if cache is not None:
-                cache.evict()  # a put evicts only for a moment; nothing waits here, so a cache over its cap is trimmed fully
+            self.cache_upkeep()
         finally:
             if self._cache is not None:
                 self._cache.close()

@@ -189,6 +189,8 @@ class Config:
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
     # The cache file's size cap, in GB (10^9 bytes); past it the least recently used vectors go. 0 = no cap.
     vector_cache_max_gb: float = 8.0
+    # A cached vector that no index on this machine has needed for this many days goes. 0 = never.
+    vector_cache_max_age_days: float = 30.0
     # The in-memory search index: auto (the exact one while it fits `vector_memory_mb`, the
     # compact one when it does not) | faiss (exact: every vector in memory) | compact (small
     # codes of each vector, exact scores from the stored vectors) | "module:Class" subclassing
@@ -211,8 +213,9 @@ class Config:
     debounce_max_wait_ms: int = 2000  # ... or at the latest this long after the first save
     catchup_budget_ms: int = 4000  # a search first applies and embeds pending edits for at most this long
     # The local embedding model leaves memory after this many minutes without embedding, and the
-    # next search or edit loads it again; 0 keeps it in memory (docs/decisions.md §3)
-    model_idle_minutes: float = 0.0
+    # next search or edit loads it again: that search waits for the load. 0 keeps it in memory
+    # (docs/decisions.md §3)
+    model_idle_minutes: float = 60.0
 
     def enabled_vec_types(self) -> list[str]:
         return [name for name, v in self.vectors.items() if v.enabled]
@@ -462,15 +465,21 @@ def _env_overrides() -> dict[str, Any]:
         raw["vectors"] = {name: {"model": model} for name in _default_vectors()}
     if cache := os.environ.get("CODEMEM_VECTOR_CACHE"):
         raw["vector_cache"] = cache
+    if idle := os.environ.get("CODEMEM_MODEL_IDLE_MINUTES"):
+        # For a run that must never unload its model, without a config file: the eval sets 0.
+        try:
+            raw["model_idle_minutes"] = float(idle)
+        except ValueError:
+            raise ValueError(f"CODEMEM_MODEL_IDLE_MINUTES must be a number of minutes, got {idle!r}") from None
     return raw
 
 
 _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
-    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb", "vector_backend",
-    "vector_memory_mb", "kinds", "test_weight", "kind_weights", "debounce_ms", "debounce_max_wait_ms",
-    "catchup_budget_ms", "model_idle_minutes",
+    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb",
+    "vector_cache_max_age_days", "vector_backend", "vector_memory_mb", "kinds", "test_weight", "kind_weights",
+    "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes",
 )
 
 
@@ -522,6 +531,9 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
     cap = cfg.vector_cache_max_gb
     if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not 0 <= cap < float("inf"):
         raise ValueError(f"vector_cache_max_gb must be a size in GB, or 0 for no cap, got {cap!r}")
+    age = cfg.vector_cache_max_age_days
+    if isinstance(age, bool) or not isinstance(age, (int, float)) or not 0 <= age < float("inf"):
+        raise ValueError(f"vector_cache_max_age_days must be a number of days, or 0 for no limit, got {age!r}")
     if cfg.vector_backend not in {"auto", "faiss", "compact"} and ":" not in cfg.vector_backend:
         raise ValueError(f"vector_backend must be auto, faiss, compact or 'module:Class', got {cfg.vector_backend!r}")
     if type(cfg.vector_memory_mb) is not int or cfg.vector_memory_mb < 0:

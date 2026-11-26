@@ -372,8 +372,11 @@ def codemem_mcp_config(codemem: dict, settings: RunSettings) -> dict:
     copy at /cmindex, the model from the Hugging Face cache, and no network."""
     # Python in a container sees all processors of the host, also with --cpus.
     threads = str(max(1, int(settings.cpus)))
+    # The model stays in memory for the whole run: an idle unload is for a user's machine, and a run
+    # must not differ by whether one fell into it.
     env = {"HF_HOME": HF_MOUNT, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-           "CODEMEM_HOME": "/home/agent/.codemem", "OMP_NUM_THREADS": threads, "MKL_NUM_THREADS": threads}
+           "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0",
+           "OMP_NUM_THREADS": threads, "MKL_NUM_THREADS": threads}
     if steering := os.environ.get(STEERING_ENV):
         if steering not in STEERING_LEVELS:
             raise GenerateError(f"{STEERING_ENV} must be one of {', '.join(STEERING_LEVELS)}, not {steering!r}")

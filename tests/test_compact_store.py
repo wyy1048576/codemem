@@ -567,7 +567,7 @@ def test_finer_codes_rank_the_scan_s_best_again(monkeypatch):
 
 
 def test_how_many_of_the_scan_s_best_the_fine_codes_rank(monkeypatch):
-    """At least 2,000, at least 4 for each candidate, and at least one in 50 of the vectors the
+    """At least 4,000, at least 4 for each candidate, and at least one in 50 of the vectors the
     search may return."""
     v = for_index(_vecs(6000, dim=16), 16)
     vs = CompactVectorStore(16, bits=2, rescore=10)
@@ -576,12 +576,12 @@ def test_how_many_of_the_scan_s_best_the_fine_codes_rank(monkeypatch):
     scan = vs._scan
     monkeypatch.setattr(vs, "_scan", lambda x, size, allowed: asked.append(size) or scan(x, size, allowed))
     half = np.arange(len(v)) < 3000
-    for size, allowed in ((10, None), (600, None), (10, half)):
+    for size, allowed in ((10, None), (1200, None), (10, half)):
         assert 10 <= len(vs._candidates(v[0], size, allowed)) <= size + 5
     monkeypatch.setattr("codemem.store._RANKED", 50)
     for size, allowed in ((10, None), (10, half), (40, half)):
         vs._candidates(v[0], size, allowed)
-    assert asked == [2000, 2400, 2000, 120, 60, 160]
+    assert asked == [4000, 4800, 4000, 120, 60, 160]
 
 
 def _codes(vs):

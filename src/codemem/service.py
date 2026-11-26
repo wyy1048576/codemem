@@ -54,6 +54,11 @@ RECONCILE_EVERY = 300.0  # a full scan, in case a file event was missed
 POLL_EVERY = 10.0  # the scan interval when file events don't work
 RETRY_FIRST = 1.0  # a step of the writer that failed is tried again after this long ...
 RETRY_MAX = 60.0  # ... then after twice as long each time, up to this
+# A search that may not wait for a loading model still waits this long for one that was freed for
+# being idle: after an idle time a search costs the reload (2 to 6 s on an M1), not its results.
+IDLE_RELOAD_WAIT = 20.0
+CACHE_UPKEEP_EVERY = 6 * 3600.0  # in a quiet moment the writer keeps the vector cache: what this index uses, the age limit, the cap
+CACHE_UPKEEP_SECONDS = 1.0  # ... deleting for this long at a time, so that a save never waits long behind it
 BURST_PATHS = 2000  # more changed paths than this at once: scan everything instead
 _BATCH = 64  # queued chunks per embedding batch outside a build (new edits wait for one at most)
 _FILTERS = ("path_prefix", "kinds", "languages", "tests", "test_weight", "kind_weights")  # of a search
@@ -171,6 +176,7 @@ class CodememService:
         self._polling = False
         self._last_write = 0.0  # monotonic time of the last index change
         self._last_reconcile = 0.0
+        self._last_cache_upkeep = time.monotonic()  # an update at start has just done it
 
     def embedder_factory(self, spec: VectorConfig | str, config: Config) -> Embedder:
         """The embedder of a vector type (or of a bare model name, as `make_embedder` takes). Each
@@ -373,6 +379,17 @@ class CodememService:
             return True
         for embedder in list(self._embedders.values()):  # no model call is due here: a quiet moment for the models
             release_idle(embedder, self.config.model_idle_minutes)
+        if now - self._last_cache_upkeep > CACHE_UPKEEP_EVERY:
+            # A session that runs for days makes no update of its own kind (Indexer.update), which
+            # is where the cache is kept otherwise. Cut short, it goes on at the next quiet moment.
+            try:
+                done = self.indexer.cache_upkeep(CACHE_UPKEEP_SECONDS)
+            except Exception:
+                log.exception("could not keep the vector cache")
+                done = True
+            if done:
+                self._last_cache_upkeep = now
+            return True
         if self._watcher is not None and not self._watcher.alive() and not self._polling:
             log.warning("the file watcher stopped; scanning the repo every %.0f s instead", POLL_EVERY)
             self._polling = True
@@ -526,7 +543,7 @@ class CodememService:
             big = pending > CATCHUP_MAX_CHUNKS  # a big change: report the rest, don't wait for it
             if big and first is None:
                 return Freshness(pending, indexing=True, unconfirmed=not confirmed)
-            if not wait_for_models and not self._models_ready(deadline):
+            if not wait_for_models and not self._models_ready(deadline, after_idle=True):
                 # Embedding now would wait out the load, for the chunks of `first()` as for the rest.
                 return Freshness(pending, indexing=big, unconfirmed=not confirmed)
             if first is not None:
@@ -641,10 +658,12 @@ class CodememService:
     def search(self, query: str, *, wait_for_models: bool = True, **kwargs: Any) -> SearchResponse:
         """Catch up on pending saves, then search. With `wait_for_models=False` (the MCP server), a
         search waits for what is still loading only within `catchup_budget_ms` too: the embedding
-        model (at start-up, or again after an idle unload), and the search indexes (read from their
-        files, or rebuilt from the stored vectors on the first start after the search index changed,
-        which takes half a minute for 200,000 vectors in the compact form, with FAISS on one thread).
-        If they are not in memory by then, or will not be, the search uses keywords alone and says so."""
+        model at start-up, and the search indexes (read from their files, or rebuilt from the stored
+        vectors on the first start after the search index changed, which takes half a minute for
+        200,000 vectors in the compact form, with FAISS on one thread). If they are not in memory
+        by then, or will not be, the search uses keywords alone and says so. A model that was
+        freed for being idle is waited for longer (`IDLE_RELOAD_WAIT`): the first search after an
+        idle time then costs the reload, not the vectors' part of its results."""
         deadline = time.monotonic() + self.config.catchup_budget_ms / 1000
         freshness = Freshness()
         if self._worker is not None or self._watcher is not None:
@@ -656,22 +675,26 @@ class CodememService:
             first = (lambda: self._keyword_results(query, kwargs)) if by_meaning else None
             freshness = self.catch_up(wait_for_models=wait_for_models, first=first)
         loading = not wait_for_models and "signals" not in kwargs and not (
-            self._models_ready(deadline) and self._indexes_ready(deadline))
+            self._models_ready(deadline, after_idle=True) and self._indexes_ready(deadline))
         if loading:
             kwargs["signals"] = ["bm25"]
         resp = search(self.store, query, self.config, embedder_factory=self.embedder_factory, **kwargs)
         resp.freshness, resp.models_loading = freshness, loading
         return resp
 
-    def _models_ready(self, until: float) -> bool:
+    def _models_ready(self, until: float, *, after_idle: bool = False) -> bool:
         """Whether the embedding models are in memory, waiting until `until` while they load.
         Starts loading them in the background if nothing is and a try is due (`_Retry`). It does
-        not wait for a load that has failed: there is nothing to wait for until the next try."""
+        not wait for a load that has failed: there is nothing to wait for until the next try.
+        With `after_idle`, a model that was freed for being idle is waited for until
+        `IDLE_RELOAD_WAIT` from now, however near `until` is."""
         embedders = [self.embedder_factory(self.config.vectors[v], self.config) for v in self.config.enabled_vec_types()]
         for e in embedders:
             e.touch()  # first, so that an idle unload cannot fall between this check and the embedding
         if all(e.ready for e in embedders):
             return True
+        if after_idle and any(e.freed_idle for e in embedders):
+            until = max(until, time.monotonic() + IDLE_RELOAD_WAIT)
         with self._cond:
             if (self._prewarm is None or not self._prewarm.is_alive()) and self._load_retry.due:
                 self._prewarm = threading.Thread(target=self.prewarm, name="codemem-prewarm", daemon=True)

@@ -607,7 +607,8 @@ def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
     assert e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4)) == {"mcpServers": {"codemem": {
         "command": program, "args": ["mcp", "/testbed", "--index-dir", "/cmindex"],
         "env": {"HF_HOME": "/hf", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-                "CODEMEM_HOME": "/home/agent/.codemem", "OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
+                "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0",
+                "OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
         "alwaysLoad": True}}}
     assert e2e_run.codemem_mounts(codemem, Path("/runs/x/cmindex")) == [
         "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",

@@ -125,7 +125,7 @@ first catches up on your latest saves, so an agent finds the code it just wrote
 
 `~/.codemem/config.toml`, overridden per repo by `<repo>/.codemem.toml`, then by environment
 variables (`CODEMEM_HOME`, `CODEMEM_DEVICE`, `CODEMEM_MODEL`, `CODEMEM_STEERING`,
-`CODEMEM_VECTOR_CACHE`). The defaults, and why they have their values, are in
+`CODEMEM_VECTOR_CACHE`, `CODEMEM_MODEL_IDLE_MINUTES`). The defaults, and why they have their values, are in
 [decisions.md §3](docs/decisions.md); what each change redoes is in §5 there.
 
 ```toml
@@ -142,6 +142,7 @@ languages = ["python", "go"] # default: every supported language
 code_header = true           # put the path and enclosing class above the embedded code
 vector_cache = "global"      # global = reuse vectors across indexes on this machine | off
 vector_cache_max_gb = 8      # that cache's size cap in GB; past it the least recently used vectors go; 0 = no cap
+vector_cache_max_age_days = 30  # a cached vector that no index has needed for this long goes; 0 = never
 vector_backend = "auto"      # the in-memory search index: auto (the exact one while it fits vector_memory_mb,
                              # the compact one when it does not) | faiss (exact: every vector in memory) |
                              # compact (small codes of each vector, [compact] below) | a plugin class (below)
@@ -154,8 +155,9 @@ steering = "light"           # none | light | strong: how strongly agents are to
 debounce_ms = 500            # the index updates once saves stop for this long,
 debounce_max_wait_ms = 2000  # or at the latest this long after the first save
 catchup_budget_ms = 4000     # how long a search may spend catching up on recent saves
-model_idle_minutes = 0       # free the local model after this many minutes without a search or an
-                             # edit (1.3 GB on an M1); the next one loads it again. 0 keeps it
+model_idle_minutes = 60      # free the local model after this many minutes without a search or an
+                             # edit (1.3 GB on an M1); the next one loads it again, and a search
+                             # waits for that. 0 keeps it
 
 [vectors.code]
 model = "jinaai/jina-code-embeddings-0.5b"   # a Hugging Face name, or a local model folder
@@ -218,9 +220,11 @@ returns the same vectors for the same text: the same model and weights, at the s
 codemem cannot check that. Use it when a provider moves to a new host, when a second provider
 serves the same model, and when one server is reached at different addresses (next section).
 
-**One model for several codemem processes.** Each codemem that runs the local model keeps it in
-memory, 1.3 GB on an M1's GPU. With several git worktrees, or several containers, run the model
-once and let every codemem embed through it:
+**One model for several codemem processes.** Each codemem that runs the local model holds its
+own copy in memory, 1.3 GB on an M1's GPU: three agent sessions in three git worktrees hold three.
+A copy that embeds nothing for `model_idle_minutes` (60 by default) is freed, so the sessions
+nobody is using give theirs back. To hold one copy however many sessions are in use, with several
+git worktrees or several containers, run the model once and let every codemem embed through it:
 
 ```bash
 codemem serve-embeddings            # on 127.0.0.1:8791
@@ -396,9 +400,22 @@ version = "run-7"                            # optional label for the weights
 ## Where things are stored
 
 An index lives in `~/.codemem/indexes/<repo-name>-<hash of its path>/` (`CODEMEM_HOME` moves
-`~/.codemem`), and the vectors computed on the machine in `~/.codemem/cache/vector_cache.db`, up to
-`vector_cache_max_gb`. `codemem status` shows that cache's size. What each file holds and what is
-safe to delete: [decisions.md §6](docs/decisions.md).
+`~/.codemem`), and the vectors computed on the machine in `~/.codemem/cache/vector_cache.db`.
+What each file holds and what is safe to delete: [decisions.md §6](docs/decisions.md).
+
+**How much disk codemem uses, and what limits it:**
+
+| What | Size | What limits it |
+|---|---|---|
+| an index, one per checkout | about 0.3 GB for pandas (50,000 vectors), 0.9 GB for vLLM (145,000) | deleted with its git worktree; an index of a repo you no longer have is a folder you can delete |
+| the vector cache, one per machine | 1.9 KB per vector: about 0.1 GB for pandas, 0.3 GB for vLLM | `vector_cache_max_gb` (8 by default; any size, 0 = no cap) and `vector_cache_max_age_days` (30 by default; 0 = never) |
+
+The cache only saves work: it remembers every vector the machine computed, so a rebuild, another
+commit or a branch you come back to embeds nothing twice. It is a file on disk and is not held in
+memory. Past the cap its least recently used vectors go, and a vector that no index on the
+machine has needed for 30 days goes too. The vectors of an index you still use stay, however old
+they are. A vector that was dropped is computed again when its text comes back: a smaller cache
+costs time, never results. `codemem status` shows the cache's size.
 
 Each git worktree is a checkout with an index of its own: run codemem inside it. The index starts
 as a copy of another checkout's index, so it is ready in seconds, and it is deleted after the
