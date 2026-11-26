@@ -113,12 +113,14 @@ codemem's tool texts have three steering levels (`none`, `light`, `strong`) that
 
 ### Prompt levels
 
-A run gives the agent the issue as written (level L0) unless the batch names another level. L1 is the same content with the names removed (no paths, identifiers, traces or code). L2 is a short request in a user's voice. Both can end with one "Done when:" line that gives what the hidden tests need and the text does not say.
+A run gives the agent the issue as written (level L0) unless the batch names another level. L1 is the same content with the names removed (no paths, identifiers, traces or code). L2 is a short request in a user's voice. A prompt can end with one short "Done when:" line, only to name something new that the tests call and a user would name (rules: `tasks/vague-rules-v2.md`). Tasks whose hidden tests need more than that are not in the vague set.
 
 ```
 cmeval e2e run pandas --tasks tasks/fresh-v1.jsonl --run-id vague-l1-1 --setup tool \
-    --prompt-level L1 --prompts tasks/vague-pilot18-v1.jsonl
+    --prompt-level L1 --prompts tasks/vague-pilot18-v2.jsonl
 ```
+
+`vague-pilot18-v2.jsonl` holds 10 of the 18 pilot tasks; its `.meta.json` gives the reason for each removed task. `vague-pilot18-v1.jsonl` is kept only because the runs `vague-l1-1` and `vague-l2-1` used it: its "Done when" lines state what the hidden tests check, so completion with it is not comparable with L0.
 
 The prompts file has one JSON object per line: `id`, `level`, `prompt`. A valid task with no prompt of the level is skipped, with a note. `run.json` records the level and the file's name and hash (`identity.prompt_level`, `identity.prompt_source`). Use one level per run ID: a batch does not run a task again that the run ID already holds.
 
