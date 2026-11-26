@@ -428,6 +428,11 @@ def cmd_e2e_run(args) -> int:
             e2e_run.get_setup(name)
         recipe = gen.load_recipe(args.recipe)
         tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        prompts = None
+        if args.prompt_level != e2e_run.PROMPT_LEVEL:
+            if not args.prompts:
+                raise gen.GenerateError(f"--prompt-level {args.prompt_level} needs --prompts FILE")
+            prompts = e2e_run.load_prompts(args.prompts, args.prompt_level)
     except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
         print(f"e2e run: {exc}", file=sys.stderr)
         return 1
@@ -435,6 +440,12 @@ def cmd_e2e_run(args) -> int:
         wanted = set(args.id)
         tasks = [t for t in tasks if t.id in wanted]
     ready = [t for t in tasks if gen.tests_path(recipe, t).exists()]
+    if prompts is not None:
+        missing = [t.id for t in ready if t.id not in prompts.texts]
+        if missing:
+            print(f"note: {len(missing)} valid tasks have no {prompts.level} prompt in {prompts.source}; skipped",
+                  file=sys.stderr)
+        ready = [t for t in ready if t.id in prompts.texts]
     if len(ready) < len(tasks):
         print(f"note: {len(tasks) - len(ready)} tasks have no tests.json (not valid or not generated); skipped",
               file=sys.stderr)
@@ -460,7 +471,7 @@ def cmd_e2e_run(args) -> int:
         try:
             batch = e2e_run.run_batch(recipe, ready, run_id=args.run_id, setups=setups, model=args.model,
                                       reps=args.reps, settings=e2e_run.RunSettings(), progress=progress,
-                                      status=status)
+                                      status=status, prompts=prompts)
         except (gen.GenerateError, OSError) as exc:
             print(f"e2e run: {exc}", file=sys.stderr)
             status.fail(str(exc))
@@ -700,6 +711,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", default="claude-haiku-5-5", help="a full model id (default claude-haiku-5-5)")
     p.add_argument("--reps", type=int, default=1, help="repetitions of each task and setup (default 1)")
     p.add_argument("--limit", type=int, help="at most this number of tasks")
+    p.add_argument("--prompt-level", choices=("L0", "L1", "L2"), default="L0",
+                   help="L0: the issue as written (default). L1, L2: the rewrites in --prompts. One level per run id")
+    p.add_argument("--prompts", type=Path, help="file of rewritten prompts, one JSON object per line: id, level, prompt")
     p.add_argument("--dry-run", action="store_true", help="print the runs and how many exist already; run nothing")
     p.set_defaults(func=cmd_e2e_run)
     p = e2e_sub.add_parser("index", help="build the codemem index of each valid task, for runs of the setup tool")
