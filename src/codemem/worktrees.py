@@ -83,13 +83,18 @@ def is_worktree_of(folder: Path, common: Path) -> bool:
 
     Narrow on purpose. A submodule also has a `.git` file, but its git folder shares nothing
     (`is_linked_worktree`). A worktree of another repository shares that repository's git folder.
-    A repository of its own has a `.git` folder. None of them counts."""
-    if not (folder / ".git").is_file():  # nearly every folder: one look, and no more
-        return False
-    shared = git_common_dir(folder) if is_linked_worktree(folder) else None
+    A repository of its own has a `.git` folder. None of them counts.
+
+    It never raises. The scan asks this of every folder, and the look itself can fail: `is_file`
+    raises for a folder the user may not enter (a container's volume owned by root, a test's
+    `chmod 000`). Nothing then says the folder is a checkout of this repository, so the answer is
+    no, and the scan and the watcher go on as they did before they asked."""
     try:
+        if not (folder / ".git").is_file():  # nearly every folder: one look, and no more
+            return False
+        shared = git_common_dir(folder) if is_linked_worktree(folder) else None
         return shared is not None and os.path.samefile(shared, common)  # one folder, however it is spelled
-    except OSError:
+    except (OSError, ValueError):
         return False
 
 

@@ -817,7 +817,9 @@ twice. So:
 
 The rule is narrow. A folder counts only if its `.git` file leads to a git folder that shares this
 repository's own (git writes that link for every `git worktree add`). A submodule, a repository of
-another project and a worktree of another repository are read as part of the checkout.
+another project and a worktree of another repository are read as part of the checkout. A folder
+that cannot be looked into (the user may not enter it), or whose `.git` file is not text, does not
+count either: the question never stops a scan, which goes on as for any other folder.
 
 **A new worktree's index starts from a copy.** Without one, codemem would chunk every file again
 just to find that almost all of them equal the main checkout's.

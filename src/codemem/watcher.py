@@ -40,7 +40,7 @@ def git_dir(root: Path) -> Path | None:
     if dot.is_file():
         try:
             line = dot.read_text("utf-8").strip()
-        except OSError:
+        except (OSError, ValueError):  # it cannot be read, or it is not text (UTF-16, as PowerShell writes it)
             return None
         if line.startswith("gitdir:"):
             target = Path(line.split(":", 1)[1].strip())

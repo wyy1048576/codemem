@@ -21,6 +21,7 @@ from codemem.render import format_status
 from codemem.search import search
 from codemem.service import CodememService
 from codemem.store import IndexLock, Store, diff_snapshots
+from codemem.watcher import RepoWatcher, git_dir
 from codemem.worktrees import (
     DB, RECORD, _is_gone, checkouts, copy_index, copy_source, git_common_dir, is_linked_worktree, is_worktree_of,
     removable_indexes,
@@ -706,6 +707,54 @@ def test_another_spelling_of_the_checkouts_folder_finds_the_worktree_inside_it(r
         pytest.skip("this disk tells upper case from lower case")
     files = walk_source_files(spelled, fake_config)
     assert "auth/sessions.py" in files and not any(path.startswith(".claude/") for path in files)
+
+
+def test_a_folder_that_may_not_be_entered_does_not_stop_the_scan(repo, main_index, fake_config):
+    """Fixed bug: the scan asks every folder whether it is another checkout, by a look for its
+    `.git` file. For a folder the user may not enter (a container's volume owned by root, a
+    test's `chmod 000` left behind) that look raised PermissionError, and with it every full
+    check of the checkout: `codemem index`, `codemem search` and the server's writer. Nothing
+    says such a folder is a checkout of this repository. The walk goes on, cannot enter it
+    either, and leaves it out, as it did before the scan asked."""
+    closed = repo / "data" / "volume"
+    closed.mkdir(parents=True)
+    (closed / "inner.py").write_text("def inner():\n    return 1\n")
+    closed.chmod(0o000)
+    try:
+        if os.access(closed, os.X_OK):
+            pytest.skip("this user may enter every folder")
+        assert not is_worktree_of(closed, repo / ".git")
+        files = walk_source_files(repo, fake_config)
+        assert "auth/sessions.py" in files and not any(path.startswith("data/") for path in files)
+        service = CodememService(repo)
+        try:
+            stats = service.update()  # a full check, as `codemem index` and the server's writer make it
+            assert stats is not None, service.last_error
+            assert (stats.files_changed, stats.files_deleted) == (0, 0) and service.behind() is None
+        finally:
+            service.close()
+        watcher = RepoWatcher(repo, lambda paths, reconcile: None)  # an event of the folder itself asks the same
+        assert not watcher._in_other_checkout(("data", "volume"), True)
+    finally:
+        closed.chmod(0o755)
+
+
+def test_a_git_file_that_is_not_text_makes_no_checkout_and_stops_no_scan(repo, tmp_path, fake_config):
+    """git tracks no file named `.git`, but a tool can leave one that is not text: PowerShell
+    writes `echo "gitdir: ..." > .git` as UTF-16. git reads no checkout from such a file, and
+    neither does codemem: the folder is read as a plain folder, and no scan raises."""
+    code = "def helper():\n    return 1\n"
+    (repo / "odd").mkdir()
+    (repo / "odd" / "odd.py").write_text(code)
+    (repo / "odd" / ".git").write_bytes("gitdir: ../.git/modules/odd\n".encode("utf-16"))
+    assert git_dir(repo / "odd") is None and not is_linked_worktree(repo / "odd")
+    assert not is_worktree_of(repo / "odd", repo / ".git")
+    assert "odd/odd.py" in walk_source_files(repo, fake_config)
+    alone = tmp_path / "alone"  # and where it is the `.git` of the checkout itself
+    alone.mkdir()
+    (alone / "alone.py").write_text(code)
+    (alone / ".git").write_bytes(b"\xff\xfe\x00\x80")
+    assert git_common_dir(alone) is None and "alone.py" in walk_source_files(alone, fake_config)
 
 
 def test_changed_paths_inside_a_worktree_are_not_this_checkouts(repo, main_index):
