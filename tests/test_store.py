@@ -316,6 +316,22 @@ def test_transaction_rollback(store):
     assert store.counts()["chunks"] == 0
 
 
+def test_large_deletions_give_their_pages_back(store):
+    """Deleted rows leave free pages inside the file. One call returns all of them, not one page."""
+    with store.transaction():
+        ids = [store.upsert_chunk(_chunk(f"f{i:04d}", code=f"def f{i:04d}():\n    return '{'x' * 3000}'")) for i in range(400)]
+    before = store.conn.execute("PRAGMA page_count").fetchone()[0]
+    assert store.vacuum_if_sparse() is False  # nothing is free yet
+    with store.transaction():
+        store.delete_chunks(ids[:360])
+    free = store.conn.execute("PRAGMA freelist_count").fetchone()[0]
+    assert free > 200 and free / before >= 0.25
+    assert store.vacuum_if_sparse() is True
+    assert store.conn.execute("PRAGMA freelist_count").fetchone()[0] == 0
+    assert store.conn.execute("PRAGMA page_count").fetchone()[0] <= before - free
+    assert store.vacuum_if_sparse() is False and store.counts()["chunks"] == 40
+
+
 def test_index_lock_is_exclusive(tmp_path):
     with IndexLock(tmp_path):
         other = IndexLock(tmp_path)
@@ -354,13 +370,14 @@ def test_a_saved_index_is_reconciled_with_the_rows(tmp_path):
     s = Store(tmp_path / "idx")
     _seed(s, ["one", "two"])
     s.save_vectors()
-    old_faiss = (tmp_path / "idx" / "vec_code.faiss").read_bytes()
+    saved = s._data_path("code")  # vec_code.faiss, or vec_code.rabitq when the index is compact
+    older = saved.read_bytes()
     vid = next(iter(s.vector_rows("code").values()))[0]
     s.delete_vectors("code", [vid])
     _seed(s, ["three"], seed=2)  # same count as before, different ids
     s.save_vectors()
     s.close()
-    (tmp_path / "idx" / "vec_code.faiss").write_bytes(old_faiss)  # older data under a newer note
+    saved.write_bytes(older)  # older data under a newer note
     s2 = Store(tmp_path / "idx")
     assert _in_sync(s2, "code")
     q = _vecs(1, seed=2)[0]
@@ -442,7 +459,7 @@ def test_closing_the_vector_cache_leaves_a_running_thread_its_connection(tmp_pat
 
     cache = VectorCache(tmp_path / "cache.db")
     _while_another_thread_holds_its_connection(
-        cache._conn, cache.close, lambda conn: conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+        cache._conn, cache.close, lambda conn: conn.execute("SELECT COUNT(*) FROM entry").fetchone()[0]
     )
     cache.put_many("e", ["h"], np.ones((1, 4), dtype=np.float32))
     assert cache.count("e") == 1

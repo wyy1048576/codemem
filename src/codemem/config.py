@@ -16,9 +16,10 @@ import json
 import logging
 import os
 import re
+import sys
 import threading
 import tomllib
-from dataclasses import dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,7 @@ DEFAULT_MODEL = "jinaai/jina-code-embeddings-0.5b"
 REPO_CONFIG_NAME = ".codemem.toml"
 TEXT_FORMAT_VERSION = 3  # bump when a text builder's output changes, so old vectors are not reused
 CHUNKER_VERSION = 2  # bump when chunking changes (kinds, ranges, keys, calls): an index is then rebuilt
+DEFAULT_VECTOR_BACKEND = "auto"
 
 # Directories that are never indexed, regardless of .gitignore.
 ALWAYS_SKIP_DIRS = frozenset(
@@ -57,6 +59,7 @@ DTYPES = ("auto", "float32", "float16", "bfloat16")
 # whole classes, while questions like "add OCR to uploads" often need both. The knobs stay for runs.
 DEFAULT_TEST_WEIGHT = 1.0
 DEFAULT_KIND_WEIGHTS: dict[str, float] = {}
+COMPACT_MAX_DIM = 4096  # the longest compact code: FAISS's RaBitQ calls were checked up to this length
 
 
 @dataclass
@@ -132,6 +135,20 @@ class EmbeddingConfig:
         }
 
 
+@dataclass
+class CompactConfig:
+    """The compact search index, `vector_backend = "compact"` (docs/architecture.md §5): small
+    codes of each vector in memory, and the best candidates scored exactly from the stored vectors."""
+
+    # bits per number of the fine code, which ranks the candidates, 1 to 8. Every vector also has a
+    # 1-bit code, which a search scans; at 1 that is the only code
+    bits: int = 4
+    # numbers of each vector the codes cover (the first N); 0 = as many as the index uses. At most
+    # COMPACT_MAX_DIM either way
+    dim: int = 0
+    rescore: int = 200  # candidates scored exactly: at least this many, and at least 4 per result asked for
+
+
 def _default_vectors() -> dict[str, VectorConfig]:
     return {"code": VectorConfig(), "usage": VectorConfig()}
 
@@ -170,9 +187,18 @@ class Config:
     window_overlap_lines: int = 3
     max_block_lines: int = 200
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
-    # The in-memory search index: faiss (exact) | "module:Class" subclassing store.VectorStore.
-    # Vectors stay in SQLite, so a change rebuilds the search index from them, with no re-embedding.
-    vector_backend: str = "faiss"
+    # The cache file's size cap, in GB (10^9 bytes); past it the least recently used vectors go. 0 = no cap.
+    vector_cache_max_gb: float = 8.0
+    # The in-memory search index: auto (the exact one while it fits `vector_memory_mb`, the
+    # compact one when it does not) | faiss (exact: every vector in memory) | compact (small
+    # codes of each vector, exact scores from the stored vectors) | "module:Class" subclassing
+    # store.VectorStore. Vectors stay in SQLite, so a change rebuilds the search index from them,
+    # with no re-embedding.
+    vector_backend: str = DEFAULT_VECTOR_BACKEND
+    # Search-time: the memory, in MB, that the exact search indexes of one index may take before
+    # `auto` uses the compact one. 0 = 2% of the machine's memory, at least 128 MB (vector_memory_budget).
+    vector_memory_mb: int = 0
+    compact: CompactConfig = field(default_factory=CompactConfig)
     # search-time result filters and weights (the eval adapter can set them per system)
     kinds: list[str] | None = None  # None = every kind; e.g. ["function", "method"]
     test_weight: float = DEFAULT_TEST_WEIGHT  # multiplies the fused score of test chunks; 0 drops them
@@ -202,6 +228,11 @@ class Config:
         if spec.embedder:
             out += f"+{spec.embedder}"
         return out
+
+    def vector_options(self) -> dict[str, Any]:
+        """The search index's own settings, as `Store` passes them to the backend by keyword: the
+        compact index's, for `compact` and for `auto`, which uses them when it picks that index."""
+        return asdict(self.compact) if self.vector_backend in ("auto", "compact") else {}
 
     def effective_window_chars(self) -> int:
         return self.window_chars or max(3 * (self.max_seq_length - 32), 1000)
@@ -241,13 +272,82 @@ class Config:
         }
         if self.embedding.remote:  # absent for the local model, so local indexes keep their settings
             settings["embedding"] = self.embedding.index_settings()
-        if self.vector_backend != "faiss":  # likewise: systems with another backend get their own index
+        # Likewise the search index. `auto` is absent, so an index built before there was a choice
+        # keeps its settings. A backend that is named gets its own index, and so do the compact
+        # index's options that differ from their defaults, where the backend can use them.
+        if self.vector_backend != DEFAULT_VECTOR_BACKEND:
             settings["vector_backend"] = self.vector_backend
+        if self.vector_backend in ("auto", "compact"):
+            usual = asdict(CompactConfig())
+            if chosen := {k: v for k, v in asdict(self.compact).items() if v != usual[k]}:
+                settings["compact"] = chosen
         return settings
 
 
 def codemem_home() -> Path:
     return Path(os.environ.get("CODEMEM_HOME") or Path.home() / ".codemem")
+
+
+# --------------------------------------------------------------------------- the search index's memory budget
+
+_BUDGET_ONE_IN = 50  # `vector_memory_mb = 0`: 2% of the machine's memory ...
+_BUDGET_FLOOR = 128_000_000  # ... and at least this many bytes
+_ASSUMED_MEMORY = 16_000_000_000  # where the machine's memory cannot be read
+_CGROUP_LIMITS = ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes")
+
+
+def _windows_memory() -> int | None:
+    import ctypes
+
+    class MemoryStatus(ctypes.Structure):  # MEMORYSTATUSEX
+        _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong)] + [
+            (name, ctypes.c_ulonglong) for name in (
+                "total_phys", "avail_phys", "total_page_file", "avail_page_file", "total_virtual",
+                "avail_virtual", "avail_extended_virtual")]
+
+    status = MemoryStatus()
+    status.length = ctypes.sizeof(status)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+        return None
+    return int(status.total_phys)
+
+
+def physical_memory() -> int | None:
+    """Bytes of memory the machine has, or None where that cannot be read. On Linux a memory
+    limit set on the process's container counts when it is lower."""
+    try:
+        if sys.platform == "win32":
+            total = _windows_memory()
+        else:
+            total = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except Exception:  # no such call or name on this system
+        return None
+    if not total or total <= 0:
+        return None
+    for path in _CGROUP_LIMITS:
+        try:
+            limit = int(Path(path).read_text("ascii").strip())  # "max" where there is no limit
+        except (OSError, ValueError):
+            continue
+        if 0 < limit < total:
+            total = limit
+    return total
+
+
+def vector_memory_budget(setting_mb: int = 0) -> tuple[int, str]:
+    """The bytes that the exact search indexes of one index may take before `auto` uses the
+    compact one, and where that number comes from (for `codemem status`). `setting_mb` is
+    `vector_memory_mb`: megabytes of 10^6 bytes, or 0 for 2% of the machine's memory."""
+    if setting_mb > 0:
+        return setting_mb * 1_000_000, f"vector_memory_mb = {setting_mb}"
+    memory = physical_memory()
+    if memory is None:
+        memory, of = _ASSUMED_MEMORY, "2% of 16 GB (this machine's memory could not be read)"
+    else:
+        of = f"2% of this machine's {memory / 1e9:.1f} GB"
+    if memory // _BUDGET_ONE_IN < _BUDGET_FLOOR:
+        return _BUDGET_FLOOR, f"128 MB ({of} would be less)"
+    return memory // _BUDGET_ONE_IN, of
 
 
 # --------------------------------------------------------------------------- model weights version
@@ -368,8 +468,9 @@ def _env_overrides() -> dict[str, Any]:
 _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
-    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_backend", "kinds", "test_weight",
-    "kind_weights", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes",
+    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb", "vector_backend",
+    "vector_memory_mb", "kinds", "test_weight", "kind_weights", "debounce_ms", "debounce_max_wait_ms",
+    "catchup_budget_ms", "model_idle_minutes",
 )
 
 
@@ -418,8 +519,26 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
     if not isinstance(cfg.model_idle_minutes, (int, float)) or cfg.model_idle_minutes < 0:
         raise ValueError(f"model_idle_minutes must be a number, 0 or more, got {cfg.model_idle_minutes!r}")
-    if cfg.vector_backend != "faiss" and ":" not in cfg.vector_backend:
-        raise ValueError(f"vector_backend must be faiss or 'module:Class', got {cfg.vector_backend!r}")
+    cap = cfg.vector_cache_max_gb
+    if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not 0 <= cap < float("inf"):
+        raise ValueError(f"vector_cache_max_gb must be a size in GB, or 0 for no cap, got {cap!r}")
+    if cfg.vector_backend not in {"auto", "faiss", "compact"} and ":" not in cfg.vector_backend:
+        raise ValueError(f"vector_backend must be auto, faiss, compact or 'module:Class', got {cfg.vector_backend!r}")
+    if type(cfg.vector_memory_mb) is not int or cfg.vector_memory_mb < 0:
+        raise ValueError(f"vector_memory_mb must be a whole number of MB, 0 or more, got {cfg.vector_memory_mb!r}")
+    compact = dict(raw.get("compact") or {})
+    known = {f.name for f in fields(CompactConfig)}
+    if unknown := sorted(set(compact) - known):
+        raise ValueError(f"unknown [compact] settings {unknown}; choose from {sorted(known)}")
+    cfg.compact = CompactConfig(**compact)
+    if not all(type(v) is int for v in asdict(cfg.compact).values()):
+        raise ValueError(f"[compact] settings must be whole numbers, got {compact}")
+    if not 1 <= cfg.compact.bits <= 8:
+        raise ValueError(f"[compact] bits must be 1 to 8, got {cfg.compact.bits}")
+    if not 0 <= cfg.compact.dim <= COMPACT_MAX_DIM:
+        raise ValueError(f"[compact] dim must be 0 to {COMPACT_MAX_DIM}, got {cfg.compact.dim}")
+    if cfg.compact.rescore < 1:
+        raise ValueError(f"[compact] rescore must be 1 or more, got {cfg.compact.rescore}")
     from .texts import TEXT_BUILDERS
 
     if unknown := sorted(set(cfg.enabled_vec_types()) - set(TEXT_BUILDERS)):

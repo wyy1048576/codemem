@@ -35,6 +35,13 @@ uv run pytest              # fast suite with a fake embedding model, no download
 uv run pytest -m model     # the real jina-code-embeddings-0.5b (downloads ~1 GB once)
 ```
 
+The suite runs on the default search index (`auto`). `CODEMEM_TEST_VECTOR_BACKEND=compact uv run
+pytest` and `CODEMEM_TEST_VECTOR_BACKEND=faiss uv run pytest` run it on one search index each.
+Two scripts check the search indexes where the tests cannot: `scripts/check_faiss_calls.py` runs
+every FAISS call the compact index makes (on a platform or a FAISS it was not checked on), and
+`scripts/check_search_indexes.py --index <index folder> --repo <owner/name>` compares the search
+indexes with the exact one on a real index and the eval's questions for that repo.
+
 Python 3.11+, on Windows, macOS or Linux. In this workspace, run `source .cache/env.sh` first, so
 models, caches and indexes stay inside the project.
 
@@ -134,7 +141,12 @@ skip_generated = true        # skip files marked "Code generated ... DO NOT EDIT
 languages = ["python", "go"] # default: every supported language
 code_header = true           # put the path and enclosing class above the embedded code
 vector_cache = "global"      # global = reuse vectors across indexes on this machine | off
-vector_backend = "faiss"     # the in-memory search index; a plugin class can replace it (below)
+vector_cache_max_gb = 8      # that cache's size cap in GB; past it the least recently used vectors go; 0 = no cap
+vector_backend = "auto"      # the in-memory search index: auto (the exact one while it fits vector_memory_mb,
+                             # the compact one when it does not) | faiss (exact: every vector in memory) |
+                             # compact (small codes of each vector, [compact] below) | a plugin class (below)
+vector_memory_mb = 0         # search-time: what the exact search indexes of one index may take in memory before
+                             # auto uses the compact one; 0 = 2% of the machine's memory, at least 128 MB
 kinds = ["function", "method"]  # search-time filter; default: every kind
 test_weight = 1.0            # search-time: lower it to rank tests lower
 kind_weights = { class = 1.0, block = 1.0 }  # search-time: lower them to rank classes or blocks lower
@@ -149,6 +161,12 @@ model_idle_minutes = 0       # free the local model after this many minutes with
 model = "jinaai/jina-code-embeddings-0.5b"   # a Hugging Face name, or a local model folder
 [vectors.usage]
 model = "jinaai/jina-code-embeddings-0.5b"
+
+[compact]                    # the compact search index: read when vector_backend is "compact" or "auto"
+bits = 4                     # bits per number of the code that ranks the candidates, 1 to 8 (1 = the smallest index)
+dim = 0                      # numbers of each vector the codes cover (the first N); 0 = as many as the index uses
+rescore = 200                # candidates scored exactly from the stored vectors: at least this many,
+                             # and at least 4 per result asked for
 
 [bm25]
 weights = [10.0, 3.0, 5.0, 2.0, 1.0]   # name, path, signature, doc, body
@@ -345,7 +363,7 @@ your code.
 HNSW index:
 
 ```toml
-vector_backend = "mypkg.vectors:HnswStore"   # default "faiss" (exact search)
+vector_backend = "mypkg.vectors:HnswStore"   # default "auto": the exact index, or the compact one on a large index
 
 [vectors.code]
 model = "/models/my-code-encoder"            # a local folder
@@ -364,7 +382,9 @@ version = "run-7"                            # optional label for the weights
   `ids` and `__len__`, built as `HnswStore(dim)`. `search` returns at most k `(id, score)` pairs,
   best first, with real similarity scores, and only ids in `allowed_ids` when it is given. Saving
   it is optional (`to_bytes` / `from_bytes`, and a file `suffix`); one that isn't saved is rebuilt
-  from the stored vectors at each start. Switching re-embeds nothing.
+  from the stored vectors at each start. An index that keeps less than the vectors can read them
+  back from SQLite: define `bind(fetch)` and call `fetch(ids)` in `search` (data-model.md §12.4).
+  Switching re-embeds nothing.
 - `tests/test_plugins.py` has a small numpy search index and a wrapped embedder to copy from.
 
 **Other notes:**
@@ -376,8 +396,9 @@ version = "run-7"                            # optional label for the weights
 ## Where things are stored
 
 An index lives in `~/.codemem/indexes/<repo-name>-<hash of its path>/` (`CODEMEM_HOME` moves
-`~/.codemem`), and every vector computed on the machine in `~/.codemem/cache/vectors.db`. What each
-file holds and what is safe to delete: [decisions.md §6](docs/decisions.md).
+`~/.codemem`), and the vectors computed on the machine in `~/.codemem/cache/vector_cache.db`, up to
+`vector_cache_max_gb`. `codemem status` shows that cache's size. What each file holds and what is
+safe to delete: [decisions.md §6](docs/decisions.md).
 
 Each git worktree is a checkout with an index of its own: run codemem inside it. The index starts
 as a copy of another checkout's index, so it is ready in seconds, and it is deleted after the

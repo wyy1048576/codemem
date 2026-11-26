@@ -216,7 +216,7 @@ def test_matryoshka_dim_change_does_not_reembed(indexed, fake_config, recorder):
 def test_crash_before_vector_save_recovers(sample_repo, tmp_path, fake_config, recorder, monkeypatch):
     store = Store(tmp_path / "index")
     indexer = Indexer(sample_repo, store, fake_config, embedder_factory=lambda m, c: recorder)
-    monkeypatch.setattr(store, "save_vectors", lambda: (_ for _ in ()).throw(KeyboardInterrupt()))
+    monkeypatch.setattr(store, "save_vectors", lambda **how: (_ for _ in ()).throw(KeyboardInterrupt()))
     with pytest.raises(KeyboardInterrupt):
         indexer.update()
     store.close()

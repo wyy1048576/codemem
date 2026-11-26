@@ -379,13 +379,13 @@ def test_the_search_indexes_are_written_once_the_index_is_quiet(service, sample_
 
     monkeypatch.setattr(svc_mod, "SAVE_AFTER_IDLE", 0.3)
     service.update()
-    faiss = service.index_dir / "vec_code.faiss"
-    before = faiss.stat().st_mtime_ns
+    saved = service.store._data_path("code")
+    before = saved.stat().st_mtime_ns
     service.start(prewarm=False)
     time.sleep(0.3)
     (sample_repo / "auth" / "late.py").write_text("def late_save():\n    pass\n")
     assert _wait_for(lambda: service.store.get_chunk_by_key("auth/late.py::late_save") is not None)
-    assert _wait_for(lambda: faiss.stat().st_mtime_ns != before and not service.store.vectors_unsaved())
+    assert _wait_for(lambda: saved.stat().st_mtime_ns != before and not service.store.vectors_unsaved())
 
 
 # ---------------------------------------------------------------- CLI
@@ -466,7 +466,8 @@ def test_cli_default_index_dir_under_codemem_home(sample_repo, fake_env, isolate
     assert main(["index", str(sample_repo)]) == 0
     dirs = list((isolated_home / "indexes").iterdir())
     assert len(dirs) == 1 and dirs[0].name.startswith("sample_repo-")
-    assert (dirs[0] / "index.db").is_file() and (dirs[0] / "vec_code.faiss").is_file()
+    saved = {p.name for p in dirs[0].glob("vec_code.*")}  # the search index and its note
+    assert (dirs[0] / "index.db").is_file() and "vec_code.json" in saved and len(saved) == 2
 
 
 def test_cli_init_dry_run_writes_nothing(sample_repo, fake_env, capsys):
