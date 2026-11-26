@@ -135,7 +135,9 @@ def test_parse_results_reads_each_head_line():
 
 
 def test_notes():
-    assert rp.notes_of(RESULT_TEXT) == {"keywords_only": True, "indexing": False, "not_fresh": False}
+    notes = rp.notes_of(RESULT_TEXT)
+    assert notes["keywords_only"] and notes["loading"]
+    assert not any(notes[k] for k in ("cannot_embed", "indexing", "not_fresh", "unchecked_copy", "not_available"))
     assert rp.full_search(rp.notes_of("1. a.py:1-2  f  [id 1]"))
     building = "Note: the codemem index is still being built (40% done); results may be incomplete."
     assert rp.notes_of(building)["indexing"]
@@ -301,5 +303,5 @@ def test_cost_table_and_check_summary(make_task):
     assert cells[5] == "2.0"  # turns after
     summary = rp.check_summary(entries, Counter({"no search_code call": 3}))
     assert "Left out, no search_code call: 3." in summary
-    assert "keywords only (model loading): 2" in summary
+    assert "keywords only (model loading, or codemem could not embed): 2" in summary
     assert "same 2" in summary
