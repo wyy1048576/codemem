@@ -1495,6 +1495,63 @@ class Store:
         ids = [r[0] for r in self.conn.execute("SELECT callee_id FROM edges WHERE caller_id = ?", (chunk_id,))]
         return sorted(self.get_chunks(ids).values(), key=lambda c: (c.path, c.start_line))
 
+    def neighbours(self, chunk_ids: Sequence[int], max_callers: int) -> dict[int, list[tuple[int, str]]]:
+        """Each chunk's callees and callers, as (chunk id, "calls" or "called by"). An edge into a
+        callee with more than `max_callers` callers is left out both ways: such a callee is not
+        listed, and its callers are not followed. Calls are linked by name, so a method named
+        `append` collects every `list.append` of the repo as its callers."""
+        ids = sorted(set(chunk_ids))
+        pairs: set[tuple[int, int]] = set()
+        for batch in _batches(ids):
+            marks = ",".join("?" * len(batch))
+            for column in ("caller_id", "callee_id"):
+                rows = self.conn.execute(f"SELECT caller_id, callee_id FROM edges WHERE {column} IN ({marks})", batch)
+                pairs.update((r[0], r[1]) for r in rows)
+        callers: dict[int, int] = {}
+        for batch in _batches(sorted({callee for _, callee in pairs})):
+            marks = ",".join("?" * len(batch))
+            rows = self.conn.execute(f"SELECT callee_id, COUNT(*) FROM edges WHERE callee_id IN ({marks}) GROUP BY callee_id", batch)
+            callers.update((r[0], r[1]) for r in rows)
+        wanted = set(ids)
+        out: dict[int, list[tuple[int, str]]] = {i: [] for i in ids}
+        for caller, callee in sorted(pairs):
+            if callers.get(callee, 0) > max_callers:
+                continue
+            if caller in wanted:
+                out[caller].append((callee, "calls"))
+            if callee in wanted:
+                out[callee].append((caller, "called by"))
+        return out
+
+    def similarity(self, vec_type: str, query: np.ndarray, chunk_ids: Iterable[int]) -> dict[int, float]:
+        """Each chunk's similarity to a query vector by one vector type, its best part, from the
+        stored vectors as the search index holds them: the score vector_search gives. No model call.
+        A chunk with no vector of the type is left out."""
+        dim = self.vector_dim(vec_type)
+        parts = self.vector_parts(vec_type, chunk_ids) if dim else {}
+        if not parts:
+            return {}
+        owner = {vector_id: chunk_id for (chunk_id, _), (vector_id, *_) in parts.items()}
+        found, vecs = self._stored_vectors(dim, list(owner))
+        q = prepare(np.asarray(query), dim)[0]
+        out: dict[int, float] = {}
+        for vector_id, score in zip(found.tolist(), (vecs @ q).tolist()):
+            chunk_id = owner[vector_id]
+            if chunk_id not in out or score > out[chunk_id]:
+                out[chunk_id] = score
+        return out
+
+    def refs(self, chunk_ids: Iterable[int]) -> dict[int, tuple[str, str, int, str]]:
+        """(qualname, path, start line, kind) of each chunk, read from the index that covers them."""
+        out: dict[int, tuple[str, str, int, str]] = {}
+        for batch in _batches(sorted(set(chunk_ids))):
+            marks = ",".join("?" * len(batch))
+            for r in self.conn.execute(
+                f"SELECT chunk_id, qualname, path, start_line, kind FROM chunks WHERE chunk_id IN ({marks})", batch
+            ):
+                out[r[0]] = (r[1], r[2], r[3], r[4])
+        return out
+
     # ---- BM25
     def chunk_total(self) -> int:
         """How many chunks the keyword index holds (its small per-row table, not `chunks`)."""

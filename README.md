@@ -151,6 +151,7 @@ vector_memory_mb = 0         # search-time: what the exact search indexes of one
 kinds = ["function", "method"]  # search-time filter; default: every kind
 test_weight = 1.0            # search-time: lower it to rank tests lower
 kind_weights = { class = 1.0, block = 1.0 }  # search-time: lower them to rank classes or blocks lower
+card_relations = 3           # search-time: each result names its 3 callers and callees closest to the query; 0 = none
 steering = "light"           # none | light | strong: how strongly agents are told to use codemem
 debounce_ms = 500            # the index updates once saves stop for this long,
 debounce_max_wait_ms = 2000  # or at the latest this long after the first save

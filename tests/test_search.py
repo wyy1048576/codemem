@@ -263,3 +263,93 @@ def test_bm25_queries_drop_stopwords_and_optionally_common_words(index):
     assert '"revoke"' in words and all(0 < docs.get(w.strip('"'), 0) <= 0.5 * total for w in words)
     cfg.bm25_common_share, cfg.bm25_query_terms = 0.0, 0  # every word, stopwords too
     assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "the" OR "session"'
+
+
+# ---------------------------------------------------------------- related names on the cards
+
+
+def _id(store, key):
+    return store.get_chunk_by_key(key).chunk_id
+
+
+def test_neighbours_go_both_ways_and_leave_out_hub_callees(index):
+    store, _, _ = index
+    revoke, disable = _id(store, "auth/sessions.py::revoke_session"), _id(store, "auth/users.py::disable_user")
+    delete, logout = _id(store, "auth/db.py::Table.delete"), _id(store, "api/routes.py::logout")
+    near = store.neighbours([revoke, disable], max_callers=100)
+    assert {(delete, "calls"), (disable, "called by"), (logout, "called by")} <= set(near[revoke])
+    assert (revoke, "calls") in near[disable]
+    # revoke_session has three callers: over a cap of 2 it is a hub, not listed by its callers
+    # (disable_user loses it) and its callers not followed (it keeps only its own call)
+    capped = store.neighbours([revoke, disable], max_callers=2)
+    assert capped[revoke] == [(delete, "calls")] and (revoke, "calls") not in capped[disable]
+
+
+def test_similarity_is_the_score_vector_search_gives(index):
+    store, cfg, factory = index
+    query = factory(cfg.vectors["code"], cfg).embed_queries([QUERY])[0]
+    hits = store.vector_search("code", query, 8)
+    scores = store.similarity("code", query, [h.chunk_id for h in hits] + [10**9])  # an id with no row is left out
+    assert scores == pytest.approx({h.chunk_id: h.score for h in hits}, abs=1e-5)
+
+
+def _text(resp):
+    from codemem.render import format_results
+
+    return format_results(resp)
+
+
+def test_cards_name_their_callers_and_callees(index):
+    store, cfg, factory = index
+    assert cfg.card_relations == 3  # the default
+    on = search(store, "revoke_session", cfg, k=1, embedder_factory=factory)
+    card = on.results[0]
+    assert card.qualname == "revoke_session"
+    assert len(card.related) == 3 and {(r.qualname, r.relation) for r in card.related} <= {
+        ("disable_user", "called by"), ("logout", "called by"), ("test_disabled_user_loses_sessions", "called by"),
+        ("Table.delete", "calls"),
+    }
+    line = _text(on).splitlines()[-1]
+    assert line == "   related: " + ", ".join(f"{r.qualname} ({r.path}:{r.start_line})" for r in card.related)
+    cfg.card_relations = 0
+    off = search(store, "revoke_session", cfg, k=1, embedder_factory=factory)
+    assert not off.results[0].related and "related:" not in _text(off)
+    assert _text(off).splitlines() == _text(on).splitlines()[:-1]  # the line is all that differs
+
+
+def test_related_names_leave_the_ranking_and_the_results_alone(index):
+    store, cfg, factory = index
+    for query in (QUERY, "revoke_session", "table rows", "session"):
+        cfg.card_relations = 3
+        on = search(store, query, cfg, k=5, embedder_factory=factory).results
+        cfg.card_relations = 0
+        off = search(store, query, cfg, k=5, embedder_factory=factory).results
+        assert [(r.key, r.score) for r in on] == [(r.key, r.score) for r in off]  # same results, same order
+        shown = {r.chunk_id for r in on}
+        assert all(x.chunk_id not in shown for r in on for x in r.related)  # a result is never named again
+        assert all(len(r.related) <= 3 for r in on)
+
+
+def test_related_names_leave_out_hubs_and_keep_the_filters(index, monkeypatch):
+    import codemem.search as search_module
+
+    store, cfg, factory = index
+    monkeypatch.setattr(search_module, "RELATION_MAX_CALLERS", 2)  # revoke_session (3 callers) is now a hub
+    card = search(store, "revoke_session", cfg, k=1, embedder_factory=factory).results[0]
+    assert [(r.qualname, r.relation) for r in card.related] == [("Table.delete", "calls")]
+    monkeypatch.setattr(search_module, "RELATION_MAX_CALLERS", 100)
+    card = search(store, "revoke_session", cfg, k=1, tests="exclude", embedder_factory=factory).results[0]
+    assert card.related and not any(r.qualname.startswith("test_") for r in card.related)
+    # no line without neighbours, and none for a search by keywords alone (no query vector to choose by)
+    cards = search(store, "secrets token hex", cfg, k=10, embedder_factory=factory).results
+    assert any(not c.related for c in cards)
+    assert "related:" not in _text(search(store, "revoke_session", cfg, k=3, signals=["bm25"], embedder_factory=factory))
+
+
+def test_card_relations_setting_is_validated():
+    from codemem.config import Config, config_from_dict
+
+    assert Config().card_relations == 3 and config_from_dict({"card_relations": 0}).card_relations == 0
+    for bad in (-1, 1.5, "3", True):
+        with pytest.raises(ValueError, match="card_relations"):
+            config_from_dict({"card_relations": bad})

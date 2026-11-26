@@ -654,10 +654,18 @@ The tool names stay stable, so other front-ends can be compared.
 3. auth/sessions.py:19-20  revoke_session  [id 14]
    def revoke_session(session_id):
    |     db.sessions.delete(session_id)
+   related: disable_user (auth/users.py:5), logout (api/routes.py:10), Table.delete (auth/db.py:11)
 ```
 
 `N. path:start-end  name  [id X]` (a long function adds `best a-b`, its best window's lines), then
-the signature (not for blocks), the first doc line, and up to 6 preview lines.
+the signature (not for blocks), the first doc line, and up to 6 preview lines. Then one `related:`
+line: up to `card_relations` (3) of the result's callers and callees, the ones closest to the query
+by their stored code vectors, as `qualified name (path:start line)`. A neighbour that is itself one
+of the results is not named, nor a callee with more than 100 callers (whose callers are not
+followed either), nor a chunk the search's filters leave out. A result with no such neighbour has
+no line, and so has every result of a search by keywords alone. In `SearchResponse.to_dict()` each
+card has `related`: a list of `chunk_id`, `qualname`, `path`, `start_line` and `relation` (`calls`
+or `called by`).
 
 **The freshness note.** `search_code` catches up first (architecture.md §4): the background writer
 applies every save the watcher has seen, then the search embeds the queue, its own keyword results
@@ -767,6 +775,8 @@ A change to any of these must be made together with the eval:
   `CODEMEM_VECTOR_BACKEND` sets it from the environment, for an index that is built in one place
   and opened in another: `auto` picks by the memory of the place it runs in, so the two can
   differ, and every start that begins from the build's files then rebuilds the search index.
+- **`card_relations`:** search-time; a whole number, 0 or more; the default is 3. How many callers
+  and callees each card names (§12.1); 0 names none. The ranking does not depend on it.
 - **`vector_memory_mb`:** search-time. The memory, in MB of 10^6 bytes, that the exact search
   indexes of one index may take before `auto` uses the compact one. 0, the default, is 2% of the
   machine's memory, and at least 128 MB. A whole number, 0 or more.

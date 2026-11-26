@@ -21,6 +21,22 @@ from .store import ChunkFilter, Store, VectorHit
 from .tokenize import fts_or, tokenize
 
 BM25 = "bm25"
+# A card's related names leave out a callee with more callers than this, and do not follow its callers
+# (store.neighbours): calls are linked by name, so such a callee is mostly a common method name
+# (`append`: 4,362 callers on vLLM). 100 is about the 99th percentile of callers per callee on vLLM,
+# and reached as many gold functions in the lab as every edge did, with fewer names.
+RELATION_MAX_CALLERS = 100
+
+
+@dataclass
+class Related:
+    """A caller or callee that a card names: one step along the call graph from the result."""
+
+    chunk_id: int
+    qualname: str
+    path: str
+    start_line: int
+    relation: str  # "calls" (the result calls it) or "called by"
 
 
 @dataclass
@@ -42,6 +58,7 @@ class ResultCard:
     name: str = ""
     is_test: bool = False
     best_lines: tuple[int, int] | None = None  # the best-matching window of a long chunk
+    related: list[Related] = field(default_factory=list)  # callers and callees closest to the query
 
     @property
     def location(self) -> str:
@@ -267,9 +284,9 @@ def search(
         timings[BM25] = time.perf_counter() - t
 
     vec_signals = [s for s in signals if s != BM25]
+    # Embed the query once per distinct model (and plugin and weights), not once per vector set.
+    query_vecs: dict[tuple, np.ndarray] = {}
     if vec_signals and (allowed is None or allowed):
-        # Embed the query once per distinct model (and plugin and weights), not once per vector set.
-        query_vecs: dict[tuple, np.ndarray] = {}
         for vec_type in vec_signals:
             spec = config.vectors[vec_type]
             model = (spec.model, spec.embedder, spec.version)
@@ -305,5 +322,37 @@ def search(
             best_lines = (chunk.start_line + hit.start_off, chunk.start_line + hit.end_off)
         results.append(make_card(chunk, score, config, ranks, best_lines, query_tokens))
     timings["fuse"] = time.perf_counter() - t
+    # The related names are chosen by meaning, with the query vector this search already made.
+    by_meaning = next((v for v in ("code", *vec_signals) if ranked.get(v)), None)
+    if config.card_relations > 0 and results and by_meaning is not None:
+        t = time.perf_counter()
+        spec = config.vectors[by_meaning]
+        query_vec = query_vecs[(spec.model, spec.embedder, spec.version)]
+        _add_relations(store, results, by_meaning, query_vec, config.card_relations, None if allowed is None else set(allowed))
+        timings["relations"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
     return SearchResponse(query=query, signals=list(signals), results=results, timings=timings)
+
+
+def _add_relations(
+    store: Store, cards: list[ResultCard], vec_type: str, query_vec: np.ndarray, per_card: int,
+    allowed: set[int] | None,
+) -> None:
+    """Give each card up to `per_card` of its callers and callees, the ones closest to the query by
+    their stored `vec_type` vectors (ties by location), among the chunks the search's filters allow.
+    A neighbour that is itself one of the results is left out (the agent reads it already), and so
+    is one with no vector of the type. A search by keywords alone has no query vector: no names."""
+    shown = {c.chunk_id for c in cards}
+    near = store.neighbours([c.chunk_id for c in cards], RELATION_MAX_CALLERS)
+    candidates = {o for links in near.values() for o, _ in links if o not in shown and (allowed is None or o in allowed)}
+    if not candidates:
+        return
+    score = store.similarity(vec_type, query_vec, candidates)
+    where = store.refs(c for c in candidates if c in score)
+    for card in cards:
+        best: dict[int, str] = {}
+        for other, relation in near.get(card.chunk_id, []):
+            if other in where and other not in best:
+                best[other] = relation
+        chosen = sorted(best, key=lambda o: (-score[o], where[o][1], where[o][2], where[o][0]))[:per_card]
+        card.related = [Related(o, where[o][0], where[o][1], where[o][2], best[o]) for o in chosen]

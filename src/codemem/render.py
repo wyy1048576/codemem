@@ -40,6 +40,8 @@ def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool =
             if r.kind != "block" and not r.best_lines:
                 body = body[1:]  # first line repeats the signature/decorator
             out.extend(f"   | {line}" for line in body[:6])
+        if r.related:
+            out.append("   related: " + ", ".join(f"{x.qualname} ({x.path}:{x.start_line})" for x in r.related))
     return "\n".join(out)
 
 
