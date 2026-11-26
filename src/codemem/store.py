@@ -355,8 +355,10 @@ def _require_rabitq() -> None:
 @functools.lru_cache(maxsize=2)
 def _rotation(dim: int) -> tuple[np.ndarray, str]:
     """The random rotation the compact codes are made after, and a hash that names it in saved
-    files. One fixed rotation per length: equal vectors get equal codes in every index, and a
-    file is only read by a process that makes the same rotation."""
+    files. One fixed rotation per length: every index of that length codes vectors the same
+    way, and a file is only read by a process that makes the same rotation. Equal vectors get
+    equal codes up to the rounding of the product in `_coded`, where a BLAS can round a row
+    differently in a call of another size (docs/architecture.md §5)."""
     rotation, _ = np.linalg.qr(np.random.default_rng(_ROTATION_SEED).standard_normal((dim, dim), dtype=np.float32))
     rotation.setflags(write=False)  # shared by every index of this length
     return rotation, hashlib.sha1(rotation.tobytes()).hexdigest()[:16]
@@ -365,8 +367,9 @@ def _rotation(dim: int) -> tuple[np.ndarray, str]:
 def _rabitq(dim: int, bits: int) -> Any:
     """An empty FAISS index of RaBitQ codes at `bits` bits per number, with its centre at zero.
     RaBitQ codes a vector minus a centre, which train() sets to the mean of what it is shown. One
-    zero vector makes the centre zero: a code then depends only on its own vector, so an index
-    patched edit by edit holds the same codes as one rebuilt from the rows."""
+    zero vector makes the centre zero: a code then depends only on its own vector, not on what
+    else the index holds. So an index patched edit by edit holds the codes of one rebuilt from
+    the rows, up to the rotation's rounding (`_rotation`)."""
     index = faiss.IndexRaBitQ(dim, faiss.METRIC_INNER_PRODUCT, bits)
     index.train(np.zeros((1, dim), dtype=np.float32))
     return index
@@ -394,10 +397,10 @@ class CompactVectorStore(VectorStore):
     codes, each at 25 times the cost of a 1-bit estimate, so that a search took 2 to 4 times as
     long as with the exact index. And which codes that is depends on the order they are held in.
     Here a search takes the fine estimate of the scan's best only, and its candidates depend
-    only on the vectors held.
+    only on the codes held.
 
     FAISS holds the codes by position; `_ids` maps a position to its vector id, and the codes are
-    kept in the order of those ids, so two indexes that hold the same vectors are the same bytes.
+    kept in the order of those ids, so two indexes that hold the same codes are the same bytes.
     A mistake in a FAISS call can end the process instead of raising, so whatever goes into one
     is checked here first: lengths, number types, and the size of every selector."""
 
@@ -566,7 +569,7 @@ class CompactVectorStore(VectorStore):
 
     def _candidates(self, q: np.ndarray, size: int, allowed: np.ndarray | None) -> np.ndarray:
         """Positions of the `size` best codes for a query, and of every code that ties with the
-        last of them. Which they are depends on the vectors held, never on their order."""
+        last of them. Which they are depends on the codes held, never on their order."""
         self._in_step()
         x = self._coded(q)
         if self._fine is None:
