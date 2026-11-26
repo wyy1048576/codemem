@@ -7,9 +7,11 @@ the counts must read shell commands. This module has three parts:
   classify        gives one simple command a kind (a search, a view, an edit, a test, ...) and its files
   count_steps     walks the events of a run in order and counts what the main agent did, turn by turn
 
-The rules are heuristics. They read what the agent wrote, not what the shell did: a command that failed
-counts like one that worked. STEPS_VERSION goes up when a rule changes, and `cmeval e2e recount` computes the
-counts of old runs again from their streams.
+The rules are heuristics. They read what the agent wrote, not what the shell did: a command that ran and
+failed counts like one that worked. A call that Claude Code did not run (its result is a <tool_use_error>, for
+example "Blocked: sleep 100 followed by ...") counts in tool_calls, bash_calls and blocked_calls, and nothing in it
+counts as done. STEPS_VERSION goes up when a rule changes, and `cmeval e2e recount` computes the counts of old
+runs again from their streams. The record keeps the version that made its counts in steps_version.
 
 The kinds of an action:
 
@@ -18,16 +20,46 @@ The kinds of an action:
   view            cat, head, tail, sed -n, less, more, nl, bat, awk that only prints, wc, git show REV:PATH,
                   git blame (and the Read tool)
   view_git        git diff, git show REV, git log -p: changes, not files. Kept apart from view
-  edit            sed -i, perl -i, tee, patch, git apply, git checkout -- PATH, git restore, mv, cp, rm, touch,
-                  mkdir, and a command whose output goes to a file with > or >> (and Edit, Write, NotebookEdit)
+  edit            sed -i, perl -i, tee, patch, git apply, mv, cp, rm, touch, mkdir, and a command whose output
+                  goes to a file with > or >> (and Edit, Write, NotebookEdit)
   edit_script     python, node, perl or ruby with an inline script that writes a file. Its targets are a guess
+  revert          git checkout PATH, git restore PATH, and git show REV:PATH > PATH: the file goes back to the
+                  version in git. Not an edit
+  read_outside    a view or a search whose files are all outside the repo: a log in /tmp, a task output file
+                  of a command in the background, a cache folder
+  write_outside   an edit whose files are all outside the repo: a script or a backup in /tmp
   test            pytest, python -m pytest, tox, npm test, npx playwright test, make test, cargo test, go test
   run             other python, node, npm, make and build commands, and a script that the agent wrote
   git             other git commands
   filter          grep, head, sed and others that read the output of a pipe, not a file
   mcp             a tool of an MCP server (names that start with mcp__)
-  other           everything else (echo, cd, true, sleep, ...)
+  other           everything else (echo, cd, true, sleep, ...), and a view or a search of /dev/null only
   unparsed        a command that the reader cannot split
+
+The counts, one line each (all of the main agent; the repo is the folder /testbed):
+
+  search          an action of kind search_content (searches.content) or search_files (searches.files)
+  view            an action of kind view (views.count); a file of the repo that it shows is in views.files_viewed
+  edit            an action that writes a file of the repo: an edit or edit_script with a repo path, a file
+                  written by > or >>, or an edit whose files are not known (git apply). edits.outside counts
+                  write_outside actions, edits.reverts counts revert actions; neither is an edit
+  surfaced        first turn in which the file reaches the agent: a tool result shows its path (also relative
+                  to the shell's folder, or its name in a listing of its folder), or the agent views it or
+                  greps inside it by name
+  opened          first turn with a view of the file (Read, cat, sed -n, head, ...)
+  edited          first turn with an edit of the file (an Edit whose old text was not found counts)
+  named_by_agent  first turn in which the agent wrote the path in a tool call
+
+Changes in version 3 (the field names stay; these fields mean something else than in version 2):
+
+  actions         has the kinds revert, read_outside and write_outside. edit, search_content, search_files and
+                  view lose those actions; view and search_content of /dev/null only are now other
+  searches        counts searches in the repo only. A grep in a log in /tmp is read_outside
+  views.count     counts views of repo files only (and views whose file is not known)
+  edits.shell     no longer counts git checkout and git restore (they are in edits.reverts)
+  gold surfaced   is never later than opened. Version 2 read only the path in the result text, and a grep in
+                  one file prints no path
+  blocked calls   do not count as actions. New fields: blocked_calls, edits.reverts, and "blocked" in commands
 """
 
 from __future__ import annotations
@@ -43,15 +75,15 @@ from pathlib import Path
 
 # Raise this number whenever a rule of this module changes. Version 1 was the count_steps of e2e_run, which
 # read only the Read tool and the first word of each shell command.
-STEPS_VERSION = 2
+STEPS_VERSION = 3
 REPO_ROOT = "/testbed"
 MAX_COMMAND_CHARS = 2000
 MAX_DEPTH = 8
 EDIT_TOOLS = ("Edit", "Write", "NotebookEdit")
 MCP_PREFIX = "mcp__"
 CODEMEM_PREFIX = "mcp__codemem__"
-KINDS = ("search_content", "search_files", "view", "view_git", "edit", "edit_script", "test", "run", "git",
-         "filter", "mcp", "other", "unparsed")
+KINDS = ("search_content", "search_files", "view", "view_git", "edit", "edit_script", "revert", "read_outside",
+         "write_outside", "test", "run", "git", "filter", "mcp", "other", "unparsed")
 # Claude Code's Bash tool keeps the working folder of the main agent from one call to the next when the folder
 # is inside the project; outside it, the next call starts in the project again. A subagent's calls start in the
 # project each time. This is how the tool describes itself. The two transcripts we studied have no cd at all.
@@ -907,12 +939,12 @@ def _git(cmd: SimpleCommand, args, where: _Where) -> Action:
     if sub == "checkout":
         targets = pathspec or [w for w in words if w == "." or (_pathish(w) and not _REV_LIKE.fullmatch(w))]
         if targets:
-            return Action("edit", name, *where.split(targets))
+            return Action("revert", name, *where.split(targets))
         return Action("git", name)
     if sub == "restore":
         if ("--staged" in opts or "-S" in opts) and not ({"--worktree", "-W"} & set(opts)):
             return Action("git", name)
-        return Action("edit", name, *where.split(pathspec or words))
+        return Action("revert", name, *where.split(pathspec or words))
     if sub == "apply":
         if {"--check", "--stat", "--numstat", "--summary"} & set(opts):
             return Action("git", name)
@@ -1037,10 +1069,38 @@ def classify(cmd: SimpleCommand, cwd: str | None = None, repo_root: str = REPO_R
     shows = not (cmd.piped_out or cmd.nested or hides)
     if written:
         writes, writes_outside = where.split(written)
+        if action.program == "git show" and action.kind == "view" and writes and set(writes) <= set(action.paths):
+            return Action("revert", "git show", writes, shows_output=False)  # git show HEAD:a.py > a.py
         if action.kind in ("view", "view_git", "filter", "other", "git"):
-            return Action("edit", cmd.program, writes, writes_outside, shows_output=False)
+            return _place(Action("edit", cmd.program, writes, writes_outside, shows_output=False), where)
         action = replace(action, writes=writes, writes_outside=writes_outside)
+    action = _place(action, where)
     return replace(action, shows_output=shows) if action.shows_output != shows else action
+
+
+def _holds_repo(path: str, root: str) -> bool:
+    """True when an absolute path outside the repo is a folder that holds the repo (/ for the root /testbed)."""
+    return path.startswith("/") and (root + "/").startswith(path.rstrip("/") + "/")
+
+
+def _place(action: Action, where: _Where) -> Action:
+    """Move a view, search or edit whose files are all outside the repo to read_outside or write_outside.
+    /dev/null and other /dev/ files are not files: a view or search of only them is `other`."""
+    if action.kind in ("view", "search_content", "search_files"):
+        outside = tuple(p for p in action.outside if not p.startswith("/dev/"))
+        if outside != action.outside:
+            if not action.paths and not outside:
+                return Action("other", action.program, shows_output=action.shows_output)
+            action = replace(action, outside=outside)
+        # A search without a target looks in the shell's folder.
+        places = outside or ((where.cwd,) if action.kind != "view" and where.norm(where.cwd)[1] else ())
+        if not action.paths and places and not any(_holds_repo(p, where.root) for p in places):
+            return replace(action, kind="read_outside", first_line=None, last_line=None, lines=None,
+                           whole_file=False, recursive=False)
+    elif action.kind in ("edit", "edit_script") and not action.paths and not action.writes and action.outside \
+            and not any(_holds_repo(p, where.root) for p in action.outside):
+        return replace(action, kind="write_outside")
+    return action
 
 
 def _classify(cmd: SimpleCommand, where: _Where) -> Action:
@@ -1188,15 +1248,30 @@ def result_text(block: dict) -> str:
     return ""
 
 
-def _results(events: list[dict]) -> dict[str, str]:
+def _results(events: list[dict]) -> dict[str, tuple[str, bool]]:
+    """The text of each tool result, and whether Claude Code marked it as its own error (<tool_use_error>)."""
     found = {}
     for event in events:
         if event.get("type") != "user":
             continue
         for block in (event.get("message") or {}).get("content") or []:
             if isinstance(block, dict) and block.get("type") == "tool_result" and block.get("tool_use_id"):
-                found[block["tool_use_id"]] = result_text(block)
+                text = result_text(block)
+                found[block["tool_use_id"]] = (text, text.lstrip().startswith("<tool_use_error>"))
     return found
+
+
+_REFUSED = re.compile(r"<tool_use_error>\s*(Blocked|Permission|.{0,200}(denied|haven't granted|hook))", re.S)
+
+
+def blocked(tool: str, result: str | None, tool_error: bool) -> bool:
+    """True when Claude Code did not run the call. A Bash command that runs and fails gets "Exit code N"; a
+    <tool_use_error> means that Claude Code stopped it before it ran (for example "Blocked: sleep 100 followed
+    by ..."). For other tools only a refusal counts: an Edit whose old text is not found also gets a
+    <tool_use_error>, and it still counts as an edit."""
+    if not tool_error or result is None:
+        return False
+    return tool == "Bash" or bool(_REFUSED.match(result.lstrip()))
 
 
 # ---- the counts of a run
@@ -1206,6 +1281,30 @@ def path_pattern(path: str, repo_root: str = REPO_ROOT) -> re.Pattern:
     and b/ of a git diff before it, and not as a part of a longer path."""
     root = re.escape((repo_root.rstrip("/") or "") + "/")
     return re.compile(rf"(?<![\w./-])(?:{root}|\./|[ab]/)?{re.escape(path)}(?![\w/-]|\.\w)")
+
+
+def _short_pattern(text: str) -> re.Pattern:
+    """A pattern that finds a relative path or a file name in text as a whole word."""
+    return re.compile(rf"(?<![\w./-])(?:\./)?{re.escape(text)}(?![\w/-]|\.\w)")
+
+
+def _short_patterns(gold: str, actions: list[Action], folders: set[str]) -> list[re.Pattern]:
+    """Patterns for the shorter forms of a gold path that a Bash call can print: the path relative to the shell's
+    folder (grep -rn after a cd), and the bare file name in a listing of its folder (ls, or a recursive ls or
+    tree of a folder above it). `folders` are the shell's folders at the start and the end of the call."""
+    found = []
+    for folder in folders:
+        if folder not in (".", "") and not folder.startswith("/") and gold.startswith(folder + "/"):
+            found.append(_short_pattern(gold[len(folder) + 1:]))
+    parent = posixpath.dirname(gold) or "."
+    for a in actions:
+        if a.kind != "search_files" or a.program not in ("ls", "tree"):
+            continue
+        listed = a.paths or (() if a.outside else tuple(folders))
+        if any(f == parent or (a.recursive and (f == "." or gold.startswith(f.rstrip("/") + "/"))) for f in listed):
+            found.append(_short_pattern(posixpath.basename(gold)))
+            break
+    return found
 
 
 def _norm_gold(path: str, root: str) -> str:
@@ -1241,10 +1340,11 @@ def _tool_actions(name: str, args: dict, where: _Where) -> list[Action]:
     if name == "Read":
         limit = args.get("limit")
         offset = args.get("offset")
-        return [Action("view", "Read", paths, outside, first_line=offset if isinstance(offset, int) else None,
-                       lines=limit if isinstance(limit, int) else None, whole_file=not (limit or offset))]
+        return [_place(Action("view", "Read", paths, outside, first_line=offset if isinstance(offset, int) else None,
+                              lines=limit if isinstance(limit, int) else None, whole_file=not (limit or offset)),
+                       where)]
     if name in EDIT_TOOLS:
-        return [Action("edit", name, paths, outside)]
+        return [_place(Action("edit", name, paths, outside), where)]
     if name == "Grep":  # older Claude Code versions
         return [Action("search_content", "Grep", paths, outside, pattern=args.get("pattern"), recursive=True)]
     if name == "Glob":
@@ -1268,6 +1368,7 @@ class _Tally:
         self.files_edited_guess: list[str] = []
         self.bash_calls = 0
         self.bash_commands = 0
+        self.blocked_calls = 0
 
     def add(self, actions: list[Action], tool: str, result: str | None) -> bool:
         """Count the actions of one tool call. True when it edits a repo file (or files it cannot name)."""
@@ -1295,6 +1396,10 @@ class _Tally:
                     self.views["lines_viewed"] += len(result.splitlines())
                 else:
                     self.views["lines_unknown"] += 1
+            if a.kind == "revert":
+                self.edits["reverts"] += 1
+            if a.kind == "write_outside":
+                self.edits["outside"] += 1
             certain = a.paths if a.kind == "edit" else ()
             guessed = a.paths if a.kind == "edit_script" else ()
             written = certain + guessed + a.writes
@@ -1333,14 +1438,17 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
     subagent's event belongs to the main turn of its Task call. Turn numbers start at 1 and are null when the
     thing did not happen. For each gold file:
 
-      surfaced        first turn whose tool result shows the file's path (a search hit, a listing, a trace)
+      surfaced        first turn in which the file reaches the agent: a tool result shows its path (a search
+                      hit, a listing, a trace), or the agent views the file or greps inside it by name
       opened          first turn with a view of the file (Read, cat, sed -n, head, ...)
       edited          first turn with an edit of the file (an edit that failed counts; a guess of an
-                      edit_script counts)
+                      edit_script counts; a revert does not)
       named_by_agent  first turn in which the agent wrote the path in a tool call
 
-    `commands` holds each Bash call (of the main agent and of subagents) with the kind, program and paths of
-    its simple commands, so that anyone can count again. gold_file_read and first_gold_read_turn are the names
+    A call that Claude Code did not run (see `blocked`) adds nothing but tool_calls, bash_calls, bash_commands,
+    blocked_calls and named_by_agent; its result surfaces nothing. `commands` holds each Bash call (of the main
+    agent and of subagents) with the kind, program and paths of its simple commands, and "blocked" when it did
+    not run, so that anyone can count again. gold_file_read and first_gold_read_turn are the names
     of version 1. They are kept as copies of gold_opened and first_gold_opened_turn, so that e2e_score and
     older readers still work.
     """
@@ -1353,6 +1461,8 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
     main, sub = _Tally(), _Tally()
     tools, sub_tools = Counter(), Counter()
     call_turn: dict[str, int] = {}
+    blocked_ids: set[str] = set()
+    short: dict[str, dict[str, list[re.Pattern]]] = {}  # call id -> gold file -> patterns of shorter forms
     marks = {"first_edit_turn": None, "first_test_turn": None, "first_mcp_turn": None, "first_codemem_turn": None}
     commands = []
     cwd = root
@@ -1363,10 +1473,12 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
         if event.get("type") == "user" and not is_sub:
             for block in (event.get("message") or {}).get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_result" and \
-                        block.get("tool_use_id") in call_turn:
+                        block.get("tool_use_id") in call_turn and block.get("tool_use_id") not in blocked_ids:
                     text = result_text(block)
+                    extra = short.get(block["tool_use_id"], {})
                     for g, pattern in patterns.items():
-                        if gold[g]["surfaced"] is None and pattern.search(text):
+                        if gold[g]["surfaced"] is None and (pattern.search(text)
+                                                            or any(p.search(text) for p in extra.get(g, ()))):
                             gold[g]["surfaced"] = call_turn[block["tool_use_id"]]
             continue
         if event.get("type") != "assistant":
@@ -1381,7 +1493,8 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
             (sub_tools if is_sub else tools)[name] += 1
             if call_id and not is_sub:
                 call_turn[call_id] = turn
-            result = results.get(call_id) if call_id else None
+            result, tool_error = results.get(call_id, (None, False)) if call_id else (None, False)
+            not_run = blocked(name, result, tool_error)
             start = cwd if (CD_PERSISTS and not is_sub) else root
             if name == "Bash":
                 text = str(args.get("command") or "")
@@ -1394,13 +1507,23 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
                          "simple": [[a.kind, a.program, list(a.paths + a.outside)] for a in actions]}
                 if is_sub:
                     entry["subagent"] = True
+                if not_run:
+                    entry["blocked"] = True
                 commands.append(entry)
-                if not is_sub:
+                if not is_sub and not not_run:
                     inside = end == root or end.startswith(root + "/")
                     cwd = end if inside else root
+                    if call_id:
+                        folders = {_Where(start, root).norm(start)[0], _Where(end, root).norm(end)[0]}
+                        short[call_id] = {g: _short_patterns(g, actions, folders) for g in gold_list}
             else:
                 text = json.dumps(args, ensure_ascii=False)
                 actions = _tool_actions(name, args, _Where(start, root))
+            if not_run:  # the call is in tool_calls (and in commands), but nothing in it happened
+                tally.blocked_calls += 1
+                actions = []
+                if call_id:
+                    blocked_ids.add(call_id)
             edits_repo = tally.add(actions, name, result)
             if is_sub:
                 continue
@@ -1414,11 +1537,15 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
                 marks["first_codemem_turn"] = _first(marks["first_codemem_turn"], turn)
             touched = [p for a in actions for p in a.paths + a.writes]
             viewed = [p for a in actions if a.kind == "view" for p in a.paths]
+            searched = [p for a in actions if a.kind == "search_content" for p in a.paths]
             edited = [p for a in actions for p in _edit_targets(a)]
             for g, pattern in patterns.items():
                 marks_of = gold[g]
                 if marks_of["named_by_agent"] is None and (pattern.search(text) or _any_match(touched, g)):
                     marks_of["named_by_agent"] = turn
+                # The file's content reaches the agent without its path: a view, or a grep in the one file.
+                if marks_of["surfaced"] is None and (_any_match(viewed, g) or g in searched):
+                    marks_of["surfaced"] = turn
                 if marks_of["opened"] is None and _any_match(viewed, g):
                     marks_of["opened"] = turn
                 if marks_of["edited"] is None and _any_match(edited, g):
@@ -1438,6 +1565,7 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
         "subagent_tool_calls": dict(sub_tools),
         "bash_calls": main.bash_calls,
         "bash_commands": main.bash_commands,
+        "blocked_calls": main.blocked_calls,
         "actions": main.kinds(),
         "mcp_tools": dict(main.mcp_tools),
         "codemem_calls": sum(n for t, n in main.mcp_tools.items() if t.startswith(CODEMEM_PREFIX)),
@@ -1447,7 +1575,7 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
                   "lines_viewed": main.views["lines_viewed"], "whole_file_views": main.views["whole_file_views"],
                   "lines_unknown": main.views["lines_unknown"]},
         "edits": {"tool": main.edits["tool"], "shell": main.edits["shell"], "script": main.edits["script"],
-                  "outside": main.edits["outside"], "files_edited": main.files_edited,
+                  "outside": main.edits["outside"], "reverts": main.edits["reverts"], "files_edited": main.files_edited,
                   "files_edited_guess": main.files_edited_guess},
         "tests_run": main.actions["test"],
         **marks,
