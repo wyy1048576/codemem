@@ -257,6 +257,28 @@ Reading 100 rows by id for rescoring is the one new disk access per search. If S
 for it on a cold disk, the fallback is a flat file of vectors opened as a memory map: row `i`
 starts at byte `i × row size`.
 
+**Proposed after this phase: no saved copy for the exact index** (Andre, Nov 26; a proposal, not
+for the freeze). The saved copy was kept when the search indexes were built. For the exact index
+it is the vectors a second time, in the layout FAISS reads in one go: 261 MB of the 909 MB of
+vLLM's index folder. The compact index's copy stays in any case, because its codes take 18.6 s
+to compute again at that size.
+
+- **What the copy is for today.** Every codemem process loads its search index when it starts.
+  With the copy that takes 0.3 s on vLLM. From the database's rows it takes 1.8 s, about 1.2 s
+  per 100,000 vectors on an M1 (0.5 s for pandas).
+- **An agent's session does not need it.** The session is one long process (the MCP server). It
+  pays the load once, in a thread of its own, beside a model load of 2 to 6 s.
+- **The open-weight models need it.** Their harness (mini-SWE-agent) gives the model a shell,
+  and codemem reaches it as the command `codemem search "..."`
+  ([track A](track-a-evals.md) §4.2). Each call is a new process. Without the copy each call
+  would build the index again: about 0.5 s on pandas, and about 3 s at 250,000 vectors
+  (extrapolated), inside the time the eval measures. The same holds for anyone who searches
+  from the command line.
+- **When it can go.** When the command asks a long-lived codemem process instead of loading the
+  index itself, which also takes the model's part out of each call. Until then the copy stays.
+- **What dropping it gives.** The 261 MB; no rewrite of the whole file 30 s after each burst of
+  edits; and one file less that a start has to check.
+
 ### 4.5 Reranking
 
 **What it is.** After the vector step, a second model reads the query and each candidate's code

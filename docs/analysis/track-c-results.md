@@ -147,6 +147,13 @@ holds 186 MB and the compact one 63 MB.
 (648 MB for vLLM): they are what step 3 reads, and what a search index is rebuilt from. Only the
 saved copy of the search index shrinks, so the folder is a fifth smaller, not three times.
 
+**What the saved copy is for.** It is the search index as a file, so that a start loads it in
+0.3 s instead of building it from the database's rows (1.8 s for the exact index on vLLM, 18.6 s
+for the compact one). An agent's session starts once and would not notice. A `codemem search`
+on the command line is a new process each time, and that is how the open-weight models call
+codemem in the eval. So the copy stays for now; dropping it for the exact index is a proposal
+for after the freeze ([the plan](../plan/track-c-memory.md) §4.4).
+
 **Time is not a saving today.** A search is milliseconds either way, and at the size of our
 repos the two are level. The reason is how each one's time is made up:
 
