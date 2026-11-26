@@ -1,12 +1,14 @@
 # Track C: what was built, what it saves, and how it was checked
 
-**State on 2026-11-25.** Track C is seven pull requests. #30 to #33 are on `main`. #34 (the vector
-cache), #35 (the compact search index) and #36 (the default search index) are open.
+**State on 2026-11-26.** Track C is seven pull requests, #30 to #36. All are on `main`, and so
+is the move of the pinned FAISS from 1.15.1 to 1.16.0 (#38).
 
 **How to read the numbers.** Everything was measured on an M1 MacBook with 16 GB, with FAISS on
 one thread, unless a line says otherwise. "Real" means vectors made by the real embedding model
 (`jina-code-embeddings-0.5b`, 896 numbers per vector). "Stand-in model" means a fake model that
-gives the same vector for the same text: it measures codemem's own work, not the model's.
+gives the same vector for the same text: it measures codemem's own work, not the model's. The
+numbers were taken with FAISS 1.15.1, before #38, unless a line names 1.16.0: on `main` today a
+vector search is faster than they say (§3.3).
 
 **Still to come.** Nothing here has run on Linux or x86 yet.
 
@@ -268,9 +270,9 @@ number is the median over every question of the repo, three times.
   4,000 codes 13.5 ms, 8,000 codes 19.8 ms; 500 candidates 12.7 ms; 8 bits 11.0 ms; 1 bit with
   1,000 candidates 14.1 ms.
 
-**A newer FAISS is faster on Apple processors.** FAISS 1.15.1, the version codemem pins, has no
-vectorized code for Apple's ARM processors in its RaBitQ parts: its ARM file calls the plain
-loops. Intel and AMD processors have vectorized ones. FAISS 1.16.0 (November 9, 2026) adds the
+**A newer FAISS is faster on Apple processors.** FAISS 1.15.1, the version codemem pinned until
+#38, has no vectorized code for Apple's ARM processors in its RaBitQ parts: its ARM file calls the
+plain loops. Intel and AMD processors have vectorized ones. FAISS 1.16.0 (November 9, 2026) adds the
 ARM ones. Both versions, one after the other, measured as above:
 
 | One search, median | FAISS 1.15.1 | FAISS 1.16.0 |
@@ -292,8 +294,7 @@ ARM ones. Both versions, one after the other, measured as above:
 - A wider first scan then costs 0.5 ms and not 2.6 ms, which makes 4,000 codes an easy choice
   (§3.2, the weak point).
 - Not run under 1.16.0: Linux and Windows. Its build for Apple-silicon Macs needs macOS 15 or
-  newer, where 1.15.1's needed macOS 14. The lock file still pins 1.15.1; the branch
-  `andre/faiss-1-16` moves it.
+  newer, where 1.15.1's needed macOS 14. `main` pins 1.16.0 since #38.
 
 **Vector search beside the rest of a search.** On vLLM, with the model's part left out: three
 short questions (4 to 9 words) took 38 to 57 ms each, of which 10 to 27 ms were keywords, about
@@ -479,7 +480,7 @@ Items 1 to 4 and the measurements of §6 are the candidates for the paper.
 | The compact index against the exact one, real vectors | §3.2 |
 | The compact index against a brute-force oracle, on the real vLLM index | the true top 10 and top 50 in all 762 searches with vLLM's questions; one top 50 of 704 lost a result with another repo's questions (§3.2) |
 | An index built by `main`, then updated by the new code | nothing embedded again, the stored settings equal byte for byte |
-| Each merge to `main` | #30 to #33 are, byte for byte, the branches that were tested |
+| Each merge to `main` | #30 to #36 and #38 are, byte for byte, the content that was tested |
 | Audit 1: the search index (#35, #36) | no finding that blocks a merge |
 | Audit 2: `main` with #30 to #33, and the cache (#34) | no wrong index and no lost data; no finding that blocks #34 |
 
@@ -499,7 +500,7 @@ Each audit was done by a separate agent that was told to break the code, with it
 | worktrees | a worktree inside the main checkout doubles the main index | a known gap, now measured |
 | cache (#34) | within one day "used longest ago" is "first used", so a very small cap can drop vectors read a minute ago | to fix or to document |
 | cache, on `main` already | a cache locked by another process stalls an MCP search for 64 s | to fix |
-| the check script (#36) | `scripts/check_search_indexes.py` ended in an error when run without `--tasks`, since a task file of another kind was added to `eval/tasks` | fixed on #36's branch, with tests |
+| the check script (#36) | `scripts/check_search_indexes.py` ended in an error when run without `--tasks`, since a task file of another kind was added to `eval/tasks` | fixed in #36, with tests |
 
 ---
 
@@ -509,7 +510,7 @@ Each audit was done by a separate agent that was told to break the code, with it
   are only synthetic vectors (200,000).
 - **Linux and x86**, CUDA, and FAISS on more than one thread.
 - **FAISS 1.16.0 on Linux and Windows.** It passes everything run here (§3.3) and is faster on
-  Apple processors. The branch `andre/faiss-1-16` moves the lock file to it.
+  Apple processors. `main` pins it since #38; nobody has run it on Linux or Windows yet.
 - **The eval's end-to-end runs** (track A): whether an agent's results change at all.
 - **The embedding assist with a real model or a hosted provider.**
 - **Whether a vector that is embedded a second time is bit-identical** to the first, with the real model.
@@ -525,3 +526,5 @@ Each audit was done by a separate agent that was told to break the code, with it
   and `scripts/check_served_vectors.py`.
 - The benchmark scripts, their raw results and the two audit reports are kept by Andre outside the
   repository.
+- codemem as it was before track C is kept on the branch `archive/codemem-before-track-c`, to
+  benchmark against.
