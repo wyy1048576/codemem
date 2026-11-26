@@ -199,7 +199,8 @@ def difficulty(patch: str) -> str:
     `cmeval resplit` adds data or build files to the fix."""
     patch = code_part(patch)
     files, lines = len(changed_files(patch)), changed_lines(patch)
-    if files == 1 and lines <= 15:
+    # A fix with no code file (a test fixture, or a data-only change) is the smallest class.
+    if files <= 1 and lines <= 15:
         return "easy"
     if files <= 2 and lines <= 100:
         return "medium"
