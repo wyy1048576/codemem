@@ -10,13 +10,14 @@ which keeps small codes of each vector and scores its best candidates from the r
 named in config. By default (`auto`) it is the exact one while that fits a memory budget, and
 the compact one when it does not (Store._pick). It is truncated to `embedding_dim` if set, kept
 in memory and saved as `vec_<type><suffix>` with a `vec_<type>.json` note of the epoch it
-reflects (and the database, backend and options it was saved from, and the checksum of the
-file). Every transaction that changes a vector type's rows bumps its epoch in `meta`, and the
-index is patched right after the commit (never before, so it never holds an uncommitted vector).
-Vector rows never change in place: a new vector is a new row with a new id. So an index that is
-behind (a saved file from before a crash, or another process wrote) catches up by comparing
-vector ids and applying only the difference; a missing file, or one whose bytes are not the
-bytes that were saved, is rebuilt from the rows, which needs no model, and outside the vector
+reflects (and the database, backend and options it was saved from, the checksum of the file,
+and the id of the save). Every transaction that changes a vector type's rows bumps its epoch in
+`meta`, and the index is patched right after the commit (never before, so it never holds an
+uncommitted vector). Vector rows never change in place: a new vector is a new row with a new
+id. So an index that is behind (a saved file from before a crash, or another process wrote)
+catches up by comparing vector ids and applying only the difference. A missing file, one whose
+bytes are not the bytes that were saved, and one saved from a later state than the database is
+in (Store.save_vectors) are rebuilt from the rows, which needs no model, and outside the vector
 lock (Store._type_index). docs/architecture.md §5 lists the tables.
 """
 
@@ -132,9 +133,13 @@ _CHUNK_COLS = (
 )
 
 
-def _atomic_write(path: Path, data: bytes) -> None:
+def _temp_path(path: Path) -> Path:
     # A name of its own per process and thread: two writers never share a half-written temp file.
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    return path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+
+
+def _atomic_write(path: Path, data: bytes) -> None:
+    tmp = _temp_path(path)
     tmp.write_bytes(data)
     os.replace(tmp, path)  # atomic on Windows and POSIX
 
@@ -1621,7 +1626,7 @@ class Store:
 
     def drop_vec_type(self, vec_type: str) -> None:
         self.conn.execute("DELETE FROM vectors WHERE vec_type = ?", (vec_type,))
-        for key in ("embedder", "full_dim", "dim_setting"):
+        for key in ("embedder", "full_dim", "dim_setting", "save_id"):
             self.conn.execute("DELETE FROM meta WHERE key = ?", (f"vec.{vec_type}.{key}",))
         self._bump_epoch(vec_type)
 
@@ -1908,10 +1913,13 @@ class Store:
     def _usable_note(self, vec_type: str, dim: int | None) -> dict[str, Any] | None:
         """The note of a vector type's saved index, when a start can read that index: it was saved
         from this database, by the backend in use with its options, for this length and embedder,
-        it holds the checksum of its file, and the file is there. Whatever epoch it was saved at."""
+        it holds the checksum of its file, and the file is there. Whatever epoch it was saved at,
+        as long as the database has not gone back behind that save: the note and `meta` then hold
+        the same `save_id` (save_vectors)."""
         use = self._search_index()
         note = self._read_note(vec_type)
         if (note is None or note.get("database") != self.database_id()
+                or not note.get("save_id") or note.get("save_id") != self.get_meta(f"vec.{vec_type}.save_id")
                 or note.get("backend", "faiss") != use.name or note.get("options", {}) != use.options
                 or note.get("dim") != dim or note.get("embedder") != self.get_meta(f"vec.{vec_type}.embedder")
                 or type(note.get("crc32")) is not int or not self._noted_file(vec_type, note).is_file()):
@@ -2071,6 +2079,18 @@ class Store:
         the checksum of the data: a start reads no other bytes under it (_load_saved). A backend
         that is not saved leaves no file, and is rebuilt from the stored vectors at the next start.
 
+        Each save has a random `save_id`, written into the note and into `meta`. A start matches
+        a saved index to the rows by vector id, which is right for the state of the database the
+        index was saved from and for later ones only: a database that went back (an `index.db`
+        put back from a copy, commits lost in a power cut) hands the same ids out again, for
+        other vectors. `meta` goes back with it, so the two ids then differ and the index is
+        rebuilt. The id is committed after the index is copied: a state that holds it comes after
+        every row of the copy. The file is written under a temporary name first. One short
+        transaction then sets the id, moves the file in place and writes the note, which also
+        keeps the saves of two processes apart. A save that stops before it leaves the earlier
+        file, note and id, which agree; one that stops inside it leaves those, or a file and a
+        note that fail one of the two checks.
+
         With `stale` (an update that ends by saving: the CLI's, the eval's), the files are first
         made what the next start needs, so that no search has to wait for it: `auto` picks again,
         as a start would, and a vector type whose file is missing, behind the rows, or another
@@ -2086,7 +2106,7 @@ class Store:
                         continue
                     note = {"epoch": ti.epoch, "dim": ti.dim, "count": len(ti.store),
                             "embedder": self.get_meta(f"vec.{vec_type}.embedder"), "database": self.database_id(),
-                            "backend": use.name, "file": self._data_path(vec_type).name}
+                            "save_id": uuid.uuid4().hex, "backend": use.name, "file": self._data_path(vec_type).name}
                     if use.options:
                         note["options"] = use.options
                     copies.append((vec_type, ti.store.to_bytes(), note))
@@ -2097,8 +2117,16 @@ class Store:
                     self._note_path(vec_type).unlink(missing_ok=True)
                 else:
                     note["crc32"] = zlib.crc32(data)
-                    _atomic_write(self.index_dir / note["file"], data)
-                    _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
+                    path = self.index_dir / note["file"]
+                    tmp = _temp_path(path)
+                    try:
+                        tmp.write_bytes(data)  # the long write: nothing a start reads has changed yet
+                        with self.transaction():
+                            self.set_meta(f"vec.{vec_type}.save_id", note["save_id"])
+                            os.replace(tmp, path)
+                            _atomic_write(self._note_path(vec_type), json.dumps(note).encode("utf-8"))
+                    finally:
+                        tmp.unlink(missing_ok=True)
                 if old is not None and old.name != (note["file"] if data is not None else None):
                     old.unlink(missing_ok=True)  # another backend's file: no note describes it any more
 

@@ -1129,9 +1129,10 @@ than 1.15.1 when the index is opened.
 start: 0.9 s for the exact index of 200,000 vectors, 0.5 s for the compact one. It is rebuilt
 from the stored vectors instead when the saved copy cannot be used: there is none, it is another
 backend's (the rule picks the other index, or the config names another), its bytes are not the
-bytes that were saved, or its note lacks the database or the checksum that a start checks. That
-last case is every copy saved by a codemem that did not write them: the first start on such an
-index rebuilds its search index, once. On an M1 that was running other jobs, an
+bytes that were saved, the database has gone back to a state from before the copy, or its note
+lacks the database, the save's id or the checksum that a start checks. That last case is every
+copy saved by a codemem that did not write them: the first start on such an index rebuilds its
+search index, once. On an M1 that was running other jobs, an
 exact index took 0.5 to 1.5 s to rebuild at 50,000 vectors and 2.5 to 5 s at 200,000. A compact
 index has to code every vector: 12 to 20 s at 50,000 and 32 to 70 s at 200,000, with FAISS on
 one thread.
@@ -1176,6 +1177,19 @@ A saved copy is read only into the database it was saved from. Each `index.db` c
 `database_id` in `meta`, and the copy's note names it. A copy whose note names another database,
 or none, is rebuilt from the rows. Vector ids start again at 1 in a new `index.db`, so without the
 name the copy of a deleted one would be matched, id by id, against vectors it was not made from.
+
+A saved copy is read only by the state of the database it was saved from, or a later one.
+Matching by vector id is right while no id is used twice, and a database that goes back uses
+them twice: an `index.db` put back from a backup, or one that lost its last commits in a power
+cut (commits are not synced to the disk one by one), hands out again the ids of the rows it
+lost, for other vectors. The version number does not show it, because it counts up again. So
+each save writes a random `save_id` into the copy's note and into `meta`, and a start reads the
+copy only when the two are equal. `meta` goes back with the database: after a step back they
+differ, and the search index is rebuilt from the rows. The id is committed after the index was
+copied from memory, so a state that holds it comes after every vector of the copy. A save
+writes the file under a temporary name first; one short transaction then sets the id, renames
+the file and writes the note. A save that is stopped part of the way leaves the earlier copy,
+or one that a start refuses.
 
 A saved copy is read only if its bytes are the bytes that were saved. Its note holds a checksum
 of the file (CRC-32), and a start compares the two before the index is given the file. A file

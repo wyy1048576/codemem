@@ -394,9 +394,10 @@ change to `tokenize.py`'s output bumps `SCHEMA_VERSION`.
   index.db                           SQLite (WAL): meta, files, chunks, fts (word lists only, + fts_vocab), calls, edges, vectors,
                                      dirty_texts (the queue)
   vec_code.faiss, vec_code.json      a saved copy of the search index + a note {epoch, dim, count, embedder,
-  vec_usage.faiss, vec_usage.json    database, backend, file, crc32}; another backend saves vec_<type><suffix>,
-                                     or nothing.
+  vec_usage.faiss, vec_usage.json    database, save_id, backend, file, crc32}; another backend saves
+                                     vec_<type><suffix>, or nothing.
                                      `database` is the `database_id` of the index.db the copy was saved from.
+                                     `save_id` is a random token of the save, also in `meta` (§8).
                                      `crc32` is the checksum of the copy's file, whatever the backend.
                                      `backend` is the search index the file holds (`faiss`, `compact` or a
                                      plugin's name), whether a configuration named it or `auto` picked it.
@@ -453,7 +454,8 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 - `cache_marked_day`: the day (days since 1970, UTC) on which this index last marked the vectors it
   holds as used in the vector cache, so that it does so once a day (§7);
 - per vector type: `vec.<type>.embedder`, `vec.<type>.full_dim`, `vec.<type>.dim_setting`,
-  `vec.<type>.epoch`.
+  `vec.<type>.epoch`, and `vec.<type>.save_id`: the random token of the last save of that type's
+  search index, which the saved copy's note holds too (§8).
 
 **An index that starts as a copy** of another checkout's (architecture.md §4.6) is that
 `index.db` as one SQLite backup, with every `files.mtime` set to 0 and without the `meta` rows
@@ -489,6 +491,12 @@ it doesn't own.
      CRC-32, which is compared before the backend is given the file. A file that differs (damaged,
      cut short, or another index's file under this note), or a note without a checksum, means a
      rebuild from the rows. A file that differs is also a warning in the log.
+  6. a saved copy is read only by the state of the database it was saved from, or a later one.
+     Each save writes a random `save_id` into the note and into `meta` (`vec.<type>.save_id`),
+     and commits it after the index was copied. A note whose `save_id` is not the one in `meta`,
+     or a note without one, means a rebuild from the rows. That is the case after `index.db` was
+     put back from a copy, or lost its last commits in a power cut: such a database hands out
+     again the vector ids of the rows it lost, and its epoch counts up again.
 - **Which search index** (`vector_backend`): the one a configuration names, or for `auto` the
   exact index while the exact indexes of every vector type fit the budget together
   (`vector_memory_mb`), and the compact one for every type when they do not (architecture.md §5).
@@ -498,7 +506,7 @@ it doesn't own.
   - where the installed FAISS cannot make the compact index, `auto` picks the exact one.
 - **Loading the search index:**
   - a vector type's index is read from its saved copy, or rebuilt from the rows when the copy
-    cannot be used (rules 3 to 5, or no copy);
+    cannot be used (rules 3 to 6, or no copy);
   - loading holds no lock. One thread loads a type; the others that need it wait for that thread.
     Rows written meanwhile are applied when the index is installed, by vector id;
   - a write to a type whose index is not in memory does not load it: the index is loaded at its
@@ -507,7 +515,10 @@ it doesn't own.
     comes before they are in memory waits within `catchup_budget_ms`, then answers from keywords
     alone with a note (§12.1); the CLI and the eval wait for the index.
 - **Saving the search index:**
-  - the data file is written first and its note second, each by atomic rename;
+  - the data is written under a temporary name. One short transaction then writes the save's
+    `save_id` into `meta`, renames the data file into place and writes the note, also by a
+    rename. A save that is stopped leaves the earlier copy, or one that fails rule 5 or 6. The
+    transaction waits its turn like any write to `index.db`, and keeps two processes' saves apart;
   - the MCP server saves lazily (after 30 s idle, on shutdown, on refresh), while the CLI and the
     blocking `update()` save at once;
   - an update that saves (`update()`, the CLI) first makes the saved copies what the next start
@@ -535,6 +546,8 @@ it doesn't own.
   - A crash before saving: the saved file is behind and catches up by id at the next load. A corrupt
     or missing file is rebuilt from the rows. No model call, no re-embedding, either way.
   - A process sees an epoch change made by another process: it catches up by id before searching.
+  - `index.db` goes back to an earlier state under a search index that was saved later: the two
+    `save_id`s differ, and the index is rebuilt from the rows.
   - Another process deletes vectors while a compact index is searching: the rows it can no longer
     read are left out of the result, and the search takes more candidates to fill it.
 - **Large deletions** give pages back to the OS (`auto_vacuum = INCREMENTAL`).

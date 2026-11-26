@@ -178,6 +178,32 @@ def test_a_copy_does_not_keep_its_source_databases_identity(main_index, tmp_path
         assert copy.execute("SELECT COUNT(*) FROM meta").fetchone()[0] > 0  # the rest of the meta rows came along
 
 
+def test_a_copy_does_not_read_its_source_s_saved_search_indexes(main_index, tmp_path, monkeypatch):
+    """A copy has its source's vector rows and ids, and the `save_id` its source last saved with.
+    It gets a database id of its own, and that keeps the source's saved files out of it wherever
+    they lie: from the copy on, the two databases hand out the same vector ids for other vectors."""
+    copy = tmp_path / "copy"
+    assert copy_index(main_index, copy)
+    saved = [shutil.copy(path, copy) for path in main_index.glob("vec_*")]
+    assert len(saved) == 4  # the code and the usage index, each with its note
+    rebuilt = []
+    rebuild = Store._rebuild
+    monkeypatch.setattr(Store, "_rebuild", lambda self, *a: rebuilt.append((self.index_dir, a[0])) or rebuild(self, *a))
+    config = Config()  # the search index the service saved the source's files with
+    source, store = (Store(path, vector_backend=config.vector_backend, vector_options=config.vector_options())
+                     for path in (main_index, copy))
+    try:
+        for vec_type in ("code", "usage"):
+            assert store.get_meta(f"vec.{vec_type}.save_id") == source.get_meta(f"vec.{vec_type}.save_id") is not None
+        assert store.database_id() != source.database_id()
+        source.load_vectors()
+        store.load_vectors()
+        assert sorted(rebuilt) == [(copy, "code"), (copy, "usage")]  # the source read its files, the copy did not
+    finally:
+        source.close()
+        store.close()
+
+
 def test_a_copy_never_replaces_an_index(main_index, tmp_path):
     existing = tmp_path / "existing"
     own = Store(existing)
