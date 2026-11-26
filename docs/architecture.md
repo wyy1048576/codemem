@@ -919,7 +919,9 @@ transaction. Vectors are stored in it as plain rows, so the search index is only
 which can always be rebuilt without the model (2 s on vLLM).
 
 **The times in this section** are from an M1 laptop (8 cores, 16 GB), with FAISS on one thread.
-On macOS codemem keeps FAISS to one thread, because it shares the process with PyTorch
+On macOS codemem gives OpenMP one thread, and so FAISS and PyTorch, whatever `OMP_NUM_THREADS` or
+`MKL_NUM_THREADS` say: the two each bring their own copy of OpenMP, and on more threads the copies
+crash the process. When this changes a value, codemem says so once on stderr
 (`codemem/__init__.py`). On Linux and Windows FAISS uses every core, and none of these times was
 taken that way.
 

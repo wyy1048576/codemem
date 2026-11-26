@@ -9,7 +9,8 @@ Everything else has a default:
   --sizes    how many vectors each index holds (default 100000,200000,500000,1000000)
   --threads  run with OMP_NUM_THREADS set to this (default: unset, so FAISS runs as codemem runs
              it on this machine: every core on Linux and Windows, one on macOS). `--threads 1`
-             gives the numbers of one core, to compare machines
+             gives the numbers of one core, to compare machines. On macOS codemem sets it to 1
+             whatever this says, and the run says so
   --keep-indexes  do not delete the indexes afterwards
 
 For each size it builds one index of synthetic vectors (clustered, so that a query has
@@ -262,6 +263,9 @@ def cmd_run(args: argparse.Namespace) -> None:
     rows = []
     print(f"codemem {codemem.__version__} | FAISS {faiss.__version__} | {platform.machine()} {platform.platform()} | "
           f"{os.cpu_count()} CPUs | OMP_NUM_THREADS {'=' + str(args.threads) if args.threads else 'unset'}", flush=True)
+    if sys.platform == "darwin" and args.threads > 1:
+        print(f"macOS: importing codemem sets OMP_NUM_THREADS to 1 (codemem/__init__.py), so every step runs FAISS on "
+              f"one thread, not {args.threads}", flush=True)
     head = (f"{'vectors':>9} {'index':<8} {'memory MB':>10} {'saved MB':>9} {'from file s':>11} {'from rows s':>11} "
             f"{'search ms':>10} {'filtered ms':>11} | in turns: {'exact':>7} {'compact':>8} {'FAISS own':>9} {'same top 10':>11} {'same candidates':>15}")
     print(head, flush=True)
