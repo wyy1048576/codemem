@@ -150,11 +150,13 @@ right half (the texts and their vectors). The rest of this section takes them in
 codemem indexes every file in a supported language: Python, JavaScript, TypeScript, TSX, Go,
 Java, Rust, C and C++ (with CUDA). It skips what `.gitignore` excludes, folders like
 `node_modules` and `.venv`, vendored or generated code (`vendor/`, `*.min.js`, `*_pb2.py`), binary
-files, and files over 10 MB.
+files, and files over 10 MB. It also skips a git worktree of the same repository that lies inside
+the checkout: that folder is another checkout, with an index of its own (§4.6).
 
 **Nothing is skipped silently.** Every skipped file is stored with its reason, and `index_status`
 lists them, together with counts of ignored folders and of files in no supported language
-(README, YAML, SQL…). A file whose size and modification date haven't changed is never re-read.
+(README, YAML, SQL…), and the worktrees it left out. A file whose size and modification date
+haven't changed is never re-read.
 
 ### 3.2 Chunks
 
@@ -633,7 +635,8 @@ The **watcher** turns file events into changed paths. It collects them until sav
 or for at most 2 s while saves keep coming, then hands them to the writer in one batch. A change to
 `.gitignore`, `.codemem.toml` or the git branch, or more than 2,000 paths at once, asks for a full
 check of the repo instead. While git is rewriting files (a checkout or a merge), updates wait for
-it, up to 10 s.
+it, up to 10 s. A save in a worktree that lies inside the checkout is ignored: it belongs to that
+worktree's index (§4.6).
 
 The **writer** is one thread, the only thing that writes the index while codemem runs, so updates
 never race. Besides running the two stages (§4.1), it:
@@ -766,6 +769,20 @@ the vectors stage B had not replaced yet are still in place.
 worktrees never share an index, and a codemem started inside a worktree (an MCP server, the CLI)
 serves that worktree, with its own watcher and writer. Each such process also holds the embedding
 model, unless they share one through `codemem serve-embeddings` (§3.5).
+
+**A worktree inside another checkout stays out of that checkout's index.** Agent hosts put
+worktrees inside the main checkout, in `.claude/worktrees/<name>/`. Read as plain folders, they
+would give the main index a second copy of every function, and a search would return each one
+twice. So:
+- the scan of a checkout skips every folder that is a linked worktree of the checkout's own
+  repository, and `index_status` lists the folders it left out;
+- the watcher ignores the saves in such a folder, and its `.gitignore` and `.codemem.toml`;
+- the worktree's own index is not affected: a codemem started inside it indexes it as it would
+  anywhere else.
+
+The rule is narrow. A folder counts only if its `.git` file leads to a git folder that shares this
+repository's own (git writes that link for every `git worktree add`). A submodule, a repository of
+another project and a worktree of another repository are read as part of the checkout.
 
 **A new worktree's index starts from a copy.** Without one, codemem would chunk every file again
 just to find that almost all of them equal the main checkout's.

@@ -419,7 +419,9 @@ costs time, never results. `codemem status` shows the cache's size.
 
 Each git worktree is a checkout with an index of its own: run codemem inside it. The index starts
 as a copy of another checkout's index, so it is ready in seconds, and it is deleted after the
-worktree is removed ([architecture.md §4.6](docs/architecture.md)).
+worktree is removed. A worktree that lies inside another checkout (agent hosts put them in
+`.claude/worktrees/`) is left out of that checkout's index
+([architecture.md §4.6](docs/architecture.md)).
 
 ## Evaluating
 

@@ -130,13 +130,18 @@ class IndexStats:
 
 
 class IgnoreRules:
-    """.gitignore files (root and nested) + always-skip dirs + config extras."""
+    """.gitignore files (root and nested) + always-skip dirs + config extras, and the other
+    checkouts of the same repository that lie inside this one."""
 
     def __init__(self, root: Path, extra: list[str], skip_dirs: set[Path]):
+        from .worktrees import git_common_dir, is_worktree_of  # here, not at the top: worktrees.py imports this module
+
         self.root = root
         self.specs: dict[str, pathspec.PathSpec] = {}
         self.skip_dirs = {os.path.normcase(str(p)) for p in skip_dirs}
         self.loaded: set[str] = set()
+        self._common = git_common_dir(root)  # the git folder every checkout of the repository shares; None without git
+        self._is_worktree_of = is_worktree_of
         if extra:
             self.specs[""] = pathspec.GitIgnoreSpec.from_lines(extra)
 
@@ -169,14 +174,23 @@ class IgnoreRules:
     def skip_dir(self, name: str, abs_dir: Path) -> bool:
         return name in ALWAYS_SKIP_DIRS or os.path.normcase(str(abs_dir)) in self.skip_dirs
 
+    def other_checkout(self, abs_dir: Path) -> bool:
+        """`abs_dir` is a linked worktree of this checkout's own repository (worktrees.py): another
+        checkout, whose files belong to its own index. Agent hosts put worktrees inside the main
+        checkout (`.claude/worktrees/<name>/`), and reading them would give this index a second
+        copy of every function. A submodule and a repository of another project are not skipped."""
+        return self._common is not None and self._is_worktree_of(abs_dir, self._common)
+
     def allows(self, rel: str) -> bool:
-        """Whether the walk would reach the file `rel`: no ancestor folder skipped or ignored, and
-        the file itself not ignored. The single rule for the walk, the watcher and path updates."""
+        """Whether the walk would reach the file `rel`: no ancestor folder skipped, ignored or
+        another checkout, and the file itself not ignored. The single rule for the walk, the
+        watcher and path updates."""
         parts = rel.split("/")
         for i in range(len(parts) - 1):
             parent, d = "/".join(parts[:i]), "/".join(parts[: i + 1])
             self.ensure_dir(parent)
-            if self.skip_dir(parts[i], self.root / d) or self.ignored(d, is_dir=True):
+            folder = self.root / d
+            if self.skip_dir(parts[i], folder) or self.ignored(d, is_dir=True) or self.other_checkout(folder):
                 return False
         self.ensure_dir("/".join(parts[:-1]))
         return not self.ignored(rel, is_dir=False)
@@ -204,6 +218,7 @@ def walk_repo(root: Path, config: Config, skip_dirs: Iterable[Path] = ()) -> tup
     exts = indexed_extensions(config)
     out: dict[str, Path] = {}
     skipped_dirs: Counter[str] = Counter()
+    worktrees: list[str] = []  # other checkouts of this repository inside this one
     ignored_files = 0
     not_code: Counter[str] = Counter()
     for dirpath, dirnames, filenames in os.walk(root):
@@ -218,6 +233,8 @@ def walk_repo(root: Path, config: Config, skip_dirs: Iterable[Path] = ()) -> tup
                 skipped_dirs[d] += 1
             elif rules.ignored(rel, is_dir=True):
                 skipped_dirs["(ignored)"] += 1
+            elif rules.other_checkout(abs_dir / d):
+                worktrees.append(rel)
             else:
                 keep.append(d)
         dirnames[:] = keep
@@ -235,6 +252,7 @@ def walk_repo(root: Path, config: Config, skip_dirs: Iterable[Path] = ()) -> tup
         "ignored_files": ignored_files,
         "not_code_files": sum(not_code.values()),
         "not_code_by_extension": dict(not_code.most_common(10)),
+        "worktrees": {"count": len(worktrees), "examples": worktrees[:10]},
     }
     return out, coverage
 
@@ -556,6 +574,7 @@ class Indexer:
             dirnames[:] = sorted(
                 d for d in dirnames
                 if not rules.skip_dir(d, Path(dirpath) / d) and not rules.ignored(f"{d_rel}/{d}", is_dir=True)
+                and not rules.other_checkout(Path(dirpath) / d)
             )
             for f in sorted(filenames):
                 rel = f"{d_rel}/{f}"

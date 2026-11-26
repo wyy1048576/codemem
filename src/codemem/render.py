@@ -240,4 +240,11 @@ def format_coverage(info: dict[str, Any]) -> list[str]:
     if cov.get("ignored_files") or dirs:
         folders = ", ".join(f"{n} by ignore rules" if d == "(ignored)" else f"{d} {n}" for d, n in dirs.items())
         out.append(f"ignored: {_files(cov.get('ignored_files', 0))}; skipped folders: {folders or 'none'}")
+    trees = cov.get("worktrees") or {}
+    if n := trees.get("count"):
+        shown = trees.get("examples", [])[:3]
+        names = f" ({', '.join(shown)}{', ...' if n > len(shown) else ''})" if shown else ""
+        out.append(
+            f"not indexed here (git worktrees, each a checkout with its own index): {n} folder{'' if n == 1 else 's'}{names}"
+        )
     return out

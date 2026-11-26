@@ -16,12 +16,14 @@ from gitrepo import ONLY_ON_A, ONLY_ON_B, TO_B, UNCHANGED, add_worktree, commit,
 
 from codemem.cli import main
 from codemem.config import Config, default_index_dir, load_config
-from codemem.indexer import Indexer
+from codemem.indexer import IgnoreRules, Indexer, walk_source_files
+from codemem.render import format_status
 from codemem.search import search
 from codemem.service import CodememService
 from codemem.store import IndexLock, Store, diff_snapshots
 from codemem.worktrees import (
-    DB, RECORD, _is_gone, checkouts, copy_index, copy_source, git_common_dir, is_linked_worktree, removable_indexes,
+    DB, RECORD, _is_gone, checkouts, copy_index, copy_source, git_common_dir, is_linked_worktree, is_worktree_of,
+    removable_indexes,
 )
 
 pytestmark = needs_git
@@ -427,6 +429,164 @@ def test_an_index_that_was_never_checked_is_not_copied(repo, main_index, tmp_pat
     shutil.rmtree(main_index)
     second = add_worktree(repo, tmp_path / "trees" / "second", "--detach", "feature")
     assert copy_source(second, _settings(second)) is None
+
+
+# --------------------------------------------------------------------------- a worktree inside another checkout
+
+INSIDE = ".claude/worktrees/agent-1"  # where agent hosts put a worktree: inside the main checkout
+
+
+def _files_and_chunks(checkout):
+    store = Store(default_index_dir(checkout))
+    try:
+        counts = store.counts()
+        return counts["files"], counts["chunks"]
+    finally:
+        store.close()
+
+
+def test_a_worktree_inside_a_checkout_is_left_out_of_that_checkouts_index(repo, main_index):
+    """Fixed bug: the main checkout's scan read a worktree placed inside it, so its index held
+    every function twice. The worktree is another checkout: the scan counts it and leaves it out."""
+    before = _files_and_chunks(repo)
+    inner = add_worktree(repo, repo / INSIDE, "feature")
+    service = CodememService(repo)
+    try:
+        stats = service.update()
+        assert (stats.files_changed, stats.files_deleted) == (0, 0) and _files_and_chunks(repo) == before
+        assert not any(path.startswith(".claude/") for path in service.store.get_files())
+        found = [r.key for r in service.search("revoke session", k=10).results]
+        assert found.count("auth/sessions.py::revoke_session") == 1 and not any(".claude/" in key for key in found)
+        info = service.status()
+        assert info["coverage"]["worktrees"] == {"count": 1, "examples": [INSIDE]}
+        assert f"not indexed here (git worktrees, each a checkout with its own index): 1 folder ({INSIDE})" in format_status(info)
+        assert service.indexer.verify() == []
+    finally:
+        service.close()
+
+    # The worktree's own index is the one that holds its files, as for a worktree anywhere else.
+    service = CodememService(inner)
+    try:
+        assert service.copied_from == main_index and service.index_dir == default_index_dir(inner) != main_index
+        stats = service.update()
+        assert {"files_changed": stats.files_changed, "files_deleted": stats.files_deleted} == TO_B
+        assert all(service.store.get_chunk_by_key(key) is not None for key in ONLY_ON_B)
+        assert service.status()["coverage"]["worktrees"] == {"count": 0, "examples": []}
+        assert service.indexer.verify() == []
+    finally:
+        service.close()
+
+
+def test_an_index_that_read_a_worktree_inside_its_checkout_drops_those_files(repo, monkeypatch):
+    """An index built before the scan knew the rule holds the worktree's files. The next full
+    check drops them."""
+    add_worktree(repo, repo / INSIDE, "--detach", "main")
+    with monkeypatch.context() as as_before:
+        as_before.setattr(IgnoreRules, "other_checkout", lambda self, folder: False)
+        assert _indexed(repo).files_changed == 12  # every file twice
+    service = CodememService(repo)
+    try:
+        stats = service.update()
+        assert (stats.files_changed, stats.files_deleted) == (0, 6) and service.store.counts()["files"] == 6
+        assert service.indexer.verify() == []
+    finally:
+        service.close()
+
+
+def test_a_worktree_inside_a_worktree_is_left_out_too(repo, tmp_path, fake_config):
+    """The rule asks for the repository's shared git folder, which a linked worktree names in its
+    own git folder: it holds for a checkout that is itself a linked worktree."""
+    outer = add_worktree(repo, tmp_path / "trees" / "outer", "feature")
+    add_worktree(repo, outer / INSIDE, "--detach", "main")
+    files = walk_source_files(outer, fake_config)
+    assert "auth/audit.py" in files and not any(path.startswith(".claude/") for path in files)
+    # A folder that is no checkout of the repository reads what is in it, as before.
+    assert f"outer/{INSIDE}/auth/sessions.py" in walk_source_files(tmp_path / "trees", fake_config)
+
+
+def test_a_submodule_and_other_repositories_inside_a_checkout_are_read_as_before(repo, tmp_path, fake_config):
+    """Only another checkout of the same repository is left out. A submodule has a `.git` file
+    too; a nested repository has a `.git` folder; a worktree of another repository has a `.git`
+    file that names that repository. All three stay in the index."""
+    code = "def helper():\n    return 1\n"
+    (repo / ".git" / "modules" / "lib").mkdir(parents=True)  # a submodule, as `git submodule add` lays it out
+    (repo / "lib").mkdir()
+    (repo / "lib" / ".git").write_text("gitdir: ../.git/modules/lib\n")
+    (repo / "lib" / "lib.py").write_text(code)
+    nested = repo / "tools" / "nested"  # a repository of its own
+    nested.mkdir(parents=True)
+    (nested / "nested.py").write_text(code)
+    git(nested, "init", "-q", "-b", "main")
+    commit(nested, "nested")
+    other = tmp_path / "other"  # another repository, with a worktree placed inside this checkout
+    other.mkdir()
+    (other / "other.py").write_text(code)
+    git(other, "init", "-q", "-b", "main")
+    commit(other, "other")
+    foreign = add_worktree(other, repo / "third_party" / "other", "--detach", "main")
+    common = repo / ".git"
+    assert not any(is_worktree_of(folder, common) for folder in (repo / "lib", nested, foreign, repo, repo / "auth"))
+    assert is_worktree_of(foreign, other / ".git")
+
+    inner = add_worktree(repo, repo / INSIDE, "--detach", "main")
+    assert is_worktree_of(inner, common) and not is_worktree_of(inner, other / ".git")
+    files = walk_source_files(repo, fake_config)
+    assert {"lib/lib.py", "tools/nested/nested.py", "third_party/other/other.py"} <= set(files)
+    assert not any(path.startswith(".claude/") for path in files)
+
+
+def test_another_spelling_of_the_checkouts_folder_finds_the_worktree_inside_it(repo, fake_config):
+    """On a disk that ignores case, codemem can be started in `SAMPLE_REPO` while git wrote
+    `sample_repo` into the worktree's `.git` file. It is the same repository all the same."""
+    add_worktree(repo, repo / INSIDE, "--detach", "main")
+    spelled = repo.with_name(repo.name.upper())
+    if not spelled.exists():
+        pytest.skip("this disk tells upper case from lower case")
+    files = walk_source_files(spelled, fake_config)
+    assert "auth/sessions.py" in files and not any(path.startswith(".claude/") for path in files)
+
+
+def test_changed_paths_inside_a_worktree_are_not_this_checkouts(repo, main_index):
+    """What the watcher reports is checked by the same rule as the scan: a path in a worktree
+    inside the checkout changes nothing, whether it comes as a file or as a folder."""
+    inner = add_worktree(repo, repo / INSIDE, "feature")
+    (inner / "auth" / "extra.py").write_text("def extra():\n    return 1\n")
+    store = Store(main_index)
+    try:
+        indexer = Indexer(repo, store, load_config(repo))
+        stats = indexer.update(paths=[INSIDE, f"{INSIDE}/auth/extra.py", f"{INSIDE}/auth", ".claude"])
+        assert (stats.files_changed, stats.files_deleted, stats.queued) == (0, 0, 0) and store.counts()["files"] == 6
+        assert not indexer.allows(f"{INSIDE}/auth/extra.py") and indexer.allows("auth/sessions.py")
+        assert indexer.verify() == []
+    finally:
+        store.close()
+
+
+def test_the_watcher_ignores_saves_in_a_worktree_inside_the_checkout(repo, main_index):
+    """Saves in the inner worktree are its own index's. For the outer checkout they would be a
+    wake-up of its writer at every save, and a full check at every change of the inner
+    `.gitignore` or `.codemem.toml`."""
+    inner = add_worktree(repo, repo / INSIDE, "feature")
+    service = CodememService(repo)
+    calls = []
+    try:
+        service.update()
+        service.notify = lambda paths, reconcile=False: calls.append((paths, reconcile))
+        service.start_watcher()
+        time.sleep(0.3)
+        (inner / "auth" / "extra.py").write_text("def extra():\n    return 1\n")
+        (inner / "auth" / "sessions.py").unlink()
+        (inner / "pkg").mkdir()
+        (inner / "pkg" / "new.py").write_text("def new():\n    return 2\n")
+        (inner / ".gitignore").write_text("scratch/\n")
+        (inner / ".codemem.toml").write_text("debounce_ms = 300\n")
+        time.sleep(1.5)
+        assert calls == []
+        (repo / "auth" / "extra.py").write_text("def extra():\n    return 1\n")
+        assert _wait_for(lambda: calls)
+        assert calls[0] == ({"auth/extra.py"}, False)
+    finally:
+        service.close()
 
 
 # --------------------------------------------------------------------------- clean-up

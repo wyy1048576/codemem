@@ -84,14 +84,17 @@ repo file ──► File row (status + reason)
 - Never read:
   - paths in `.gitignore`;
   - `ALWAYS_SKIP_DIRS` (`.git`, `node_modules`, `.venv`, `build`, `dist`, …);
-  - `DEFAULT_IGNORE` (`vendor/`, `*.min.js`, `*_pb2.py`, `*.pb.go`, …).
+  - `DEFAULT_IGNORE` (`vendor/`, `*.min.js`, `*_pb2.py`, `*.pb.go`, …);
+  - a folder that is a git worktree of the checkout's own repository (architecture.md §4.6). A
+    submodule and a repository of another project are read.
 - **Stored as skipped with a reason**, so the next scan doesn't read them again:
   - files over `max_file_size` (10 MB);
   - binary files (a NUL byte in the first 8 KB);
   - files marked `Code generated … DO NOT EDIT` or `@generated` (in the first 2 KB);
   - JS/TS files with a line over 5,000 characters.
 - **Coverage:** ignored files and files in unsupported languages have no row. They are counted in
-  `meta.coverage` (by folder and by extension) at each full check.
+  `meta.coverage` (by folder and by extension) at each full check. The worktrees left out are
+  counted there too, with up to 10 of their folders.
 
 ---
 
@@ -444,7 +447,8 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
   database that has none; a copy made to start another index drops the row and so gets its own;
 - `repo_path`, `indexed_commit`, `indexed_at`;
 - `codemem_version`, `index_settings`, `last_update` (the last `IndexStats`);
-- `coverage`: ignored and non-code counts;
+- `coverage`: ignored and non-code counts, and `worktrees`: how many git worktrees inside the
+  checkout the scan left out (`count`), and up to 10 of their folders (`examples`);
 - `last_scan_at`: when the last full check started (files saved within 2 s of it are re-hashed next
   time);
 - `dirty_seq`: the queue's sequence number, one per stage-A commit;
