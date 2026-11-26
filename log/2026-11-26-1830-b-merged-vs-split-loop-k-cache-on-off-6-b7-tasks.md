@@ -30,7 +30,8 @@ searches) or split (a judge call, then a fix call), each with the prompt cache o
 | L2 | loop-k split | 0.99 | 0.65 | 54 | 6 | 4 | 1 |
 | L2 | loop-k split, no cache | 1.05 | 0.76 | 70 | 4 | 3 | 3 |
 
-- Merged beats split in cost and edits at both levels, and stops at the cap less often (2 of 12 runs, against 7 of 12).
+- Merged beats split in cost and edits at both levels, and stops at the cap less often (3 of its 24 runs, against 7 of
+  24; corrected at 19:10, first written as 2 of 12 and 7 of 12).
 - Merged without prompt cache is the best loop: within $0.05 of grep at L1 and $0.02 at L2, with the same edits at L1
   and one fewer at L2 (7 against 8).
 - Playwright 41988 (an accessibility snapshot drops a button's name; gold: a plugin's `exit` in
