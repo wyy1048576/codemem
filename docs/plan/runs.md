@@ -20,7 +20,7 @@ In task 68195 the real fix changes one file, `pandas/core/reshape/merge.py`.
 |---|---|---|
 | **easy** | at most two files and 100 lines | `easy` and `medium` |
 | **medium** | three to five files, or 101 to 200 lines | `hard` |
-| **hard** | 6 to 15 files, or 201 to 600 lines | none: these are collected now, for every repo (§10) |
+| **hard** | 6 to 15 files, or 201 to 600 lines | none: these are collected now, for every repo that is run (§10) |
 
 Task 68195 is easy. **The tiers are not the labels of the task files:** today's `easy` and
 `medium` are one tier, today's `hard` is the medium tier, and the hard tier is new. Every count
@@ -79,7 +79,8 @@ nothing tells in advance which candidates are valid and fair.
 
 **The rule that saves time:** check a tier only until it has what the sample needs and 2 spare
 tasks, then stop that tier: 8 fair tasks for easy (5 with the label `medium`, 3 with the label
-`easy`), 6 for medium, and 4 for hard, where each one is costly. A repo whose hard tier falls short needs that many more in medium (§3).
+`easy`), 6 for medium, and 4 for hard, where each one is costly. A repo whose hard tier falls
+short needs that many more in medium (§3).
 
 ---
 
