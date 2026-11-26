@@ -1,6 +1,7 @@
 """Build and validate: the parts that need no Docker."""
 
 import json
+import shlex
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -74,6 +75,12 @@ def test_recipe_with_suites_and_env(tmp_path):
     assert """bash -c 'one '"'"'t/one/a.ts'"'"' /work/before-1.0.xml'""" in script
     assert """bash -c 'two '"'"'t/two/b.ts'"'"' /work/after-1.1.xml'""" in script
     assert 'echo "before-1 0 $r ' in script and 'echo "after-1 1 $r ' in script
+
+
+def test_quote_files_keeps_quotes_in_paths():
+    files = ["a/b.md", "s/x_-_Tests_for_ty's_`inst…_(98b5).snap", "c d.py"]
+    assert gen.quote_files(files[:1]) == "'a/b.md'"
+    assert shlex.split(gen.quote_files(files)) == files
 
 
 def test_recipe_needs_test_or_suites(tmp_path):

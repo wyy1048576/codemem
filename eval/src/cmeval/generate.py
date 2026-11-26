@@ -472,6 +472,12 @@ def judge(before: list[dict[str, str]], after: list[dict[str, str]]) -> Verdict:
     return verdict
 
 
+def quote_files(files: list[str]) -> str:
+    """The files as shell words, each in single quotes. A single quote in a path (ruff has snapshot
+    files such as "Tests_for_ty's_...snap") closes the quotes, adds an escaped quote, and opens them again."""
+    return " ".join("'" + f.replace("'", "'\\''") + "'" for f in files)
+
+
 def test_run_line(recipe: Recipe, task: Task, name: str) -> str:
     """One shell line that runs every suite that has files of the task, one after the other.
     Suite k writes /work/<name>.<k>.xml and /work/<name>.<k>.log, and one line to /work/times.txt:
@@ -482,7 +488,7 @@ def test_run_line(recipe: Recipe, task: Task, name: str) -> str:
         files = suite_files(suite, task)
         if not files:
             continue
-        test = suite.test.replace("{files}", " ".join(f"'{f}'" for f in files))
+        test = suite.test.replace("{files}", quote_files(files))
         test = test.replace("{junit}", f"/work/{name}.{k}.xml")
         # The command goes through a shell, so it can start with variables and use pipes.
         parts.append(f"s=$(date +%s%N); timeout -k 30 {limit} bash -c {shlex.quote(test)} > /work/{name}.{k}.log 2>&1; "
