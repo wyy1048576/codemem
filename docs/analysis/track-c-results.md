@@ -109,10 +109,10 @@ would be 11.6 times less. §3.2 shows its price: it has to read 1,000 full vecto
 return what the default returns with 200.
 
 **Why a separate 1-bit code, when the 4-bit code holds it.** For speed. Step 1 compares the query
-with every code: 109,562 on vLLM. A 1-bit comparison takes about 0.04 microseconds and a 4-bit
-one about 3.4, so all of them take about 4.5 ms at 1 bit and would take about 370 ms at 4 bits.
-FAISS's own search over 4-bit codes skips most of them by their first bit, and still measured 3
-to 4 times slower than the exact index. FAISS scans at 1-bit speed only over an index of 1-bit
+with every code: 109,562 on vLLM. With FAISS 1.15.1 on this Mac a 1-bit comparison takes about
+0.04 microseconds and a 4-bit one about 3.4, so all of them take about 4.5 ms at 1 bit and would
+take about 370 ms at 4 bits. FAISS's own search over 4-bit codes skips most of them by their
+first bit, and still measured 3 to 4 times slower than the exact index. FAISS scans at 1-bit speed only over an index of 1-bit
 codes, so the compact index keeps one: 120 of its 628 bytes per vector. One code for both steps
 would need a scan of our own over the bits inside the 4-bit codes. It is not built.
 
@@ -139,8 +139,9 @@ Every score returned was the real one: the largest difference from the oracle's 
 
 The whole search (keywords and vectors merged) takes its vector results from exactly these
 searches: 50 per vector type, with no filter. So equal vector results give equal merged results.
-The repo's check script compares the merged results directly: on pandas they were the same 10
-results in the same order for all 352 questions. Its run on vLLM is not finished yet.
+The repo's check script compares the merged results directly. On pandas they were the same 10
+results in the same order for all 352 questions, and on vLLM for all 381, with the default rule
+and with the compact index.
 
 **How much room the default leaves.** For every question: how deep in each step's order did the
 chunks of its true top 50 lie?
@@ -263,6 +264,27 @@ ratios hold, and the milliseconds are to be taken again on a quiet machine.
 - What the other knobs cost on vLLM's code vectors, against the default's 15.5 ms: step 1 keeping
   4,000 codes 19.0 ms, 8,000 codes 28.2 ms; 500 candidates 18.1 ms; 8 bits 15.3 ms; 1 bit with
   1,000 candidates 18.3 ms.
+
+**A newer FAISS is faster on Apple processors.** FAISS 1.15.1, the version codemem pins, has no
+vectorized code for Apple's ARM processors in its RaBitQ parts: its ARM file calls the plain
+loops. Intel and AMD processors have vectorized ones. FAISS 1.16.0 (November 9, 2026) adds the
+ARM ones. Both versions on the vLLM index, one after the other under the same load:
+
+| One search, median | FAISS 1.15.1 | FAISS 1.16.0 |
+|---|---|---|
+| exact index, code vectors | 12.2 ms | 8.4 ms |
+| compact, the default, code vectors | 11.7 ms | 7.5 ms |
+| compact, step 1 keeping 4,000 codes, code vectors | 14.5 ms | 8.2 ms |
+| exact index, usage vectors | 3.8 ms | 2.6 ms |
+| compact, the default, usage vectors | 6.4 ms | 3.7 ms |
+
+- Both indexes are about 1.5 times faster, and one 4-bit estimate about 4 times.
+- The results are the same: the default against the oracle on vLLM gives 762 of 762 again, every
+  FAISS call the store makes ran for all 2,608 combinations, and the test suite passes (622 with
+  the default index; 619 and 3 skipped on the compact one).
+- A wider first scan then costs 0.7 ms and not 2.7 ms, which makes 4,000 codes an easy choice
+  (§3.2, the weak point).
+- Not done under 1.16.0: the run under the memory checker, and Linux. codemem still pins 1.15.1.
 
 **Vector search beside the rest of a search.** On vLLM, with the model's part left out: three
 short questions (4 to 9 words) took 38 to 57 ms each, of which 10 to 27 ms were keywords, about
@@ -477,6 +499,8 @@ Each audit was done by a separate agent that was told to break the code, with it
 - **A real index above 145,000 vectors.** vLLM is the largest real index checked. Beyond it there
   are only synthetic vectors (200,000).
 - **Linux and x86**, CUDA, and FAISS on more than one thread.
+- **FAISS 1.16.0 as the pinned version.** It passes everything run here (§3.3) and is faster on
+  Apple processors. The lock file still pins 1.15.1.
 - **The eval's end-to-end runs** (track A): whether an agent's results change at all.
 - **The embedding assist with a real model or a hosted provider.**
 - **Whether a vector that is embedded a second time is bit-identical** to the first, with the real model.
