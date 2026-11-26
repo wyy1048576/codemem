@@ -8,8 +8,7 @@ one thread, unless a line says otherwise. "Real" means vectors made by the real 
 (`jina-code-embeddings-0.5b`, 896 numbers per vector). "Stand-in model" means a fake model that
 gives the same vector for the same text: it measures codemem's own work, not the model's.
 
-**Still to come.** Nothing here has run on Linux or x86 yet. The search times of §3.3 are to be
-taken again on a quiet machine.
+**Still to come.** Nothing here has run on Linux or x86 yet.
 
 ---
 
@@ -141,7 +140,10 @@ The whole search (keywords and vectors merged) takes its vector results from exa
 searches: 50 per vector type, with no filter. So equal vector results give equal merged results.
 The repo's check script compares the merged results directly. On pandas they were the same 10
 results in the same order for all 352 questions, and on vLLM for all 381, with the default rule
-and with the compact index.
+and with the compact index. Counted on the tasks' gold labels the indexes are then equal too: on
+vLLM a gold file is among the 10 results for 277 of the 375 questions that have one in this
+index, with every setting of that run (with 1 bit and 500 candidates the 10 results differed for
+4 questions, and none of the 4 gained or lost a gold file).
 
 **How much room the default leaves.** For every question: how deep in each step's order did the
 chunks of its true top 50 lie?
@@ -206,7 +208,8 @@ and the 1-bit code cannot order them well.
   same 10 results, and the same 50, in the same order as with the exact index.
 - The result that took the lost one's place scored 0.0006 less on pandas and 0.0016 less on vLLM.
 - More bits would not have caught either. A wider scan does: with step 1 keeping 4,000 codes, all
-  704 searches on vLLM were right. It costs about 3 ms more per vector type and search (§3.3).
+  704 searches on vLLM were right. It costs about 2.5 ms more per vector type and search, and
+  0.5 ms with a newer FAISS (§3.3).
 - The scan's depth is a constant in the code (2,000, or one in 50 of the vectors), not a setting.
 
 For comparison, questions about the repo itself needed at most place 661 of 2,000 on pandas and
@@ -226,8 +229,8 @@ the exact top 10 in 78% of searches.
 | saved search index on disk | 261 MB | 86 MB |
 | loading at a start, from the saved file | 0.3 s | 0.3 s |
 | building it from the database's rows (a first start, or a saved file that is refused) | 1.8 s | 18.6 s |
-| one search over the 109,562 code vectors, median | 16.3 ms | 15.5 ms |
-| one search over the 35,167 usage vectors, median | 4.4 ms | 7.3 ms |
+| one search over the 109,562 code vectors, median | 11.4 ms | 10.9 ms |
+| one search over the 35,167 usage vectors, median | 3.4 ms | 5.7 ms |
 
 **On the real pandas index** (49,770 vectors). Memory, file sizes and the compact index's loading
 times are the audit's:
@@ -237,8 +240,8 @@ times are the audit's:
 | memory the process holds for the search index | 110 MB | 46.5 MB |
 | saved search index on disk | 89.6 MB | 29.7 MB |
 | loading at a start: from the saved file / built from the rows | 0.17 s / 0.66 s | 0.19 s / 6.15 s |
-| one search over the 43,187 code vectors, median | 4.6 ms | 6.9 ms |
-| one search over the 6,583 usage vectors, median | 0.8 ms | 4.2 ms |
+| one search over the 43,187 code vectors, median | 4.1 ms | 6.2 ms |
+| one search over the 6,583 usage vectors, median | 0.8 ms | 4.0 ms |
 
 **At 200,000 vectors** (synthetic vectors of 896 numbers):
 
@@ -252,8 +255,8 @@ The exact index also shrank, from 441 to 371 MB: the bookkeeping that says which
 belongs to went from Python dictionaries (337 bytes a vector) to arrays (32 bytes).
 
 **Reading the search times.** In the vLLM and pandas tables the two indexes took turns, question
-by question, in one process, so both saw the same machine. Another job ran beside them: the
-ratios hold, and the milliseconds are to be taken again on a quiet machine.
+by question, in one process, so both saw the same machine, and no other job of ours ran. Each
+number is the median over every question of the repo, three times.
 
 - The compact index pays a fixed 4 to 7 ms per search (the 4-bit ranking of 2,000 codes and the
   read of 200 vectors), and its scan grows far more slowly than the exact one's.
@@ -261,28 +264,31 @@ ratios hold, and the milliseconds are to be taken again on a quiet machine.
   vectors, and faster beyond (0.92 times at 200,000).
 - That fits the default rule of §3.4: the compact index is used only for an index too large for
   the memory budget, which is where it is also no slower.
-- What the other knobs cost on vLLM's code vectors, against the default's 15.5 ms: step 1 keeping
-  4,000 codes 19.0 ms, 8,000 codes 28.2 ms; 500 candidates 18.1 ms; 8 bits 15.3 ms; 1 bit with
-  1,000 candidates 18.3 ms.
+- What the other knobs cost on vLLM's code vectors, against the default's 10.9 ms: step 1 keeping
+  4,000 codes 13.5 ms, 8,000 codes 19.8 ms; 500 candidates 12.7 ms; 8 bits 11.0 ms; 1 bit with
+  1,000 candidates 14.1 ms.
 
 **A newer FAISS is faster on Apple processors.** FAISS 1.15.1, the version codemem pins, has no
 vectorized code for Apple's ARM processors in its RaBitQ parts: its ARM file calls the plain
 loops. Intel and AMD processors have vectorized ones. FAISS 1.16.0 (November 9, 2026) adds the
-ARM ones. Both versions on the vLLM index, one after the other under the same load:
+ARM ones. Both versions, one after the other, measured as above:
 
 | One search, median | FAISS 1.15.1 | FAISS 1.16.0 |
 |---|---|---|
-| exact index, code vectors | 12.2 ms | 8.4 ms |
-| compact, the default, code vectors | 11.7 ms | 7.5 ms |
-| compact, step 1 keeping 4,000 codes, code vectors | 14.5 ms | 8.2 ms |
-| exact index, usage vectors | 3.8 ms | 2.6 ms |
-| compact, the default, usage vectors | 6.4 ms | 3.7 ms |
+| vLLM, exact index, 109,562 code vectors | 11.4 ms | 8.1 ms |
+| vLLM, compact, the default, code vectors | 10.9 ms | 7.0 ms |
+| vLLM, compact, step 1 keeping 4,000 codes, code vectors | 13.5 ms | 7.5 ms |
+| vLLM, exact index, 35,167 usage vectors | 3.4 ms | 2.4 ms |
+| vLLM, compact, the default, usage vectors | 5.7 ms | 3.3 ms |
+| pandas, exact index, 43,187 code vectors | 4.1 ms | 3.0 ms |
+| pandas, compact, the default, code vectors | 6.2 ms | 3.8 ms |
 
-- Both indexes are about 1.5 times faster, and one 4-bit estimate about 4 times.
+- The exact index is 1.4 times faster, the compact one 1.6 to 1.7 times, and one 4-bit estimate
+  about 5 times.
 - The results are the same: the default against the oracle on vLLM gives 762 of 762 again, every
   FAISS call the store makes ran for all 2,608 combinations, and the test suite passes (622 with
   the default index; 619 and 3 skipped on the compact one).
-- A wider first scan then costs 0.7 ms and not 2.7 ms, which makes 4,000 codes an easy choice
+- A wider first scan then costs 0.5 ms and not 2.6 ms, which makes 4,000 codes an easy choice
   (§3.2, the weak point).
 - Not done under 1.16.0: the run under the memory checker, and Linux. codemem still pins 1.15.1.
 
@@ -504,7 +510,8 @@ Each audit was done by a separate agent that was told to break the code, with it
 - **The eval's end-to-end runs** (track A): whether an agent's results change at all.
 - **The embedding assist with a real model or a hosted provider.**
 - **Whether a vector that is embedded a second time is bit-identical** to the first, with the real model.
-- **Times on a quiet machine.** Most times here were taken while other jobs ran.
+- **Times on a quiet machine.** The search times of §3.3 were taken with no other job of ours
+  running. Most other times here were taken while other jobs ran.
 
 ---
 
