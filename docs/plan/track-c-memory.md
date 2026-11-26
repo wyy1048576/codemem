@@ -296,6 +296,23 @@ embedding options the user picks.
 | the light local model | 2.2 GB for today's model in PyTorch. For EmbeddingGemma 2 on a 16 GB M4: 0.8 to 1.2 GB under llama.cpp, 5 to 7 GB under MLX or PyTorch *(reported)* | the runtime matters more than the model here: measure each. Unload after some idle minutes; a reload takes 7 to 13 s today, during which searches answer from keywords with a note |
 | Qwen 8B, run locally | 8 GB at 8 bits. A 4-bit file is 4.7 GB, but its vectors differ too much from the full model's to share an index (§6.3) | the same idle unload. On 16 GB it leaves too little for an IDE and an agent; the option is documented for 24 GB and up |
 
+**Planned after this phase: one model per machine** (Andre, Nov 26; for a production release,
+not for the freeze). Every codemem process that runs the local model holds a copy of its own:
+three agent sessions in three git worktrees hold three, 1.3 GB each on an M1. The pieces for one
+shared copy exist: `codemem serve-embeddings` serves a model to other processes, and a model
+that nobody uses is freed after an hour. What is missing is that it happens by itself:
+
+- the first codemem process that needs the model starts the one server of the machine, and every
+  later process finds it and embeds through it;
+- a second copy is started only where the first cannot keep up and the machine has the memory
+  for it;
+- under memory pressure, and when nothing has used it for a while, the server frees its model
+  and loads it again at the next request;
+- a process that cannot reach the server loads its own model, as today.
+
+It sits in the path of every search, so it needs its own tests of what happens when the server
+dies, is replaced by a newer codemem, or is asked by many processes at once.
+
 ### 4.7 The cache cap
 
 The vector cache makes branch switches and rebuilds free, and it only grows. How branches use it
