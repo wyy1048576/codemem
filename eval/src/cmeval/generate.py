@@ -27,8 +27,10 @@ A recipe is one TOML file for each repo, in eval/envs/. Its fields:
   test_paths    globs: files that are tests in this repo (test code, test data, snapshots), in
                 addition to the collector's rule. Default: made from the folders of test_files
   leave_out     globs: files of a fix that go to neither patch (CI files, change logs)
-  dependency_paths  globs: files that name the repo's dependencies. A fix that changes one is
-                tagged, because the image has the dependencies of the base commit
+  dependency_paths  globs: files that the image installs from (deps_files, lock files, vendored
+                code). A fix that adds or raises a third-party requirement in one is tagged
+                dependency_needed and leaves the pool (in_pool): the image has the dependencies
+                of the base commit, and the tests run with the network off (see deps.py)
                 The last three fields are read by `cmeval resplit` only (see resplit.py)
 
 A task is valid when at least one test does not pass in any run before the fix (it fails, it is
