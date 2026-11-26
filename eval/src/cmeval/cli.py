@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -475,6 +476,67 @@ def cmd_e2e_grader_check(args) -> int:
     return 0 if passed == len(records) else 3
 
 
+PATCH_SUFFIXES = (".patch", ".diff")
+
+
+def _saved_patches(patch: Path, ids: list[str] | None) -> list[tuple[str, str, Path]]:
+    """The changes that `e2e grade` grades: (task id, label, file). A file needs one --id. A folder holds
+    <task id>.patch files, or folders <task id>/ with one or more <label>.patch files; .diff works as well."""
+    if patch.is_file():
+        if not ids or len(ids) != 1:
+            raise TaskError("a patch file needs exactly one --id: the task it is for")
+        return [(ids[0], patch.stem, patch)]
+    if not patch.is_dir():
+        raise FileNotFoundError(f"{patch}: no such file or folder")
+    found = [(p.stem, p.stem, p) for p in patch.iterdir() if p.is_file() and p.suffix in PATCH_SUFFIXES]
+    found += [(d.name, p.stem, p) for d in patch.iterdir() if d.is_dir()
+              for p in d.iterdir() if p.is_file() and p.suffix in PATCH_SUFFIXES]
+    if ids:
+        found = [item for item in found if item[0] in set(ids)]
+    if not found:
+        raise FileNotFoundError(f"{patch}: no <task id>.patch file and no <task id>/<label>.patch file"
+                                + (" for the given --id" if ids else ""))
+    return sorted(found, key=lambda item: (item[0], item[1]))
+
+
+def cmd_e2e_grade(args) -> int:
+    from . import e2e
+    from . import generate as gen
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = {t.id: t for t in load_tasks(args.tasks)}
+        items = _saved_patches(args.patch, args.id)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e grade: {exc}", file=sys.stderr)
+        return 1
+    root = args.out or e2e.grades_dir() / recipe.name
+    records, errors, other_repo = [], 0, []
+    for task_id, label, path in items:
+        task = tasks.get(task_id)
+        if task is not None and task.repo != recipe.repo:
+            other_repo.append(task_id)
+            continue
+        try:
+            if task is None:
+                raise gen.GenerateError(f"no task {task_id} in {args.tasks}")
+            record = e2e.grade_saved(recipe, task, path, root / task_id / label, cpus=args.cpus)
+        except (gen.GenerateError, subprocess.TimeoutExpired, OSError) as exc:
+            errors += 1
+            print(f"{task_id} {label}: error: {exc}", flush=True)
+            continue
+        records.append(record)
+        print(e2e.format_grade(task_id, label, record), flush=True)
+    if other_repo:
+        say(f"note: {len(other_repo)} changes skipped: their task is not of {recipe.repo}: {' '.join(other_repo)}")
+    completed = sum(1 for r in records if r["completed"])
+    print(f"{recipe.name}: {completed} of {len(records)} graded changes completed, {errors} errors; records in {root}")
+    if errors or not records:
+        return 1
+    return 0 if completed == len(records) else 3
+
+
 def cmd_e2e_run(args) -> int:
     from . import e2e_run
     from . import generate as gen
@@ -660,6 +722,39 @@ def cmd_e2e_recount(args) -> int:
     return 0
 
 
+def cmd_e2e_turns(args) -> int:
+    from .e2e_turns import (TurnsError, build_table, format_pair, format_table, run_folder)
+
+    setups = args.setup or []
+    try:
+        gold = None
+        if args.tasks:
+            task = next((t for t in load_tasks(args.tasks) if t.id == args.id), None)
+            if task is None:
+                raise TurnsError(f"no task {args.id} in {args.tasks}")
+            gold = list(task.gold.files)
+        if args.with_run:
+            if len(setups) > 2:
+                raise TurnsError("give at most two --setup with --with: one for each run")
+            pairs = [(args.run_id, setups[0] if setups else None), (args.with_run, setups[-1] if setups else None)]
+        elif len(setups) == 2:
+            pairs = [(args.run_id, setups[0]), (args.run_id, setups[1])]
+        elif len(setups) > 2:
+            raise TurnsError("give one --setup, or two to see two setups of the run side by side")
+        else:
+            pairs = [(args.run_id, setups[0] if setups else None)]
+        tables = [build_table(run_folder(run, args.id, setup, args.rep), gold) for run, setup in pairs]
+    except (TurnsError, FileNotFoundError, TaskError, ValueError) as exc:
+        print(f"e2e turns: {exc}", file=sys.stderr)
+        return 1
+    width = args.width if args.width is not None else (60 if len(tables) == 2 else 100)
+    if len(tables) == 2:
+        print(format_pair(*tables, fmt=args.format, width=width), end="")
+    else:
+        print(format_table(tables[0], fmt=args.format, width=width), end="")
+    return 0
+
+
 def cmd_dashboard(args) -> int:
     from .dashboard import serve
 
@@ -842,6 +937,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jobs", type=int, default=1, help="tasks checked at the same time (default 1)")
     p.add_argument("--cpus", type=int, default=8, help="processors for one grading container (default 8)")
     p.set_defaults(func=cmd_e2e_grader_check)
+    p = e2e_sub.add_parser(
+        "grade", help="grade saved changes (git diffs) of tasks with the hidden tests, in a fresh container of each "
+                      "task's image",
+        description="Grade a change that was made outside `cmeval e2e run`, with the grader of the runs. The change is "
+                    "a git diff against the task's base commit, with the default a/ and b/ prefixes (git diff, not "
+                    "git diff --no-prefix), as UTF-8 text. Files that the hidden test change touches are dropped from "
+                    "it before it is applied, as for an agent's change. The task needs a valid saved validation "
+                    "(tests.json from cmeval generate) and its image; build a removed image again with cmeval "
+                    "generate RECIPE --tasks FILE --id TASK --rebuild. Exit code 0 when every change completed its "
+                    "task, 3 when one did not, 1 for an error.")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the tasks")
+    p.add_argument("--patch", type=Path, required=True,
+                   help="a diff file (give --id), or a folder of <task id>.patch files or of <task id>/<label>.patch "
+                        "files (.diff works as well)")
+    p.add_argument("--id", action="append", help="the task of a diff file; with a folder: only this task "
+                                                 "(can be given more than once)")
+    p.add_argument("--out", type=Path, help="folder of the records: <out>/<task id>/<patch name>/ "
+                                            "(default CMEVAL_HOME/e2e/grades/<recipe>)")
+    p.add_argument("--cpus", type=int, default=8, help="processors for one grading container (default 8)")
+    p.set_defaults(func=cmd_e2e_grade)
     p = e2e_sub.add_parser("run", help="run Claude Code on each valid task in its container, record it, and grade it")
     p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
     p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
@@ -907,6 +1023,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
     p.add_argument("--tasks", type=Path, help="the task file, for records that do not hold their gold files")
     p.set_defaults(func=cmd_e2e_recount)
+
+    p = e2e_sub.add_parser(
+        "turns", help="one table per run, one row per turn of the main agent: seconds, tokens, tools, commands, "
+                      "kinds, and gold files surfaced, opened and edited",
+        description="One row per turn of the main agent of one run, from stream.jsonl, proxy.jsonl and run.json of "
+                    "its folder. A turn gets the tokens and the clock of its model request (matched by the message "
+                    "id). The last rows are the requests that no turn matched, and the sums; the token sums must "
+                    "equal the proxy's sums in run.json, and the last line says whether they do. With --with RUN_ID2, "
+                    "or with two --setup, two runs of the task are shown side by side.")
+    p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs), or the path of a run id's folder")
+    p.add_argument("--id", required=True, help="the task")
+    p.add_argument("--setup", action="append",
+                   help="the setup (needed when the task has runs of several setups); give two to see both")
+    p.add_argument("--rep", default="1",
+                   help="the repetition (default 1), or the folder name of a discarded attempt, such as 1.discarded-1")
+    p.add_argument("--with", dest="with_run", metavar="RUN_ID2", help="a second run id of the same task, side by side")
+    p.add_argument("--format", choices=("md", "csv", "json"), default="md", help="output format (default md)")
+    p.add_argument("--width", type=int,
+                   help="characters of the command column (default 100, 60 side by side; 0: no cut)")
+    p.add_argument("--tasks", type=Path, help="the task file, for a run.json that does not hold its gold files")
+    p.set_defaults(func=cmd_e2e_turns)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
