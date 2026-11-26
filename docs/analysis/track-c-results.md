@@ -286,11 +286,14 @@ ARM ones. Both versions, one after the other, measured as above:
 - The exact index is 1.4 times faster, the compact one 1.6 to 1.7 times, and one 4-bit estimate
   about 5 times.
 - The results are the same: the default against the oracle on vLLM gives 762 of 762 again, every
-  FAISS call the store makes ran for all 2,608 combinations, and the test suite passes (622 with
-  the default index; 619 and 3 skipped on the compact one).
+  FAISS call the store makes ran for all 2,608 combinations under the memory checker, and the
+  test suite passes in an environment made from a lock file with 1.16.0 (622 with the default
+  index; 619 and 3 skipped on the compact one).
 - A wider first scan then costs 0.5 ms and not 2.6 ms, which makes 4,000 codes an easy choice
   (§3.2, the weak point).
-- Not done under 1.16.0: the run under the memory checker, and Linux. codemem still pins 1.15.1.
+- Not run under 1.16.0: Linux and Windows. Its build for Apple-silicon Macs needs macOS 15 or
+  newer, where 1.15.1's needed macOS 14. The lock file still pins 1.15.1; the branch
+  `andre/faiss-1-16` moves it.
 
 **Vector search beside the rest of a search.** On vLLM, with the model's part left out: three
 short questions (4 to 9 words) took 38 to 57 ms each, of which 10 to 27 ms were keywords, about
@@ -505,8 +508,8 @@ Each audit was done by a separate agent that was told to break the code, with it
 - **A real index above 145,000 vectors.** vLLM is the largest real index checked. Beyond it there
   are only synthetic vectors (200,000).
 - **Linux and x86**, CUDA, and FAISS on more than one thread.
-- **FAISS 1.16.0 as the pinned version.** It passes everything run here (§3.3) and is faster on
-  Apple processors. The lock file still pins 1.15.1.
+- **FAISS 1.16.0 on Linux and Windows.** It passes everything run here (§3.3) and is faster on
+  Apple processors. The branch `andre/faiss-1-16` moves the lock file to it.
 - **The eval's end-to-end runs** (track A): whether an agent's results change at all.
 - **The embedding assist with a real model or a hosted provider.**
 - **Whether a vector that is embedded a second time is bit-identical** to the first, with the real model.
