@@ -420,6 +420,7 @@ class SentenceTransformerEmbedder(Embedder):
         self._prompts: dict[str, dict[str, str]] = {_AS_GIVEN: {"prompt": ""}}  # how each kind of text is encoded
         self._prefixes = ("", "")  # the query and document prompts as text, known once the model is loaded
         self._lock = threading.Lock()
+        self._run_lock = threading.Lock()  # one model call at a time (`_encode`); taken before `_lock`, never after it
         self._device: str | None = None
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
         self._uses = _Uses()
@@ -525,20 +526,29 @@ class SentenceTransformerEmbedder(Embedder):
             batch_size=self.batch_size, normalize_embeddings=True, convert_to_numpy=True, show_progress_bar=False,
             **self._prompts[prompt],
         )
-        vecs = np.asarray(model.encode(list(texts), **kwargs), dtype=np.float32)
-        bad = ~np.isfinite(vecs).all(axis=1)
-        if bad.any():
-            # float16 can overflow on unusual inputs; redo those rows in float32.
-            import torch
+        # One call at a time. Two threads in `encode` at once (the start-up warm-up, the writer, a
+        # search's query) crashed the process on the Apple GPU: each moves its batches to the device
+        # through PyTorch's cache of Metal kernels, which is not safe for two threads. And the float32
+        # redo below converts the weights that another call would be using. So a search's query waits
+        # for the call that is running: one of the writer's, at most 3,000 characters
+        # (service._CALL_CHARS), or during refresh_index one of up to 256 texts. A GPU runs one call
+        # at a time anyway. The wait counts as a use (`_counted`), so `unload` does not drop the
+        # model under it.
+        with self._run_lock:
+            vecs = np.asarray(model.encode(list(texts), **kwargs), dtype=np.float32)
+            bad = ~np.isfinite(vecs).all(axis=1)
+            if bad.any():
+                # float16 can overflow on unusual inputs; redo those rows in float32.
+                import torch
 
-            log.warning("%d embeddings overflowed in %s; recomputing them in float32", int(bad.sum()), self.dtype)
-            with self._lock:
-                model.to(torch.float32)
-                try:
-                    redo = model.encode([t for t, b in zip(texts, bad) if b], **kwargs)
-                finally:
-                    model.to(getattr(torch, self.dtype))
-            vecs[bad] = np.asarray(redo, dtype=np.float32)
+                log.warning("%d embeddings overflowed in %s; recomputing them in float32", int(bad.sum()), self.dtype)
+                with self._lock:
+                    model.to(torch.float32)
+                    try:
+                        redo = model.encode([t for t, b in zip(texts, bad) if b], **kwargs)
+                    finally:
+                        model.to(getattr(torch, self.dtype))
+                vecs[bad] = np.asarray(redo, dtype=np.float32)
         return l2_normalize(vecs)
 
     def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
