@@ -1,0 +1,21 @@
+# The hard tier (plan docs/plan/runs.md, section 10).
+# `cmeval collect configs/fresh-java-v1-large.toml --exclude-tasks tasks/fresh-java-v1.jsonl`
+# The same as configs/fresh-java-v1.toml, with two changes: the size limits are 15 code files and
+# 600 changed lines, and only the repos of the plan's ranks 1 to 8 are listed. --exclude-tasks
+# keeps only the tasks that the first collection did not keep.
+
+[collect]
+since = "2026-07-01"  # the freshness cutoff (Opus 5.5 data ends in June 2026)
+until = "2026-10-22"
+min_body_chars = 100  # issue body without hidden comments, as of when the fix PR was opened
+extra_bots = []  # more bot logins to drop, next to the built-in list
+max_code_files = 15  # changed code files in the fix (tests and docs do not count)
+max_code_lines = 600  # added plus removed lines in those code files
+
+# Chosen over keycloak, quarkus and elasticsearch: a Maven build that fits the image limit, and
+# most tests run in the JVM without services. See the B10 notes.
+[[repo]]
+name = "trinodb/trino"
+# Test files whatever their extension (collect/test_split.py): Maven test sources and test
+# resources. Keep in step with the recipe.
+test_paths = ["**/src/test/**"]
