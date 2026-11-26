@@ -4,6 +4,9 @@ Track B experiments on Wilson's laptop (Windows, Intel Arc 140V GPU through `arc
 The scripts were written against a local copy of `main` at `7c24558` (`analysis/codemem-7c24558`) and use
 absolute Windows paths in places; they are here to be read and rerun, not yet cleaned up for other machines.
 
+**Start with [`loop_vs_grep.md`](loop_vs_grep.md):** Track B's current focus (loop vs grep), the algorithms, the
+21-task results, the n = 10 / 25 / 50 sweep, the duckdb-25101 case study and the grep "memory" test.
+
 **Nothing in this folder builds the repo or runs tests.** An arm "edits a gold function" when its final diff
 touches a line of a function that the real fix changed. That is not "fixed": the hidden tests were not run.
 

@@ -1,0 +1,103 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "judge_sees": "500-character previews",
+ "oneshot_cost_usd": 0.0125,
+ "task": "pandas-dev__pandas-70107",
+ "fixed": {
+  "round": 1,
+  "explanation": "For PeriodArray, object-dtype values such as strings remain object after maybe_convert_objects, because no freq is available. isin then compares Period objects to raw strings, which is always False. The fix tries to build a PeriodArray from the values using self.dtype (which carries the freq) before falling back to elementwise comparison.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0613,
+ "seconds": 30,
+ "diff_stat": "pandas/core/arrays/datetimelike.py | 12 ++++++++++++\n 1 file changed, 12 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "DatetimeLikeArrayMixin.isin converts the passed values to the array's type via type(self)._from_sequence / PeriodArray, which fails for string values because freq cannot be inferred, so it falls back to elementwise comparison of Periods to strings. It should pass the period dtype/freq when converting values for PeriodArray so strings are parsed.",
+    "symptom": "isin with date strings on a PeriodArray/PeriodIndex returns all False, so df.query(\"Date == '2000-01-06'\") on a period column returns an empty result while == works.",
+    "anchors": [
+     "isin",
+     "query",
+     "PeriodArray",
+     "period_range",
+     "freq",
+     "period_array_like",
+     "datetimelike.py",
+     "eval"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/arrays/datetimelike.py",
+     391,
+     406
+    ],
+    [
+     "pandas/core/arrays/datetimelike.py",
+     1764,
+     1814
+    ],
+    [
+     "pandas/core/arrays/datetimelike.py",
+     408,
+     463
+    ],
+    [
+     "pandas/core/arrays/datetimelike.py",
+     768,
+     819
+    ],
+    [
+     "pandas/core/arrays/base.py",
+     1745,
+     1775
+    ],
+    [
+     "pandas/core/frame.py",
+     19949,
+     20075
+    ],
+    [
+     "pandas/core/arrays/period.py",
+     412,
+     427
+    ],
+    [
+     "pandas/tests/frame/test_query_eval.py",
+     1997,
+     2015
+    ],
+    [
+     "pandas/core/frame.py",
+     5027,
+     5261
+    ],
+    [
+     "pandas/tests/frame/test_query_eval.py",
+     326,
+     335
+    ]
+   ],
+   "analysis": "DatetimeLikeArrayMixin.isin in datetimelike.py is the code the issue points to. It tries to convert the passed values with type(self)._from_sequence. For PeriodArray that conversion fails on strings, because no freq is given. It then falls back to elementwise comparison of Periods with strings, which is always False. The fix is to pass the array's dtype (freq) when converting values for a PeriodArray.",
+   "picked": [
+    "pandas/core/arrays/datetimelike.py:DatetimeLikeArrayMixin.isin"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/arrays/datetimelike.py lines 768-819 (DatetimeLikeArrayMixin.isin)"
+   ],
+   "fix_attempt": "applied: For PeriodArray, object-dtype values such as strings remain object after maybe_convert_objects, because no freq is available. isin then compares Period objects to raw strings, which is always False. The fix tries to build a PeriodArray from the values using self.dtype (which carries the freq) before falling back to elementwise comparison."
+  }
+ ]
+}

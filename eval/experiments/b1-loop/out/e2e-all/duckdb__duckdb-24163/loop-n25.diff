@@ -1,0 +1,14 @@
+diff --git a/src/planner/binder/statement/bind_create.cpp b/src/planner/binder/statement/bind_create.cpp
+index 5d8fe32..bdccc00 100644
+--- a/src/planner/binder/statement/bind_create.cpp
++++ b/src/planner/binder/statement/bind_create.cpp
+@@ -659,6 +659,9 @@ SchemaCatalogEntry &Binder::BindCreateTriggerInfo(CreateTriggerInfo &create_trig
+ 			}
+ 		}
+ 	}
++	if (create_trigger_info.timing != TriggerTiming::BEFORE && create_trigger_info.timing != TriggerTiming::AFTER) {
++		throw NotImplementedException("INSTEAD OF triggers on base tables are not supported");
++	}
+ 	if (create_trigger_info.for_each == TriggerForEach::ROW &&
+ 	    (!create_trigger_info.referencing_new_table.empty() || !create_trigger_info.referencing_old_table.empty())) {
+ 		throw BinderException("REFERENCING is not valid for FOR EACH ROW triggers");

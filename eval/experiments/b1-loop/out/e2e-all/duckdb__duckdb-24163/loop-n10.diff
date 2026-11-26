@@ -1,0 +1,16 @@
+diff --git a/src/planner/binder/statement/bind_create.cpp b/src/planner/binder/statement/bind_create.cpp
+index 5d8fe32..5d41ea2 100644
+--- a/src/planner/binder/statement/bind_create.cpp
++++ b/src/planner/binder/statement/bind_create.cpp
+@@ -651,6 +651,11 @@ SchemaCatalogEntry &Binder::BindCreateTriggerInfo(CreateTriggerInfo &create_trig
+ 		}
+ 	}
+ 
++	// Only BEFORE and AFTER triggers are expanded on base tables; INSTEAD OF triggers would never fire.
++	if (create_trigger_info.timing != TriggerTiming::BEFORE && create_trigger_info.timing != TriggerTiming::AFTER) {
++		throw BinderException("INSTEAD OF triggers are not supported on base tables (table \"%s\")", table.name);
++	}
++
+ 	// Validate UPDATE OF columns exist
+ 	if (create_trigger_info.event_type == TriggerEventType::UPDATE_EVENT && !create_trigger_info.columns.empty()) {
+ 		for (const auto &col_name : create_trigger_info.columns) {

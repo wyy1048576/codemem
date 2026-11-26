@@ -1,0 +1,27 @@
+diff --git a/src/execution/operator/order/physical_top_n.cpp b/src/execution/operator/order/physical_top_n.cpp
+index 91247490..04955ca8 100644
+--- a/src/execution/operator/order/physical_top_n.cpp
++++ b/src/execution/operator/order/physical_top_n.cpp
+@@ -138,8 +138,12 @@ public:
+ 
+ private:
+ 	inline bool EntryShouldBeAdded(const string_t &sort_key) {
++		if (heap_size == 0) {
++			// LIMIT 0: nothing can ever be added (and the heap is empty, so we cannot look at its front)
++			return false;
++		}
+ 		if (heap.size() < heap_size) {
+-			// heap is full - check the latest entry
++			// heap is not full yet - add the entry
+ 			return true;
+ 		}
+ 		if (sort_key < heap.front().sort_key) {
+@@ -372,7 +376,7 @@ void TopNHeap::Sink(DataChunk &input, optional_ptr<TopNBoundaryValue> global_bou
+ 
+ 	// if we modified the heap we might be able to update the global boundary
+ 	// note that the global boundary only applies to FULL heaps
+-	if (heap.size() >= heap_size && global_boundary) {
++	if (!heap.empty() && heap.size() >= heap_size && global_boundary) {
+ 		global_boundary->UpdateValue(heap.front().sort_key);
+ 	}
+ }

@@ -1,55 +1,55 @@
 {
  "per_arm": {
   "loop n=10": {
-   "tasks": 10,
-   "cost": 1.6580999999999997,
-   "no_change": 2,
-   "edits_all_gold_files": 8,
-   "tasks_with_gold_files": 10,
-   "scored_tasks": 9,
-   "gold_functions": 15,
-   "seen_or_edited": 12,
-   "edits_one": 7,
-   "edits_all": 6,
-   "median_rounds": 1.5
+   "tasks": 21,
+   "cost": 4.1618,
+   "no_change": 7,
+   "edits_all_gold_files": 13,
+   "tasks_with_gold_files": 21,
+   "scored_tasks": 20,
+   "gold_functions": 36,
+   "seen_or_edited": 30,
+   "edits_one": 11,
+   "edits_all": 9,
+   "median_rounds": 2
   },
   "loop n=25": {
-   "tasks": 10,
-   "cost": 1.5119000000000002,
-   "no_change": 2,
-   "edits_all_gold_files": 8,
-   "tasks_with_gold_files": 10,
-   "scored_tasks": 9,
-   "gold_functions": 15,
-   "seen_or_edited": 13,
-   "edits_one": 7,
-   "edits_all": 6,
-   "median_rounds": 1.0
+   "tasks": 21,
+   "cost": 5.017799999999999,
+   "no_change": 9,
+   "edits_all_gold_files": 10,
+   "tasks_with_gold_files": 21,
+   "scored_tasks": 20,
+   "gold_functions": 36,
+   "seen_or_edited": 31,
+   "edits_one": 9,
+   "edits_all": 8,
+   "median_rounds": 1
   },
   "loop n=50": {
-   "tasks": 10,
-   "cost": 1.5549,
-   "no_change": 1,
-   "edits_all_gold_files": 9,
-   "tasks_with_gold_files": 10,
-   "scored_tasks": 9,
-   "gold_functions": 15,
-   "seen_or_edited": 15,
-   "edits_one": 8,
-   "edits_all": 7,
-   "median_rounds": 1.0
+   "tasks": 21,
+   "cost": 5.5863,
+   "no_change": 7,
+   "edits_all_gold_files": 12,
+   "tasks_with_gold_files": 21,
+   "scored_tasks": 20,
+   "gold_functions": 36,
+   "seen_or_edited": 33,
+   "edits_one": 10,
+   "edits_all": 9,
+   "median_rounds": 1
   },
   "grep": {
-   "tasks": 10,
-   "cost": 0.5720441999999999,
+   "tasks": 21,
+   "cost": 1.5809954,
    "no_change": 0,
-   "edits_all_gold_files": 8,
-   "tasks_with_gold_files": 10,
-   "scored_tasks": 9,
-   "gold_functions": 15,
-   "seen_or_edited": 8,
-   "edits_one": 8,
-   "edits_all": 7,
+   "edits_all_gold_files": 15,
+   "tasks_with_gold_files": 21,
+   "scored_tasks": 20,
+   "gold_functions": 36,
+   "seen_or_edited": 24,
+   "edits_one": 15,
+   "edits_all": 12,
    "median_rounds": null
   }
  },
@@ -124,6 +124,102 @@
     0,
     0,
     0.129
+   ]
+  },
+  {
+   "task": "duckdb__duckdb-23876",
+   "gold_functions": 1,
+   "loop n=10": [
+    1,
+    0,
+    0.565
+   ],
+   "loop n=25": [
+    1,
+    0,
+    0.506
+   ],
+   "loop n=50": [
+    1,
+    0,
+    0.641
+   ],
+   "grep": [
+    1,
+    1,
+    0.144
+   ]
+  },
+  {
+   "task": "duckdb__duckdb-23939",
+   "gold_functions": 3,
+   "loop n=10": [
+    2,
+    2,
+    0.109
+   ],
+   "loop n=25": [
+    2,
+    0,
+    0.089
+   ],
+   "loop n=50": [
+    2,
+    0,
+    0.133
+   ],
+   "grep": [
+    3,
+    0,
+    0.059
+   ]
+  },
+  {
+   "task": "duckdb__duckdb-23952",
+   "gold_functions": 1,
+   "loop n=10": [
+    1,
+    0,
+    0.337
+   ],
+   "loop n=25": [
+    1,
+    0,
+    0.481
+   ],
+   "loop n=50": [
+    1,
+    0,
+    0.649
+   ],
+   "grep": [
+    1,
+    1,
+    0.071
+   ]
+  },
+  {
+   "task": "duckdb__duckdb-24163",
+   "gold_functions": 1,
+   "loop n=10": [
+    1,
+    1,
+    0.12
+   ],
+   "loop n=25": [
+    1,
+    1,
+    0.085
+   ],
+   "loop n=50": [
+    1,
+    1,
+    0.123
+   ],
+   "grep": [
+    1,
+    1,
+    0.111
    ]
   },
   {
@@ -273,6 +369,174 @@
   {
    "task": "pandas-dev__pandas-68081",
    "gold_functions": 0
+  },
+  {
+   "task": "pandas-dev__pandas-68083",
+   "gold_functions": 1,
+   "loop n=10": [
+    1,
+    0,
+    0.094
+   ],
+   "loop n=25": [
+    1,
+    0,
+    0.405
+   ],
+   "loop n=50": [
+    1,
+    0,
+    0.107
+   ],
+   "grep": [
+    1,
+    1,
+    0.086
+   ]
+  },
+  {
+   "task": "pandas-dev__pandas-68358",
+   "gold_functions": 1,
+   "loop n=10": [
+    1,
+    1,
+    0.044
+   ],
+   "loop n=25": [
+    1,
+    1,
+    0.064
+   ],
+   "loop n=50": [
+    1,
+    1,
+    0.074
+   ],
+   "grep": [
+    1,
+    1,
+    0.03
+   ]
+  },
+  {
+   "task": "pandas-dev__pandas-68575",
+   "gold_functions": 2,
+   "loop n=10": [
+    2,
+    0,
+    0.408
+   ],
+   "loop n=25": [
+    2,
+    0,
+    0.414
+   ],
+   "loop n=50": [
+    2,
+    0,
+    0.507
+   ],
+   "grep": [
+    2,
+    1,
+    0.104
+   ]
+  },
+  {
+   "task": "pandas-dev__pandas-68947",
+   "gold_functions": 4,
+   "loop n=10": [
+    4,
+    0,
+    0.39
+   ],
+   "loop n=25": [
+    4,
+    0,
+    0.509
+   ],
+   "loop n=50": [
+    4,
+    0,
+    0.572
+   ],
+   "grep": [
+    4,
+    3,
+    0.185
+   ]
+  },
+  {
+   "task": "pandas-dev__pandas-69447",
+   "gold_functions": 4,
+   "loop n=10": [
+    4,
+    0,
+    0.315
+   ],
+   "loop n=25": [
+    4,
+    0,
+    0.426
+   ],
+   "loop n=50": [
+    4,
+    0,
+    0.541
+   ],
+   "grep": [
+    1,
+    0,
+    0.132
+   ]
+  },
+  {
+   "task": "pandas-dev__pandas-69478",
+   "gold_functions": 1,
+   "loop n=10": [
+    1,
+    1,
+    0.06
+   ],
+   "loop n=25": [
+    1,
+    0,
+    0.459
+   ],
+   "loop n=50": [
+    1,
+    0,
+    0.609
+   ],
+   "grep": [
+    1,
+    0,
+    0.055
+   ]
+  },
+  {
+   "task": "pandas-dev__pandas-70107",
+   "gold_functions": 2,
+   "loop n=10": [
+    0,
+    0,
+    0.061
+   ],
+   "loop n=25": [
+    0,
+    0,
+    0.069
+   ],
+   "loop n=50": [
+    0,
+    0,
+    0.076
+   ],
+   "grep": [
+    0,
+    0,
+    0.032
+   ]
   }
  ]
 }

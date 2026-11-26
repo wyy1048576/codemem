@@ -1,0 +1,344 @@
+[
+ {
+  "task": "duckdb__duckdb-23604",
+  "calls": 16,
+  "cost": 0.115,
+  "names": 10,
+  "new_names": 5,
+  "first_gold": {
+   "call": 2,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": true,
+   "pattern": "LikeRange|like_range|PrefixFun|\"prefix\"",
+   "new_names": [
+    "LikeRange",
+    "like_range"
+   ]
+  }
+ },
+ {
+  "task": "duckdb__duckdb-23773",
+  "calls": 8,
+  "cost": 0.076,
+  "names": 1,
+  "new_names": 0,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "exponent"
+  }
+ },
+ {
+  "task": "duckdb__duckdb-23825",
+  "calls": 12,
+  "cost": 0.129,
+  "names": 8,
+  "new_names": 4,
+  "first_gold": null
+ },
+ {
+  "task": "duckdb__duckdb-23876",
+  "calls": 10,
+  "cost": 0.144,
+  "names": 16,
+  "new_names": 9,
+  "first_gold": {
+   "call": 4,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": true,
+   "pattern": "ContainsFun::GetFunctions|ScalarFunction\\(.*contains|\"contains\"",
+   "new_names": [
+    "ContainsFun",
+    "GetFunctions",
+    "ScalarFunction"
+   ]
+  }
+ },
+ {
+  "task": "duckdb__duckdb-23939",
+  "calls": 6,
+  "cost": 0.059,
+  "names": 4,
+  "new_names": 2,
+  "first_gold": {
+   "call": 3,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": true,
+   "pattern": "Date::TryConvertDate\\(|Date::FromCString\\(|Date::TryFromCString\\(",
+   "new_names": [
+    "TryFromCString"
+   ]
+  }
+ },
+ {
+  "task": "duckdb__duckdb-23952",
+  "calls": 5,
+  "cost": 0.071,
+  "names": 8,
+  "new_names": 6,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": true,
+   "pattern": "SemiAnti|ScanStructure::NextSemiOrAntiJoin|NextSemiJoin|NextAntiJoin",
+   "new_names": [
+    "NextAntiJoin",
+    "NextSemiJoin",
+    "NextSemiOrAntiJoin",
+    "ScanStructure",
+    "SemiAnti"
+   ]
+  }
+ },
+ {
+  "task": "duckdb__duckdb-24101",
+  "calls": 8,
+  "cost": 0.084,
+  "names": 5,
+  "new_names": 2,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": true,
+   "pattern": "BloomFilter|bloom",
+   "new_names": [
+    "BloomFilter"
+   ]
+  }
+ },
+ {
+  "task": "duckdb__duckdb-24163",
+  "calls": 6,
+  "cost": 0.111,
+  "names": 7,
+  "new_names": 6,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": true,
+   "pattern": "INSTEAD|instead_of|TriggerTiming|TRIGGER_TIMING",
+   "new_names": [
+    "TRIGGER_TIMING",
+    "TriggerTiming",
+    "instead_of"
+   ]
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-66145",
+  "calls": 13,
+  "cost": 0.078,
+  "names": 5,
+  "new_names": 2,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "convert_dates|keep_default_dates"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-66234",
+  "calls": 2,
+  "cost": 0.02,
+  "names": 1,
+  "new_names": 0,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": false,
+   "pattern": "def _compute_grand_margin"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-66270",
+  "calls": 2,
+  "cost": 0.019,
+  "names": 1,
+  "new_names": 0,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "def __getitem__"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-66530",
+  "calls": 3,
+  "cost": 0.031,
+  "names": 3,
+  "new_names": 0,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": false,
+   "pattern": "left_dtype|left\\.dtype"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-67004",
+  "calls": 4,
+  "cost": 0.046,
+  "names": 5,
+  "new_names": 3,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "def _getitem|def __getitem__|list_element"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-67944",
+  "calls": 2,
+  "cost": 0.021,
+  "names": 4,
+  "new_names": 0,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "left side of interval must be"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-68081",
+  "calls": 6,
+  "cost": 0.036,
+  "names": 2,
+  "new_names": 0,
+  "first_gold": {
+   "call": 1,
+   "tool": "Read",
+   "how": "named path",
+   "blind": false,
+   "pattern": ""
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-68083",
+  "calls": 9,
+  "cost": 0.086,
+  "names": 8,
+  "new_names": 3,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": false,
+   "pattern": "skip_if_not_english_lc_time|_has_english_lc_time",
+   "new_names": []
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-68358",
+  "calls": 3,
+  "cost": 0.03,
+  "names": 3,
+  "new_names": 1,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "def symmetric_difference"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-68575",
+  "calls": 10,
+  "cost": 0.104,
+  "names": 3,
+  "new_names": 0,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "\\.value"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-68947",
+  "calls": 16,
+  "cost": 0.185,
+  "names": 8,
+  "new_names": 4,
+  "first_gold": {
+   "call": 2,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": true,
+   "pattern": "def _infer_columns",
+   "new_names": [
+    "_infer_columns"
+   ]
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-69113",
+  "calls": 6,
+  "cost": 0.047,
+  "names": 6,
+  "new_names": 3,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "def difference|def _difference|def _wrap_difference_result"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-69447",
+  "calls": 11,
+  "cost": 0.132,
+  "names": 11,
+  "new_names": 4,
+  "first_gold": {
+   "call": 2,
+   "tool": "Grep",
+   "how": "search result",
+   "blind": false,
+   "pattern": "drops timezone",
+   "new_names": []
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-69478",
+  "calls": 7,
+  "cost": 0.055,
+  "names": 7,
+  "new_names": 5,
+  "first_gold": {
+   "call": 1,
+   "tool": "Grep",
+   "how": "named path",
+   "blind": true,
+   "pattern": "def __array_ufunc__|def _maybe_align_series_as_frame|align_method_FRAME"
+  }
+ },
+ {
+  "task": "pandas-dev__pandas-70107",
+  "calls": 3,
+  "cost": 0.032,
+  "names": 2,
+  "new_names": 1,
+  "first_gold": null
+ }
+]
