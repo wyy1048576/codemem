@@ -29,6 +29,7 @@ track C makes the index small.
 | [track-a-evals.md](track-a-evals.md) | you build or use the evaluation |
 | [track-b-retrieval.md](track-b-retrieval.md) | you work on what codemem stores and how it ranks |
 | [track-c-memory.md](track-c-memory.md) | you work on memory, disk and speed |
+| [runs.md](runs.md) | you run, or want to read, the runs of Nov 27 to 30: which model runs which tasks, in what order |
 
 Each track file can be read on its own. This page holds what all three share. Who has which
 track, and how progress is recorded, is in [CONTRIBUTING.md](../../CONTRIBUTING.md).
