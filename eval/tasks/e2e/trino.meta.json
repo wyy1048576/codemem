@@ -1,0 +1,56 @@
+{
+  "kind": "resplit",
+  "source": "fresh-java-v1.jsonl",
+  "source_sha256": "c5361b25869746a97e53f1085add441995e79d76c11aef42bcf2228c8f8dbafd",
+  "repo": "trinodb/trino",
+  "recipe": "trino",
+  "test_paths": [
+    "**/src/test/**"
+  ],
+  "test_paths_from_test_files": false,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "pom.xml",
+    "**/pom.xml",
+    ".mvn/**"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 70,
+  "changed": 12,
+  "unchanged": 58,
+  "not_split": {},
+  "with_test_files_added": 0,
+  "with_fix_files_added": 12,
+  "test_files_added": 0,
+  "fix_files_added": 13,
+  "files_left_out": {},
+  "with_dependency_needed": 0,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 0
+  },
+  "dependency_needed": {},
+  "with_dependency_other": 4,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 3,
+    "hard": 1
+  },
+  "with_test_patch_before": 64,
+  "with_test_patch_after": 64,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "2acb6a6e44201a795a9f69b396a761687022aef9",
+    "dirty": false
+  },
+  "created": "2026-11-26T10:55:31+00:00"
+}
