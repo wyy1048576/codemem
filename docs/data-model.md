@@ -680,7 +680,7 @@ They come from the same merge as the cards, in its order, so the cards are those
 without them. Each list gives `candidates` (50), so k + M up to 50 is always there in an index with
 that many chunks; past that, the block holds what the lists have. `SearchResponse.more` holds them
 (`to_dict()`: `more`, each with `chunk_id`, `path`, `start_line`, `end_line`, `qualname`, `kind`,
-`subkind`, `name`, `score`).
+`subkind`, `name`, `score`). On the 381 vLLM issues (the whole issue as the query, k = 10), search_code's answer is 5,801 characters on average (95th percentile 7,660) without the related names and the next results, and 9,332 (11,713) with both at their defaults; on the 17 vague pandas requests 5,125 (6,865) and 7,967 (9,426).
 
 **The freshness note.** `search_code` catches up first (architecture.md §4): the background writer
 applies every save the watcher has seen, then the search embeds the queue, its own keyword results

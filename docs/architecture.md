@@ -1463,6 +1463,7 @@ methods named `append` have 4,362 callers each, really `list.append`; keeping ev
 more tasks and named more functions. The next 20 results, named after the cards, reach about as many
 tasks (116 of 175 vLLM, 108 of 162 pandas, 12 of 16 vague requests against 9 with the related
 names), but other ones: with both, a gold function is on the page for 127 of 175 and 117 of 162.
+On the 381 vLLM issues (the whole issue as the query, k = 10), search_code's answer is 5,801 characters on average (95th percentile 7,660) without the related names and the next results, and 9,332 (11,713) with both at their defaults; on the 17 vague pandas requests 5,125 (6,865) and 7,967 (9,426).
 
 **Long queries stay fast.** BM25 joins every query word with OR, so a whole issue text is costly.
 Dropping stopwords keeps a 250-word query on vLLM at 0.36 s of BM25 with no loss in accuracy.
