@@ -50,6 +50,10 @@ _LONG_CLASS_LINES = 80
 # Rough share of total work per phase, for a single progress percentage.
 _PHASE_SPAN = {"chunk": (0.0, 0.15), "embed": (0.15, 1.0), "done": (1.0, 1.0)}
 CATCHUP_MAX_CHUNKS = 1000  # beyond this many queued chunks a search embeds only its own keyword results
+# How long `codemem search` embeds the rest of a change before it answers (`follow_checkout`). Its
+# own keyword results come first and are not counted. Whoever runs the command may have a time
+# limit of its own (an agent's shell tool: often 30 to 120 s), and should get an answer within it.
+FOLLOW_EMBED_SECONDS = 20.0
 SAVE_AFTER_IDLE = 30.0  # write the search indexes' files once nothing changed for this long
 RECONCILE_EVERY = 300.0  # a full scan, in case a file event was missed
 POLL_EVERY = 10.0  # the scan interval when file events don't work
@@ -266,11 +270,11 @@ class CodememService:
         command has no writer that would do it, and it waits, as it waits for the model.
 
         Stage A first, a full check however long it takes: from then on names, lines and keywords
-        are the checkout's. Then stage B: every queued chunk, or, with more than
-        `CATCHUP_MAX_CHUNKS` queued (a large switch, a build another process has not finished),
-        only the chunks this search's own keywords rank on top, as a search of a running server
-        does. A search by keywords alone needs no vector and embeds nothing. Returns what the
-        search still lacks.
+        are the checkout's. Then stage B, as a search of a running server does it: first the
+        chunks this search's own keywords rank on top, however long the queue is; then the rest,
+        for at most `FOLLOW_EMBED_SECONDS`, unless more than `CATCHUP_MAX_CHUNKS` are queued (a
+        large switch, a build another process has not finished). A search by keywords alone needs
+        no vector and embeds nothing. Returns what the search still lacks.
 
         It follows the files and does nothing else: an index built with other settings or by
         another embedder, which an update would rebuild or embed again, is left as it is
@@ -283,8 +287,13 @@ class CodememService:
         pending = self.store.dirty_count()
         if not pending or not _by_meaning(options.get("signals")):
             return Freshness()
+        self.indexer.embed_pending(stats, only=self._keyword_results(query, options))
         big = pending > CATCHUP_MAX_CHUNKS
-        self.indexer.embed_pending(stats, only=self._keyword_results(query, options) if big else None)
+        if not big:
+            self.indexer.embed_pending(
+                stats, deadline=time.monotonic() + FOLLOW_EMBED_SECONDS, batch_chunks=_BATCH,
+                group=self.config.batch_size, group_chars=_CALL_CHARS,
+            )
         return Freshness(self.store.dirty_count(), indexing=big)
 
     # ---- indexing in the background (MCP server, `codemem watch`)

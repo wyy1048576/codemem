@@ -762,9 +762,10 @@ the index is behind this checkout (52 files changed, 12 deleted, git HEAD moved)
 
 - **It waits for stage A,** as it waits for the model: the names, lines and keywords of its
   answer are the checkout's.
-- **Then stage B:** every queued vector, or, with more than 1,000 chunks queued, only the ones
-  its own keyword results need (§4.2). What is left is named after the results, with the command
-  that embeds it:
+- **Then stage B:** first the vectors its own keyword results need (§4.2), then the other
+  queued ones for at most 20 s, and none of them with more than 1,000 chunks queued. So the
+  command answers within the time limit a caller may have (an agent's shell tool). What is left
+  is named after the results, with the command that embeds it:
 
   ```
   note: 4384 code chunks in 240 files (vllm/a.py, ...) are not embedded yet: keyword matches for

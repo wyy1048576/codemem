@@ -577,6 +577,25 @@ def test_after_a_large_switch_the_command_lines_search_names_what_is_left(cli_re
     assert _queued(cli_repo) == 0 and _cli_search(capsys, cli_repo, "record audit event")[2] == ""
 
 
+def test_the_command_lines_search_embeds_the_rest_of_a_change_for_a_limited_time(cli_repo, capsys, monkeypatch):
+    """A change of fewer chunks than a large one is embedded whole before the answer, but not for
+    longer than a caller with a time limit of its own would wait (an agent's shell tool). When the
+    time is up, the search has its own keyword results' vectors, answers, and names what is left."""
+    monkeypatch.setattr("codemem.service.FOLLOW_EMBED_SECONDS", 0.0)  # no time for the rest
+    git(cli_repo, "switch", "-q", "feature")
+    status, results, err = _cli_search(capsys, cli_repo, "record audit event", "--debug")
+    assert status == 0 and results[0]["key"] == "auth/audit.py::record_audit_event"
+    assert {"bm25", "code"} <= set(results[0]["ranks"])  # its own results were embedded first, and are not counted
+    left = _queued(cli_repo)
+    assert 0 < left < 11
+    assert f"note: {left} code chunks in " in err and "Run `codemem index` to embed them." in err
+
+    monkeypatch.setattr("codemem.service.FOLLOW_EMBED_SECONDS", 20.0)
+    status, _, err = _cli_search(capsys, cli_repo, "record audit event")  # with time, the next search embeds the rest
+    assert status == 0 and f"({left} chunks to embed); updating it first" in err and "note:" not in err
+    assert _queued(cli_repo) == 0
+
+
 def test_a_keyword_search_on_the_command_line_follows_a_switch_and_embeds_nothing(cli_repo, capsys):
     """`--signals bm25` needs no vector: it brings the structure to the checkout and loads no
     model for the rest, which the next search by meaning embeds."""
