@@ -22,14 +22,15 @@ In task 68195 the real fix changes one file, `pandas/core/reshape/merge.py`.
 |---|---|
 | easy | one file, at most 15 lines |
 | medium | at most two files and 100 lines |
-| hard | more: three to five files, or 100 to 200 lines |
+| hard | more: three to five files, or 101 to 200 lines |
+| large | more again: 6 to 15 files, or 201 to 600 lines |
 
 Task 68195 is easy.
 
-**The pools hold nothing larger than "hard".** The collector kept only fixes of at most 5 code
-files and 200 changed lines, because a larger pull request is rarely the fix of one issue. So
-"hard" here is the hard end of small fixes. A feature that touches ten files is not in the
-sample (§10).
+**"Hard" is the hard end of small fixes.** The task files on `main` stop there: the collector
+kept only fixes of at most 5 code files and 200 changed lines. A request that touches many files
+is what codemem is meant for, so a fourth level, **large**, is collected for the repos that are
+run fully (§10).
 
 **The prompt level** is how the request is worded. It is not a property of the task: **every
 task has all three wordings**, and the hidden tests are the same for all three.
@@ -89,7 +90,8 @@ of the sample and 2 spare), then stop that level.
 ## 3. The sample
 
 **15 fair tasks per repo: 5 easy, 5 medium, 5 hard. Each has its three prompts,** so a repo has
-45 requests.
+45 requests. **The six repos that are run fully also get 4 large tasks each,** 3 if no more are
+fair (§10).
 
 - Drawn once per repo with the seeded sampler, from tasks that are valid and fair. Tasks of the
   test split come first: they are the ones no track tuned codemem on. The list is committed
@@ -125,6 +127,7 @@ Every model runs a part of the same sample, so that models are compared on the s
 | **Sonnet** (most runs) | all 15 | L0, L1, L2 | `grep`, `tool` | 3 | 90 for each repetition |
 | **Haiku** (the cheap tier) | 6: numbers 1 and 2 of each level | L0, L1, L2 | `grep`, `tool` | 1 | 36 |
 | **Opus** (the top; few runs, because of their cost) | 3: number 1 of each level | L0, L2 | `grep`, `tool` | 1 | 12 |
+| **Sonnet and Opus, the large tasks** | the 4 large ones, in the six repos run fully | L0, L2 | `grep`, `tool` | Sonnet 3, Opus 1 | 16 for each repetition |
 | **Open models:** the 9B first, then the 27B, then the 14B | 8: numbers 1 to 4 of easy and of medium | L0, L1 | `grep`, `tool` | 3 | 96 for each model |
 | **Open models, a probe** | 3: numbers 1 to 3 of hard | L0 | `grep`, `tool` | 1 | 6 for each model |
 
@@ -209,8 +212,9 @@ track C the index, before any more seats are spent.
 1. the check run (§6);
 2. Sonnet, repetition 1, on repos 1 to 6 in the order of their rank;
 3. Haiku, then Opus, on repos 1 to 6;
-4. Sonnet, repetition 1, on kubernetes and trino;
-5. Sonnet, repetitions 2 and 3, on repos 1 to 6 in the order of their rank.
+4. the large tasks of repos 1 to 6: Sonnet, repetition 1, and Opus;
+5. Sonnet, repetition 1, on kubernetes and trino;
+6. Sonnet, repetitions 2 and 3, on repos 1 to 6 in the order of their rank, the large tasks last.
 
 A repo that is not ready when its turn comes is passed over and taken up when it is. A batch
 that is cut short leaves a complete table with fewer repetitions, never a table with holes. The
@@ -224,16 +228,17 @@ can be compared.
 | | Runs | On three seats, at 5 to 7 minutes a run |
 |---|---|---|
 | steps 1 to 3 | 828 (Sonnet 540, Haiku 216, Opus 72) | 23 to 32 hours |
-| step 4 | 180 | 5 to 7 hours |
-| step 5 | 1,080 | 30 to 42 hours |
-| all Claude runs | 2,088 | 2.4 to 3.4 days without a pause |
+| step 4, the large tasks | 192 (Sonnet 96, Opus 96) | 5 to 7 hours, and more if large tasks run longer |
+| step 5 | 180 | 5 to 7 hours |
+| step 6 | 1,272 (1,080, and 192 on the large tasks) | 35 to 49 hours |
+| all Claude runs | 2,472 | 2.9 to 4.0 days without a pause |
 | the open models, on the rented GPU | 612 for each model | about half a day for each model, if a run takes as long as a Claude run and six run at once |
 
 - **The 5 to 7 minutes are an assumption.** The pilot measured 4.3 to 5.5 minutes for Haiku at
   L0. Nobody has measured Sonnet or Opus, and vague prompts took more tokens in the pilot. The
   check run measures it.
-- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 4 are
-  what the presentation counts on, and step 5 fills the time that is left until Nov 30, 23:59.
+- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 5 are
+  what the presentation counts on, and step 6 fills the time that is left until Nov 30, 23:59.
 - Checking candidates, writing the L1 and L2 prompts and building the indexes come before a
   repo's runs and are not in these numbers.
 
@@ -249,19 +254,20 @@ can be compared.
 4. **Run the check run** (§6) and post its five points and the first Sonnet numbers. Go on only
    when it has passed.
 5. **Then run in the order of §7.**
+6. **The large level** (§10): collect again with the higher limit now; check a repo's large
+   candidates when its sample of 15 is ready.
 
 ---
 
-## 10. What the sample does not hold
+## 10. The large level
 
-**Large changes.** No task's real fix has more than 5 code files or 200 changed lines (§1). The
-limit is a setting of the task collector (`max_code_files = 5`, `max_code_lines = 200`), from the
-first collection in October, which was made for the retrieval eval. A request such as "add OCR
-to the upload pipeline", which touches many files, is what codemem is meant for, and it is not
-in the sample.
+**Why.** No task on `main` has a real fix of more than 5 code files or 200 changed lines. That
+is a setting of the task collector (`max_code_files = 5`, `max_code_lines = 200`), from the first
+collection in October, which was made for the retrieval eval. A request such as "add OCR to the
+upload pipeline", which touches many files, is what codemem is meant for.
 
-**How much the limit removed.** Among merged pull requests that fix exactly one linked issue
-and change code:
+**What the limit removed.** Among merged pull requests that fix exactly one linked issue and
+change code:
 
 | Repo | Such fixes | Larger than the limit | Share |
 |---|---|---|---|
@@ -272,11 +278,18 @@ and change code:
 | ruff | 285 | 55 | 19% |
 | vscode | 1,026 | 253 | 25% |
 
-So most fixes of one issue are small, and the limit removed a minority: about 430 candidates in
-these six repos, more than half of them in vscode. Larger work usually comes as a pull request
-without a linked issue, and those cannot be tasks: there is no request to give the agent.
+Most fixes of one issue are small. The limit removed about 430 candidates in these six repos,
+more than half of them in vscode. Larger work often comes as a pull request without a linked
+issue, and such a pull request cannot be a task: there is no request to give the agent.
 
-**How to get them:** the same collection again with a higher limit, as a fourth level, "large".
-They cost more to check, and fewer of them pass the screen: of pandas's valid hard tasks 11% are
-fair, of its easy ones 32%. Whether that level is collected before the presentation or for the
-paper is Andre's decision.
+**How the level is made.**
+
+1. The same collection again, for the six repos that are run fully, with the limit at 15 code
+   files and 600 changed lines. Nothing else changes, so every task of today is found again.
+2. A fix of more than 5 code files or more than 200 changed lines is **large**.
+3. A repo's large candidates are validated and screened after its sample of 15 is ready, until
+   4 are fair. Fewer large tasks pass the screen than small ones (of pandas's valid hard tasks
+   11% are fair, of its easy ones 32%), so a repo may end with 3, and pandas, with 19
+   candidates, with fewer.
+4. Each large task gets its L1 and L2 prompts like any other. Sonnet and Opus run it at L0 and
+   L2 (§4).
