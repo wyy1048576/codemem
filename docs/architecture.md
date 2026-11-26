@@ -1436,7 +1436,8 @@ and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and bec
 A card gives the location, the name, an id for `get_chunk`, the signature, the first doc line and
 a few lines of code; for a long function, the best-matching window. Then a `related:` line names up
 to 3 of the result's callers and callees, the ones closest to the query by their stored code
-vectors (`card_relations`; data-model.md §12.1 has the rules).
+vectors (`card_relations`; data-model.md §12.1 has the rules). After the cards, the next 20
+results are named, one line each (`more_results`).
 
 **Why the call graph is shown and not merged into the ranking.** Measured on Nov 26 on the eval's
 vLLM and pandas tasks (the issue as the query), on the half of the tasks no setting was chosen on.
@@ -1449,7 +1450,9 @@ tasks against 94, for 16 to 18 names a search; with the issue's first line as th
 58 and 88 against 70. The agent decides what to open, and the order of the 10 results does not
 change. Callees with more than 100 callers are left out: calls are linked by name, and on vLLM three
 methods named `append` have 4,362 callers each, really `list.append`; keeping every edge reached no
-more tasks and named more functions.
+more tasks and named more functions. The next 20 results, named after the cards, reach about as many
+tasks (116 of 175 vLLM, 108 of 162 pandas, 12 of 16 vague requests against 9 with the related
+names), but other ones: with both, a gold function is on the page for 127 of 175 and 117 of 162.
 
 **Long queries stay fast.** BM25 joins every query word with OR, so a whole issue text is costly.
 Dropping stopwords keeps a 250-word query on vLLM at 0.36 s of BM25 with no loss in accuracy.

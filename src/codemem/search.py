@@ -73,6 +73,21 @@ class ResultCard:
 
 
 @dataclass
+class MoreResult:
+    """A result after the k cards, shown by name only: where it is and what it is."""
+
+    chunk_id: int
+    path: str
+    start_line: int
+    end_line: int
+    qualname: str
+    kind: str
+    subkind: str
+    name: str
+    score: float
+
+
+@dataclass
 class SearchResponse:
     query: str
     signals: list[str]
@@ -84,6 +99,7 @@ class SearchResponse:
     # set with it: why no vector could be used, when that is a failure and not a load in progress
     # (a model that did not load, an embedding endpoint that does not answer)
     models_error: str | None = None
+    more: list[MoreResult] = field(default_factory=list)  # the results after the k cards, by name
 
     def to_dict(self) -> dict:
         return {
@@ -91,6 +107,7 @@ class SearchResponse:
             "signals": self.signals,
             "timings": self.timings,
             "results": [r.to_dict() for r in self.results],
+            "more": [asdict(m) for m in self.more],
         }
 
 
@@ -313,7 +330,13 @@ def search(
     rank_of = {s: {doc: r for r, doc in enumerate(ids, start=1)} for s, ids in ranked.items()}
     query_tokens = set(tokenize(query, stopwords=True))
     results: list[ResultCard] = []
-    for chunk, score in _pick_top(fused, k, store.get_chunks):
+    # The next `more_results` come from the same merge: each list gives `candidates` (50), so k + M up
+    # to 50 is always there when the index has that many chunks; past that, what the lists hold. The
+    # first k are the k a search without them returns (_pick_top orders by score, then location).
+    picked = _pick_top(fused, k + max(config.more_results, 0), store.get_chunks)
+    more = [MoreResult(c.chunk_id or 0, c.path, c.start_line, c.end_line, c.qualname, c.kind, c.subkind, c.name, score)
+            for c, score in picked[k:]]
+    for chunk, score in picked[:k]:
         doc = chunk.chunk_id
         ranks = {s: rank_of[s][doc] for s in ranked if doc in rank_of[s]} if debug else None
         hit = best_part.get(("code", doc))
@@ -331,7 +354,7 @@ def search(
         _add_relations(store, results, by_meaning, query_vec, config.card_relations, None if allowed is None else set(allowed))
         timings["relations"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
-    return SearchResponse(query=query, signals=list(signals), results=results, timings=timings)
+    return SearchResponse(query=query, signals=list(signals), results=results, timings=timings, more=more)
 
 
 def _add_relations(

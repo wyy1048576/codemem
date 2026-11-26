@@ -302,6 +302,7 @@ def _text(resp):
 def test_cards_name_their_callers_and_callees(index):
     store, cfg, factory = index
     assert cfg.card_relations == 3  # the default
+    cfg.more_results = 0  # the cards alone
     on = search(store, "revoke_session", cfg, k=1, embedder_factory=factory)
     card = on.results[0]
     assert card.qualname == "revoke_session"
@@ -353,3 +354,39 @@ def test_card_relations_setting_is_validated():
     for bad in (-1, 1.5, "3", True):
         with pytest.raises(ValueError, match="card_relations"):
             config_from_dict({"card_relations": bad})
+
+
+# ---------------------------------------------------------------- the next results, by name
+
+
+def test_the_next_results_follow_the_cards_by_name(index):
+    from codemem.render import MORE_HEADER, card_label
+
+    store, cfg, factory = index
+    assert cfg.more_results == 20  # the default
+    on = search(store, QUERY, cfg, k=3, embedder_factory=factory)
+    deeper = search(store, QUERY, cfg, k=23, embedder_factory=factory).results
+    total = len(search(store, QUERY, cfg, k=50, embedder_factory=factory).results)
+    assert len(on.more) == min(20, total - 3)  # the merge holds k + M when the index has them
+    assert [(m.path, m.start_line, m.qualname, m.score) for m in on.more] == [
+        (r.path, r.start_line, r.qualname, r.score) for r in deeper[3 : 3 + len(on.more)]
+    ]
+    text = _text(on).splitlines()
+    block = text.index(MORE_HEADER)
+    assert text[block - 1] == "" and text[block + 1 :] == [f"{m.path}:{m.start_line}  {card_label(m)}" for m in on.more]
+    assert any(m.kind == "block" for m in on.more) and f"{on.more[0].path}:{on.more[0].start_line}  {on.more[0].qualname}" in text
+    assert on.to_dict()["more"][0]["qualname"] == on.more[0].qualname
+    cfg.more_results = 0
+    off = search(store, QUERY, cfg, k=3, embedder_factory=factory)
+    assert off.more == [] and MORE_HEADER not in _text(off)
+    assert _text(off).splitlines() == text[: block - 1]  # the cards are the same, the block is all that differs
+    assert [(r.key, r.score) for r in off.results] == [(r.key, r.score) for r in on.results]
+
+
+def test_more_results_setting_is_validated():
+    from codemem.config import Config, config_from_dict
+
+    assert Config().more_results == 20 and config_from_dict({"more_results": 0}).more_results == 0
+    for bad in (-1, 2.5, "20", False):
+        with pytest.raises(ValueError, match="more_results"):
+            config_from_dict({"more_results": bad})

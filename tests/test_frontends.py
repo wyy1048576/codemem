@@ -981,6 +981,7 @@ def test_mcp_tools_end_to_end(service):
             assert "auth/sessions.py:19-20  revoke_session" in text
             assert text.endswith("\n\n" + prompts.search_footer("light"))
             assert "\n   related: " in text  # the cards name their closest callers and callees
+            assert "\n\nMore results, by name (ask get_chunk for any of them):\n" in text
             res = await client.call_tool("get_chunk", {"ref": "auth/sessions.py:20"})
             assert "db.sessions.delete(session_id)" in res.content[0].text
             assert "callers: " in res.content[0].text
