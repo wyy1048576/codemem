@@ -24,6 +24,10 @@ A recipe is one TOML file for each repo, in eval/envs/. Its fields:
                 test_files and test. It replaces the two fields above
   parser        how results are read. Only "junit" exists
   timeout_min   the limit for one suite in one test run
+  test_paths    globs: files that are tests in this repo, in addition to the collector's rule
+                (patches.classify_path). Only `cmeval resplit` reads it (see resplit.py)
+  fix_paths     globs: files that are not code but that the fix needs to build (CMakeLists.txt,
+                for example). Only `cmeval resplit` reads it
 
 A task is valid when at least one test does not pass in any run before the fix (it fails, it is
 skipped, or it is missing) and passes in every run after it, no test that passed before the fix
@@ -107,6 +111,10 @@ class Recipe:
     timeout_min: int = 10
     env: tuple[tuple[str, str], ...] = ()
     suite: tuple[Suite, ...] = ()
+    # Read by `cmeval resplit` only. They change the task data, not the image or the tests, so the
+    # fingerprints leave them out: the task's patches are in the validation fingerprint.
+    test_paths: tuple[str, ...] = ()
+    fix_paths: tuple[str, ...] = ()
 
     @property
     def suites(self) -> tuple[Suite, ...]:

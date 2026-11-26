@@ -76,6 +76,17 @@ def test_recipe_with_suites_and_env(tmp_path):
     assert 'echo "before-1 0 $r ' in script and 'echo "after-1 1 $r ' in script
 
 
+def test_recipe_test_and_fix_paths_do_not_change_fingerprints(tmp_path, make_task):
+    path = tmp_path / "x.toml"
+    path.write_text('repo = "a/b"\nbase_image = "i"\ntest = "t"\ntest_paths = ["test/**"]\nfix_paths = ["src/**"]\n')
+    recipe = gen.load_recipe(path)
+    assert recipe.test_paths == ("test/**",) and recipe.fix_paths == ("src/**",)
+    plain = replace(recipe, test_paths=(), fix_paths=())
+    task = make_task()
+    assert gen.image_fingerprint(recipe, task) == gen.image_fingerprint(plain, task)
+    assert gen.validation_fingerprint(recipe, task, 3) == gen.validation_fingerprint(plain, task, 3)
+
+
 def test_recipe_needs_test_or_suites(tmp_path):
     path = tmp_path / "x.toml"
     path.write_text('repo = "a/b"\nbase_image = "i"\n')
@@ -236,7 +247,9 @@ def test_every_recipe_field_changes_the_right_fingerprint(make_task):
     recipe = gen.Recipe(name="r", repo="a/b", base_image="i", test="t {files} {junit}")
     task = make_task(test_patch=_patch("t/test_a.py"))
     image, validation = gen.image_fingerprint(recipe, task), gen.validation_fingerprint(recipe, task, 3)
-    assert set(IMAGE_FIELDS) | set(TEST_FIELDS) == set(gen.Recipe.__dataclass_fields__) - {"name"}
+    # test_paths and fix_paths only shape the task data (cmeval resplit); the patches are in the fingerprint.
+    data_fields = {"name", "test_paths", "fix_paths"}
+    assert set(IMAGE_FIELDS) | set(TEST_FIELDS) == set(gen.Recipe.__dataclass_fields__) - data_fields
     for name, value in IMAGE_FIELDS.items():
         other = replace(recipe, **{name: value})
         assert gen.image_fingerprint(other, task) != image, name
