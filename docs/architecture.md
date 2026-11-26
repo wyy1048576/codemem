@@ -960,20 +960,31 @@ vectors it has to compare exactly. A search has three steps:
 - **Step 3 makes every score exact.** It reads the candidates' stored vectors and computes the
   real similarity. A score that leaves the index differs from the exact index's by less than
   0.000001, so result lists can be merged by score.
-- **How many.** Step 1 keeps the best 2,000 codes; one in 50 of the vectors the search may
-  return, when that is more (4,000 at 200,000 vectors); and never fewer than 4 for each candidate
+- **How many.** Step 1 keeps the best 4,000 codes; one in 50 of the vectors the search may
+  return, when that is more (beyond 200,000 vectors); and never fewer than 4 for each candidate
   of step 2. Step 2 keeps `rescore` (200), and at least 4 for each result asked for. A search
   asks for the best 50 chunks, which is 51 vectors when every chunk has one, so 204 are read
   (252 in the index of the picture, whose chunks have 1.25 vectors each).
 - **When steps are skipped.** If no more vectors qualify than step 3 would read (a small index,
   or a filter that leaves few), all of them are read and scored, and the result is the exact
   index's. If no more qualify than step 1 would keep, step 2 ranks them all.
-- **Why step 1 keeps 2,000.** For each of the 768 real searches we looked up how far down the
-  1-bit scan's order its exact top 50 lie. The deepest lay at place 1,901. Half the question
-  searches need only the best 206, 99% of them the best 1,356, and a top 10 never lay deeper than
-  place 247. On a random half, quarter and eighth of the vectors the deepest places were 952,
-  1,484 and 533: the depth grows more slowly than the index, so one in 50 leaves a larger index
-  more room.
+- **Why step 1 keeps 4,000.** For each of the 768 real searches on 31k vectors we looked up how
+  far down the 1-bit scan's order its exact top 50 lie. The deepest lay at place 1,901. Half the
+  question searches need only the best 206, 99% of them the best 1,356, and a top 10 never lay
+  deeper than place 247. On a random half, quarter and eighth of the vectors the deepest places
+  were 952, 1,484 and 533: the depth grows more slowly than the index, so one in 50 leaves a
+  larger index more room. On two real indexes the depth depends on the question:
+
+  | Index | Questions about the repo: the deepest place | Questions about another repo: the deepest place |
+  |---|---|---|
+  | pandas, 43,187 code vectors | 661 | 2,021 |
+  | vLLM, 109,562 code and 35,167 usage vectors | 976 | 2,178 |
+
+  A question about something the repo does not hold has weak matches that lie close together,
+  and the 1-bit code orders them badly. With 2,000 kept, one such search on each index lost one
+  result of its top 50 (ranks 45 and 44; no top 10 was touched). With 4,000 all 704 such searches
+  on vLLM return the exact top 50, as do the 762 with vLLM's own questions. The 2,000 more codes
+  cost a search 0.5 ms with FAISS 1.16.0.
 - **Why FAISS does not scan the fine codes itself.** FAISS can scan a multi-bit index in one
   call. It then takes the full estimate of every code whose first bit leaves it a chance against
   the best found so far: a tenth of the codes when 200 candidates are asked for, a fifth to a
@@ -1065,10 +1076,14 @@ with FAISS on one thread:
 In a process of its own each backend meets the load of its own minute. In the last two rows they
 take turns, query by query, so that the load slows them alike; no backend then keeps its codes in
 the processor's cache from one search to the next. Four more things to know about the cost:
-- **On a small index the exact one is faster.** At 31k vectors it answers in 6.2 ms and the
-  compact index in 8.5 (7.1 and 12.8 ms in turns): steps 2 and 3 take 5.4 ms there, and the
-  faster scan before them saves less than that. The two meet somewhere between 60,000 and
-  160,000 vectors, depending on the load.
+- **On a small index the exact one is faster.** Steps 2 and 3 take about 3 ms whatever the
+  index's size, and on a small index the faster scan before them saves less than that. With
+  FAISS 1.16.0, which the lock file pins, and the two indexes taking turns: 3.0 ms against 4.5
+  on pandas's 43,187 real code vectors, 2.4 against 3.9 ms on vLLM's 35,167 usage vectors, and
+  8.1 against 7.5 ms on vLLM's 109,562 code vectors. The two meet at about 100,000 vectors. The
+  table above was taken with FAISS 1.15.1, whose RaBitQ code has no vectorized form for ARM
+  processors: with 1.16.0 both indexes are about 1.5 times faster on an M1, and one 4-bit
+  estimate takes 0.3 µs and not 1.4.
 - **Coding takes time.** A start from the rows codes every vector: 32 s at 200,000,
   against 2.5 s for the exact index. The saved file avoids it.
 - **The rows must be in the operating system's file cache.** When they are not (after a restart),
@@ -1083,9 +1098,10 @@ the processor's cache from one search to the next. Four more things to know abou
   of the store, the rows are read through the main connection instead.
 
 **Where it can differ from the exact index.**
-- The measurements above are one model and 31k vectors. On another model's vectors, or on an
-  index several times larger, the best 2,000 (or one in 50) of the 1-bit scan may hold less of a
-  search's top 50. Its top 10 has more room: it never lay deeper than place 458 in any sample.
+- The measurements above are one model, on indexes of up to 145,000 vectors. On another model's
+  vectors, or on an index several times larger, the best 4,000 (or one in 50) of the 1-bit scan
+  may hold less of a search's top 50. Its top 10 has more room: it never lay deeper than place
+  581 in any sample.
 - A query with nothing near it. On 200,000 synthetic vectors, queries that have about 100 near
   neighbours each got the exact top 50 in every search. Queries that have none (their best
   match scores 0.14 and their 4,000th best 0.07, so a thousand vectors lie within a 1-bit code's

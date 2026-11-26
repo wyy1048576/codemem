@@ -295,7 +295,9 @@ _ROTATION_SEED = 20261125
 _QUERY_BITS = 4  # FAISS takes estimates against a query rounded to this many bits per number
 _PER_RESULT = 4  # candidates scored exactly for each result asked for
 # With fine codes, how many of the scan's best they rank again: at least this many, ...
-_RANKED = 2000
+# (2,000 lost one result of a top 50 in each of two real indexes, at places 2,021 and 2,178 of the
+# scan, both for a question about another repo: docs/architecture.md §5)
+_RANKED = 4000
 _RANKED_PER_CANDIDATE = 4  # ... this many for each candidate, ...
 _RANKED_ONE_IN = 50  # ... and one in this many of the vectors the search may return.
 _NO_THRESHOLD = -1e30  # below every estimate: FAISS's range search then returns all it is given
@@ -346,7 +348,7 @@ class CompactVectorStore(VectorStore):
     them, at most COMPACT_MAX_DIM; `code_dim` once resolved), scaled to length 1 and rotated.
     Every vector has a coarse code, 1 bit per number plus 8 bytes: that is what a search scans.
     With `bits` above 1 it also has a fine code of `bits` bits per number, and the scan's best
-    (2,000 or more: `_candidates`) are ranked again by their fine estimates. The best of that, at
+    (4,000 or more: `_candidates`) are ranked again by their fine estimates. The best of that, at
     least `rescore` and at least 4 per result asked for, are the candidates: their vectors are
     read through `fetch` and scored exactly, so every score a search returns is the real
     similarity. With no more vectors to choose from than it would score, it scores them all and
