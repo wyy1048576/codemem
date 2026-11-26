@@ -12,13 +12,14 @@ from cmeval.collect.tasks_build import (
     Skip,
     build_tasks,
     candidate_to_task,
+    drop_known,
     fetch_pr_files,
     merge_base,
     patch_paths,
     write_task_set,
 )
 from cmeval.github import GitHub
-from cmeval.tasks import assign_split, load_tasks
+from cmeval.tasks import Task, assign_split, load_tasks
 
 from conftest import REMOTE_REPO
 
@@ -328,3 +329,30 @@ def test_rust_file_with_fix_and_test_code_drops_the_task(history):
     with pytest.raises(Skip) as info:
         candidate_to_task(candidate(mixed), settings(), ["src/lib.rs"])
     assert info.value.args[0] == "test_split" and "src/lib.rs" in info.value.args[1]
+
+
+def test_drop_known_keeps_new_tasks_and_records_the_rest(history, tmp_path):
+    remote, _ = history
+    fix = remote.commit({"pkg/core.py": CORE_FIXED}, "Fix Store.get (#7)")
+    task = candidate_to_task(candidate(fix), settings(), ["pkg/core.py"])
+    row = task.to_dict()
+    other = Task.from_dict({**row, "id": "acme__demo-9", "fix": {**row["fix"], "pr_number": 9}})
+    first = tmp_path / "first.jsonl"  # only id and repo are read
+    first.write_text("".join(json.dumps({"id": i, "repo": r, "query": "a\u2028b\x0cc"}, ensure_ascii=False) + "\n"
+                             for i, r in ((task.id, REMOTE_REPO), ("acme__demo-3", REMOTE_REPO),
+                                          ("acme__other-7", "acme/other"))), encoding="utf-8")
+
+    kept, record = drop_known([task, other], [first], [REMOTE_REPO])
+    assert [t.id for t in kept] == ["acme__demo-9"]
+    assert record["repos"] == {REMOTE_REPO: {"found": 2, "left_out": 1, "kept": 1, "not_found_again": ["acme__demo-3"]}}
+    assert record["files"][0]["name"] == "first.jsonl" and len(record["files"][0]["sha256"]) == 64
+    # the same id in another repo is not the same task
+    kept, _ = drop_known([Task.from_dict({**task.to_dict(), "repo": "acme/third"})], [first], ["acme/third"])
+    assert len(kept) == 1
+
+    funnel = Funnel(repo=REMOTE_REPO, base_branch="main", since="2026-07-01", until="2026-10-22")
+    out = tmp_path / "new.jsonl"
+    write_task_set(out, [other], [funnel], settings(), tmp_path / "fresh-t.toml", record)
+    assert json.loads(out.with_suffix(".meta.json").read_text())["excluded"] == record
+    write_task_set(out, [other], [funnel], settings(), tmp_path / "fresh-t.toml")
+    assert "excluded" not in json.loads(out.with_suffix(".meta.json").read_text())

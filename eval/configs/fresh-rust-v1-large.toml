@@ -1,0 +1,39 @@
+# The hard tier (plan docs/plan/runs.md, section 10).
+# `cmeval collect configs/fresh-rust-v1-large.toml --exclude-tasks tasks/fresh-rust-v1.jsonl`
+# The same as configs/fresh-rust-v1.toml, with two changes: the size limits are 15 code files and
+# 600 changed lines, and only the repos of the plan's ranks 1 to 8 are listed. --exclude-tasks
+# keeps only the tasks that the first collection did not keep.
+
+[collect]
+since = "2026-07-01"  # the freshness cutoff (Opus 5.5 data ends in June 2026)
+until = "2026-10-22"
+min_body_chars = 100  # issue body without hidden comments, as of when the fix PR was opened
+extra_bots = []  # more bot logins to drop, next to the built-in list
+max_code_files = 15  # changed code files in the fix (tests and docs do not count)
+max_code_lines = 600  # added plus removed lines in those code files
+
+[[repo]]
+name = "astral-sh/ruff"
+# ty's issues live in astral-sh/ty, its code in this repo. 257 of the human PRs in the window
+# link exactly one ty issue, 78 one ruff issue. The tag issue_repo tells the two kinds apart.
+issue_repos = ["astral-sh/ty"]
+note = """The standard rule (an issue in the same repo) gives 65 tasks: tag issue_repo = astral-sh/ruff. \
+With issues of astral-sh/ty too, 230 tasks. ty keeps its issue tracker in the separate repo astral-sh/ty, \
+and its code lives in astral-sh/ruff. Whether the 165 tasks with a ty issue enter the reported set is \
+Andrew's decision."""
+# Test files whatever their extension (collect/test_split.py). Rust source files whose changes
+# are all in #[cfg(test)] code also count as tests. Keep in step with eval/envs/ruff.toml.
+test_paths = [
+    "crates/*/resources/test/**",  # rule fixtures
+    "crates/*/resources/mdtest/**",  # markdown tests (ty, ruff_linter)
+    "crates/ty_python_semantic/resources/corpus/**",
+    "crates/ruff_python_parser/resources/valid/**",
+    "crates/ruff_python_parser/resources/invalid/**",
+    "crates/ruff_python_parser/resources/inline/**",
+    "**/tests/**",  # integration tests and their data
+    "**/snapshots/**",  # insta snapshots
+    "**/*.snap",
+    "**/src/**/tests.rs",  # out-of-line #[cfg(test)] mod tests;
+    "**/property_tests.rs",
+    "**/property_tests/**",
+]

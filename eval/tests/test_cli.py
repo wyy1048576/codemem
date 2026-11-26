@@ -117,6 +117,13 @@ def test_collect_dry_run_writes_nothing_and_full_run_writes(tmp_path, monkeypatc
     assert (full["name"], full["state"], full["done"], full["total"], full["unit"]) == ("fresh-t", "done", 1, 1, "repos")
     assert full["result"]["tasks"] == 0 and dry["result"]["tasks"] is None
 
+    first = tmp_path / "first.jsonl"
+    first.write_text(json.dumps({"id": "acme__demo-1", "repo": "acme/demo"}) + "\n")
+    assert main(["collect", str(config), "--out", str(tmp_path / "tasks" / "new.jsonl"), "--exclude-tasks", str(first)]) == 0
+    excluded = json.loads((tmp_path / "tasks" / "new.meta.json").read_text())["excluded"]
+    assert excluded["repos"] == {"acme/demo": {"found": 0, "left_out": 0, "kept": 0, "not_found_again": ["acme__demo-1"]}}
+    assert "0 tasks found, 0 left out" in capsys.readouterr().err
+
 
 def test_repo_stats_status_shows_retries_and_failures(tmp_path, monkeypatch, capsys):
     import json

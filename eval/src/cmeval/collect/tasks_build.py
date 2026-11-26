@@ -7,6 +7,8 @@ labels with the same rules as for SWE-bench tasks.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -266,8 +268,45 @@ def _repo_rules(settings: Settings, repo: str) -> dict:
     return {key: value for key, value in rules.items() if value}
 
 
-def write_task_set(out: Path, tasks: list[Task], funnels: list[Funnel], settings: Settings, config: Path) -> None:
-    """The task file (all repos, oldest fix first within a repo) and its meta file next to it."""
+def known_ids(files: list[Path]) -> dict[str, set[str]]:
+    """Repo -> the task ids in these task files (an earlier collection, for example)."""
+    found: dict[str, set[str]] = {}
+    for path in files:
+        # Line by line as load_tasks reads: str.splitlines also splits at characters such as
+        # U+2028, which a task file holds unescaped inside its strings.
+        with Path(path).open(encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    row = json.loads(line)
+                    found.setdefault(row["repo"], set()).add(row["id"])
+    return found
+
+
+def drop_known(tasks: list[Task], files: list[Path], repos_: list[str]) -> tuple[list[Task], dict]:
+    """The tasks whose id is in none of the task files, and a record of what was left out.
+
+    A second collection with wider size limits finds every task of the first one again. This
+    keeps only the new tasks. The record lists, for each repo of the collection, the tasks found,
+    left out and kept, and the ids of the files that the collection did not find again.
+    """
+    known = known_ids(files)
+    kept = [t for t in tasks if t.id not in known.get(t.repo, set())]
+    found = Counter(t.repo for t in tasks)
+    new = Counter(t.repo for t in kept)
+    ids = {t.id for t in tasks}
+    record = {
+        "files": [{"name": Path(f).name, "sha256": hashlib.sha256(Path(f).read_bytes()).hexdigest()} for f in files],
+        "repos": {repo: {"found": found[repo], "left_out": found[repo] - new[repo], "kept": new[repo],
+                         "not_found_again": sorted(known.get(repo, set()) - ids)} for repo in repos_},
+    }
+    return kept, record
+
+
+def write_task_set(out: Path, tasks: list[Task], funnels: list[Funnel], settings: Settings, config: Path,
+                   excluded: dict | None = None) -> None:
+    """The task file (all repos, oldest fix first within a repo) and its meta file next to it.
+
+    excluded is the record of drop_known, when tasks of earlier task files were left out."""
     from ..importers.swebench import label_stats
     from ..run import _eval_git
 
@@ -289,4 +328,5 @@ def write_task_set(out: Path, tasks: list[Task], funnels: list[Funnel], settings
         "repos": {f.repo: {"base_branch": f.base_branch, "counts": f.counts, "link_methods": f.link_methods,
                            "drop_reasons": f.drop_reasons(), **_repo_rules(settings, f.repo)} for f in funnels},
         "stats": stats,
+        **({"excluded": excluded} if excluded else {}),
     })

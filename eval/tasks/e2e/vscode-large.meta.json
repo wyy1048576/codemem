@@ -1,0 +1,69 @@
+{
+  "kind": "resplit",
+  "source": "fresh-ts-v1-large.jsonl",
+  "source_sha256": "dbb702fbbb186cccd1dbd19beba4e8456cd08ee6ba734174691590849030ec13",
+  "repo": "microsoft/vscode",
+  "recipe": "vscode",
+  "test_paths": [
+    "src/vs/**/test/**",
+    "test/**"
+  ],
+  "test_paths_from_test_files": false,
+  "leave_out": [
+    ".github/**",
+    ".circleci/**",
+    ".azure-pipelines/**",
+    ".gitlab-ci.yml",
+    "**/CHANGELOG*",
+    "**/newsfragments/**",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "**/package.json",
+    "**/package-lock.json",
+    "**/.npmrc"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 199,
+  "changed": 95,
+  "unchanged": 104,
+  "not_split": {},
+  "with_test_files_added": 14,
+  "with_fix_files_added": 90,
+  "test_files_added": 50,
+  "fix_files_added": 190,
+  "files_left_out": {
+    "leave_out .github/**": 12
+  },
+  "with_dependency_needed": 1,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 1
+  },
+  "dependency_needed": {
+    "microsoft__vscode-326164": [
+      {
+        "file": "package-lock.json",
+        "package": "@vscode/telemetry-extractor",
+        "old": "1.20.2",
+        "new": "1.20.4",
+        "kind": "raised"
+      }
+    ]
+  },
+  "with_dependency_other": 8,
+  "with_dependency_other_by_difficulty": {
+    "easy": 0,
+    "medium": 0,
+    "hard": 8
+  },
+  "with_test_patch_before": 189,
+  "with_test_patch_after": 189,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "0057385f398d68eeb41ff98436a53abb51ba991d",
+    "dirty": false
+  },
+  "created": "2026-11-26T19:09:53+00:00"
+}
