@@ -25,6 +25,7 @@ work is redone, and the files it keeps. How the system works is in
                  │  git (optional) ... the indexed commit; commit messages if you turn them on     │
                  │  an embedding API (optional, off by default) + its key in an environment var    │
                  │  a `codemem serve-embeddings` server (optional): one model for several codemem  │
+                 │  an assist endpoint (optional): a second source for a build's vectors           │
                  └────────────────────────────────────────────────────────────────────────────────┘
 
   depends on codemem:  the eval's adapter (eval/src/cmeval/adapters/codemem.py), through the
@@ -53,6 +54,7 @@ against 887 MB for the environment `uv sync` builds (Apple Silicon, Python 3.11,
 | **MCP SDK** (`mcp` 2.x, pinned below 3) | the standard MCP server over stdio | the MCP server can't start; the CLI still works | agents can't connect | the CLI |
 | **An embedding API** (optional: Nebius, OpenAI, a self-hosted server) | faster first builds of large repos, bigger models | a search waits about 31 s for retries, then fails (a known gap, §8); new edits wait in the queue and are retried | the search error names the provider; `index_status` doesn't flag it yet | none quick: another model means re-embedding everything, since vectors of different models can't mix. The same model at another address keeps the index if the config names the vectors with `space` (§5) |
 | **A `codemem serve-embeddings` server** (optional) | one copy of the local model in memory (1.3 GB on an M1's GPU) for several codemem processes: one per git worktree, one per container. Its clients need no PyTorch and no GPU | The same as an API that is down: a search waits about 31 s for retries, then fails; new edits wait in the queue and are retried; `codemem index` stops with the error. Nothing is lost: the server holds no index and no state | the error names the address, `embedding request to 127.0.0.1:8791 failed`; `GET /health` on the server answers `{"status":"ok"}` when it is up | start it again, on any address: an index is tied to its `space`, not to the address. It takes its port first and then loads the model, so requests that arrive meanwhile wait for the model, not for a retry |
+| **An assist endpoint** (optional: a `serve-embeddings` server on another machine, or a hosted API that serves the same model) | a first build is hours of model time on a weak machine, and a second source embeds part of it meanwhile. With stand-in models a build ran 1.26 to 3.4 times as fast, for an endpoint a quarter to four times as fast as the local model (architecture.md §3.5) | **Down, slow or over its rate limit:** the build goes on at the local model's speed. A request that fails gives its texts back within the same call, one that is late has them taken back, and the endpoint rests before it is tried again (§3). Measured with stand-in models: 1.00 times the local model's speed with an endpoint that is not there, 1.11 times with one that stops answering after a quarter of the texts. **Not the same vectors** (another model, precision or prompt, or texts cut earlier than the local model cuts them): it gets no text at all | the line `assist: …` of `codemem status` and `index_status` says that it shares the work, or in one sentence why not; the same sentence is logged once as a warning | none needed: the local model embeds everything, as without an assist |
 
 ---
 
@@ -81,6 +83,11 @@ The values codemem runs with, and why each was picked. All of these are settings
 | **vendored and generated code** | skipped | copies crowd results and cost embedding time; `third_party/` is kept, as it is often the project's own code | `use_default_ignore`, `skip_generated` |
 | **text length per vector** | 1,024 tokens (about 3,000 characters) | keeps CPU indexing tractable; longer code is split into windows, so nothing is lost | `max_seq_length` |
 | **API requests** | 64 texts each, 4 at a time, 60 s timeout; 6 tries, waiting 1, 2, 4, 8, 16 s (or the server's Retry-After, up to 60 s) | provider rate limits and brief outages | `[embedding] batch_size`, `max_concurrency`, `timeout_s`; tries are a constant |
+| **what an assist endpoint has to show** | every one of seven probe texts at a cosine of 0.99995 or more with the local model's vector, after its vectors are scaled to length 1 | Its vectors go into the index as the local model's, so "the same model" has to be measured. A provider need not normalize, and a vector's length says nothing about the model, so only the direction is compared. The bar sits between what is known to be harmless and what is known not to be. The same model on this machine's CPU in float32 and on its GPU in float16 agrees to 0.999996, and no score moves by more than 0.0007. In bfloat16 against float16 the agreement is 0.99978, and 2 of 20 top-10 lists change. In distance between two vectors that is 0.003 and 0.021; the bar is at 0.010. A `serve-embeddings` server on the same kind of device gives the same numbers (1.000000) | constant (`SAME_VECTORS`) |
+| **what an assist endpoint shares** | embedding calls of more than `batch_size` (16) texts: the calls of a build by `codemem index` or `codemem init` | an edit, a search's catch-up and a model warm-up are calls of one batch or less. They stay with the local model, so the 4 s catch-up and the writer's short calls behave as without an assist. Queries are never sent | `batch_size` |
+| **which texts of a shared call an assist endpoint may get** | those the local model reads whole: at most `max_seq_length` (1,024) tokens with the model's prompt and the tokenizer's own tokens, counted with the local model's tokenizer | the local model cuts a longer text, and a hosted model that reads further would give another vector for it. A text of exactly the limit may go; one token more stays local. An embedder that cannot say which texts it cuts (a plugin without `cut`) gets no assist | `max_seq_length` |
+| **an assist endpoint's requests** | 32 texts each, 4 at a time, 30 s timeout; sent once | a request that fails is not sent again: its texts go back to the local model within the same call, and the endpoint rests | `[embedding.assist] batch_size`, `max_concurrency`, `timeout_s` |
+| **an assist endpoint that failed** | rests 1 s, then twice as long after each further failure, up to 60 s; after a rate limit, for its Retry-After | a build must not stall on an endpoint that is down. After the rest its vectors are compared again before it gets work, since what answers then may be another server; after a rate limit it gets work again as it is | constants (`FIRST_PAUSE_S`, `LONGEST_PAUSE_S`) |
 | **the embedding server's address** | `127.0.0.1`, port 8791 | the loopback address is reachable from this machine only; containers on Docker Desktop reach it as `host.docker.internal`. Another address is a choice to expose the model, made with `--host` | `codemem serve-embeddings --host`, `--port` |
 | **the embedding server's key** | none | on the loopback address every client is a process of this machine. With `CODEMEM_SERVE_KEY` set in the server's environment, every request but `GET /health` must carry it as `Authorization: Bearer`; the server warns at start when it listens beyond the loopback address without one | the environment variable `CODEMEM_SERVE_KEY`, for the server and for each client (`api_key_env`) |
 | **the embedding server's model calls** | one at a time, at most `batch_size` (16) texts each; between calls the request with the fewest texts left goes first | nothing guards a call of the local model against a second thread, so one thread makes them all. A search's single query then waits for one batch of another client's build, not for the build. Texts of several requests may share a call | `batch_size` in the server's config |
@@ -155,6 +162,10 @@ Values in the code, not in the config.
 | `DEFAULT_PORT` | 8791 | `embedserver.py` | where `serve-embeddings` listens unless `--port` says otherwise |
 | `MAX_BODY_BYTES`, `MAX_INPUTS` | 16 MB, 2,048 texts | `embedserver.py` | the largest request the embedding server reads; a larger one gets HTTP 413 unread. codemem's own requests are 64 texts, about 0.2 MB |
 | `IDLE_TIMEOUT_S` | 60 s | `embedserver.py` | the embedding server closes a connection that sends nothing for this long |
+| `SAME_VECTORS` | cosine 0.99995 | `assist.py` | what each of an assist endpoint's probe vectors must reach against the local model's, once scaled to length 1 |
+| `FIRST_PAUSE_S`, `LONGEST_PAUSE_S` | 1 s, 60 s | `assist.py` | how long an assist endpoint rests after a failure, doubling in between |
+| `FIRST_CHECK_WAIT_S` | 2 s | `assist.py` | how long the first large call of a build waits for the endpoint's answer to the probe; an answer that comes later is used by the calls after it |
+| `LEAST_PATIENCE_S` | 0.5 s | `assist.py` | until the local model's speed is measured, the earliest moment it takes a late request's texts back |
 | `SAME_VECTOR` | cosine 0.9999 | `embedserver.py` | at start the embedding server embeds two texts as a query and as a document, in process and as prefix plus text; below this agreement it refuses to serve the model |
 | `RETRY_FIRST`, `RETRY_MAX` | 1 s, 60 s | `service.py` | the writer tries a failed step again (an update, embedding, a model's load) after 1 s, then after twice as long each time, up to a minute |
 | `TRIM_AFTER_IDLE` | 5 s | `embedder.py` | a model that has made no call for this long gives back what its calls needed beside it; calls closer together are one burst |
@@ -217,9 +228,14 @@ Three identities decide whether codemem can reuse what it has:
   (`jinaai/…|doc|L1024|float16|mps` and `api:st-L1024-float16-mps|jinaai/…|dims=full|doc=861b2167`),
   although the vectors are the same numbers. Moving an index from one to the other embeds it once
   more. Processes that are to share an index all embed through the server, the host's too.
-- **The API key and the server's key** are never part of anything: only the name of the
-  environment variable is in the config, and the key is read at each request. It is never written
-  to the index, the logs or `index_status`.
+- **An assist endpoint is no part of any key or setting.** What it embeds is stored under the
+  local embedder's key, and `[embedding.assist]` is not in the index settings. Setting it,
+  changing it or removing it redoes nothing, and an index built with it equals one built without
+  it. That is only right if the endpoint gives the local model's vectors, which the check before
+  its first text is for (§3).
+- **The API key, the server's key and an assist's key** are never part of anything: only the name
+  of the environment variable is in the config, and the key is read at each request. It is never
+  written to the index, the logs or `index_status`.
 
 **When you change a setting, what is redone:**
 
@@ -228,6 +244,7 @@ Three identities decide whether codemem can reuse what it has:
 | the model, the embedder, new weights in a model folder, `dtype`, the device | that vector type is re-embedded | a full embedding (vLLM: about 5 h on the M1), unless the cache has it |
 | an API's `model`, `dimensions`, `document_prefix` or `space`; its address when no `space` is set; between the model in process and the same model served | that vector type is re-embedded | the same |
 | an API's address when a `space` is set | nothing | none |
+| `[embedding.assist]`, any of it | nothing | none; the endpoint is compared with the local model again before it gets work |
 | `embedding_dim`, `vector_backend` | the search index is rebuilt from the stored vectors | seconds |
 | text settings (`max_seq_length`, `code_header`, `window_chars`, `window_overlap_lines`, `max_usage_items`, `include_commits`) | every text is rebuilt; only changed ones are re-embedded | depends on how many change |
 | `max_defs_per_name` | every call is relinked | seconds; usage texts that change are re-embedded |
@@ -253,6 +270,8 @@ only what each file costs to recreate.
 | `~/.codemem/indexes/<worktree>-<hash>/worktree.json` | which worktree the folder serves, and its repository | tiny | written again at the next start in that worktree; until then the folder is not deleted when the worktree is removed |
 | `~/.codemem/cache/vectors.db` | every vector ever computed on this machine | grows about 4.5 KB per vector, never shrinks | **costly:** the next rebuild of each repo re-embeds everything (vLLM: about 5 h). The one file worth keeping |
 | `~/.codemem/model_hashes.json` | hashes of local model folders' files | tiny | each local model folder is read once more (about 1 s per GB) |
+| `~/.codemem/assist/probe-<hash>.npz` | the seven probe texts of an assist's check, the local model's vectors for them and its document prompt, one file per embedder key | about 40 KB (25 KB of vectors, the rest the texts) | the local model finds the text that fills its limit and embeds the seven once more, at the next check |
+| `~/.codemem/assist/checks.json` | what the last check of each assist endpoint found, per local model, for `codemem status` | tiny | `codemem status` says "not checked yet" until the next check |
 | the Hugging Face model cache (`HF_HOME`) | the downloaded model | ~1 GB | downloaded again at the next start (needs the network) |
 | `~/.codemem/config.toml`, `<repo>/.codemem.toml` | your settings | | yours to keep |
 
@@ -288,12 +307,17 @@ deleted: remove them by hand.
 
 ## 7. Network and privacy
 
-codemem goes over the network in two cases only:
+codemem goes over the network in three cases only:
 - **downloading the model** from Hugging Face, once (`HF_HUB_OFFLINE=1` stops even the update
   check afterwards);
 - **an embedding API**, only if you configure one. That sends your code to the provider, and
   `index_status` says so. A `serve-embeddings` server is such an endpoint: the code goes to the
-  machine it runs on.
+  machine it runs on;
+- **an assist endpoint**, only if you configure one. The texts of a build's large embedding calls
+  go there, and seven fixed probe texts that hold none of your code. Queries, the texts of small
+  calls, and texts longer than the local model reads do not. `codemem status --check-assist`
+  sends the seven probe texts only. `index_status` names the endpoint and says that code is sent
+  to it.
 
 Searches, updates and everything else stay on your machine.
 
@@ -319,4 +343,9 @@ whoever can reach that address; `CODEMEM_SERVE_KEY` asks for a key then (§3).
 | a new worktree's index is copied before the MCP handshake | on vLLM the server answers its first message 1 to 2 s later; an agent host with a short start-up limit could give up on a much larger repo or a busy disk | open the index in the background, or clone the file where the file system can (APFS: no time, no extra disk) |
 | every worktree has a full index on disk | vLLM: ~640 MB each, ~900 MB with its saved search indexes | vectors stored once per machine, so an index holds only structure |
 | the local embedder gives jina's two prompts to every model | a model without jina's prompt names (`nl2code_query`, `nl2code_document`) is embedded with jina's prompt texts in front, which it was not trained with. `serve-embeddings` prints the same two texts as its clients' prefixes, so a served model matches the model in process | the model's own `query` and `document` prompts, else `query_prefix` and `document_prefix`. The key of those models then has to change, and the document prefix becomes an index-time setting of local indexes |
+| an assist shares only a build's large calls | a first build that the MCP server's writer does in the background is made of calls of at most 16 texts and 3,000 characters, so the endpoint gets none of it. Build with `codemem index` or `codemem init`, which embed in calls of 256 texts | larger background calls while no search waits, or sharing a small call by measured speed |
+| an assist endpoint gets no text longer than the local model reads | a code text is a window of whole lines sized at 3 characters for each token of the limit, and a usage text can be twice as long, so the texts over the limit are the dense and the long ones. Their share of a repository has not been counted, and the local model embeds all of them | count them on a real repository with the model's tokenizer; share them with an endpoint that is shown to cut where the local model does (a `serve-embeddings` server with the same settings) |
+| the time to count a call's tokens is not measured for the default model | each large call tokenizes its longer texts once more than the model does, on a copy of the tokenizer that is made at each model load | time one call of 256 texts and the copy, and read the copy's size, on a quiet machine |
+| the indexer keeps one speed estimate for shared and local calls | a call is timed as a whole, so after a shared call the estimate is the two sources' speed together, and after a small call it is the local model's alone. In a process that makes both (an MCP server after `refresh_index`, `codemem watch` after its first update), a search's catch-up can start a small call that the estimate says fits its 4 s and that ends after them: by less than one small call's time, and only until a few small calls have moved the estimate. `refresh_index` (60 s) makes large calls: one that follows small calls is judged slower than it is and may not be started, and one that follows shared calls runs past the 60 s by a share of its own time when the endpoint has stopped answering. None of it has been timed | one estimate for calls of at most `batch_size` texts and one for larger calls, in `Indexer._compute` |
+| an assist has only met stand-in models | the check, the split and the failure handling are tested with fake models and a `serve-embeddings` server. The token count was compared with a small BERT model's own cutting on a CPU. No hosted provider was called, and the default model shared no build | a build with the real model against a `serve-embeddings` server on a second machine, and `codemem status --check-assist` against a hosted API with its key |
 | the embedding server's client reads vectors as JSON text | 1.2 to 2.1 ms a text in a build (§3): 1 to 2% of the model's time on the M1, and a larger share the faster the model is. A search does not notice it | the server also answers `encoding_format = "base64"`, which costs 0.06 to 0.12 ms a text in the same measurement; have the client ask for it |

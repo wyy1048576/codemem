@@ -27,9 +27,12 @@ its calls needed besides it.
 
 from __future__ import annotations
 
+import copy
+import dataclasses
 import functools
 import gc
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -44,7 +47,7 @@ from urllib.parse import urlparse
 
 import numpy as np
 
-from .config import Config, EmbeddingConfig, VectorConfig, model_version
+from .config import AssistConfig, Config, EmbeddingConfig, VectorConfig, model_version
 from .plugins import load_object
 from .tokenize import tokenize
 
@@ -200,6 +203,14 @@ class Embedder(ABC):
         give. A served model's clients carry the two as `query_prefix` and `document_prefix`."""
         raise NotImplementedError(f"{type(self).__name__} does not say what it puts before a query or a document")
 
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        """For each document text, whether this embedder reads less than all of it: with its
+        document prefix and the tokenizer's own tokens it is longer than the model's limit. Another
+        source of the same model may read it whole and give another vector, so such a text is
+        never embedded elsewhere (assist.py). An embedder that cannot say raises NotImplementedError
+        with the reason, and gets no assist."""
+        raise NotImplementedError(f"{type(self).__name__} does not say which texts it reads only in part")
+
     @property
     def ready(self) -> bool:
         """Can embed now, without loading a model first."""
@@ -323,6 +334,9 @@ class FakeEmbedder(Embedder):
     def prefixes(self) -> tuple[str, str]:
         return ("", "")
 
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        return [False] * len(texts)  # it reads every text whole
+
 
 def resolve_device(preference: str) -> str:
     """The device a local model runs on. An environment without PyTorch has nothing to run on a GPU: cpu."""
@@ -375,6 +389,8 @@ class SentenceTransformerEmbedder(Embedder):
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self._model = None
+        self._counter = None  # a copy of the model's tokenizer that only counts (`cut`)
+        self._count_lock = threading.Lock()
         self._prompts: dict[str, dict[str, str]] = {_AS_GIVEN: {"prompt": ""}}  # how each kind of text is encoded
         self._prefixes = ("", "")  # the query and document prompts as text, known once the model is loaded
         self._lock = threading.Lock()
@@ -402,7 +418,7 @@ class SentenceTransformerEmbedder(Embedder):
             self._lock.release()
 
     def _drop(self) -> bool:
-        had, self._model = self._model is not None, None
+        had, self._model, self._counter = self._model is not None, None, None
         return had
 
     def trim(self, idle_seconds: float = 0.0) -> bool:
@@ -504,6 +520,39 @@ class SentenceTransformerEmbedder(Embedder):
         _ = self.model  # loads it: the prompts come with the model
         return self._prefixes
 
+    @_counted
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        """Counted as the model counts: the document prefix and the text as one string, the
+        tokenizer's own tokens included, against the length the model cuts at. A text of exactly
+        that many tokens is read whole; one token more and it is cut. A plain ASCII text of fewer
+        characters than the limit cannot reach it, a token being one character at least, and is
+        not tokenized for this."""
+        model = self.model
+        limit = model.max_seq_length
+        if not limit:
+            return [False] * len(texts)
+        prefix = self.prefixes[1]
+        try:
+            with self._count_lock:
+                if self._counter is None:
+                    # A tokenizer keeps whether it cuts as a setting of its own. Counting on the
+                    # model's would switch that off under a call embedding in another thread.
+                    self._counter = copy.deepcopy(model.tokenizer)
+                counter = self._counter
+                # 8: for a token a tokenizer puts in beside the text's own and does not count as special
+                spare = limit - counter.num_special_tokens_to_add() - len(prefix) - 8 if prefix.isascii() else -1
+                out = [False] * len(texts)
+                long = [i for i, text in enumerate(texts) if len(text) > spare or not text.isascii()]
+                if long:
+                    counted = counter([prefix + texts[i] for i in long], truncation=False, padding=False, verbose=False)
+                    for i, ids in zip(long, counted["input_ids"]):
+                        out[i] = len(ids) > limit
+        except Exception as e:
+            raise NotImplementedError(
+                f"the tokens of {self.model_name} could not be counted ({type(e).__name__}: {e})"
+            ) from e
+        return out
+
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         """Queries are cached (the eval asks the same query of several systems that share a model)."""
         missing = [t for t in dict.fromkeys(texts) if t not in self._queries]
@@ -525,9 +574,11 @@ class OpenAIEmbedder(Embedder):
     RETRIES = 6
     BACKOFF_S = 1.0  # first wait between retries; doubles, up to 30 s
 
-    def __init__(self, cfg: EmbeddingConfig):
+    def __init__(self, cfg: EmbeddingConfig, *, section: str = "[embedding]", request: dict[str, Any] | None = None):
         self.cfg = cfg
         self.model_name = cfg.model
+        self.section = section  # the config section these settings come from, for messages
+        self.request = dict(request or {})  # more fields for the request body, a provider's own
         self._dim: int | None = None
         self._client: Any = None
         self._lock = threading.Lock()
@@ -565,51 +616,54 @@ class OpenAIEmbedder(Embedder):
             key = os.environ.get(self.cfg.api_key_env)
             if not key:
                 raise RuntimeError(
-                    f"[embedding] api_key_env is {self.cfg.api_key_env!r}, but that environment variable is not set"
+                    f"{self.section} api_key_env is {self.cfg.api_key_env!r}, but that environment variable is not set"
                 )
             headers["Authorization"] = f"Bearer {key}"
         return headers
 
-    def _request(self, texts: list[str]) -> np.ndarray:
+    def attempt(self, texts: list[str]) -> np.ndarray:
+        """One request, sent once: the reply's vectors as they came, one row per text. Raises
+        TryLater for what a later request may not hit (a rate limit, a server error, a timeout, a
+        refused or dropped connection) and RuntimeError, with the provider's message, for the rest."""
         import httpx
 
-        client = self._http()
         url = self.cfg.base_url.rstrip("/") + "/embeddings"
-        body: dict[str, Any] = {"model": self.model_name, "input": texts}
+        body: dict[str, Any] = {**self.request, "model": self.model_name, "input": texts}
         if self.cfg.dimensions:
             body["dimensions"] = self.cfg.dimensions
+        try:
+            r = self._http().post(url, json=body, headers=self._headers())
+        except httpx.TransportError as e:
+            raise TryLater(f"embedding request to {self.host} failed: {e}") from e
+        if r.status_code == 429 or r.status_code >= 500:
+            failed = f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}"
+            raise TryLater(failed, _retry_after(r), rate_limited=r.status_code == 429)
+        if r.status_code >= 400:
+            raise RuntimeError(f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}")
+        data = sorted(r.json()["data"], key=lambda d: d["index"])
+        if len(data) != len(texts):
+            raise RuntimeError(f"{self.host} returned {len(data)} embeddings for {len(texts)} texts")
+        rows = [d["embedding"] for d in data]
+        if len({len(row) for row in rows}) != 1:
+            raise RuntimeError(f"{self.host} returned vectors of different lengths")
+        return np.asarray(rows, dtype=np.float32)
+
+    def _request(self, texts: list[str]) -> np.ndarray:
         delay = self.BACKOFF_S
         for attempt in range(self.RETRIES):
-            last = attempt == self.RETRIES - 1
             try:
-                r = client.post(url, json=body, headers=self._headers())
-            except httpx.TransportError as e:  # a timeout, or a refused or dropped connection
-                if last:
-                    raise RuntimeError(f"embedding request to {self.host} failed: {e}") from e
-                time.sleep(delay)
+                return self._shape(self.attempt(texts))
+            except TryLater as e:
+                if attempt == self.RETRIES - 1:
+                    raise RuntimeError(str(e)) from e
+                time.sleep(e.wait or delay)
                 delay = min(delay * 2, 30.0)
-                continue
-            if r.status_code == 429 or r.status_code >= 500:
-                if last:
-                    raise RuntimeError(f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}")
-                time.sleep(_retry_after(r) or delay)
-                delay = min(delay * 2, 30.0)
-                continue
-            if r.status_code >= 400:
-                raise RuntimeError(f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}")
-            data = sorted(r.json()["data"], key=lambda d: d["index"])
-            if len(data) != len(texts):
-                raise RuntimeError(f"{self.host} returned {len(data)} embeddings for {len(texts)} texts")
-            return self._shape([d["embedding"] for d in data])
         raise AssertionError("unreachable")
 
-    def _shape(self, rows: list[list[float]]) -> np.ndarray:
+    def _shape(self, vecs: np.ndarray) -> np.ndarray:
         """A reply's vectors at the configured length, normalized. `dimensions` goes to the provider,
         but one that ignores it answers with full vectors: the first numbers of those are the short
         vector, so they are cut here, and what the key names is what gets stored."""
-        if len({len(row) for row in rows}) != 1:
-            raise RuntimeError(f"{self.host} returned vectors of different lengths")
-        vecs = np.asarray(rows, dtype=np.float32)
         want = self.cfg.dimensions
         if want and vecs.shape[1] < want:
             raise RuntimeError(
@@ -641,6 +695,16 @@ class OpenAIEmbedder(Embedder):
                 if len(self._queries) > _QUERY_CACHE_SIZE:
                     self._queries.popitem(last=False)
         return np.stack([self._queries[t] for t in texts]) if texts else np.zeros((0, self.dim), dtype=np.float32)
+
+
+class TryLater(Exception):
+    """A request failed in a way a later one may not: a rate limit (429), a server error (5xx), a
+    timeout, a refused or dropped connection. `wait` is the server's Retry-After, when it sent
+    one; `rate_limited` says the server answered, and only asked for fewer requests."""
+
+    def __init__(self, message: str, wait: float | None = None, rate_limited: bool = False):
+        super().__init__(message)
+        self.wait, self.rate_limited = wait, rate_limited
 
 
 def _retry_after(response: Any) -> float | None:
@@ -706,6 +770,9 @@ class PluginEmbedder(Embedder):
     def prefixes(self) -> tuple[str, str]:
         return self.inner.prefixes
 
+    def cut(self, texts: Sequence[str]) -> list[bool]:
+        return self.inner.cut(texts)
+
 
 _CACHE: dict[tuple, Embedder] = {}
 _CACHE_LOCK = threading.Lock()
@@ -726,10 +793,12 @@ def make_embedder(spec: VectorConfig | str, config: Config) -> Embedder:
         key: tuple = ("fake", model_name, *settings)
     elif spec.embedder:
         key = ("plugin", spec.embedder, model_name, model_version(spec), *settings)
-    elif emb.remote:
-        key = ("api", *(getattr(emb, f) for f in emb.__dataclass_fields__))
+    elif emb.remote:  # every setting but the assist's, which is the local model's alone
+        key = ("api", *(getattr(emb, f) for f in emb.__dataclass_fields__ if f != "assist"))
     else:  # the version is in the key, so new weights saved over a model folder load fresh
         key = ("local", model_name, model_version(spec), *settings)
+    if emb.assist.active and not emb.remote:
+        return _assisted(key, spec, config)
     with _CACHE_LOCK:
         if key not in _CACHE:
             if fake:
@@ -749,3 +818,21 @@ def make_embedder(spec: VectorConfig | str, config: Config) -> Embedder:
                     version=key[2],
                 )
         return _CACHE[key]
+
+
+def _assisted(key: tuple, spec: VectorConfig, config: Config) -> Embedder:
+    """The embedder `make_embedder` gives for these settings without an assist, wrapped so that an
+    endpoint shares its document work (assist.py). The wrapped one is the cached one: a process
+    that uses a model with and without the assist loads it once."""
+    from .assist import AssistedEmbedder
+
+    assist = config.embedding.assist
+    plain = dataclasses.replace(config, embedding=dataclasses.replace(config.embedding, assist=AssistConfig()))
+    inner = make_embedder(spec, plain)
+    wrapped = ("assist", key, json.dumps(dataclasses.asdict(assist), sort_keys=True, default=str))
+    with _CACHE_LOCK:
+        if wrapped not in _CACHE:
+            _CACHE[wrapped] = AssistedEmbedder(
+                inner, assist, batch_size=config.batch_size, max_seq_length=config.max_seq_length
+            )
+        return _CACHE[wrapped]

@@ -534,7 +534,7 @@ The tool names stay stable, so other front-ends can be compared.
 |---|---|---|
 | `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding |
 | `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)` |
-| `index_status` | none | state and progress, counts, models, local or remote embeddings, whether the embedding model is in memory, the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
+| `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
 
 **A card:**
@@ -648,6 +648,37 @@ A change to any of these must be made together with the eval:
   - A reply is brought to the configured form before it is stored: with `dimensions`, vectors
     longer than that are cut to their first numbers, and fewer numbers is an error; every vector is
     normalized to length 1.
+- **The `[embedding.assist]` section** names an endpoint that embeds part of a build's document
+  texts beside the local model (architecture.md §3.5). It needs `provider = "local"`.
+  - `base_url`: the endpoint's OpenAI-style address. Empty means no assist, which also switches
+    off one that a config file read earlier set.
+  - `model`: the endpoint's name for the model. Required with `base_url`.
+  - `api_key_env`: the environment variable that holds the key; empty for none.
+  - `document_prefix`: put before each text. Left out, it is what the local model puts before a
+    document (its `prefixes`). `""` is for a provider that adds the model's prompt on its side.
+  - `request`: a table of more fields for the request body, the provider's own. `model` and
+    `input` cannot be among them.
+  - `batch_size` (32), `max_concurrency` (4), `timeout_s` (30): texts per request, requests in
+    flight, seconds per request.
+  - A reply's vectors are scaled to length 1 before they are compared or stored. A reply with a
+    vector that cannot be scaled, or with another number of numbers than the local model's,
+    ends the endpoint's part.
+  - The endpoint is sent only texts the local model reads whole (`Embedder.cut`, §12.4).
+  - `codemem status [PATH] --check-assist [--json]` compares the endpoint with each local model
+    now, without a build, and prints one report per model. It loads a local model unless that
+    model's vectors for the probe texts are remembered (decisions.md §6), and sends the probe
+    texts only. Exit status 0: the endpoint can share a build's work; 1: it cannot; 2: no assist
+    is set. With `--json` the output is a list of objects:
+    - `host`, `model`: the endpoint; `local_model`: the model it was compared with;
+    - `state`: `sharing`, `refused`, or `resting` when the endpoint could not be reached;
+    - `reason`: one sentence, null when it can share;
+    - `agreement`: the smallest cosine, null when nothing could be compared; `needed`: 0.99995;
+    - `local_vectors`: `"embedded now"` or `"remembered"`;
+    - `probes`: for each probe text `probe` (what it is), `characters`, `cosine`, `local_length`
+      and `endpoint_length`, the length of the endpoint's vector as it came.
+  - None of it is index-time: it is not in `index_settings()`, and the vectors carry the local
+    embedder's key (§5.4).
+  - An unknown key is refused.
 - Every setting and its default: README, "Configuration".
 
 ### 12.4 Plugin classes
@@ -672,6 +703,11 @@ Named in the config as `"module:Class"` and loaded with `plugins.load_object`.
   embeds each text exactly as given, and `prefixes` (a property), the pair of strings it puts
   before a query and before a document. They must agree: `embed_texts([prefix + text])` equals
   `embed_queries([text])` and `embed_documents([text])`. The server checks this at start.
+- with an assist endpoint (§12.3) its `prefixes` say what goes before the endpoint's texts, unless
+  `document_prefix` is set, and `cut(texts)` says, with one true or false per document text,
+  which texts it reads only in part: those are never sent to the endpoint. A class that reads
+  every text whole returns false for each. A plugin that does not define `cut`, or gives no
+  prefix by either way, gets no help from the endpoint, and `status` says so.
 
 **A search index** (`vector_backend`):
 - subclasses `codemem.store.VectorStore`, is built as `Class(dim: int)`, and keeps `dim`;
@@ -700,8 +736,12 @@ repository whose `.codemem.toml` is read, by default the one of the current dire
 
 **At start** it prints to stdout, as TOML under comment lines, the `[embedding]` section of a
 client: `provider = "openai"`, `base_url`, `model`, `space`, `query_prefix`, `document_prefix`,
-and `api_key_env = "CODEMEM_SERVE_KEY"` when a key is set. Everything else goes to stderr. Exit
-code 2 means the port is taken or the model cannot be served.
+and `api_key_env = "CODEMEM_SERVE_KEY"` when a key is set. After an empty line come comment lines
+only: when to use which section, and the `[embedding.assist]` section of a codemem that runs the
+same model itself (§12.3), with `base_url`, `model` and, when a key is set, `api_key_env`, each
+line behind `# `. So all of stdout parses as TOML and holds the `[embedding]` section alone.
+Everything else goes to stderr. Exit code 2 means the port is taken or the model cannot be
+served.
 
 **Routes.** Bodies are JSON in OpenAI's shapes.
 

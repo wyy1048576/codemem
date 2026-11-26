@@ -163,6 +163,8 @@ def cmd_search(args) -> int:
 def cmd_status(args) -> int:
     svc = _service(args)
     try:
+        if args.check_assist:
+            return _check_assist(svc, args.json)
         info = svc.status(check_staleness=True)
         from .render import format_status
 
@@ -170,6 +172,29 @@ def cmd_status(args) -> int:
     finally:
         svc.close()
     return 0
+
+
+def _check_assist(svc, as_json: bool) -> int:
+    """`status --check-assist`: 0 when the endpoint can share a build's work, 1 when it cannot, 2
+    when the config names none."""
+    checker = logging.getLogger("codemem.assist")
+    level = checker.level
+    if checker.getEffectiveLevel() > logging.DEBUG:  # without -v: its warnings are what the report says
+        checker.setLevel(logging.ERROR)
+    try:
+        reports = svc.check_assist()
+    finally:
+        checker.setLevel(level)
+    if not reports:
+        print("error: no assist endpoint to check: the config has no `[embedding.assist]` section", file=sys.stderr)
+        return 2
+    if as_json:
+        print(json.dumps(reports, indent=2))
+    else:
+        from .render import format_assist_check
+
+        print("\n\n".join(format_assist_check(report) for report in reports))
+    return 0 if any(report["state"] == "sharing" for report in reports) else 1
 
 
 def cmd_watch(args) -> int:
@@ -234,6 +259,11 @@ def cmd_serve_embeddings(args) -> int:
     if server.has_key:
         print(f"# This server asks for a key: a client needs {SERVE_KEY_ENV} in its environment too.")
     print(server.client_config(), flush=True)
+    print("# The section above is for a codemem that runs no model of its own: every vector comes from this server.")
+    print("# A codemem on another machine that runs this model itself can let this server embed a share of each")
+    print("# build instead, and keep its own model for the rest, for searches and for edits. For that, leave the")
+    print("# section above out and use these lines, with this machine's address in base_url:")
+    print("".join(f"# {line}\n" for line in server.assist_config().splitlines()), flush=True)
     if not server.has_key and args.host not in ("127.0.0.1", "localhost", "::1"):
         print(
             f"warning: {args.host} is not the loopback address and no key is set: whoever can reach it can use "
@@ -302,6 +332,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = common(sub.add_parser("status", help="counts, models, indexed commit, staleness"))
     sp.add_argument("--json", action="store_true")
+    sp.add_argument(
+        "--check-assist", action="store_true",
+        help="only compare the [embedding.assist] endpoint's vectors with the local model's, now and without a "
+        "build, and print each probe text's numbers and the verdict. Loads the local model unless its vectors for "
+        "the probe texts are remembered from an earlier check. Sends codemem's own probe texts, no code of the "
+        "repository. Exit status: 0 it can share a build's work, 1 it cannot, 2 no assist is set",
+    )
     sp.set_defaults(func=cmd_status)
 
     sp = sub.add_parser(

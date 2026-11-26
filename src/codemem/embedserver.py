@@ -37,7 +37,7 @@ from . import __version__
 from .config import SERVE_HOST as DEFAULT_HOST
 from .config import SERVE_KEY_ENV as KEY_ENV  # the environment variable that holds the shared key, when there is one
 from .config import SERVE_PORT as DEFAULT_PORT
-from .config import Config
+from .config import AssistConfig, Config
 from .embedder import Embedder, FakeEmbedder, SentenceTransformerEmbedder, l2_normalize, make_embedder, release_idle
 
 log = logging.getLogger(__name__)
@@ -83,15 +83,16 @@ def served_space(embedder: Embedder) -> str:
 
 def local_embedder(config: Config) -> Embedder:
     """The embedder this process serves: the config's local model, whatever `[embedding] provider`
-    says, because the same config file may be the one that sends clients here."""
+    says, because the same config file may be the one that sends clients here. An assist of that
+    config is the clients' too: a server is the model, and shares its work with nobody."""
     specs = {(s.model, s.embedder, s.version): s for s in (config.vectors[v] for v in config.enabled_vec_types())}
     if len(specs) != 1:
         raise ValueError(
             f"serve-embeddings serves one model, and the vector types name {len(specs)}: "
             f"{', '.join(sorted(s.model for s in specs.values())) or 'none is enabled'}"
         )
-    local = dataclasses.replace(config, embedding=dataclasses.replace(config.embedding, provider="local"))
-    return make_embedder(next(iter(specs.values())), local)
+    alone = dataclasses.replace(config.embedding, provider="local", assist=AssistConfig())
+    return make_embedder(next(iter(specs.values())), dataclasses.replace(config, embedding=alone))
 
 
 def describe(embedder: Embedder) -> Served:
@@ -295,6 +296,14 @@ class EmbeddingServer:
             f"query_prefix = {_toml(s.query_prefix)}",
             f"document_prefix = {_toml(s.document_prefix)}",
         ]
+        if self.has_key:
+            lines.append(f"api_key_env = {_toml(KEY_ENV)}")
+        return "\n".join(lines) + "\n"
+
+    def assist_config(self) -> str:
+        """The `[embedding.assist]` section of a codemem that runs the same model itself and lets
+        this server embed a share of each build. The prefix is that codemem's own model's."""
+        lines = ["[embedding.assist]", f"base_url = {_toml(self.url)}", f"model = {_toml(self.served.model)}"]
         if self.has_key:
             lines.append(f"api_key_env = {_toml(KEY_ENV)}")
         return "\n".join(lines) + "\n"
