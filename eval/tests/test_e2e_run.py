@@ -396,7 +396,6 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
     out_holder = {}
     fake_claude = shims / "claude"
     (tmp_path / "agent_mcp.py").write_text(AGENT_MCP)
-    gate_dir = tempfile.mkdtemp(prefix="cmg-", dir="/tmp")
     monkeypatch.setattr(e2e_run, "codemem_python", lambda codemem: sys.executable)
     _shim(shims, "claude", (
         "#!/bin/sh\n"
@@ -432,6 +431,7 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
         out_holder["out"] = out
         text = Path(out, "agent.sh").read_text()
         assert e2e_run.KILL_AGENT in text
+        gate_dir = tempfile.mkdtemp(prefix="cmg-", dir="/tmp")
         moves = ((e2e_run.GATE_DIR, gate_dir), ("/testbed", str(testbed)), ("/out", out))
         for old, new in ((e2e_run.KILL_AGENT, "true"), *moves, ("/run/claude-empty", str(tmp_path / "claude-empty")),
                          ("/tmp/mcp.json", f"{tmp_path}/mcp.json")):
