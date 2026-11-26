@@ -12,6 +12,7 @@ dependencies = [
     "tree-sitter-c>=0.24,<0.25",
     "tree-sitter-cpp>=0.23,<0.24",
     "tree-sitter-typescript>=0.23,<0.24",
+    "tree-sitter-rust>=0.24,<0.25",  # Rust unit tests inside source files (collect/test_split.py)
     "pyarrow>=15",
     "anthropic>=2,<3",  # token counting (count_tokens)
 ]

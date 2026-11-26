@@ -60,6 +60,12 @@ class RepoStatsError(RuntimeError):
 class Candidate:
     name: str
     note: str = ""
+    # Globs of paths that are test files in this repo, whatever their extension (collect only;
+    # see collect/test_split.py). The same glob form as recipe test_files.
+    test_paths: list[str] = field(default_factory=list)
+    # Other repos whose issues are about this repo's code (collect only). Example: astral-sh/ty
+    # keeps the issues of ty, whose code lives in astral-sh/ruff.
+    issue_repos: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -107,7 +113,14 @@ def load_candidates(path: Path) -> list[Candidate]:
         name = row.get("name")
         if not isinstance(name, str) or not _REPO_RE.match(name):
             raise RepoStatsError(f"{path}: repo {i}: name must look like owner/name, got {name!r}")
-        candidates.append(Candidate(name=name, note=str(row.get("note", ""))))
+        test_paths = row.get("test_paths", [])
+        if not isinstance(test_paths, list) or not all(isinstance(g, str) and g for g in test_paths):
+            raise RepoStatsError(f"{path}: repo {name}: test_paths must be a list of globs")
+        issue_repos = row.get("issue_repos", [])
+        if not isinstance(issue_repos, list) or not all(isinstance(r, str) and _REPO_RE.match(r) for r in issue_repos):
+            raise RepoStatsError(f"{path}: repo {name}: issue_repos must be a list of owner/name")
+        candidates.append(Candidate(name=name, note=str(row.get("note", "")), test_paths=test_paths,
+                                    issue_repos=issue_repos))
     names = [c.name.lower() for c in candidates]
     if len(set(names)) != len(names):
         raise RepoStatsError(f"{path}: a repo is listed twice")
