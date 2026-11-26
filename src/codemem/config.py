@@ -189,6 +189,8 @@ class Config:
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
     # The cache file's size cap, in GB (10^9 bytes); past it the least recently used vectors go. 0 = no cap.
     vector_cache_max_gb: float = 8.0
+    # A cached vector that no index on this machine has needed for this many days goes. 0 = never.
+    vector_cache_max_age_days: float = 30.0
     # The in-memory search index: auto (the exact one while it fits `vector_memory_mb`, the
     # compact one when it does not) | faiss (exact: every vector in memory) | compact (small
     # codes of each vector, exact scores from the stored vectors) | "module:Class" subclassing
@@ -475,9 +477,9 @@ def _env_overrides() -> dict[str, Any]:
 _FLAT_KEYS = (
     "device", "embedding_dim", "dtype", "batch_size", "max_seq_length", "max_file_size", "ignore", "steering",
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
-    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb", "vector_backend",
-    "vector_memory_mb", "kinds", "test_weight", "kind_weights", "debounce_ms", "debounce_max_wait_ms",
-    "catchup_budget_ms", "model_idle_minutes",
+    "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb",
+    "vector_cache_max_age_days", "vector_backend", "vector_memory_mb", "kinds", "test_weight", "kind_weights",
+    "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes",
 )
 
 
@@ -529,6 +531,9 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
     cap = cfg.vector_cache_max_gb
     if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not 0 <= cap < float("inf"):
         raise ValueError(f"vector_cache_max_gb must be a size in GB, or 0 for no cap, got {cap!r}")
+    age = cfg.vector_cache_max_age_days
+    if isinstance(age, bool) or not isinstance(age, (int, float)) or not 0 <= age < float("inf"):
+        raise ValueError(f"vector_cache_max_age_days must be a number of days, or 0 for no limit, got {age!r}")
     if cfg.vector_backend not in {"auto", "faiss", "compact"} and ":" not in cfg.vector_backend:
         raise ValueError(f"vector_backend must be auto, faiss, compact or 'module:Class', got {cfg.vector_backend!r}")
     if type(cfg.vector_memory_mb) is not int or cfg.vector_memory_mb < 0:

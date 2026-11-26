@@ -13,7 +13,10 @@ things shape its layout (docs/architecture.md §5):
   keys, never a page of vectors, and an index on the time gives the least recently used entries
   without a scan;
 - a size cap: past it, the least recently used entries are deleted until the file is under 90%
-  of it. An evicted vector is embedded again when its text comes back.
+  of it. An evicted vector is embedded again when its text comes back;
+- an age limit: an entry nothing has used for that long is deleted. An index counts as a user of
+  the vectors it holds (Indexer.cache_upkeep), so what goes is what no index on this machine has
+  needed for that long: other branches, other commits, repos that are gone.
 
 The cache only saves work. Nothing here raises into an index update: a failure is logged, and the
 caller goes on as if the cache were empty.
@@ -99,20 +102,33 @@ def _marks(n: int) -> str:
     return ",".join("?" * n)
 
 
+def day() -> int:
+    """Today, as the cache counts days: a stamp is written once in each."""
+    return _now() // _DAY
+
+
 def cap_bytes(config: Config) -> int:
     return int(config.vector_cache_max_gb * 1e9)
 
 
+def age_seconds(config: Config) -> int:
+    return int(config.vector_cache_max_age_days * _DAY)
+
+
 def machine_cache(config: Config) -> VectorCache:
-    """The cache under the codemem home, with the configured cap."""
+    """The cache under the codemem home, with the configured cap and age limit."""
     folder = codemem_home() / "cache"
-    return VectorCache(folder / CACHE_FILE, max_bytes=cap_bytes(config), import_from=folder / ROW_FORMAT_FILE)
+    return VectorCache(folder / CACHE_FILE, max_bytes=cap_bytes(config), max_age=age_seconds(config),
+                       import_from=folder / ROW_FORMAT_FILE)
 
 
 class VectorCache:
-    def __init__(self, path: Path | str, *, max_bytes: int = 0, import_from: Path | str | None = None):
+    def __init__(
+        self, path: Path | str, *, max_bytes: int = 0, max_age: int = 0, import_from: Path | str | None = None,
+    ):
         self.path = Path(path)
         self.max_bytes = max_bytes  # 0 = no cap
+        self.max_age = max_age  # seconds without a use after which an entry goes; 0 = never
         self._import_from = Path(import_from) if import_from else None
         self._local = threading.local()
         # Every thread's connection, with its thread: close() must not close one a running thread uses.
@@ -123,6 +139,7 @@ class VectorCache:
         self._retry_at = 0.0
         self._unchecked = float("inf")  # bytes written since the size was last looked at; the first put looks
         self._evicting = False  # over the cap and not yet back under the target
+        self._expiring = False  # entries past the age limit are left: the last `expire` ran out of time
 
     # ---- connections
     def _conn(self) -> sqlite3.Connection:
@@ -414,13 +431,46 @@ class VectorCache:
         log.info("the vector cache at %s is at %d bytes after eviction", self.path, size(free=True))
         return deleted
 
-    def _evict_batch(self, conn: sqlite3.Connection) -> int:
-        """Delete the `_EVICT_ROWS` least recently used entries. In each vector table the last rows
-        move into the freed slots, so the slots stay 1..n and the freed pages are the table's last."""
+    def expire(self, max_seconds: float | None = None) -> int:
+        """Delete the entries nothing has used for `max_age` seconds, and give the freed pages back
+        to the file system. With `max_seconds` it stops after about that long, and the next call
+        goes on. Returns the entries deleted; 0 when there is no age limit."""
+        return self._try(self._expire, max_seconds) or 0
+
+    def _expire(self, conn: sqlite3.Connection, max_seconds: float | None) -> int:
+        if not self.max_age:
+            return 0
+        before = _now() - self.max_age
+        until = None if max_seconds is None else time.monotonic() + max_seconds
+        deleted = 0
+        while n := self._evict_batch(conn, before=before):
+            deleted += n
+            conn.executescript("PRAGMA incremental_vacuum")  # execute() would stop after one page
+            if until is not None and time.monotonic() >= until:
+                self._expiring = True
+                return deleted
+        self._expiring = False
+        if deleted:
+            conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchall()  # the file shrinks when the WAL is copied back
+            log.info("the vector cache at %s dropped %d vectors that nothing used for %d days",
+                     self.path, deleted, self.max_age // _DAY)
+        return deleted
+
+    @property
+    def behind(self) -> bool:
+        """The last `evict` or `expire` stopped for its time limit with work left."""
+        return self._evicting or self._expiring
+
+    def _evict_batch(self, conn: sqlite3.Connection, before: int | None = None) -> int:
+        """Delete the `_EVICT_ROWS` least recently used entries, or with `before` those of them
+        last used before that time. In each vector table the last rows move into the freed slots,
+        so the slots stay 1..n and the freed pages are the table's last."""
         conn.execute("BEGIN IMMEDIATE")
         try:
+            aged = "" if before is None else "WHERE used < ? "
             victims = conn.execute(
-                "SELECT embedder, hash, slot FROM entry INDEXED BY entry_used ORDER BY used LIMIT ?", (_EVICT_ROWS,)
+                f"SELECT embedder, hash, slot FROM entry INDEXED BY entry_used {aged}ORDER BY used LIMIT ?",
+                (_EVICT_ROWS,) if before is None else (before, _EVICT_ROWS),
             ).fetchall()
             for eid, group in groupby(sorted(victims, key=itemgetter(0)), key=itemgetter(0)):
                 gone = {slot: key for _, key, slot in group}

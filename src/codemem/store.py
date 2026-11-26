@@ -1654,6 +1654,14 @@ class Store:
             out.update(((r[0], r[1]), (r[2], r[3], r[4], r[5], r[6])) for r in rows)
         return out
 
+    def vector_hashes(self) -> dict[str, list[str]]:
+        """The text hashes of every stored vector, by embedder key: what this index holds of the
+        vector cache's entries."""
+        out: dict[str, list[str]] = {}
+        for embedder, text_hash in self.conn.execute("SELECT DISTINCT embedder, text_hash FROM vectors"):
+            out.setdefault(embedder, []).append(text_hash)
+        return out
+
     def find_vectors(self, embedder: str, text_hashes: Iterable[str]) -> dict[str, np.ndarray]:
         """Stored vectors for these texts, from any chunk or type (equal text, equal vector)."""
         hashes = list(dict.fromkeys(text_hashes))

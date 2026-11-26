@@ -367,6 +367,69 @@ def test_no_cap_means_no_eviction(tmp_path):
     assert cache.evict() == 0 and cache.count() == 2000 and cache.stats()["max_bytes"] == 0
 
 
+# ---------------------------------------------------------------- the age limit
+
+
+def test_entries_nothing_used_for_the_age_limit_go_and_the_file_shrinks(tmp_path, clock):
+    cache = VectorCache(tmp_path / "cache.db", max_age=30 * DAY)
+    old, mid, new = _hashes("old", 4000), _hashes("mid", 1500), _hashes("new", 500)
+    _put(cache, KEY, old, _vecs(4000, 128, seed=1))
+    clock[0] += 10 * DAY
+    _put(cache, KEY, mid, _vecs(1500, 128, seed=2))
+    assert cache.expire() == 0  # nothing is 30 days old
+    clock[0] += 19 * DAY
+    kept = old[::4]
+    assert cache.touch(KEY, kept) == []  # used on day 29
+    clock[0] += 2 * DAY  # day 31: `old` is past the limit, except what was used since
+    _put(cache, KEY, new, _vecs(500, 128, seed=3))
+    conn = _raw(cache.path)
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+    before = os.path.getsize(cache.path)
+
+    assert cache.expire() == 3000
+    everything = old + mid + new
+    assert {everything[i] for i in _gone(cache, KEY, everything)} == set(old) - set(kept)
+    for hashes, seed, step in ((kept, 1, 4), (mid, 2, 1), (new, 3, 1)):
+        rows, found = cache.fetch(KEY, hashes)
+        assert found.all() and np.array_equal(rows, _vecs(len(hashes) * step, 128, seed=seed).astype(np.float16)[::step])
+    _check_layout(cache.path)
+    assert os.path.getsize(cache.path) < 0.6 * before  # half the vectors are gone, and so are their pages
+    assert cache.expire() == 0
+    conn.close()
+
+    clock[0] += 10 * DAY  # day 41: `mid`, last used on day 10, is past it now
+    assert cache.expire() == 1500 and cache.count() == 1500
+    _check_layout(cache.path)
+
+
+def test_expiry_in_slices_goes_on_where_it_stopped(tmp_path, clock, monkeypatch):
+    monkeypatch.setattr(vectorcache, "_EVICT_ROWS", 100)
+    cache = VectorCache(tmp_path / "cache.db", max_age=DAY)
+    _put(cache, KEY, _hashes("old", 1000), _vecs(1000, 32))
+    clock[0] += 2 * DAY
+    first = cache.expire(max_seconds=0.0)  # one batch, then its time is up
+    assert first == 100 and cache.count() == 900 and cache.behind
+    assert cache.expire() == 900 and cache.count() == 0 and not cache.behind
+    _check_layout(cache.path)
+
+
+def test_no_age_limit_means_nothing_expires(tmp_path, clock):
+    cache = VectorCache(tmp_path / "cache.db")
+    _put(cache, KEY, _hashes("a", 300), _vecs(300, 32))
+    clock[0] += 10_000 * DAY
+    assert cache.max_age == 0 and cache.expire() == 0 and cache.count() == 300
+
+
+def test_the_age_limit_setting_is_checked_and_changes_no_index():
+    assert Config().vector_cache_max_age_days == 30
+    cfg = config_from_dict({"vector_cache_max_age_days": 7})
+    assert vectorcache.age_seconds(cfg) == 7 * DAY and cfg.index_settings() == Config().index_settings()
+    assert vectorcache.age_seconds(config_from_dict({"vector_cache_max_age_days": 0})) == 0  # 0 = never
+    for bad in (-1, "a month", True, float("inf")):
+        with pytest.raises(ValueError, match="vector_cache_max_age_days"):
+            config_from_dict({"vector_cache_max_age_days": bad})
+
+
 def test_the_cap_setting_is_checked_and_changes_no_index():
     assert Config().vector_cache_max_gb == 8.0
     assert config_from_dict({"vector_cache_max_gb": 0}).vector_cache_max_gb == 0
@@ -598,6 +661,7 @@ def _everything(cache, monkeypatch):
         rows, found = cache.fetch(KEY, hashes)
         assert cache.get_many(KEY, hashes) == {} and rows.shape == (3, 0) and not found.any()
         assert cache.touch(KEY, hashes) == [] and cache.count() == 0 and cache.stats() is None and cache.evict() == 0
+        assert cache.expire() == 0
     cache.close()
 
 
@@ -774,6 +838,76 @@ def test_the_configured_cap_reaches_the_cache_and_an_update_enforces_it(sample_r
     fake_config.vector_cache = "off"
     assert indexer.vector_cache() is None
     store.close()
+
+
+def test_an_index_keeps_its_own_vectors_in_the_cache_and_the_rest_ages_out(
+        sample_repo, tmp_path, fake_config, recorder, clock, monkeypatch):
+    """The age limit takes what no index has needed for that long. An update marks the vectors
+    its index holds as used, so a repo that is in use keeps its whole share of the cache however
+    long ago its code was embedded, and a later rebuild of it calls no model."""
+    store = Store(tmp_path / "index")
+    indexer = Indexer(sample_repo, store, fake_config, embedder_factory=lambda m, c: recorder)
+    first = indexer.update()
+    texts = [text_hash(t) for t in dict.fromkeys(recorder.documents)]
+    cache = indexer.vector_cache()
+    assert cache.max_age == 30 * DAY and store.vector_hashes() == {recorder.key: sorted(texts)}
+    orphans = _hashes("a branch nobody came back to", 600)
+    _put(cache, recorder.key, orphans, _vecs(600, 64))
+    built = clock[0]
+
+    clock[0] += 29 * DAY
+    indexer.update()  # nothing to index; the index's vectors are stamped today
+    stamps = _stamps(cache.path)
+    assert {stamps[h] for h in texts} == {clock[0]} and {stamps[h] for h in orphans} == {built}
+    assert cache.count() == len(texts) + 600
+    marked = []
+    with monkeypatch.context() as patch:
+        patch.setattr(cache, "touch", lambda key, hashes: marked.append(key) or [])
+        indexer.update()
+    assert marked == []  # once a day: a second update the same day reads nothing for it
+
+    clock[0] += 2 * DAY  # day 31
+    indexer.update()
+    assert cache.count() == len(texts) and len(_gone(cache, recorder.key, orphans)) == 600
+    assert _gone(cache, recorder.key, texts) == []
+    store.close()
+
+    stats = _index(sample_repo, tmp_path / "rebuilt", fake_config, recorder)  # 31 days on, a rebuild is still free
+    assert sum(stats.model_embedded.values()) == 0 and stats.cache_hits == first.embedded
+
+    fake_config.vector_cache_max_age_days = 0  # no limit: nothing is stamped for it and nothing goes
+    clock[0] += 400 * DAY
+    _index(sample_repo, tmp_path / "rebuilt", fake_config, recorder)
+    assert machine_cache(fake_config).count() == len(texts)
+
+
+def test_a_session_that_runs_for_days_keeps_the_cache_too(sample_repo, tmp_path, fake_config, clock, monkeypatch):
+    """The writer of a long session does the cache's upkeep in a quiet moment, every few hours."""
+    from codemem import service as service_module
+
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=fake_config)
+    try:
+        svc.update()
+        cache = svc.indexer.vector_cache()
+        held = cache.count()
+        _put(cache, "another-model|doc", _hashes("gone", 50), _vecs(50, 16))
+        clock[0] += 31 * DAY
+        svc._step()
+        assert cache.count() == held + 50  # not due yet: the update at start did it
+        svc._last_cache_upkeep -= service_module.CACHE_UPKEEP_EVERY + 1
+        monkeypatch.setattr(vectorcache, "_EVICT_ROWS", 20)
+        monkeypatch.setattr(service_module, "CACHE_UPKEEP_SECONDS", 0.0)  # one batch of deleting per quiet moment
+        before = svc._last_cache_upkeep
+        assert svc._step() is True and cache.count() == held + 30  # cut short: it goes on at the next quiet moment
+        assert svc._step() is True and svc._step() is True
+        assert cache.count() == held and set(_stamps(cache.path).values()) == {clock[0]}
+        assert svc._last_cache_upkeep == before  # each of them ended by its time limit
+        assert svc._step() is True and svc._last_cache_upkeep > before  # this one found nothing left: done for hours
+        done = svc._last_cache_upkeep
+        svc._step()
+        assert svc._last_cache_upkeep == done
+    finally:
+        svc.close()
 
 
 def test_status_shows_the_cache(sample_repo, tmp_path, fake_config):

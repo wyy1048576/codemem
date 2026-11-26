@@ -1228,6 +1228,19 @@ takes 2.8 s, because almost every deleted row sits on a page of its own, and tha
 rewritten. Eviction loses nothing for good: an evicted vector is embedded again when its text
 comes back.
 
+**The age limit** (`vector_cache_max_age_days`, 30 by default). An entry that nothing has used for
+that long is deleted, in the same transactions of 256 entries, and its pages go back to the file
+system. Stage B alone would make that the wrong rule: it uses an entry only when an index lacks
+the vector, so the entries of a repo's unchanged code would look unused from the day they were
+made. So an index counts as a user of the vectors it holds. Where an update ends, and every 6
+hours in a quiet moment of a running session, `Indexer.cache_upkeep` marks them as used, drops
+what is past the limit, and enforces the cap. The marking is done once a day per index, which
+remembers the day in its `meta`: for vLLM's 145,000 vectors it reads their hashes from an index
+on `vectors` in 0.4 s and marks them in 0.2 to 0.7 s. What ages out is therefore what no index
+on the machine has needed for 30 days: branches and commits nobody came back to, and repos that
+are gone. A running session deletes for a second at a time, so a save never waits long behind
+it; all 194,000 vectors of a real cache took 12.5 s to delete.
+
 **When the cache file cannot be used** (another program holds it, it is read-only, it is damaged),
 every call answers as an empty cache would. It logs one warning and leaves the file alone for a
 minute. The index update goes on, with vectors from the model.

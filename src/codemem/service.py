@@ -57,6 +57,8 @@ RETRY_MAX = 60.0  # ... then after twice as long each time, up to this
 # A search that may not wait for a loading model still waits this long for one that was freed for
 # being idle: after an idle time a search costs the reload (2 to 6 s on an M1), not its results.
 IDLE_RELOAD_WAIT = 20.0
+CACHE_UPKEEP_EVERY = 6 * 3600.0  # in a quiet moment the writer keeps the vector cache: what this index uses, the age limit, the cap
+CACHE_UPKEEP_SECONDS = 1.0  # ... deleting for this long at a time, so that a save never waits long behind it
 BURST_PATHS = 2000  # more changed paths than this at once: scan everything instead
 _BATCH = 64  # queued chunks per embedding batch outside a build (new edits wait for one at most)
 _FILTERS = ("path_prefix", "kinds", "languages", "tests", "test_weight", "kind_weights")  # of a search
@@ -174,6 +176,7 @@ class CodememService:
         self._polling = False
         self._last_write = 0.0  # monotonic time of the last index change
         self._last_reconcile = 0.0
+        self._last_cache_upkeep = time.monotonic()  # an update at start has just done it
 
     def embedder_factory(self, spec: VectorConfig | str, config: Config) -> Embedder:
         """The embedder of a vector type (or of a bare model name, as `make_embedder` takes). Each
@@ -376,6 +379,17 @@ class CodememService:
             return True
         for embedder in list(self._embedders.values()):  # no model call is due here: a quiet moment for the models
             release_idle(embedder, self.config.model_idle_minutes)
+        if now - self._last_cache_upkeep > CACHE_UPKEEP_EVERY:
+            # A session that runs for days makes no update of its own kind (Indexer.update), which
+            # is where the cache is kept otherwise. Cut short, it goes on at the next quiet moment.
+            try:
+                done = self.indexer.cache_upkeep(CACHE_UPKEEP_SECONDS)
+            except Exception:
+                log.exception("could not keep the vector cache")
+                done = True
+            if done:
+                self._last_cache_upkeep = now
+            return True
         if self._watcher is not None and not self._watcher.alive() and not self._polling:
             log.warning("the file watcher stopped; scanning the repo every %.0f s instead", POLL_EVERY)
             self._polling = True

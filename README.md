@@ -142,6 +142,7 @@ languages = ["python", "go"] # default: every supported language
 code_header = true           # put the path and enclosing class above the embedded code
 vector_cache = "global"      # global = reuse vectors across indexes on this machine | off
 vector_cache_max_gb = 8      # that cache's size cap in GB; past it the least recently used vectors go; 0 = no cap
+vector_cache_max_age_days = 30  # a cached vector that no index has needed for this long goes; 0 = never
 vector_backend = "auto"      # the in-memory search index: auto (the exact one while it fits vector_memory_mb,
                              # the compact one when it does not) | faiss (exact: every vector in memory) |
                              # compact (small codes of each vector, [compact] below) | a plugin class (below)
@@ -397,9 +398,22 @@ version = "run-7"                            # optional label for the weights
 ## Where things are stored
 
 An index lives in `~/.codemem/indexes/<repo-name>-<hash of its path>/` (`CODEMEM_HOME` moves
-`~/.codemem`), and the vectors computed on the machine in `~/.codemem/cache/vector_cache.db`, up to
-`vector_cache_max_gb`. `codemem status` shows that cache's size. What each file holds and what is
-safe to delete: [decisions.md §6](docs/decisions.md).
+`~/.codemem`), and the vectors computed on the machine in `~/.codemem/cache/vector_cache.db`.
+What each file holds and what is safe to delete: [decisions.md §6](docs/decisions.md).
+
+**How much disk codemem uses, and what limits it:**
+
+| What | Size | What limits it |
+|---|---|---|
+| an index, one per checkout | about 0.3 GB for pandas (50,000 vectors), 0.9 GB for vLLM (145,000) | deleted with its git worktree; an index of a repo you no longer have is a folder you can delete |
+| the vector cache, one per machine | 1.9 KB per vector: about 0.1 GB for pandas, 0.3 GB for vLLM | `vector_cache_max_gb` (8 by default; any size, 0 = no cap) and `vector_cache_max_age_days` (30 by default; 0 = never) |
+
+The cache only saves work: it remembers every vector the machine computed, so a rebuild, another
+commit or a branch you come back to embeds nothing twice. It is a file on disk and is not held in
+memory. Past the cap its least recently used vectors go, and a vector that no index on the
+machine has needed for 30 days goes too. The vectors of an index you still use stay, however old
+they are. A vector that was dropped is computed again when its text comes back: a smaller cache
+costs time, never results. `codemem status` shows the cache's size.
 
 Each git worktree is a checkout with an index of its own: run codemem inside it. The index starts
 as a copy of another checkout's index, so it is ready in seconds, and it is deleted after the

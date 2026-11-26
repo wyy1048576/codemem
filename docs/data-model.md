@@ -448,6 +448,8 @@ $CODEMEM_HOME/model_hashes.json      each local model file's [size, mtime_ns, sh
 - `last_scan_at`: when the last full check started (files saved within 2 s of it are re-hashed next
   time);
 - `dirty_seq`: the queue's sequence number, one per stage-A commit;
+- `cache_marked_day`: the day (days since 1970, UTC) on which this index last marked the vectors it
+  holds as used in the vector cache, so that it does so once a day (§7);
 - per vector type: `vec.<type>.embedder`, `vec.<type>.full_dim`, `vec.<type>.dim_setting`,
   `vec.<type>.epoch`.
 
@@ -719,8 +721,10 @@ A change to any of these must be made together with the eval:
   Those that differ from their defaults are in `index_settings()` as `compact`, for the same
   reason as `vector_backend`.
 - **`vector_cache`:** `global` or `off`. **`vector_cache_max_gb`:** the cache file's size cap in
-  GB (10⁹ bytes), a number of 0 or more; 0 means no cap; the default is 8. Neither is index-time:
-  the cache changes where a vector comes from, never what an index stores.
+  GB (10⁹ bytes), a number of 0 or more; 0 means no cap; the default is 8.
+  **`vector_cache_max_age_days`:** a number of days, 0 or more; a cached vector that nothing has
+  used for that long is deleted; 0 means never; the default is 30. None of them is index-time: the
+  cache changes where a vector comes from, never what an index stores.
 - **`model_idle_minutes`:** a number, 0 or more; the default is 60. The local embedding model is
   freed after that many minutes in which nothing was embedded, and the next search or save loads
   it again; 0 keeps it in memory. `CODEMEM_MODEL_IDLE_MINUTES` sets it from the environment. It changes no index. A new value in `.codemem.toml`
