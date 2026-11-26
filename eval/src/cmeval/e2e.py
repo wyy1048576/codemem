@@ -17,10 +17,14 @@ fix must complete the task, and the empty change must not. It also compares each
 its result now, on the image as it is: with the real fix every fail_to_pass and pass_to_pass test
 must pass, and with the empty change no fail_to_pass test may pass. A task image can be built
 again after its validation, so this check on the image of the runs is the one that counts.
+
+`cmeval e2e grade` grades a change that was made outside the runner: a saved git diff for a task
+(grade_saved). It uses the same grader, so the verdict means the same as in a run.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -148,7 +152,8 @@ def grade(recipe: Recipe, task: Task, agent_patch: str, out: Path, cpus: int = 8
     tests = load_tests(recipe, task)
     tag = task_tag(recipe, task)
     if not image_exists(tag):
-        raise GenerateError(f"{task.id}: image {tag} does not exist; build it with cmeval generate")
+        raise GenerateError(f"{task.id}: image {tag} does not exist; build it again with cmeval generate "
+                            f"{recipe.name} --tasks FILE --id {task.id} --rebuild")
     if image_label(tag) != image_fingerprint(recipe, task):
         raise GenerateError(f"{task.id}: image {tag} was built from another version of the recipe or the task; "
                             "run cmeval generate again")
@@ -178,6 +183,86 @@ def grade(recipe: Recipe, task: Task, agent_patch: str, out: Path, cpus: int = 8
                   junit_unreadable=len(unreadable))
     (out / "grade.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return record
+
+
+# ---- a saved change
+
+SHOWN_FAILED = 3  # failed tests named in the printed line of a graded change
+SHOWN_TEST_CHARS = 80
+
+
+def grades_dir() -> Path:
+    """The default folder of `cmeval e2e grade`: grades/<recipe>/<task id>/<patch name>/."""
+    return e2e_dir() / "grades"
+
+
+def diff_problem(patch: str) -> str | None:
+    """Why a saved change is not a git diff that the grader can apply, or None. The grader applies it
+    with `git apply` in the repo's root, so each file needs a "diff --git" header with the default
+    a/ and b/ prefixes. An empty text is no problem: it is graded as an empty change."""
+    if not patch.strip():
+        return None
+    sections = [s for s in _sections(patch) if s.startswith("diff --git ")]
+    if not sections:
+        return "not a git diff (no line starts with 'diff --git'); make it with git diff against the base commit"
+    for section in sections:
+        lines = section.splitlines()
+        if not lines[0][len("diff --git "):].startswith(("a/", '"a/')):
+            return f"a file has no a/ prefix ({lines[0][:120]}); make the diff without --no-prefix"
+        for line in lines[1:]:
+            if line.startswith(("@@", "GIT binary patch", "Binary files ")):
+                break
+            if line.startswith(("--- ", "+++ ")):
+                name = line[4:].split("\t")[0].strip('"')
+                if name != "/dev/null" and not name.startswith(("a/", "b/")):
+                    return f"a file has no a/ or b/ prefix ({line[:120]}); make the diff without --no-prefix"
+    return None
+
+
+def grade_saved(recipe: Recipe, task: Task, patch_file: Path, out: Path, cpus: int = 8) -> dict:
+    """Grade a saved diff of a task with `grade`. `out` is made again; it also gets input.patch (the
+    diff as it was given), and grade.json gets the task id, the patch file and its sha256, and the test
+    files that were dropped from the diff. Refuses an `out` that holds files but is not a grade folder."""
+    data = Path(patch_file).read_bytes()
+    text = data.decode("utf-8", errors="replace")
+    problem = diff_problem(text)
+    if problem:
+        raise GenerateError(f"{task.id}: {patch_file}: {problem}")
+    if out.is_dir() and any(out.iterdir()) and not (out / "grade.json").exists() and not (out / "agent.patch").exists():
+        raise GenerateError(f"{task.id}: {out} holds files and is not a grade folder; give another --out")
+    record = grade(recipe, task, text, out, cpus=cpus)
+    (out / "input.patch").write_bytes(data)
+    record.update(task_id=task.id, patch_file=str(Path(patch_file).resolve()),
+                  patch_sha256=hashlib.sha256(data).hexdigest(),
+                  dropped_test_files=sorted(patch_files(text) & patch_files(task.test_patch or "")))
+    (out / "grade.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return record
+
+
+def _short(text: str, width: int) -> str:
+    return text if len(text) <= width else text[:width - 3] + "..."
+
+
+def format_grade(task_id: str, label: str, record: dict) -> str:
+    """One line for a graded change: the verdict, the reason, the counts of passed tests, the first
+    failed tests (shortened), and the test files dropped from the diff."""
+    verdict = "completed" if record["completed"] else "not completed"
+    line = (f"{task_id} {label}: {verdict}, {record['reason']}; "
+            f"fail-to-pass {record['fail_to_pass_passed']}/{record['fail_to_pass_total']}, "
+            f"pass-to-pass {record['pass_to_pass_passed']}/{record['pass_to_pass_total']}")
+    # Before the tests ran (the change or the hidden tests did not apply, the build failed) every
+    # test is in failed_tests, and the names say nothing.
+    ran = record["reason"] in ("tests failed", "tests timed out", "empty change")
+    failed = (record.get("failed_tests") or []) if ran else []
+    if failed:
+        # failed_tests is cut at MAX_FAILED_SHOWN; the totals give the whole count.
+        total = (record["fail_to_pass_total"] - record["fail_to_pass_passed"]
+                 + record["pass_to_pass_total"] - record["pass_to_pass_passed"])
+        shown = ", ".join(_short(t, SHOWN_TEST_CHARS) for t in failed[:SHOWN_FAILED])
+        line += f"; failed: {shown}" + (f", and {total - SHOWN_FAILED} more" if total > SHOWN_FAILED else "")
+    if record.get("dropped_test_files"):
+        line += f"; test files dropped from the diff: {', '.join(record['dropped_test_files'])}"
+    return line
 
 
 # ---- grader check
