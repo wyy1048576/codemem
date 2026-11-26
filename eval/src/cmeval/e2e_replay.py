@@ -38,14 +38,28 @@ Gold matching (the rules of metrics/matching.py):
 from __future__ import annotations
 
 import json
+import os
+import queue
 import re
+import shutil
 import statistics
+import subprocess
+import tempfile
+import threading
+import time
 from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
 
-from .e2e_steps import TurnCounter, result_text
+from .e2e_index import CODEMEM_ENV, REPO_ROOT, codemem_checkout, codemem_commit
+from .e2e_steps import TurnCounter, parse_stream, result_text
+from .files import write_json, write_text_atomic
 from .metrics.matching import excluded, hit_matches
+from .paths import e2e_dir
+from .proxy import read_log
 from .retriever import Hit
-from .tasks import Task
+from .tasks import Span, Task, load_tasks
 
 SCHEMA = 1
 SEARCH_TOOL = "mcp__codemem__search_code"
@@ -414,3 +428,415 @@ def check_summary(entries: list[dict], skipped: Counter) -> str:
     if errors:
         lines.append(f"- Replay failed: {len(errors)} runs (see `replay.error` in the JSON file).")
     return "\n".join(lines) + "\n"
+
+
+# ---- the replay through codemem's MCP server
+
+class ReplayError(Exception):
+    pass
+
+
+class McpClient:
+    """A small MCP client over stdio: one JSON-RPC message per line. The server's log goes to a file."""
+
+    PROTOCOL = "2025-11-25"
+
+    def __init__(self, argv: list[str], env: dict, log_path: Path):
+        self._log = open(log_path, "ab")
+        self.proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self._log, env=env)
+        self._lines: queue.Queue = queue.Queue()
+        self._next = 0
+        threading.Thread(target=self._read, name="mcp-reader", daemon=True).start()
+
+    def _read(self) -> None:
+        for line in self.proc.stdout:
+            self._lines.put(line)
+        self._lines.put(None)
+
+    def _send(self, message: dict) -> None:
+        try:
+            self.proc.stdin.write((json.dumps(message) + "\n").encode("utf-8"))
+            self.proc.stdin.flush()
+        except (BrokenPipeError, OSError) as exc:
+            raise ReplayError(f"the MCP server stopped (exit code {self.proc.poll()}): {exc}") from None
+
+    def notify(self, method: str, params: dict | None = None) -> None:
+        self._send({"jsonrpc": "2.0", "method": method, **({"params": params} if params is not None else {})})
+
+    def request(self, method: str, params: dict, timeout: float) -> dict:
+        self._next += 1
+        rid = self._next
+        self._send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
+        deadline = time.monotonic() + timeout
+        while True:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise ReplayError(f"no answer to {method} after {timeout:.0f} s")
+            try:
+                line = self._lines.get(timeout=left)
+            except queue.Empty:
+                continue
+            if line is None:
+                raise ReplayError(f"the MCP server stopped (exit code {self.proc.wait(timeout=10)}) during {method}")
+            try:
+                message = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(message, dict):
+                continue
+            if "method" in message and "id" in message:  # a request of the server, for example ping
+                if message["method"] == "ping":
+                    self._send({"jsonrpc": "2.0", "id": message["id"], "result": {}})
+                else:
+                    self._send({"jsonrpc": "2.0", "id": message["id"],
+                                "error": {"code": -32601, "message": "not supported by this client"}})
+                continue
+            if message.get("id") != rid:
+                continue
+            if "error" in message:
+                raise ReplayError(f"{method}: {message['error']}")
+            return message.get("result") or {}
+
+    def initialize(self, timeout: float) -> dict:
+        result = self.request("initialize", {"protocolVersion": self.PROTOCOL, "capabilities": {},
+                                             "clientInfo": {"name": "cmeval-replay", "version": "1"}}, timeout)
+        self.notify("notifications/initialized")
+        return result
+
+    def call_tool(self, name: str, args: dict, timeout: float) -> dict:
+        return self.request("tools/call", {"name": name, "arguments": args}, timeout)
+
+    def close(self) -> int | None:
+        """End the server: close its input, then wait; stop it when it does not end."""
+        try:
+            self.proc.stdin.close()
+        except OSError:
+            pass
+        try:
+            code = self.proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            self.proc.terminate()
+            try:
+                code = self.proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                code = self.proc.wait()
+        self._log.close()
+        return code
+
+
+def tool_texts(result: dict) -> tuple[str, str]:
+    """The text of a tool result, and the text as Claude Code gives it to the model: the JSON of the structured
+    content when the server sends one (codemem 041124e sends {"result": "<text>"}), else the text."""
+    text = "\n".join(str(c.get("text", "")) for c in result.get("content") or []
+                     if isinstance(c, dict) and c.get("type") == "text")
+    structured = result.get("structuredContent")
+    if isinstance(structured, dict):
+        return unwrap(text), json.dumps(structured, ensure_ascii=False, separators=(",", ":"))
+    return unwrap(text), text
+
+
+def _status_json(text: str) -> dict | None:
+    """The JSON line at the end of index_status: state, progress, chunks, vectors, stale."""
+    try:
+        data = json.loads(text.rsplit("\n\n", 1)[-1])
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+WARMUP_QUERY = "load the embedding model"
+READY_POLL_S = 2.0
+
+
+def wait_ready(client: McpClient, timeout: float, call_timeout: float, poll: float | None = None) -> dict:
+    """Wait until index_status says ready, then until a search is a full search: no note that the model is
+    loading, that the index is being built, or that edits are not indexed yet."""
+    poll = READY_POLL_S if poll is None else poll
+    deadline = time.monotonic() + timeout
+    t0 = time.monotonic()
+    while True:
+        text, _ = tool_texts(client.call_tool("index_status", {}, call_timeout))
+        status = _status_json(text)
+        if status and status.get("state") == "ready":
+            break
+        if time.monotonic() > deadline:
+            state = status.get("state") if status else None
+            raise ReplayError(f"the index was not ready after {timeout:.0f} s (state {state}). A long state of "
+                              "indexing or updating can mean that codemem embeds the repo again, for example "
+                              "because the index was built on another device")
+        time.sleep(poll)
+    warmups = 0
+    while True:
+        text, _ = tool_texts(client.call_tool("search_code", {"query": WARMUP_QUERY, "k": 1}, call_timeout))
+        warmups += 1
+        if full_search(notes_of(text)):
+            return {"status": status, "warmup_searches": warmups, "ready_s": round(time.monotonic() - t0, 1)}
+        if time.monotonic() > deadline:
+            raise ReplayError(f"searches were not full searches after {timeout:.0f} s: {notes_of(text)}")
+        time.sleep(poll)
+
+
+def server_env(steering: str | None, home: Path) -> dict:
+    """The environment of the replay's codemem: what a run gives it (e2e_run.codemem_mcp_config), with the
+    host's Hugging Face cache and an empty CODEMEM_HOME. No CODEMEM_ variable of the caller passes."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CODEMEM_")}
+    env.update({"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "CODEMEM_HOME": str(home),
+                "CODEMEM_MODEL_IDLE_MINUTES": "0", **CODEMEM_ENV})
+    if steering and steering != "default":
+        env["CODEMEM_STEERING"] = steering
+    return env
+
+
+def _gold_from_entry(entry: dict) -> dict:
+    gold = entry["gold"]
+    return {"files": gold["files"], "function_excluded": gold["function_excluded"],
+            "functions": [Span(f["path"], f["start"], f["end"], f.get("symbol")) for f in gold["functions"]]}
+
+
+def cli_search(program: Path, src: Path, index: Path, env: dict, args: dict, k: int, timeout: float,
+               signals: str | None = None) -> list[dict]:
+    """The result list of `codemem search --json` with the arguments of a search_code call."""
+    argv = [str(program), "search", "--repo", str(src), "--index-dir", str(index), "-k", str(k), "--json"]
+    if signals:
+        argv += ["--signals", signals]
+    if args.get("path_prefix"):
+        argv += ["--path-prefix", str(args["path_prefix"])]
+    if args.get("kinds"):
+        kinds = args["kinds"]
+        argv += ["--kinds", ",".join(kinds) if isinstance(kinds, list) else str(kinds)]
+    if args.get("tests"):
+        argv += ["--tests", str(args["tests"])]
+    argv += ["--", str(args.get("query", ""))]
+    proc = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=timeout)
+    if proc.returncode != 0:
+        raise ReplayError(f"codemem search ended with exit code {proc.returncode}: {proc.stderr.strip()[-500:]}")
+    data = json.loads(proc.stdout)
+    return [{"rank": i, "path": r["path"], "start": r["start_line"], "end": r["end_line"],
+             "name": r.get("qualname"), "chunk_id": r.get("chunk_id")}
+            for i, r in enumerate(data.get("results") or [], start=1)]
+
+
+def check_entry(entry: dict, same_commits: bool, bm25: list[dict] | None = None) -> dict:
+    """Compare the agent's result list with the replay at the run's k (or with the keyword-only search)."""
+    notes = entry["in_run"]["notes"]
+    suffix = "" if same_commits else ", other codemem commit"
+    if notes is None:
+        return {"verdict": "not checked: no result in the run"}
+    if notes["keywords_only"]:
+        if bm25 is None:
+            return {"verdict": "not checked: keywords only in the run"}
+        cmp = compare_lists(entry["in_run"]["results"], bm25)
+        return {"against": "codemem search --signals bm25", **cmp,
+                "verdict": ("same" if cmp["same"] else "differs") + " (keywords only)" + suffix}
+    if notes["indexing"] or notes["not_fresh"]:
+        return {"verdict": "not checked: the run's index was not complete"}
+    at = _at(entry, entry["call"]["k"])
+    if at is None:
+        return {"verdict": "not checked: no replay"}
+    cmp = compare_lists(entry["in_run"]["results"], at["results"])
+    return {"against": f"replay at k={entry['call']['k']}", **cmp,
+            "verdict": ("same" if cmp["same"] else "differs") + suffix}
+
+
+def replay_task(entries: list[dict], *, program: Path, program_commit: str | None, src: Path, index: Path,
+                index_meta: dict, steering: str | None, ks: list[int], work: Path, log: Path, iou: float,
+                ready_timeout: float, call_timeout: float, bm25_check: bool) -> None:
+    """Replay the first search of each entry (runs of one task with one steering level) on a private copy of
+    the task's index. Sets entry["replay"] and entry["check"]. The index and src/ are never written."""
+    copy, home = work / "index", work / "home"
+    shutil.copytree(index, copy)
+    home.mkdir()
+    env = server_env(steering, home)
+    client = McpClient([str(program), "mcp", str(src), "--index-dir", str(copy)], env, log)
+    try:
+        init = client.initialize(call_timeout)
+        ready = wait_ready(client, ready_timeout, call_timeout)
+        for entry in entries:
+            gold = _gold_from_entry(entry)
+            by_k = {}
+            for k in sorted(set(ks) | {entry["call"]["k"]}):
+                t0 = time.monotonic()
+                result = client.call_tool("search_code", {**entry["call"]["args"], "k": k}, call_timeout)
+                text, wire = tool_texts(result)
+                results = parse_results(text)
+                by_k[str(k)] = {"k": k, "results": results, "score": score_results(results, gold, iou),
+                                "text_chars": len(text), "wire_chars": len(wire), "notes": notes_of(text),
+                                "is_error": bool(result.get("isError")),
+                                "seconds": round(time.monotonic() - t0, 3), "text": text}
+            entry["replay"] = {"by_k": by_k, "server": {"name": (init.get("serverInfo") or {}).get("name"),
+                                                        "version": (init.get("serverInfo") or {}).get("version"),
+                                                        "protocol": init.get("protocolVersion"), **ready},
+                               "index": index_meta, "steering": steering}
+    finally:
+        client.close()
+    same = (program_commit is not None and program_commit == index_meta.get("codemem_commit"))
+    for entry in entries:
+        bm25 = None
+        if bm25_check and (entry["in_run"]["notes"] or {}).get("keywords_only"):
+            try:
+                bm25 = cli_search(program, src, copy, env, entry["call"]["args"], entry["call"]["k"], call_timeout,
+                                  signals="bm25")
+            except (ReplayError, OSError, ValueError, subprocess.SubprocessError) as exc:
+                entry["check"] = {"verdict": "not checked: keyword search failed", "error": str(exc)}
+                continue
+        same_commits = same and entry["run_codemem_commit"] == program_commit \
+            and entry["run_index_codemem_commit"] == index_meta.get("codemem_commit")
+        entry["check"] = check_entry(entry, same_commits, bm25)
+
+
+# ---- the whole replay
+
+def default_tasks_file(recipe: str) -> Path:
+    return REPO_ROOT / "eval" / "tasks" / "e2e" / f"{recipe}.jsonl"
+
+
+def read_runs(run_ids: list[str], *, tasks_files: list[Path] | None = None, iou: float = DEFAULT_IOU,
+              progress: Callable[[str], None] = lambda m: None) -> tuple[list[dict], Counter, list[str]]:
+    """The entries of every run of a codemem setup with a first search_code call, the counts of runs left out
+    by reason, and warnings. The tasks come from tasks_files, or from eval/tasks/e2e/<recipe>.jsonl."""
+    runs_root = e2e_dir() / "runs"
+    given = {t.id: t for path in tasks_files or [] for t in load_tasks(path)}
+    by_recipe: dict[str, dict[str, Task]] = {}
+    entries, skipped, warnings = [], Counter(), []
+    for run_id in run_ids:
+        root = runs_root / run_id
+        if not root.is_dir():
+            skipped["run id not found"] += 1
+            warnings.append(f"no run folder {root}")
+            continue
+        for path in sorted(p for p in root.glob("*/*/*/run.json") if p.parent.name.isdigit()):
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record.setdefault("run_id", run_id)
+            if record.get("discard"):
+                skipped["discarded run"] += 1
+                continue
+            if not (record.get("identity") or {}).get("codemem"):
+                skipped["setup without codemem"] += 1
+                continue
+            stream = path.parent / "stream.jsonl"
+            if not stream.exists():
+                skipped["no stream.jsonl"] += 1
+                continue
+            events = parse_stream(stream)["events"]
+            search = first_search(events)
+            if search is None:
+                skipped["no search_code call of the main agent"] += 1
+                continue
+            proxy = path.parent / "proxy.jsonl"
+            records = read_log(proxy)[0] if proxy.exists() else None
+            if tasks_files:
+                task = given.get(record.get("task_id"))
+            else:
+                recipe = record.get("recipe") or ""
+                if recipe not in by_recipe:
+                    file = default_tasks_file(recipe)
+                    by_recipe[recipe] = {t.id: t for t in load_tasks(file)} if file.exists() else {}
+                task = by_recipe[recipe].get(record.get("task_id"))
+            entry = run_entry(record, events, records, search, task, iou)
+            entry["run_dir"] = str(path.parent)
+            where = f"{entry['run_id']} {entry['task_id']} rep {entry['rep']}"
+            if task is None:
+                warnings.append(f"{where}: task not in the task files; gold files from run.json, no function gold")
+            elif entry["run_index_base_commit"] and entry["run_index_base_commit"] != task.base_commit:
+                warnings.append(f"{where}: the run's index is of base commit {entry['run_index_base_commit'][:12]}, "
+                                f"the task's is {task.base_commit[:12]}")
+            entries.append(entry)
+        progress(f"{run_id}: {sum(1 for e in entries if e['run_id'] == run_id)} runs with a first search")
+    return entries, skipped, warnings
+
+
+def replay_entries(entries: list[dict], *, program: Path, ks: list[int], index_root: Path, log_dir: Path,
+                   work_root: Path | None = None, iou: float = DEFAULT_IOU, ready_timeout: float = 900,
+                   call_timeout: float = 180, bm25_check: bool = True,
+                   progress: Callable[[str], None] = lambda m: None) -> dict:
+    """Replay the entries, one MCP server for each task and steering level. Returns the program, its commit and
+    the environment that codemem got. A task that fails gets replay.error in its entries."""
+    program_commit = codemem_commit(codemem_checkout(program))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    groups: dict[tuple, list[dict]] = {}
+    for entry in entries:
+        groups.setdefault((entry["recipe"], entry["task_id"], entry["steering"]), []).append(entry)
+    env_shown = None
+    for n, ((recipe, task_id, steering), group) in enumerate(sorted(groups.items(), key=lambda g: str(g[0])), 1):
+        root = index_root / str(recipe) / str(task_id)
+        try:
+            meta = json.loads((root / "index.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            meta = None
+        error = None
+        if meta is None or not (root / "index").is_dir() or not (root / "src").is_dir():
+            error = f"no index at {root} (index/, src/ and index.json); run cmeval e2e index {recipe}"
+        elif group[0]["base_commit"] and meta.get("base_commit") != group[0]["base_commit"]:
+            error = f"the index at {root} is of base commit {str(meta.get('base_commit'))[:12]}, not the task's"
+        if error is None:
+            work = Path(tempfile.mkdtemp(prefix="cmeval-replay-", dir=work_root))
+            t0 = time.monotonic()
+            try:
+                replay_task(group, program=program, program_commit=program_commit, src=root / "src",
+                            index=root / "index", index_meta=meta, steering=steering, ks=ks, work=work,
+                            log=log_dir / f"{task_id}-{steering}.log", iou=iou, ready_timeout=ready_timeout,
+                            call_timeout=call_timeout, bm25_check=bm25_check)
+                env_shown = env_shown or {k: v for k, v in server_env(steering, work / "home").items()
+                                          if k.startswith(("CODEMEM_", "HF_", "TRANSFORMERS_"))}
+            except (ReplayError, OSError, ValueError, subprocess.SubprocessError, shutil.Error) as exc:
+                error = str(exc)
+            finally:
+                shutil.rmtree(work, ignore_errors=True)
+            seconds = round(time.monotonic() - t0)
+        if error is not None:
+            for entry in group:
+                entry["replay"], entry["check"] = {"error": error}, {"verdict": "not checked: replay failed"}
+            progress(f"[{n}/{len(groups)}] {task_id} ({steering}): failed: {error}")
+        else:
+            progress(f"[{n}/{len(groups)}] {task_id} ({steering}): {len(group)} runs replayed in {seconds} s")
+    return {"bin": str(program), "commit": program_commit, "env": env_shown}
+
+
+def report(summary: dict) -> str:
+    """The Markdown of a replay: the runs and checks, the tables of part 1, the table of part 2."""
+    entries, ks = summary["runs"], summary["ks"]
+    head = [f"# Replay of first codemem searches ({summary['created']})", "",
+            f"Run ids: {', '.join(summary['run_ids'])}. Numbers of results: {', '.join(map(str, ks))}. "
+            f"Function match: inside, or line IoU >= {summary['iou']}."]
+    if summary.get("codemem"):
+        head.append(f"codemem: {summary['codemem']['bin']} at commit {summary['codemem']['commit']}.")
+    head.append("")
+    parts = ["\n".join(head), check_summary(entries, Counter(summary["skipped"]))]
+    if summary["warnings"]:
+        parts.append("**Warnings**\n\n" + "\n".join(f"- {w}" for w in summary["warnings"]) + "\n")
+    if summary.get("codemem"):
+        parts.append(replay_tables(entries, ks))
+    parts.append(cost_table(entries))
+    return "\n".join(parts)
+
+
+def replay(run_ids: list[str], *, ks: list[int] | tuple[int, ...] = DEFAULT_KS, tasks_files: list[Path] | None = None,
+           program: Path | None = None, index_root: Path | None = None, out: Path | None = None,
+           records_only: bool = False, iou: float = DEFAULT_IOU, ready_timeout: float = 900,
+           call_timeout: float = 180, bm25_check: bool = True, work_root: Path | None = None,
+           progress: Callable[[str], None] = lambda m: None) -> tuple[dict, Path, str]:
+    """Read the runs, replay their first searches (unless records_only), and write the JSON file and the
+    Markdown file beside it. Returns the summary, the JSON path and the Markdown."""
+    ks = sorted(set(ks))
+    if not ks or ks[0] < 1 or ks[-1] > MAX_K:
+        raise ReplayError(f"each number of results must be from 1 to {MAX_K}")
+    created = datetime.now(timezone.utc)
+    out = out or e2e_dir() / "replay" / f"replay-{created:%Y%m%d-%H%M%S}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    entries, skipped, warnings = read_runs(run_ids, tasks_files=tasks_files, iou=iou, progress=progress)
+    codemem = None
+    if not records_only and entries:
+        if program is None:
+            raise ReplayError("no codemem program")
+        codemem = replay_entries(entries, program=program, ks=ks, index_root=index_root or e2e_dir() / "indexes",
+                                 log_dir=out.with_name(out.stem + "-logs"), work_root=work_root, iou=iou,
+                                 ready_timeout=ready_timeout, call_timeout=call_timeout, bm25_check=bm25_check,
+                                 progress=progress)
+    summary = {"schema": SCHEMA, "created": created.isoformat(timespec="seconds"), "run_ids": list(run_ids),
+               "ks": ks, "iou": iou, "records_only": records_only, "codemem": codemem, "skipped": dict(skipped),
+               "warnings": warnings, "runs": entries}
+    write_json(out, summary)
+    text = report(summary)
+    write_text_atomic(out.with_suffix(".md"), text)
+    return summary, out, text

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -648,6 +649,35 @@ def cmd_e2e_screen_table(args) -> int:
     return 0
 
 
+def cmd_e2e_replay(args) -> int:
+    from . import e2e_replay
+    from .e2e_index import codemem_bin
+    from .generate import GenerateError
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        program = None
+        if not args.records_only:
+            if args.codemem_bin:
+                program = Path(os.path.abspath(args.codemem_bin))
+                if not program.is_file() or not os.access(program, os.X_OK):
+                    raise GenerateError(f"codemem program {program} does not exist or is not executable")
+            else:
+                program = codemem_bin()
+        summary, out, text = e2e_replay.replay(
+            args.run_ids, ks=args.k or e2e_replay.DEFAULT_KS, tasks_files=args.tasks, program=program,
+            index_root=args.index_root, out=args.out, records_only=args.records_only, iou=args.iou,
+            ready_timeout=args.ready_timeout, call_timeout=args.call_timeout, bm25_check=not args.no_bm25_check,
+            work_root=args.work_dir, progress=say)
+    except (e2e_replay.ReplayError, GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e replay: {exc}", file=sys.stderr)
+        return 1
+    print(text)
+    failed = sum(1 for e in summary["runs"] if (e.get("replay") or {}).get("error"))
+    say(f"e2e replay: {len(summary['runs'])} runs, {failed} failed; {out} and {out.with_suffix('.md')}")
+    return 1 if failed else 0
+
+
 def cmd_e2e_recount(args) -> int:
     from .e2e_run import recount
 
@@ -903,6 +933,28 @@ def build_parser() -> argparse.ArgumentParser:
                    help="without --packets: task file, to check that each read is of the task and facts as they are now")
     p.add_argument("--facts", type=Path, help="with --tasks: facts file (default tasks/screen/facts.jsonl)")
     p.set_defaults(func=cmd_e2e_screen_table)
+    p = e2e_sub.add_parser("replay", help="ask the first codemem search of each run again at several numbers of "
+                                          "results, and read its cost from the records")
+    p.add_argument("run_ids", nargs="+", help="run ids (in CMEVAL_HOME/e2e/runs); runs of a codemem setup are read")
+    p.add_argument("--k", type=int, action="append",
+                   help="a number of results, 1 to 50; can be given more than once (default 5, 10, 20, 30, 50)")
+    p.add_argument("--tasks", type=Path, action="append",
+                   help="task file with the gold of the runs' tasks; can be given more than once "
+                        "(default eval/tasks/e2e/<recipe>.jsonl)")
+    p.add_argument("--codemem-bin", help="the codemem program (default CMEVAL_CODEMEM_BIN, else the checkout's .venv)")
+    p.add_argument("--index-root", type=Path,
+                   help="folder of the indexes, <recipe>/<task id>/ (default CMEVAL_HOME/e2e/indexes)")
+    p.add_argument("--out", type=Path, help="the JSON file; the Markdown goes beside it "
+                                            "(default CMEVAL_HOME/e2e/replay/replay-<time>.json)")
+    p.add_argument("--records-only", action="store_true", help="only part 2, from the records; start no codemem")
+    p.add_argument("--iou", type=float, default=0.5, help="line IoU for a gold function match (default 0.5)")
+    p.add_argument("--ready-timeout", type=float, default=900,
+                   help="seconds to wait for each server's index and model (default 900)")
+    p.add_argument("--call-timeout", type=float, default=180, help="seconds for one tool call (default 180)")
+    p.add_argument("--no-bm25-check", action="store_true",
+                   help="do not check the runs whose first search was keywords only with codemem search --signals bm25")
+    p.add_argument("--work-dir", type=Path, help="folder for the index copies (default the system's temp folder)")
+    p.set_defaults(func=cmd_e2e_replay)
     p = e2e_sub.add_parser("recount", help="count the steps of each run again from its stream, with today's rules")
     p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
     p.add_argument("--tasks", type=Path, help="the task file, for records that do not hold their gold files")
