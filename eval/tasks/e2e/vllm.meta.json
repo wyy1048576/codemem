@@ -1,0 +1,184 @@
+{
+  "kind": "resplit",
+  "source": "fresh-v1.jsonl",
+  "source_sha256": "9c2ca4591305c55eb5bb96750a6ec502b9ef1ab855b614e7818ae903ff6072a8",
+  "repo": "vllm-project/vllm",
+  "recipe": "vllm",
+  "test_paths": [
+    "tests/**"
+  ],
+  "test_paths_from_test_files": true,
+  "leave_out": [
+    ".github/**",
+    ".buildkite/**",
+    "**/CHANGELOG*",
+    "**/*.rst"
+  ],
+  "dependency_paths": [
+    "requirements/test/cpu.txt"
+  ],
+  "rule": "patch: the task's code patch as it was, and every other file that is not a test and is not left out. test_patch: files the collector classes as test, and files that match test_paths. Code files, gold labels and difficulty do not change. A task with nothing to add is unchanged.",
+  "tasks": 381,
+  "changed": 31,
+  "unchanged": 350,
+  "not_split": {},
+  "with_test_files_added": 7,
+  "with_fix_files_added": 24,
+  "test_files_added": 15,
+  "fix_files_added": 40,
+  "files_left_out": {
+    "leave_out .buildkite/**": 12
+  },
+  "with_dependency_needed": 2,
+  "with_dependency_needed_by_difficulty": {
+    "easy": 1,
+    "medium": 1,
+    "hard": 0
+  },
+  "dependency_needed": {
+    "vllm-project__vllm-53870": [
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "h11",
+        "old": "h11 ==0.14.0",
+        "new": "h11 ==0.16.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "httpcore",
+        "old": "httpcore ==1.0.6",
+        "new": "httpcore ==1.0.9",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "httpcore2",
+        "old": null,
+        "new": "httpcore2 ==2.12.0",
+        "kind": "added"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "httpx2",
+        "old": null,
+        "new": "httpx2 ==2.12.0",
+        "kind": "added"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "idna",
+        "old": "idna ==3.10",
+        "new": "idna ==3.19",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "mcp",
+        "old": "mcp ==1.28.1",
+        "new": "mcp ==2.1.1",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "mcp-types",
+        "old": null,
+        "new": "mcp-types ==2.1.1",
+        "kind": "added"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "truststore",
+        "old": null,
+        "new": "truststore ==0.10.4",
+        "kind": "added"
+      }
+    ],
+    "vllm-project__vllm-55128": [
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "chz",
+        "old": "chz ==0.3.0",
+        "new": "chz ==0.4.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "docker",
+        "old": "docker ==7.1.0",
+        "new": "docker ==7.2.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "gpt-oss",
+        "old": "gpt-oss ==0.0.8",
+        "new": "gpt-oss ==0.0.9",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "jupyter-client",
+        "old": null,
+        "new": "jupyter-client ==8.10.0",
+        "kind": "added"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "jupyter-core",
+        "old": null,
+        "new": "jupyter-core ==5.9.1",
+        "kind": "added"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "oss-harmony",
+        "old": null,
+        "new": "oss-harmony ==0.0.11",
+        "kind": "added"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "structlog",
+        "old": "structlog ==25.4.0",
+        "new": "structlog ==26.1.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "termcolor",
+        "old": "termcolor ==3.1.0",
+        "new": "termcolor ==3.3.0",
+        "kind": "raised"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "tornado",
+        "old": null,
+        "new": "tornado ==6.5.10",
+        "kind": "added"
+      },
+      {
+        "file": "requirements/test/cpu.txt",
+        "package": "traitlets",
+        "old": null,
+        "new": "traitlets ==5.16.1",
+        "kind": "added"
+      }
+    ]
+  },
+  "with_dependency_other": 2,
+  "with_dependency_other_by_difficulty": {
+    "easy": 1,
+    "medium": 1,
+    "hard": 0
+  },
+  "with_test_patch_before": 284,
+  "with_test_patch_after": 285,
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "7f1147de74ee59539ef1811f3d0ac5af4820d614",
+    "dirty": false
+  },
+  "created": "2026-11-26T10:39:59+00:00"
+}
