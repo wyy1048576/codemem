@@ -254,9 +254,29 @@ can be compared.
 
 ## 10. What the sample does not hold
 
-**Large changes.** No task's real fix has more than 5 code files or 200 changed lines (§1). A
-request such as "add OCR to the upload pipeline", which touches many files, is what codemem is
-meant for, and it is not here. A second collection with a higher limit would add such tasks as
-a fourth level. They cost more to check, and fewer of them pass the screen: of pandas's valid
-hard tasks 11% are fair, of its easy ones 32%. Whether to collect them before the presentation
-or for the paper is Andre's decision.
+**Large changes.** No task's real fix has more than 5 code files or 200 changed lines (§1). The
+limit is a setting of the task collector (`max_code_files = 5`, `max_code_lines = 200`), from the
+first collection in October, which was made for the retrieval eval. A request such as "add OCR
+to the upload pipeline", which touches many files, is what codemem is meant for, and it is not
+in the sample.
+
+**How much the limit removed.** Among merged pull requests that fix exactly one linked issue
+and change code:
+
+| Repo | Such fixes | Larger than the limit | Share |
+|---|---|---|---|
+| pandas | 371 | 19 | 5% |
+| home-assistant | 805 | 49 | 6% |
+| duckdb | 231 | 22 | 10% |
+| playwright | 244 | 35 | 14% |
+| ruff | 285 | 55 | 19% |
+| vscode | 1,026 | 253 | 25% |
+
+So most fixes of one issue are small, and the limit removed a minority: about 430 candidates in
+these six repos, more than half of them in vscode. Larger work usually comes as a pull request
+without a linked issue, and those cannot be tasks: there is no request to give the agent.
+
+**How to get them:** the same collection again with a higher limit, as a fourth level, "large".
+They cost more to check, and fewer of them pass the screen: of pandas's valid hard tasks 11% are
+fair, of its easy ones 32%. Whether that level is collected before the presentation or for the
+paper is Andre's decision.
