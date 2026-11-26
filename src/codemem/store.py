@@ -1580,8 +1580,10 @@ class Store:
         return sum(n * FaissVectorStore.bytes_per_vector(self.vector_dim(vec_type) or 0) for vec_type, n in counts)
 
     def _saved_as_compact(self) -> bool:
-        """Whether this database's saved search indexes are compact ones."""
-        notes = (self._read_note(p.name[len("vec_"):-len(".json")]) for p in self.index_dir.glob("vec_*.json"))
+        """Whether this database's saved search indexes are compact ones. Only the vector types
+        that have vectors count: a type that lost them all keeps the note of its last save, which
+        says nothing of the index as it is."""
+        notes = (self._read_note(vec_type) for vec_type in self.vec_types())
         return any(n.get("backend") == "compact" and n.get("database") == self.database_id() for n in notes if n)
 
     def _pick(self, compact_now: bool) -> _InUse:

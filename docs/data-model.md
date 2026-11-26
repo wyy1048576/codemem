@@ -508,7 +508,8 @@ it doesn't own.
   (`vector_memory_mb`), and the compact one for every type when they do not (architecture.md §5).
   - `auto` picks when the first search index of a process is loaded or built, and the pick holds
     while the store is open;
-  - an index whose saved copies are compact goes back to exact only under 80% of the budget;
+  - an index whose saved copies are compact goes back to exact only under 80% of the budget. The
+    copies that count are those of the vector types that have vectors;
   - where the installed FAISS cannot make the compact index, `auto` picks the exact one.
 - **Loading the search index:**
   - a vector type's index is read from its saved copy, or rebuilt from the rows when the copy
