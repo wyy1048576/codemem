@@ -2,8 +2,10 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -183,6 +185,37 @@ def test_agent_script():
                  "git diff --cached --binary HEAD > /out/agent.patch", e2e_run.KILL_AGENT):
         assert part in script
     assert FAKE_TOKEN not in script and "OAUTH" not in script
+    assert "cmgate" not in script and "codemem_warm" not in script
+
+
+def test_agent_script_with_the_gate():
+    script = e2e_run.agent_script("claude-haiku-5-5", RunSettings(), gate_python="/opt/code mem/.venv/bin/python")
+    lines = script.splitlines()
+    serve = next(line for line in lines if " serve " in line)
+    # The gate runs as the agent's user, without the login token or the proxy's address, in the background.
+    assert serve.startswith("runuser -u agent -- env -u CLAUDE_CODE_OAUTH_TOKEN -u ANTHROPIC_BASE_URL HOME=/home/agent "
+                            "'/opt/code mem/.venv/bin/python' /tmp/cmgate/cmgate.py serve /tmp/cmgate/cmgate.json")
+    assert serve.endswith("&")
+    order = [lines.index(serve), lines.index("mark codemem_warm"), lines.index("mark ready"),
+             next(i for i, line in enumerate(lines) if line.startswith("s=$(date"))]
+    assert order == sorted(order)
+    # Not warm: the script stops before Claude Code, and keeps the gate's logs.
+    stop = lines.index("  exit 3")
+    assert stop < lines.index("mark ready") and "codemem-server.log" in lines[stop - 1]
+    assert e2e_run.KILL_AGENT in lines[next(i for i, line in enumerate(lines) if "codemem-gate.log" in line
+                                            and i > lines.index("mark ready")) - 1]
+
+
+def test_codemem_checks():
+    ok = {"ok": True}
+    clean = {"first": {"turn": 1, "subagent": False, "notes": []}, "first_keywords_only": False}
+    assert e2e_run.codemem_checks(ok, clean) == []
+    assert e2e_run.codemem_checks(ok, {"first": None, "first_keywords_only": False}) == []  # no search at all
+    assert e2e_run.codemem_checks(None, clean) == ["codemem warm-up: no codemem-warm.json"]
+    assert e2e_run.codemem_checks({"ok": False, "error": "boom"}, clean) == ["codemem warm-up failed: boom"]
+    late = {"first": {"turn": 3, "subagent": False, "notes": ["loading", "not_fresh"]}, "first_keywords_only": True}
+    assert e2e_run.codemem_checks(ok, late) == [
+        "the first search_code result (turn 3) came from keywords only (loading, not_fresh)"]
 
 
 def test_token_file_and_binary_checks(tmp_path, monkeypatch):
@@ -262,9 +295,74 @@ def _shim(folder, name, text):
     path.chmod(0o755)
 
 
+# The agent's side of codemem in a local run: start the MCP server of mcp.json (the gate's bridge), do the
+# handshake and one search, and write the answer of the search to a file.
+AGENT_MCP = r'''
+import json, subprocess, sys
+
+config = json.load(open(sys.argv[1]))["mcpServers"].get("codemem")
+if config is None:
+    sys.exit(0)
+proc = subprocess.Popen([config["command"], *config["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+
+def ask(rid, method, params):
+    proc.stdin.write((json.dumps({"jsonrpc": "2.0", "id": rid, "method": method, "params": params}) + "\n").encode())
+    proc.stdin.flush()
+    while True:
+        message = json.loads(proc.stdout.readline())
+        if message.get("id") == rid:
+            return message
+
+
+ask(1, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "agent"}})
+proc.stdin.write(b'{"jsonrpc": "2.0", "method": "notifications/initialized"}\n')
+answer = ask(2, "tools/call", {"name": "search_code", "arguments": {"query": "revoke sessions"}})
+open(sys.argv[2], "w").write(answer["result"]["content"][0]["text"])
+proc.stdin.close()
+sys.exit(proc.wait())
+'''
+
+# A stand-in for `codemem mcp`: the handshake, index_status (ready from the second call on) and search_code (the
+# first search has the loading note). FAKE_SERVER_READY=never keeps it in the state "updating".
+FAKE_MCP_SERVER = r'''
+import json, os, sys
+
+log = open(os.environ["FAKE_SERVER_LOG"], "a")
+log.write(json.dumps({"argv": sys.argv[1:], "backend": os.environ.get("CODEMEM_VECTOR_BACKEND"),
+                      "token": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"), "cwd": os.getcwd()}) + "\n")
+log.flush()
+status = searches = 0
+for line in sys.stdin:
+    msg = json.loads(line)
+    if "id" not in msg:
+        continue
+    log.write(json.dumps({"method": msg["method"], "params": msg.get("params")}) + "\n")
+    log.flush()
+    if msg["method"] == "initialize":
+        result = {"protocolVersion": msg["params"]["protocolVersion"], "capabilities": {"tools": {}},
+                  "serverInfo": {"name": "codemem", "version": "0.0-fake"}}
+    elif msg["params"]["name"] == "index_status":
+        status += 1
+        state = "ready" if status > 1 and os.environ.get("FAKE_SERVER_READY") != "never" else "updating"
+        text = f"state: {state}\nwatching for changes\n\n" + json.dumps({"state": state, "models_loaded": True})
+        result = {"content": [{"type": "text", "text": text}]}
+    else:
+        searches += 1
+        text = "1. auth/sessions.py:1-2  revoke_session  [id 7]"
+        if searches == 1:
+            text += ("\n\nNote: codemem is still loading its embedding model or its search index (the first "
+                     "searches after it starts); these results come from keyword matching only.")
+        result = {"content": [{"type": "text", "text": text}]}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+'''
+
+
 def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PROXY_LINES, sleep=0):
     """Set up a run whose container script runs in local folders. The fake Claude Code prints the stream,
-    writes the token to stderr (as an agent that runs `env` could), adds proxy lines, and edits a file."""
+    writes the token to stderr (as an agent that runs `env` could), adds proxy lines, and edits a file. In a
+    codemem setup it also searches once through the MCP server of mcp.json (AGENT_MCP). The gate's folder is a
+    short one in the system's temp folder: a Unix socket path has a limit of about 100 characters."""
     monkeypatch.delenv(e2e_run.GPUS_ENV, raising=False)
     testbed = tmp_path / "testbed"
     (testbed / "auth").mkdir(parents=True)
@@ -297,10 +395,14 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
     _shim(shims, "date", f"#!/bin/sh\nexec '{sys.executable}' -c 'import time; print(time.time_ns())'\n")
     out_holder = {}
     fake_claude = shims / "claude"
+    (tmp_path / "agent_mcp.py").write_text(AGENT_MCP)
+    gate_dir = tempfile.mkdtemp(prefix="cmg-", dir="/tmp")
+    monkeypatch.setattr(e2e_run, "codemem_python", lambda codemem: sys.executable)
     _shim(shims, "claude", (
         "#!/bin/sh\n"
         f'printf "%s\\n" "$@" > {tmp_path}/argv.txt\n'
         'echo "login: $CLAUDE_CODE_OAUTH_TOKEN" >&2\n'
+        f"'{sys.executable}' {tmp_path}/agent_mcp.py {tmp_path}/mcp.json {tmp_path}/agent-search.txt >&2 || exit 9\n"
         f"cat {stream}\n"
         f'cat {proxy_in} >> "$CMEVAL_TEST_OUT/proxy.jsonl"\n'
         "printf 'def revoke_session():\\n    return 1\\n' > auth/sessions.py\n"
@@ -330,10 +432,17 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
         out_holder["out"] = out
         text = Path(out, "agent.sh").read_text()
         assert e2e_run.KILL_AGENT in text
-        for old, new in ((e2e_run.KILL_AGENT, "true"), ("/testbed", str(testbed)), ("/out", out),
-                         ("/run/claude-empty", str(tmp_path / "claude-empty")),
+        moves = ((e2e_run.GATE_DIR, gate_dir), ("/testbed", str(testbed)), ("/out", out))
+        for old, new in ((e2e_run.KILL_AGENT, "true"), *moves, ("/run/claude-empty", str(tmp_path / "claude-empty")),
                          ("/tmp/mcp.json", f"{tmp_path}/mcp.json")):
             text = text.replace(old, new)
+        for name in ("cmgate.json", "mcp.json"):  # the gate's own paths, as the container would have them
+            path = Path(out, name)
+            if path.exists():
+                data = path.read_text()
+                for old, new in moves[:2]:
+                    data = data.replace(old, new)
+                path.write_text(data)
         assert "kill -9" not in text
         script = tmp_path / "local.sh"
         script.write_text(text)
@@ -343,7 +452,10 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
             if part == "-e" and "=" in cmd[i + 1]:
                 key, value = cmd[i + 1].split("=", 1)
                 env[key] = value
-        return real_run(["bash", str(script)], env=env, **kwargs)
+        try:
+            return real_run(["bash", str(script)], env=env, **kwargs)
+        finally:
+            shutil.rmtree(gate_dir, ignore_errors=True)
 
     monkeypatch.setattr(e2e_run, "_run", fake_run)
     graded = []
@@ -577,7 +689,9 @@ def _codemem_install(tmp_path, monkeypatch, recipe, task):
     checkout = tmp_path / "codemem"
     bin_dir = checkout / ".venv" / "bin"
     bin_dir.mkdir(parents=True)
-    _shim(bin_dir, "codemem", "#!/bin/sh\nexit 0\n")
+    (bin_dir / "fake_codemem.py").write_text(FAKE_MCP_SERVER)
+    _shim(bin_dir, "codemem", f"#!/bin/sh\nexec '{sys.executable}' '{bin_dir / 'fake_codemem.py'}' \"$@\"\n")
+    monkeypatch.setenv("FAKE_SERVER_LOG", str(tmp_path / "server-calls.log"))
     python = tmp_path / "uv" / "python" / "cpython-3.12-linux" / "bin" / "python3.12"
     python.parent.mkdir(parents=True)
     python.write_text("")
@@ -705,6 +819,31 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
                              settings=RunSettings(poll_s=0.05))
 
     assert record["integrity"]["setup_ok"] and not record["discard"] and record["completed"] is True
+    # The gate: warm before the agent, outside its clock. Its warm-up searched until a search had no note.
+    warm = record["integrity"]["codemem_warm"]
+    assert warm["ok"] and warm["warmup_searches"] == 2 and warm["status"]["state"] == "ready"
+    assert "watching for changes" in warm["status_text"]
+    prep = record["time"]["prep_steps_s"]
+    assert list(prep) == ["remove_config", "chown", "codemem_warm", "ready"]
+    assert record["time"]["codemem_warm_s"] == prep["codemem_warm"] >= 1.0
+    marks = dict(line.split() for line in (out / "prep.txt").read_text().splitlines())
+    clock = e2e_run.read_clock(out)
+    assert int(marks["codemem_warm"]) < int(marks["ready"]) <= clock["agent_start"]
+    assert "warm after" in (out / "codemem-gate.log").read_text()
+    # The agent's first search went through the bridge to the warm server, and got a full search.
+    assert e2e_run.codemem_gate.note_kinds((tmp_path / "agent-search.txt").read_text()) == []
+    calls = [json.loads(line) for line in (tmp_path / "server-calls.log").read_text().splitlines()]
+    started = [c for c in calls if "argv" in c]
+    assert len(started) == 1 and started[0]["argv"][0] == "mcp" and started[0]["backend"] == "faiss"
+    assert started[0]["token"] is None and Path(started[0]["cwd"]).resolve() == (tmp_path / "testbed").resolve()
+    inits = [c["params"]["clientInfo"]["name"] for c in calls if c.get("method") == "initialize"]
+    assert inits == ["cmeval-gate", "agent"]
+    mcp = json.loads((out / "mcp.json").read_text())["mcpServers"]["codemem"]
+    assert mcp["command"] == sys.executable and mcp["args"][1:] == ["connect", mcp["args"][0].replace(
+        "cmgate.py", "codemem.sock")]
+    assert mcp["env"]["CODEMEM_VECTOR_BACKEND"] == "faiss"
+    fallbacks = record["integrity"]["codemem_fallback_searches"]
+    assert fallbacks["searches"] == 2 and fallbacks["fell_back"] == 0 and not fallbacks["first_keywords_only"]
     run = seen["cmd"]
     assert run[run.index("--device") + 1] == "nvidia.com/gpu=all"
     assert run[run.index(f"{out}:/out") + 1:run.index(record["identity"]["image"])] == [
@@ -722,6 +861,49 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
     assert steps["codemem_calls"] == 5 and steps["first_codemem_turn"] == 1
     assert steps["mcp_tools"] == {"mcp__codemem__index_status": 1, "mcp__codemem__search_code": 2,
                                   "mcp__codemem__get_chunk": 1, "mcp__codemem__refresh_index": 1}
+
+
+def _keyword_first(events):
+    """The tool stream with the loading note of codemem 041124e on the first search_code result, in the JSON
+    form of that version."""
+    events = json.loads(json.dumps(events))
+    note = ("1. auth/sessions.py:33 x\n\nNote: the embedding model is still loading (the first search after codemem "
+            "starts)")
+    events[4]["message"]["content"][0]["content"] = json.dumps({"result": note})
+    return events
+
+
+def test_run_one_tool_discards_a_first_search_from_keywords(make_task, tmp_path, monkeypatch):
+    stream = _keyword_first(_events(TOOL_STREAM))
+    recipe, task, _, graded = _local_run(monkeypatch, tmp_path, make_task, stream_lines=stream)
+    _codemem_install(tmp_path, monkeypatch, recipe, task)
+    out = e2e_run.run_dir("r1", task.id, "tool", 1)
+    record = e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
+                             settings=RunSettings(poll_s=0.05))
+    assert record["discard"] and not graded and record["completed"] is None
+    assert record["discard_reason"] == ("setup check failed: the first search_code result (turn 2) came from keywords "
+                                        "only (loading)")
+    fallbacks = record["integrity"]["codemem_fallback_searches"]
+    assert fallbacks["first_keywords_only"] and fallbacks["calls"] == [{"turn": 2, "subagent": False,
+                                                                       "notes": ["loading"]}]
+    assert e2e_run.run_state(out) == "redo"
+
+
+def test_run_one_tool_stops_before_the_agent_when_codemem_is_not_warm(make_task, tmp_path, monkeypatch):
+    recipe, task, _, graded = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events(TOOL_STREAM))
+    _codemem_install(tmp_path, monkeypatch, recipe, task)
+    monkeypatch.setenv("FAKE_SERVER_READY", "never")
+    monkeypatch.setattr(e2e_run, "GATE_TIMEOUT_S", 1)
+    out = e2e_run.run_dir("r1", task.id, "tool", 1)
+    record = e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
+                             settings=RunSettings(poll_s=0.05))
+    assert not (tmp_path / "argv.txt").exists()  # Claude Code did not start
+    assert record["end"] == "error" and record["discard"] and not graded
+    failures = record["integrity"]["setup_failures"]
+    assert failures[0] == "no init event" and failures[1].startswith("codemem warm-up failed: the index was not ready")
+    assert record["integrity"]["codemem_warm"]["ok"] is False and record["time"]["agent_s"] is None
+    assert record["time"]["codemem_warm_s"] is not None and "codemem_warm" in (out / "prep.txt").read_text()
+    assert "not warm" in (out / "codemem-gate.log").read_text()
 
 
 def test_run_one_removes_the_index_copy_when_it_fails(make_task, tmp_path, monkeypatch):
@@ -866,6 +1048,44 @@ def test_score_tool_against_grep(capsys):
     assert "tool - grep over 2 tasks: completed 0.00, tokens -150, seconds -7.5" in text
     assert "used  codemem 1st call" in text
     assert text.splitlines()[-1].endswith("0.50      2.5      1.0")
+
+
+def test_recount_and_score_count_the_fallback_searches_of_old_runs(capsys):
+    """Runs made before the count: recount fills integrity.codemem_fallback_searches from the stream and discards
+    nothing; score then reports the count for the setup with codemem."""
+    gold = {"gold_files": ["auth/sessions.py"]}
+    streams = {"t1": _keyword_first(_events(TOOL_STREAM)), "t2": _events(TOOL_STREAM)}
+    for task_id, events in streams.items():
+        _write("s3", {**_record(task_id, "grep", 1), "identity": {**gold, "codemem": None}, "integrity": {}})
+        _write("s3", {**_record(task_id, "tool", 1), "identity": {**gold, "codemem": {"commit": "041124e"}},
+                      "integrity": {"setup_ok": True}})
+        out = e2e_run.run_dir("s3", task_id, "tool", 1)
+        (out / "stream.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+        (e2e_run.run_dir("s3", task_id, "grep", 1) / "stream.jsonl").write_text(STREAM.read_text())
+    assert "codemem fallbacks" not in format_score(score("s3"))
+    assert main(["e2e", "recount", "s3"]) == 0
+    printed = capsys.readouterr().out
+    assert "t1 tool rep 1: " in printed and "codemem fallback searches - -> 1 of 2 (first from keywords)" in printed
+    assert "t2 tool rep 1: " in printed and "codemem fallback searches - -> 0 of 2" in printed
+    assert "fallback" not in next(line for line in printed.splitlines() if line.startswith("t1 grep"))
+    t1 = json.loads((e2e_run.run_dir("s3", "t1", "tool", 1) / "run.json").read_text())
+    assert t1["integrity"]["codemem_fallback_searches"]["first_keywords_only"] and not t1["discard"]
+    assert t1["integrity"]["setup_ok"] is True
+    grep = json.loads((e2e_run.run_dir("s3", "t1", "grep", 1) / "run.json").read_text())
+    assert grep["integrity"] == {}
+    summary = score("s3")
+    assert summary["setups"]["grep"]["codemem_fallbacks"] is None
+    f = summary["setups"]["tool"]["codemem_fallbacks"]
+    assert (f["runs"], f["searches"], f["fell_back"], f["keywords_only"]) == (2, 4, 1, 1)
+    assert f["first_keywords_only_runs"] == 1
+    assert ("codemem fallbacks: 1 of 4 searches had a note (loading 1) in 1 of 2 runs; first search from keywords "
+            "only: 1 runs, and 0 discarded runs") in format_score(summary)
+    # A run discarded for its first search counts apart; one without the count is named.
+    _write("s3", {**_record("t3", "tool", 1, discard=True), "identity": {"codemem": {"commit": "abc"}},
+                  "integrity": {"codemem_fallback_searches": t1["integrity"]["codemem_fallback_searches"]}})
+    _write("s3", {**_record("t4", "tool", 1), "identity": {"codemem": {"commit": "abc"}}, "integrity": {}})
+    text = format_score(score("s3"))
+    assert "1 runs, and 1 discarded runs; 1 runs without the count (run cmeval e2e recount)" in text
 
 
 def test_python_root_holds_the_alias_and_the_real_install(tmp_path):
