@@ -24,6 +24,8 @@ FAISS_ONLY = {
     "test_a_saved_index_is_reconciled_with_the_rows": "reads vec_code.faiss",
     "test_the_search_indexes_are_written_once_the_index_is_quiet": "reads vec_code.faiss",
     "test_cli_default_index_dir_under_codemem_home": "reads vec_code.faiss",
+    "test_the_mcp_server_started_in_a_new_worktree_serves_it_from_the_copy":
+        "starts codemem in a process of its own, which gets the default backend, not this run's",
 }
 
 

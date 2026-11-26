@@ -53,6 +53,7 @@ import itertools
 import json
 import re
 import signal
+import sys
 import threading
 import time
 import zlib
@@ -461,6 +462,12 @@ class _Server(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], proxy: RecordingProxy) -> None:
         self.proxy = proxy
         super().__init__(address, _Handler)
+
+    def handle_error(self, request, client_address) -> None:
+        # A client that closes an idle connection is normal. Do not print a traceback for it.
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
 
 
 class RecordingProxy:

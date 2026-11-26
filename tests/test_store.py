@@ -458,7 +458,7 @@ def test_closing_the_vector_cache_leaves_a_running_thread_its_connection(tmp_pat
 
     cache = VectorCache(tmp_path / "cache.db")
     _while_another_thread_holds_its_connection(
-        cache._conn, cache.close, lambda conn: conn.execute("SELECT COUNT(*) FROM cache").fetchone()[0]
+        cache._conn, cache.close, lambda conn: conn.execute("SELECT COUNT(*) FROM entry").fetchone()[0]
     )
     cache.put_many("e", ["h"], np.ones((1, 4), dtype=np.float32))
     assert cache.count("e") == 1

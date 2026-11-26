@@ -19,10 +19,11 @@ _SEARCH_CODE = {
         "identifier query. Returns ranked results with file:line, signature and a short preview." + _FILTERS
     ),
     "light": (
-        "Find the code for a task described in plain words, even when you know no identifier: "
-        "\"where do users log in?\", \"add OCR to the upload pipeline\", \"why are disabled users still "
-        "logged in?\". Returns ranked functions, classes and code blocks with file:line, signature and "
-        "a short preview. Prefer this over grep for exploring; use grep for exact strings." + _FILTERS
+        "Find code from a plain-words description when you have no exact name to grep for: "
+        "\"where do users log in?\", \"why are disabled users still logged in?\". Use it first on a "
+        "new task, and again whenever you lose the trail. Returns ranked functions, classes and code "
+        "blocks with file:line, signature and a short preview. Once you have an exact identifier or "
+        "string, use grep." + _FILTERS
     ),
     "strong": (
         "Use search_code FIRST to find the code for a task, bug or feature described in plain words, "
@@ -64,14 +65,16 @@ _REFRESH_INDEX = {
 _INSTRUCTIONS = {
     "none": "codemem: code search over this repository's functions and classes.",
     "light": (
-        "codemem indexes every function and class in this repository (code, callers, tests) for "
-        "hybrid keyword + semantic search.\n"
-        "- search_code(query): describe what you want to build, change or understand in plain "
-        "words (\"add OCR to the upload pipeline\"); identifiers work too.\n"
-        "- get_chunk(ref): read one result in full with its callers/callees.\n"
-        "- index_status(): readiness, and what is not indexed.\n"
-        "- refresh_index(): after git checkout, pull or rebase (the index follows your own edits).\n"
-        "Use grep for exact string matches."
+        "codemem searches this repository by meaning: every function and class, with callers and "
+        "tests.\n"
+        "Call search_code whenever you have no concrete lead:\n"
+        "- at the start of a task, before any grep or file listing: describe the behaviour in plain "
+        "words;\n"
+        "- whenever you lose the trail: a grep returned nothing or too much, or you don't know which "
+        "file or symbol to open next.\n"
+        "Once you have an exact name, path or error string, grep or read the file directly.\n"
+        "- get_chunk(ref): read one result in full with its callers and callees.\n"
+        "- refresh_index(): after git checkout, pull or rebase (the index follows your own edits)."
     ),
     "strong": (
         "codemem indexes every function and class in this repository (code, callers, tests) for "
@@ -86,7 +89,11 @@ _INSTRUCTIONS = {
 AGENT_NOTES_MARKER = "<!-- codemem -->"
 
 _AGENT_NOTES = {
-    "light": "This repo is indexed by codemem. Prefer `search_code` before grep when locating code.",
+    "light": (
+        "This repo is indexed by codemem. With no exact name, path or error string to go on (at the "
+        "start of a task, or when a grep leads nowhere), call `search_code` with a plain-words "
+        "description. Once you have an exact name, use grep."
+    ),
     "strong": (
         "This repo is indexed by codemem (MCP server `codemem`). When locating code for an issue, "
         "call `search_code` first with a plain-language description, then `get_chunk` on the hits. "
@@ -113,6 +120,43 @@ def agent_notes(steering: str = "light") -> str | None:
     if text is None:
         return None
     return f"{AGENT_NOTES_MARKER}\n## Code search\n\n{text}\n{AGENT_NOTES_MARKER}\n"
+
+
+_SEARCH_FOOTER = "Lost the trail later? Search again in different words."
+
+
+def search_footer(steering: str = "light") -> str:
+    """Last line of every search_code result from the MCP tool; "" when steering is off."""
+    return "" if steering == "none" else _SEARCH_FOOTER
+
+
+# Claude Code names an MCP tool mcp__<server>__<tool>.
+MCP_SEARCH_TOOL = f"mcp__{SERVER_NAME}__search_code"
+
+
+def first_search_refusal() -> str:
+    """What `codemem hook` tells the agent when it refuses the first Grep or Glob of a session."""
+    return (
+        "This is the first code search of this session and search_code has not been used yet.\n"
+        "Unless you already have an exact function name, file path or error string that takes you "
+        f"straight to the right file, call {MCP_SEARCH_TOOL} with a plain-words description instead. "
+        "If you do have one, repeat this call and it will go through."
+    )
+
+
+def lost_trail_nudge(reason: str, n: int = 0) -> str:
+    """What `codemem hook` adds after a Grep or Glob that looks like a lost trail. `reason` is
+    `empty` (nothing found), `many` (n files matched) or `streak` (n searches in a row with no
+    file opened in between)."""
+    what = {
+        "empty": "This search found nothing.",
+        "many": f"This search matched {n} files, too many to give a clear lead.",
+        "streak": f"That is {n} searches in a row without opening a file.",
+    }[reason]
+    return (
+        f"{what} If you have no exact name, path or error string to go on, call {MCP_SEARCH_TOOL} "
+        "with a plain-words description of what you are looking for."
+    )
 
 
 def models_loading_notice() -> str:
