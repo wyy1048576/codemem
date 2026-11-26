@@ -139,11 +139,13 @@ def cmd_search(args) -> int:
         signals = [s.strip() for s in args.signals.split(",")] if args.signals else None
         kinds = [s.strip() for s in args.kinds.split(",")] if args.kinds else None
         languages = [s.strip() for s in args.language.split(",")] if args.language else None
+        options = dict(
+            k=args.k, signals=signals, path_prefix=args.path_prefix, kinds=kinds, languages=languages,
+            tests="exclude" if args.exclude_tests else args.tests,
+        )
         try:
-            resp = svc.search(
-                args.query, k=args.k, signals=signals, path_prefix=args.path_prefix, debug=args.debug, kinds=kinds,
-                languages=languages, tests="exclude" if args.exclude_tests else args.tests,
-            )
+            note = _follow_checkout(svc, args.query, options)
+            resp = svc.search(args.query, debug=args.debug, **options)
         except ValueError as e:
             print(f"error: {e}", file=sys.stderr)
             return 2
@@ -155,9 +157,39 @@ def cmd_search(args) -> int:
             print(format_results(resp, debug=args.debug, preview=not args.no_preview))
             if args.debug:
                 print(f"\n{json.dumps({k: round(v * 1000, 1) for k, v in resp.timings.items()})} (ms)", file=sys.stderr)
+        if note:
+            print(note, file=sys.stderr)
     finally:
         svc.close()
     return 0
+
+
+def _follow_checkout(svc, query: str, options: dict) -> str:
+    """What `codemem search` does before it answers, so that it never answers for another commit
+    without saying so. No server watches for this command: after a `git switch`, a pull or edits
+    the index can be behind the checkout. A full check finds that out (the one `codemem status`
+    makes), and the index is then updated first, as `codemem index` would: the command waits for
+    it, as it waits for the model. Returns what is left to say after the results: the chunks a
+    large change left without vectors, or that the index could not be updated."""
+    from .embedder import LocalModelUnavailable
+    from .indexer import SettingsChanged
+    from .render import format_behind, pending_note
+
+    behind = svc.behind(options["signals"])
+    if behind is None:
+        return ""
+    what = f"the index is behind this checkout ({format_behind(behind)})"
+    print(f"{what}; updating it first", file=sys.stderr)
+    try:
+        fresh = svc.follow_checkout(query, **options)
+    except (TimeoutError, SettingsChanged, LocalModelUnavailable) as e:
+        # Another codemem process holds the index's write lock; or the update would be a rebuild,
+        # which a search does not start; or the model that names the vectors cannot run here.
+        return (
+            f"note: {what} and could not be updated: {str(e).rstrip('.')}. These results are from the index as it "
+            "is. Run `codemem index`, then search again."
+        )
+    return pending_note(fresh, svc.store.pending_paths() if fresh.pending_chunks else (0, []))
 
 
 def cmd_status(args) -> int:

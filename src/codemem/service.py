@@ -1,10 +1,11 @@
 """Long-lived owner of one repo's index: updates, freshness, the watcher, queries.
 
 The MCP server and `codemem watch` call `start()`. The CLI and the eval call `update()` and
-`search()` directly. Creating a service with an `index_dir` has no side effects beyond opening
-the index, because the eval adapter re-pins `repo_root` after construction. Without one, the
-checkout's default index folder is prepared first (worktrees.py): a new index starts from a copy
-of another checkout's, and the indexes of removed worktrees are deleted.
+`search()` directly; `codemem search` first asks `behind()` and, when the index is behind its
+checkout, calls `follow_checkout()`. Creating a service with an `index_dir` has no side effects
+beyond opening the index, because the eval adapter re-pins `repo_root` after construction.
+Without one, the checkout's default index folder is prepared first (worktrees.py): a new index
+starts from a copy of another checkout's, and the indexes of removed worktrees are deleted.
 
 Freshness (docs/architecture.md §4):
 - the watcher hands over batches of changed paths; a writer thread applies them (stage A), then
@@ -28,7 +29,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,11 @@ _FILTERS = ("path_prefix", "kinds", "languages", "tests", "test_weight", "kind_w
 # Characters per model call outside a build: about 0.6 s on an M1, so a search waits at most that
 # long for the background writer's current call. A build uses bigger calls, for speed.
 _CALL_CHARS = 3000
+
+
+def _by_meaning(signals: Sequence[str] | None) -> bool:
+    """Whether a search by `signals` ranks by vectors too (None: every signal the index has)."""
+    return signals is None or any(s != BM25 for s in signals)
 
 
 def _model_of(embedder_key: str | None) -> str | None:
@@ -223,6 +229,52 @@ class CodememService:
             retry.worked()
         self._last_write = self._last_reconcile = time.monotonic()
         return stats
+
+    # ---- before a search of a command that answers once (`codemem search`)
+    def behind(self, signals: Sequence[str] | None = None) -> dict[str, Any] | None:
+        """What stands between the index and an answer for the checkout as it is now, for a search
+        by `signals` (None: all of them); None when nothing does. A full check that changes
+        nothing, the one `status` makes, finds the files to re-chunk and to drop (after a `git
+        switch` or a pull, or edits made while nothing watched), and whether git's HEAD moved. A
+        search that ranks by meaning also needs the vectors of the chunks still queued."""
+        scan = self.indexer.scan()
+        pending = self.store.dirty_count() if _by_meaning(signals) else 0
+        if scan.is_clean and not pending:
+            return None
+        head = git_head(self.repo_root)
+        return {
+            "changed_files": len(scan.changed) + len(scan.skipped),
+            "deleted_files": len(scan.deleted),
+            "head_moved": bool(head and head != self.store.get_meta("indexed_commit")),
+            "pending_chunks": pending,
+        }
+
+    def follow_checkout(self, query: str, **options: Any) -> Freshness:
+        """Bring the index to the checkout now, in the calling thread, before `search(query,
+        **options)`: what `codemem search` does when `behind()` says the index is behind. Such a
+        command has no writer that would do it, and it waits, as it waits for the model.
+
+        Stage A first, a full check however long it takes: from then on names, lines and keywords
+        are the checkout's. Then stage B: every queued chunk, or, with more than
+        `CATCHUP_MAX_CHUNKS` queued (a large switch, a build another process has not finished),
+        only the chunks this search's own keywords rank on top, as a search of a running server
+        does. A search by keywords alone needs no vector and embeds nothing. Returns what the
+        search still lacks.
+
+        It follows the files and does nothing else: an index built with other settings or by
+        another embedder, which an update would rebuild or embed again, is left as it is
+        (`indexer.SettingsChanged`). That and every other error is raised, not kept: the caller
+        says what it means for its answer."""
+        stats = IndexStats()
+        with self._apply_lock:
+            self.indexer.structure(stats, only_files=True)
+        self._last_write = self._last_reconcile = time.monotonic()
+        pending = self.store.dirty_count()
+        if not pending or not _by_meaning(options.get("signals")):
+            return Freshness()
+        big = pending > CATCHUP_MAX_CHUNKS
+        self.indexer.embed_pending(stats, only=self._keyword_results(query, options) if big else None)
+        return Freshness(self.store.dirty_count(), indexing=big)
 
     # ---- indexing in the background (MCP server, `codemem watch`)
     def start(self, *, watch: bool = True, prewarm: bool = True) -> None:
@@ -670,9 +722,7 @@ class CodememService:
             # A pending chunk has an old vector or none, so the merge ranks it by its keywords
             # alone. The ones this query's keywords rank on top are embedded before anything else,
             # under the catch-up's own rule for a model that is loading (`wait_for_models`).
-            signals = kwargs.get("signals")
-            by_meaning = signals is None or any(s != BM25 for s in signals)
-            first = (lambda: self._keyword_results(query, kwargs)) if by_meaning else None
+            first = (lambda: self._keyword_results(query, kwargs)) if _by_meaning(kwargs.get("signals")) else None
             freshness = self.catch_up(wait_for_models=wait_for_models, first=first)
         loading = not wait_for_models and "signals" not in kwargs and not (
             self._models_ready(deadline, after_idle=True) and self._indexes_ready(deadline))

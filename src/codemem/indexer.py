@@ -74,6 +74,12 @@ _SETTING_TIERS = {
 }
 
 
+class SettingsChanged(RuntimeError):
+    """The index was built with other index-time settings than the config has now, or by another
+    embedder (another model, device or precision). An update would rebuild it or embed it again,
+    and a caller that only follows the files (`structure(only_files=True)`) did not ask for that."""
+
+
 @dataclass
 class FileState:
     rel: str
@@ -582,15 +588,36 @@ class Indexer:
                     yield rel
 
     # ---- settings and vector types
+    def _changed_settings(self) -> list[str]:
+        """The index-time settings (Config.index_settings()) that differ from the ones the stored
+        index was built with."""
+        stored = self.store.get_meta("index_settings")
+        if stored is None:
+            return []
+        current = json.loads(json.dumps(self.config.index_settings()))
+        return sorted(k for k in set(stored) | set(current) if stored.get(k) != current.get(k))
+
     def _changed_tiers(self) -> set[str]:
         """What the stored index was built with differs from the config: "rebuild", "links",
         "texts" or "vectors" (see _SETTING_TIERS)."""
-        stored = self.store.get_meta("index_settings")
-        if stored is None:
-            return set()
-        current = json.loads(json.dumps(self.config.index_settings()))
-        changed = {_SETTING_TIERS.get(k, "rebuild") for k in set(stored) | set(current) if stored.get(k) != current.get(k)}
-        return changed - {None}
+        return {_SETTING_TIERS.get(k, "rebuild") for k in self._changed_settings()} - {None}
+
+    def _only_files(self, keys: dict[str, str]) -> None:
+        """Raise SettingsChanged if an update now would do more than follow the files: a changed
+        setting redoes its tier for every chunk, and vectors of another embedder are dropped."""
+        settings = [k for k in self._changed_settings() if _SETTING_TIERS.get(k, "rebuild") is not None]
+        if settings:
+            raise SettingsChanged(
+                f"the index was built with other settings than the config has now ({', '.join(settings)}), and only "
+                "`codemem index` rebuilds it"
+            )
+        for vec_type, key in keys.items():
+            stored = self.store.get_meta(f"vec.{vec_type}.embedder")
+            if stored is not None and stored != key:
+                raise SettingsChanged(
+                    f"the index holds the vectors of another embedder ({stored}, now {key}), and only `codemem index` "
+                    "embeds it again"
+                )
 
     def _embedders(self) -> dict[str, Embedder]:
         cfg = self.config
@@ -638,15 +665,20 @@ class Indexer:
     # ---- stage A: structure
     def structure(
         self, stats: IndexStats, *, full: bool = False, paths: Iterable[str | Path] | None = None,
+        only_files: bool = False,
     ) -> set[int] | None:
         """Apply changed files to chunks, BM25 rows, calls and links, and queue the chunks whose
         texts may have changed. `paths` limits the check to those files (and folders). Returns
-        the queued chunk ids, or None when everything was queued."""
+        the queued chunk ids, or None when everything was queued. With `only_files` (a search
+        that updates its index first, `CodememService.follow_checkout`), it raises SettingsChanged
+        before it changes anything if following the files is not all it would do."""
         store, cfg = self.store, self.config
         with self._locked():
             # First, so that a model that cannot run (its packages are not installed) fails before
             # anything is wiped or scanned.
             keys = {v: e.key for v, e in self._embedders().items()}
+            if only_files:
+                self._only_files(keys)
             tiers = self._changed_tiers()
             if full or "rebuild" in tiers:
                 if tiers and not full:

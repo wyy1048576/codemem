@@ -254,7 +254,8 @@ def test_two_starts_at_once_make_one_copy(main_index, tmp_path):
 
 
 def test_a_copy_does_not_count_as_an_index_until_it_is_checked(repo, main_index, tmp_path, capsys):
-    """`codemem search` never updates an index, so it must not answer from another checkout's code."""
+    """`codemem search` follows the checkout only with an index that is the checkout's own. A copy
+    that no full check has compared with the files is not: the command asks for `codemem index`."""
     tree = add_worktree(repo, tmp_path / "trees" / "feature", "feature")
     assert main(["search", "expire sessions", "--repo", str(tree)]) == 2
     assert "run `codemem index` first" in capsys.readouterr().err

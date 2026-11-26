@@ -549,7 +549,8 @@ is what makes the split safe:
   (§4.2).
 - **In the CLI and the eval,** `update()` runs stage A and then all of stage B before it returns
   (batches of 512 chunks; model calls of 256 texts, longest first), and writes the search index to
-  disk, so the index is complete when it returns.
+  disk, so the index is complete when it returns. `codemem search` runs both stages itself when
+  it finds the index behind the checkout (§4.6).
 
 ### 4.2 A search catches up first, within 4 s
 
@@ -748,6 +749,37 @@ time to the first visit only: 9,054 texts are about 18 minutes at the M1's 8.5 t
 the background, while keyword search already answers for B. On every later visit the vectors come
 from the cache.
 
+**A switch with no server running.** `codemem search` is a command that runs once: no watcher
+tells it that the checkout moved. So it starts with a full check that changes nothing, the one
+`codemem status` makes. If no file differs from the index, it searches. If files differ (a
+switch, a pull, edits), it brings the index to the checkout first, and says so on stderr:
+
+```
+the index is behind this checkout (52 files changed, 12 deleted, git HEAD moved); updating it first
+```
+
+- **It waits for stage A,** as it waits for the model: the names, lines and keywords of its
+  answer are the checkout's.
+- **Then stage B:** every queued vector, or, with more than 1,000 chunks queued, only the ones
+  its own keyword results need (§4.2). What is left is named after the results, with the command
+  that embeds it:
+
+  ```
+  note: 4384 code chunks in 240 files (vllm/a.py, ...) are not embedded yet: keyword matches for
+  them are current, ranking by meaning may be out of date. Run `codemem index` to embed them.
+  ```
+- **A search by keywords alone** (`--signals bm25`) runs stage A and loads no model.
+- **It only follows the files.** An index that was built with other settings, or by another
+  model, would be rebuilt or embedded again by an update, and its old vectors dropped first.
+  A search never starts that: `codemem index` does.
+- **If the index cannot be updated,** for that reason or because another codemem process holds
+  its write lock for more than 30 s, the search answers from the index as it is. It says that the
+  index is behind the checkout, why it was not updated, and to run `codemem index`.
+
+On flask a search right after a switch across 853 commits (64 files differ) takes 1.1 s, against
+0.4 s when nothing differs (a fake model, the vectors in the cache). The check itself costs what
+`codemem status` costs: 0.02 s there.
+
 **Switching back before the vectors are done** leaves no work for the branch that was left:
 - a chunk that exists only on that branch is deleted by stage A of the switch back, and its place
   in the queue with it;
@@ -813,8 +845,8 @@ just to find that almost all of them equal the main checkout's.
   file. From there on it is the same update as a branch switch, and it ends in the same index as a
   fresh build (tests check this for changed, added, moved and deleted files).
 - **A copy is not yet this checkout's index.** Until that first check has run, `codemem search`
-  (which never updates an index) asks for `codemem index` first, and the MCP server answers with
-  its note that the index is still being built.
+  asks for `codemem index` first, and the MCP server answers with its note that the index is
+  still being built.
 
 Measured on vLLM (6,235 files, 102k chunks; a fake model; an M1 shared with other jobs), in a new
 worktree with one function added:
@@ -1359,7 +1391,8 @@ three strengths (`none`, `light`, `strong`): getting agents to use the tool at a
 adoption problem, and the agent study varies it.
 
 The CLI is for people and scripts: `codemem init` registers the MCP server with your agents,
-downloads the model and builds the index; `codemem index`, `search` and `status` do what they say;
+downloads the model and builds the index; `codemem index`, `search` and `status` do what they say
+(`search` first brings the index to the checkout if files changed since its last update, §4.6);
 `codemem serve-embeddings` serves the local model to other codemem processes (§3.5).
 
 ---

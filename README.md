@@ -58,7 +58,7 @@ codemem status
 |---|---|
 | `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--no-agent-notes] [--write-hooks] [--dry-run] [-y]` | register with agents, add the agent note, download the model, then build the index (`--no-index` skips the build) |
 | `codemem index [PATH] [--full] [--no-cache] [--verify] [--json]` | build or update the index (`--no-cache`: cold timing; `--verify`: compare with a fresh build) |
-| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--kinds function,method] [--language go] [--tests include\|exclude\|only] [--json] [--debug]` | search |
+| `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--kinds function,method] [--language go] [--tests include\|exclude\|only] [--json] [--debug]` | search. If files changed since the index was last updated (a `git switch`, a pull), it updates the index first and says so |
 | `codemem status [PATH] [--json] [--check-assist]` | what is indexed, pending or skipped, which model, the indexed commit (`--check-assist`: only compare an assist endpoint with the local model, "A second source for a build's embeddings", below) |
 | `codemem watch [PATH]` | a foreground watcher: re-index on save |
 | `codemem mcp [PATH]` | the MCP server over stdio (what agents launch) |
