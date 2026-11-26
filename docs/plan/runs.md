@@ -14,21 +14,17 @@ One example is used throughout: the pandas task **68195**.
 with the fix. The agent gets the request and the repo. The tests stay hidden and grade its change.
 In task 68195 the real fix changes one file, `pandas/core/reshape/merge.py`.
 
-**Difficulty** is the size of the real fix. It is a property of the task.
+**The tier** is the size of the real fix. It is a property of the task. There are three:
 
-| Level | The real fix changes |
-|---|---|
-| easy | one file, at most 15 lines |
-| medium | at most two files and 100 lines |
-| hard | more: three to five files, or 101 to 200 lines |
-| large | more again: 6 to 15 files, or 201 to 600 lines |
+| Tier | The real fix changes | The label in today's task files |
+|---|---|---|
+| **easy** | at most two files and 100 lines | `easy` and `medium` |
+| **medium** | three to five files, or 101 to 200 lines | `hard` |
+| **hard** | 6 to 15 files, or 201 to 600 lines | none: these are collected now (§10) |
 
-Task 68195 is easy.
-
-**"Hard" is the hard end of small fixes.** The task files on `main` stop there: the collector
-kept only fixes of at most 5 code files and 200 changed lines. A request that touches many files
-is what codemem is meant for, so a fourth level, **large**, is collected for the repos that are
-run fully (§10).
+Task 68195 is easy. **The tiers are not the labels of the task files:** today's `easy` and
+`medium` are one tier, today's `hard` is the medium tier, and the hard tier is new. Every count
+on this page is in tiers.
 
 **The prompt level** is how the request is worded. It is not a property of the task: **every
 task has all three wordings**, and the hidden tests are the same for all three.
@@ -73,46 +69,50 @@ Two checks turn candidates into tasks, and only they cost time:
 | candidates with tests on `main` | 298 | 182 |
 | checked so far | 100 | 60 |
 | valid | 92 | 49 |
-| fair | 17: 9 easy, 5 medium, 3 hard | 28: 11 easy, 9 medium, 8 hard |
+| fair, easy tier | 14 | 20 |
+| fair, medium tier | 3 | 8 |
 
 So two to six candidates are checked for each task we can run, and the share differs by repo:
 18% of pandas's valid tasks are fair, 57% of playwright's. Many pandas issues are old, and the
 fix that came late is wider than the issue. We cannot check fewer by choosing better, because
 nothing tells in advance which candidates are valid and fair.
 
-**The rule that saves time:** check each difficulty level only until it has 7 fair tasks (the 5
-of the sample and 2 spare), then stop that level.
+**The rule that saves time:** check a tier only until it has what the sample needs and 2 spare
+tasks, then stop that tier: 8 fair tasks for easy, 6 for medium, and 4 for hard, where each one
+is costly.
 
 ---
 
 ## 3. The sample
 
-**15 fair tasks per repo: 5 easy, 5 medium, 5 hard. Each has its three prompts,** so a repo has
-45 requests. **The six repos that are run fully also get 4 large tasks each,** 3 if no more are
-fair (§10).
+**14 fair tasks per repo: 6 easy, 4 medium, 4 hard. Each has its three prompts,** so a repo has
+42 requests.
 
+- **The six easy tasks are 3 with the label `easy` and 3 with the label `medium`,** so that both
+  ends of the tier are in the sample. Up to 8 may be fair and ready; 6 are run.
 - Drawn once per repo with the seeded sampler, from tasks that are valid and fair. Tasks of the
   test split come first: they are the ones no track tuned codemem on. The list is committed
   before the first run and does not change after it.
-- The five tasks of each level are numbered 1 to 5 in the order they were drawn. The table of §4
-  uses these numbers.
-- A task that breaks during the runs is replaced by the next spare of its level, in every setup.
-- **A level that has fewer than 5 fair tasks gives all it has,** and the repo's sample is filled
-  to 15 from its other levels, the nearer level first. pandas has 3 fair hard tasks, and only 8
-  hard candidates are left to check: its sample is 7 easy, 5 medium and 3 hard.
+- The tasks of each tier are numbered in the order they were drawn. In the easy tier the two
+  labels take turns, starting with `easy`: numbers 1, 3 and 5 have the label `easy`, numbers 2,
+  4 and 6 the label `medium`. The table of §4 uses these numbers.
+- A task that breaks during the runs is replaced by the next spare of its tier, in every setup.
+- **A tier that falls short gives all it has.** Nothing is filled in from another tier. pandas
+  has 3 fair tasks in the medium tier today, with 8 candidates left to check.
 
 **What this size can show.** The unit of every comparison is the task: `grep` against `tool` on
-the same task, at one prompt level. Six repos give 90 tasks, so 90 pairs at each level. The
+the same task, at one prompt level. Six repos give 84 tasks, so 84 pairs at each level. The
 numbers below are planning numbers, under the assumptions of [track A](track-a-evals.md) §13.
 
 | Comparison | Pairs | What it can show |
 |---|---|---|
-| all tasks, at one prompt level | 90 | a difference of about 14% in tokens or time; in tasks solved, only a difference of 13 points or more |
-| one difficulty | 30 | large differences only, about 25% |
-| one repo | 15 | a direction, not a result |
+| all tasks, at one prompt level | 84 | a difference of about 14% in tokens or time; in tasks solved, only a difference of 13 points or more |
+| the easy tier | 36 | a difference of about 22% |
+| the medium or the hard tier | 24 | large differences only, about 27% |
+| one repo | 14 | a direction, not a result |
 
-Prompt level and difficulty are two separate dimensions, and the 15 tasks cover both: each
-difficulty has 5 tasks, and each of them is run at L0, L1 and L2.
+Tier and prompt level are two separate dimensions, and the sample covers both: every task of
+every tier is run at L0, L1 and L2.
 
 ---
 
@@ -122,12 +122,11 @@ Every model runs a part of the same sample, so that models are compared on the s
 
 | Model | Tasks of each repo | Prompts | Setups | Repetitions | Runs per repo |
 |---|---|---|---|---|---|
-| **Sonnet** (most runs) | all 15 | L0, L1, L2 | `grep`, `tool` | 3 | 90 for each repetition |
-| **Haiku** (the cheap tier) | 6: numbers 1 and 2 of each level | L0, L1, L2 | `grep`, `tool` | 1 | 36 |
-| **Opus** (the top; few runs, because of their cost) | 3: number 1 of each level | L0, L2 | `grep`, `tool` | 1 | 12 |
-| **Sonnet and Opus, the large tasks** | the 4 large ones, in the six repos run fully | L0, L2 | `grep`, `tool` | Sonnet 3, Opus 1 | 16 for each repetition |
-| **Open models:** the 9B first, then the 27B, then the 14B | 8: numbers 1 to 4 of easy and of medium | L0, L1 | `grep`, `tool` | 3 | 96 for each model |
-| **Open models, a probe** | 3: numbers 1 to 3 of hard | L0 | `grep`, `tool` | 1 | 6 for each model |
+| **Sonnet** (most runs) | all 14 | L0, L1, L2 | `grep`, `tool` | 3 | 84 for each repetition |
+| **Haiku** (the cheap tier) | 6: numbers 1 and 2 of each tier | L0, L1, L2 | `grep`, `tool` | 1 | 36 |
+| **Opus** (the top; few runs, because of their cost) | 6: number 1 of easy, number 1 of medium, and the 4 hard ones | L0, L2 | `grep`, `tool` | 1 | 24 |
+| **Open models:** the 9B first, then the 27B, then the 14B | the 6 easy ones | L0, L1 | `grep`, `tool` | 3 | 72 for each model |
+| **Open models, a probe** | 3: numbers 1 to 3 of medium | L0 | `grep`, `tool` | 1 | 6 for each model |
 
 - The three Claude models are for the presentation. Codex is considered for the paper.
 - **The Claude runs go on Andrew's PC, and they come first there.**
@@ -142,9 +141,9 @@ three answer "did it reach the right place, and how fast", for the small models 
 
 ## 5. The repos, ranked
 
-All ten repos on `main` can carry tasks: each has enough candidates at every difficulty and a
-written recipe. They are not equally worth the seats. The rank says in which order they run and
-how far. Three things decide it:
+All ten repos on `main` can carry tasks: each has enough candidates and a written recipe. They
+are not equally worth the seats. The rank says in which order they run and how far. Three things
+decide it:
 
 - **the language:** Rust, Python, C++ and TypeScript come first;
 - **how vague the issues are:** the share of issues that name the code that has to change. The
@@ -157,19 +156,17 @@ how far. Three things decide it:
 | 2 | ruff | Rust | 8% | the vaguest issues of all: even L0 gives little to grep for | fully |
 | 3 | duckdb | C++ | 21% | vague issues, in C++ | fully |
 | 4 | playwright | TypeScript | 64% | its tasks are ready; medium size | fully |
-| 5 | vscode | TypeScript | 26% | very large and vague, with the most hard tasks: where an index should show most. Fifth only because its environment is the costliest: a long build, and tests that need a display | fully |
+| 5 | vscode | TypeScript | 26% | very large and vague, with the most candidates for the hard tier: where an index should show most. Fifth only because its environment is the costliest: a long build, and tests that need a display | fully |
 | 6 | home-assistant | Python | 54% | very large, 18,700 Python files; the largest pool | fully |
-| 7 | kubernetes | Go | 55% | a fifth language, very large. The smallest pool of these: 86 candidates, 12 hard ones in the test split | Sonnet, once |
-| 8 | trino | Java | 27% | a sixth language. A small pool: 64 candidates, 13 hard | Sonnet, once |
+| 7 | kubernetes | Go | 55% | a fifth language, very large. The smallest pool of these: 86 candidates | Sonnet, once |
+| 8 | trino | Java | 27% | a sixth language. A small pool: 64 candidates | Sonnet, once |
 | 9 | airflow | Python | 60% | a third Python repo | reserve |
 | 10 | vllm | Python | 76% | a fourth Python repo, with the issues that name the code most often | reserve |
 
-- **fully:** every row of §4, with the three Sonnet repetitions.
-- **Sonnet, once:** one Sonnet repetition, so that the language is in the table.
+- **fully:** every row of §4, with the three Sonnet repetitions, in all three tiers.
+- **Sonnet, once:** one Sonnet repetition on the easy and the medium tier, so that the language
+  is in the table. No hard tier is collected for these.
 - **reserve:** runs only in place of a repo above it that cannot be built.
-
-If a hard level falls short of 5 fair tasks in the test split (kubernetes, trino), tasks of the
-dev split fill it and are marked.
 
 Every fix in every pool was merged between July 1 and October 22, 2026.
 
@@ -180,8 +177,8 @@ Every fix in every pool was merged between July 1 and October 22, 2026.
 Before the batches are automated, one small batch shows that the whole chain works with the
 locked codemem, and that the agent calls codemem.
 
-**What runs.** On pandas and on one more repo that is ready (playwright, or ruff if it is): the
-three tasks numbered 1, one of each difficulty, at L0 and at L2, in both setups, with Sonnet,
+**What runs.** On pandas and on one more repo that is ready (playwright, or ruff if it is):
+numbers 1 and 2 of easy and number 1 of medium, at L0 and at L2, in both setups, with Sonnet,
 once. That is 24 runs, about an hour on three seats.
 
 **It passes when:**
@@ -210,14 +207,16 @@ track C the index, before any more seats are spent.
 1. the check run (§6);
 2. Sonnet, repetition 1, on repos 1 to 6 in the order of their rank;
 3. Haiku, then Opus, on repos 1 to 6;
-4. the large tasks of repos 1 to 6: Sonnet, repetition 1, and Opus;
-5. Sonnet, repetition 1, on kubernetes and trino;
-6. Sonnet, repetitions 2 and 3, on repos 1 to 6 in the order of their rank, the large tasks last.
+4. Sonnet, repetition 1, on kubernetes and trino;
+5. Sonnet, repetitions 2 and 3, on repos 1 to 6 in the order of their rank.
 
-A repo that is not ready when its turn comes is passed over and taken up when it is. A batch
-that is cut short leaves a complete table with fewer repetitions, never a table with holes. The
-`grep` run and the `tool` run of a task go turn about in the same batch, so that their times
-can be compared.
+- **The hard tier comes later than the other two** (§10). Easy and medium do not wait for it.
+  When a repo's hard tasks are ready, they are run for the steps that have passed, and are in
+  step from then on.
+- A repo that is not ready when its turn comes is passed over and taken up when it is.
+- A batch that is cut short leaves a complete table with fewer repetitions, never a table with
+  holes. The `grep` run and the `tool` run of a task go turn about in the same batch, so that
+  their times can be compared.
 
 ---
 
@@ -225,18 +224,17 @@ can be compared.
 
 | | Runs | On three seats, at 5 to 7 minutes a run |
 |---|---|---|
-| steps 1 to 3 | 828 (Sonnet 540, Haiku 216, Opus 72) | 23 to 32 hours |
-| step 4, the large tasks | 192 (Sonnet 96, Opus 96) | 5 to 7 hours, and more if large tasks run longer |
-| step 5 | 180 | 5 to 7 hours |
-| step 6 | 1,272 (1,080, and 192 on the large tasks) | 35 to 49 hours |
-| all Claude runs | 2,472 | 2.9 to 4.0 days without a pause |
-| the open models, on the rented GPU | 612 for each model | about half a day for each model, if a run takes as long as a Claude run and six run at once |
+| steps 1 to 3 | 864 (Sonnet 504, Haiku 216, Opus 144) | 24 to 34 hours |
+| step 4 | 120 | 3 to 5 hours |
+| step 5 | 1,008 | 28 to 39 hours |
+| all Claude runs | 1,992 | 2.3 to 3.2 days without a pause |
+| the open models, on the rented GPU | 468 for each model | about 8 hours for each model, if a run takes as long as a Claude run and six run at once |
 
 - **The 5 to 7 minutes are an assumption.** The pilot measured 4.3 to 5.5 minutes for Haiku at
-  L0. Nobody has measured Sonnet or Opus, and vague prompts took more tokens in the pilot. The
-  check run measures it.
-- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 5 are
-  what the presentation counts on, and step 6 fills the time that is left until Nov 30, 23:59.
+  L0. Nobody has measured Sonnet or Opus, vague prompts took more tokens in the pilot, and a
+  task of the hard tier will take longer. The check run measures it.
+- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 4 are
+  what the presentation counts on, and step 5 fills the time that is left until Nov 30, 23:59.
 - Checking candidates, writing the L1 and L2 prompts and building the indexes come before a
   repo's runs and are not in these numbers.
 
@@ -244,25 +242,29 @@ can be compared.
 
 ## 9. What track A is asked to do
 
-1. **For each repo, in the order of its rank (§5):** draw 20 candidates of each difficulty,
-   validate and screen them, and stop a level at 7 fair tasks. Post the table of fair tasks per
-   repo and level as each repo ends.
-2. **Draw the sample** (§3), write its L1 and L2 prompts, and commit the list.
-3. **Build each task's index** with the locked codemem.
-4. **Run the check run** (§6) and post its five points and the first Sonnet numbers. Go on only
+1. **The second collection, for the hard tier** (§10): start it now, for the six repos that are
+   run fully. It needs no container.
+2. **For each repo, in the order of its rank (§5):** validate and screen candidates of the easy
+   and the medium tier until each has what §2 says, then the candidates of the hard tier. Post
+   the table of fair tasks per repo and tier as each repo ends.
+3. **Draw the sample** (§3), write its L1 and L2 prompts, and commit the list.
+4. **Build each task's index** with the locked codemem.
+5. **Run the check run** (§6) and post its five points and the first Sonnet numbers. Go on only
    when it has passed.
-5. **Then run in the order of §7.**
-6. **The large level** (§10): collect again with the higher limit now; check a repo's large
-   candidates when its sample of 15 is ready.
+6. **Then run in the order of §7.**
+
+**One request about labels:** keep today's label of each task in the files as it is, and add the
+tier as a new label. Tables written so far then keep their meaning, and new ones say which of
+the two they count.
 
 ---
 
-## 10. The large level
+## 10. Where the hard tier comes from
 
-**Why.** No task on `main` has a real fix of more than 5 code files or 200 changed lines. That
-is a setting of the task collector (`max_code_files = 5`, `max_code_lines = 200`), from the first
-collection in October, which was made for the retrieval eval. A request such as "add OCR to the
-upload pipeline", which touches many files, is what codemem is meant for.
+**Why it is new.** No task on `main` has a real fix of more than 5 code files or 200 changed
+lines. That is a setting of the task collector (`max_code_files = 5`, `max_code_lines = 200`),
+from the first collection in October, which was made for the retrieval eval. A request such as
+"add OCR to the upload pipeline", which touches many files, is what codemem is meant for.
 
 **What the limit removed.** Among merged pull requests that fix exactly one linked issue and
 change code:
@@ -280,14 +282,13 @@ Most fixes of one issue are small. The limit removed about 430 candidates in the
 more than half of them in vscode. Larger work often comes as a pull request without a linked
 issue, and such a pull request cannot be a task: there is no request to give the agent.
 
-**How the level is made.**
+**How the tier is made.**
 
 1. The same collection again, for the six repos that are run fully, with the limit at 15 code
    files and 600 changed lines. Nothing else changes, so every task of today is found again.
-2. A fix of more than 5 code files or more than 200 changed lines is **large**.
-3. A repo's large candidates are validated and screened after its sample of 15 is ready, until
-   4 are fair. Fewer large tasks pass the screen than small ones (of pandas's valid hard tasks
-   11% are fair, of its easy ones 32%), so a repo may end with 3, and pandas, with 19
-   candidates, with fewer.
-4. Each large task gets its L1 and L2 prompts like any other. Sonnet and Opus run it at L0 and
-   L2 (§4).
+2. A fix of more than 5 code files or more than 200 changed lines is in the hard tier.
+3. A repo's hard candidates are validated and screened after its easy and medium tasks are
+   ready, until 4 are fair. Fewer large fixes pass the screen than small ones: of pandas's valid
+   tasks in the medium tier 11% are fair, of those with the label `easy` 32%. So a repo may end
+   with 3, and pandas, with 19 candidates, with fewer.
+4. Each hard task gets its L1 and L2 prompts like any other.
