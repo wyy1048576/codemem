@@ -478,7 +478,7 @@ def test_cli_run_batch(make_task, tmp_path, monkeypatch, capsys):
     ends = {"pandas-dev__pandas-1": "finished", "pandas-dev__pandas-2": "usage limit"}
     seen = []
 
-    def fake_run_one(recipe, task, *, setup, model, rep, out, settings, run_id):
+    def fake_run_one(recipe, task, *, setup, model, rep, out, settings, run_id, prompts=None):
         seen.append((task.id, setup, rep, model))
         record = _record(task.id, setup, rep, end=ends[task.id], discard=ends[task.id] == "usage limit")
         out.mkdir(parents=True, exist_ok=True)
@@ -518,7 +518,7 @@ def test_cli_run_batch(make_task, tmp_path, monkeypatch, capsys):
 def test_batch_stops_after_three_errors(make_task, monkeypatch):
     tasks = [make_task(id=f"acme__auth-{i}") for i in range(1, 6)]
 
-    def fake_run_one(recipe, task, *, setup, model, rep, out, settings, run_id):
+    def fake_run_one(recipe, task, *, setup, model, rep, out, settings, run_id, prompts=None):
         return _record(task.id, setup, rep, end="error", completed=False)
 
     monkeypatch.setattr(e2e_run, "run_one", fake_run_one)
@@ -886,3 +886,28 @@ def test_diagnostic_args(monkeypatch):
     assert e2e_run.diagnostic_args() == ["--thinking-display", "summarized"] and e2e_run.keep_bodies()
     assert '"WebSearch,WebFetch" --thinking-display summarized >' in script
     assert script.replace(" --thinking-display summarized", "") == plain
+
+
+def test_prompt_levels(make_task, tmp_path):
+    task = make_task()
+    assert e2e_run.make_prompt(task) == e2e_run.make_prompt(task, e2e_run.PromptSet())
+    path = tmp_path / "vague.jsonl"
+    rows = [{"id": task.id, "level": "L1", "prompt": "Logins fail after a reset.\n"},
+            {"id": task.id, "level": "L2", "prompt": "Fix login after reset."}]
+    path.write_text("\n".join(json.dumps(row) for row in rows) + "\n\n", encoding="utf-8")
+    one, two = e2e_run.load_prompts(path, "L1"), e2e_run.load_prompts(path, "L2")
+    assert one.level == "L1" and one.source == "vague.jsonl" and one.sha256 == two.sha256
+    text = e2e_run.make_prompt(task, one)
+    assert "<issue>\nLogins fail after a reset.\n</issue>" in text and task.query.strip() not in text
+    assert "Fix login after reset." in e2e_run.make_prompt(task, two)
+    with pytest.raises(gen.GenerateError, match="no L1 prompt"):
+        e2e_run.make_prompt(make_task(id="acme__auth-2"), one)
+    with pytest.raises(gen.GenerateError, match="a prompts file holds L1, L2"):
+        e2e_run.load_prompts(path, "L0")
+    path.write_text(json.dumps(rows[0]) + "\n" + json.dumps(rows[0]) + "\n", encoding="utf-8")
+    with pytest.raises(gen.GenerateError, match="second L1 prompt"):
+        e2e_run.load_prompts(path, "L1")
+    path.write_text('{"id": "x"}\n', encoding="utf-8")
+    with pytest.raises(gen.GenerateError, match="not a prompt row"):
+        e2e_run.load_prompts(path, "L1")
+
