@@ -403,7 +403,9 @@ def cmd_resplit(args) -> int:
     print(f"  test files added: {meta['test_files_added']} in {meta['with_test_files_added']} tasks; "
           f"fix files added: {meta['fix_files_added']} in {meta['with_fix_files_added']} tasks")
     print(f"  tasks with a test change: {meta['with_test_patch_before']} before, {meta['with_test_patch_after']} after; "
-          f"with a changed dependency file: {meta['with_dependency_files']}")
+          f"with a needed dependency (leave the pool): {meta['with_dependency_needed']} "
+          f"{meta['with_dependency_needed_by_difficulty']}; with another dependency file change: "
+          f"{meta['with_dependency_other']}")
     for task_id, problem in meta["not_split"].items():
         print(f"  not split: {task_id}: {problem}")
     return 0

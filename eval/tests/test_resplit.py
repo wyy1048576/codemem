@@ -77,6 +77,9 @@ def test_default_test_paths_come_from_test_files():
         gen.Suite(("tests/mcp/**/*.spec.ts",), "t")))
     assert resplit.default_test_paths(playwright) == ("tests/**",)
     assert resplit.default_test_paths(_recipe(test_files=("**/*_test.go",))) == ()
+    # A wildcard before the test folder stays in the glob: not every file under providers/ is a test.
+    assert resplit.default_test_paths(_recipe(test_files=("providers/**/tests/unit/**/test_*.py",
+                                                          "crates/*/src/**"))) == ("providers/**/tests/**",)
     assert resplit.rules(_recipe(test_paths=("t/**",))).test_paths == ("t/**",)
     assert resplit.rules(_recipe()).leave_out == resplit.DEFAULT_LEAVE_OUT
     assert resplit.rules(_recipe(leave_out=())).leave_out == ()
@@ -95,7 +98,10 @@ def test_resplit_puts_every_file_on_one_side(db, make_task):
     assert gen.changed_files(new.patch) == ["requirements.txt", "src/CMakeLists.txt", "src/a.cpp", "src/b.cpp"]
     assert new.patch.startswith(task.patch)  # the code part is the task's own text
     assert outcome.left_out == [(".github/workflows/ci.yml", "leave_out .github/**")]
-    assert outcome.dependency_files == ["requirements.txt"] == new.tags["dependency_files"]
+    # requirements.txt is new: its package is added, and the image does not have it.
+    added = {"file": "requirements.txt", "package": "foo", "old": None, "new": "foo ==2", "kind": "added"}
+    assert outcome.dependency_needed == [added] == new.tags["dependency_needed"]
+    assert new.tags["dependency_other"] == {"changes": [], "files": []}
     assert new.tags["resplit"]["fix_added"] == ["requirements.txt", "src/CMakeLists.txt"]
     # Gold labels and difficulty do not move.
     assert new.gold == task.gold and gen.difficulty(new.patch) == gen.difficulty(task.patch)
@@ -164,7 +170,7 @@ def test_resplit_file_writes_the_repo_tasks_and_a_meta_file(db, make_task, tmp_p
     assert [t.id for t in written] == [task.id] and written[0].test_patch == result.tasks[0].test_patch
     meta = json.loads((tmp_path / "out.meta.json").read_text())
     assert meta["kind"] == "resplit" and meta["recipe"] == "db" and meta["changed"] == 1
-    assert meta["test_files_added"] == 2 and meta["fix_files_added"] == 2 and meta["with_dependency_files"] == 1
+    assert meta["test_files_added"] == 2 and meta["fix_files_added"] == 2 and meta["with_dependency_needed"] == 1
     assert meta["files_left_out"] == {"leave_out .github/**": 1} and meta["not_split"] == {}
     assert meta == {**meta, "source": "in.jsonl", "with_test_patch_before": 1, "with_test_patch_after": 1}
     with pytest.raises(resplit.ResplitError, match="write over"):
@@ -192,3 +198,17 @@ def test_duckdb_recipe_test_files():
     assert gen.task_test_files(recipe, T) == ["test/sql/a.test", "test/sql/b.test_slow", "tools/shell/tests/test_e.py"]
     # The test command takes the files as they are and writes the JUnit file itself.
     assert "{files}" in recipe.suites[0].test and "{junit}" in recipe.suites[0].test
+
+
+def test_a_code_file_of_the_task_test_patch_stays_a_test(db, make_task):
+    # The Rust and Go collector puts fixtures and files with test code only in test_patch, also
+    # when patches.classify_path calls them code. resplit keeps them there.
+    repo, base, merge = db
+    task = _task(make_task, repo, base, merge, patch=repo.git("diff", base, merge, "--", "src/a.cpp") + "\n",
+                 test_patch=repo.git("diff", base, merge, "--", "src/b.cpp", "test/sql/b_test.cpp") + "\n")
+    commit, diff = resplit.fix_change(task)
+    assert commit == merge
+    new = resplit.resplit_task(task, diff, resplit.rules(_recipe(test_paths=("test/**", "data/**")))).task
+    assert gen.changed_files(new.test_patch) == ["data/x.bin", "src/b.cpp", "test/sql/a.test", "test/sql/b_test.cpp"]
+    assert "src/b.cpp" not in gen.changed_files(new.patch)
+
