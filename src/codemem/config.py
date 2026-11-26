@@ -18,7 +18,7 @@ import os
 import re
 import threading
 import tomllib
-from dataclasses import dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +57,7 @@ DTYPES = ("auto", "float32", "float16", "bfloat16")
 # whole classes, while questions like "add OCR to uploads" often need both. The knobs stay for runs.
 DEFAULT_TEST_WEIGHT = 1.0
 DEFAULT_KIND_WEIGHTS: dict[str, float] = {}
+COMPACT_MAX_DIM = 4096  # the longest compact code: FAISS's RaBitQ calls were checked up to this length
 
 
 @dataclass
@@ -132,6 +133,20 @@ class EmbeddingConfig:
         }
 
 
+@dataclass
+class CompactConfig:
+    """The compact search index, `vector_backend = "compact"` (docs/architecture.md §5): small
+    codes of each vector in memory, and the best candidates scored exactly from the stored vectors."""
+
+    # bits per number of the fine code, which ranks the candidates, 1 to 8. Every vector also has a
+    # 1-bit code, which a search scans; at 1 that is the only code
+    bits: int = 4
+    # numbers of each vector the codes cover (the first N); 0 = as many as the index uses. At most
+    # COMPACT_MAX_DIM either way
+    dim: int = 0
+    rescore: int = 200  # candidates scored exactly: at least this many, and at least 4 per result asked for
+
+
 def _default_vectors() -> dict[str, VectorConfig]:
     return {"code": VectorConfig(), "usage": VectorConfig()}
 
@@ -172,9 +187,12 @@ class Config:
     vector_cache: str = "global"  # global = reuse vectors across indexes (~/.codemem/cache) | off
     # The cache file's size cap, in GB (10^9 bytes); past it the least recently used vectors go. 0 = no cap.
     vector_cache_max_gb: float = 8.0
-    # The in-memory search index: faiss (exact) | "module:Class" subclassing store.VectorStore.
-    # Vectors stay in SQLite, so a change rebuilds the search index from them, with no re-embedding.
+    # The in-memory search index: faiss (exact, every vector in memory) | compact (a small code
+    # per vector, exact scores from the stored vectors) | "module:Class" subclassing
+    # store.VectorStore. Vectors stay in SQLite, so a change rebuilds the search index from them,
+    # with no re-embedding.
     vector_backend: str = "faiss"
+    compact: CompactConfig = field(default_factory=CompactConfig)
     # search-time result filters and weights (the eval adapter can set them per system)
     kinds: list[str] | None = None  # None = every kind; e.g. ["function", "method"]
     test_weight: float = DEFAULT_TEST_WEIGHT  # multiplies the fused score of test chunks; 0 drops them
@@ -204,6 +222,10 @@ class Config:
         if spec.embedder:
             out += f"+{spec.embedder}"
         return out
+
+    def vector_options(self) -> dict[str, Any]:
+        """The search index's own settings, as `Store` passes them to the backend by keyword."""
+        return asdict(self.compact) if self.vector_backend == "compact" else {}
 
     def effective_window_chars(self) -> int:
         return self.window_chars or max(3 * (self.max_seq_length - 32), 1000)
@@ -245,6 +267,8 @@ class Config:
             settings["embedding"] = self.embedding.index_settings()
         if self.vector_backend != "faiss":  # likewise: systems with another backend get their own index
             settings["vector_backend"] = self.vector_backend
+        if self.vector_backend == "compact":  # and so do systems whose codes or candidates differ
+            settings["compact"] = asdict(self.compact)
         return settings
 
 
@@ -423,8 +447,21 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
     cap = cfg.vector_cache_max_gb
     if isinstance(cap, bool) or not isinstance(cap, (int, float)) or not 0 <= cap < float("inf"):
         raise ValueError(f"vector_cache_max_gb must be a size in GB, or 0 for no cap, got {cap!r}")
-    if cfg.vector_backend != "faiss" and ":" not in cfg.vector_backend:
-        raise ValueError(f"vector_backend must be faiss or 'module:Class', got {cfg.vector_backend!r}")
+    if cfg.vector_backend not in {"faiss", "compact"} and ":" not in cfg.vector_backend:
+        raise ValueError(f"vector_backend must be faiss, compact or 'module:Class', got {cfg.vector_backend!r}")
+    compact = dict(raw.get("compact") or {})
+    known = {f.name for f in fields(CompactConfig)}
+    if unknown := sorted(set(compact) - known):
+        raise ValueError(f"unknown [compact] settings {unknown}; choose from {sorted(known)}")
+    cfg.compact = CompactConfig(**compact)
+    if not all(type(v) is int for v in asdict(cfg.compact).values()):
+        raise ValueError(f"[compact] settings must be whole numbers, got {compact}")
+    if not 1 <= cfg.compact.bits <= 8:
+        raise ValueError(f"[compact] bits must be 1 to 8, got {cfg.compact.bits}")
+    if not 0 <= cfg.compact.dim <= COMPACT_MAX_DIM:
+        raise ValueError(f"[compact] dim must be 0 to {COMPACT_MAX_DIM}, got {cfg.compact.dim}")
+    if cfg.compact.rescore < 1:
+        raise ValueError(f"[compact] rescore must be 1 or more, got {cfg.compact.rescore}")
     from .texts import TEXT_BUILDERS
 
     if unknown := sorted(set(cfg.enabled_vec_types()) - set(TEXT_BUILDERS)):
