@@ -453,6 +453,13 @@ def test_cli_index_search_status(sample_repo, tmp_path, fake_env, capsys):
     assert main(["search", "logout", "--repo", str(sample_repo), "--index-dir", idx, "--json", "--debug"]) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["results"][0]["qualname"] == "logout" and "ranks" in data["results"][0]
+    related = [x for r in data["results"] for x in r["related"]]
+    assert related and {"qualname", "path", "start_line", "relation"} <= set(related[0])
+
+    args = ["search", "close an account", "--repo", str(sample_repo), "--index-dir", idx, "--json", "--debug"]
+    assert main([*args, "--names", "revoke_session, disable_user"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["signals"][-1] == "names" and any(r["ranks"].get("names") == 1 for r in data["results"])
 
     assert main(["search", "x", "--repo", str(sample_repo), "--index-dir", idx, "--signals", "bogus"]) == 2
     capsys.readouterr()
@@ -978,6 +985,11 @@ def test_mcp_tools_end_to_end(service):
             text = res.content[0].text
             assert "auth/sessions.py:19-20  revoke_session" in text
             assert text.endswith("\n\n" + prompts.search_footer("light"))
+            assert "\n   related: " in text  # the cards name their closest callers and callees
+            assert "\n\nMore results, by name (ask get_chunk for any of them):\n" in text
+            res = await client.call_tool("search_code", {"query": "close an account", "k": 3, "names": ["revoke_session"]})
+            cards = [line for line in res.content[0].text.split("\n\n")[0].splitlines() if line[:1].isdigit()]
+            assert any("auth/sessions.py:19-20  revoke_session" in line for line in cards)
             res = await client.call_tool("get_chunk", {"ref": "auth/sessions.py:20"})
             assert "db.sessions.delete(session_id)" in res.content[0].text
             assert "callers: " in res.content[0].text
@@ -1018,6 +1030,28 @@ def test_mcp_tools_answer_in_plain_text(service):
             assert "\n   def revoke_session(session_id):\n" in texts["search_code"]  # real line ends
             assert texts["get_chunk"] == format_chunk(service.get_chunk("auth/sessions.py:20"))
             assert texts["index_status"].startswith("state: ready")
+
+    anyio.run(run)
+
+
+def test_mcp_search_names_tests_apart_only_when_set_and_not_overridden(service):
+    from mcp import Client
+
+    from codemem.render import TESTS_HEADER
+    from codemem.server import build_server
+
+    service.update()
+    server = build_server(service)
+
+    async def run():
+        async with Client(server) as client:
+            res = await client.call_tool("search_code", {"query": "disabled user", "k": 5})
+            assert TESTS_HEADER not in res.content[0].text  # off by default
+            service.config.tests_apart = True
+            res = await client.call_tool("search_code", {"query": "disabled user", "k": 5})
+            assert f"\n\n{TESTS_HEADER}\n" in res.content[0].text
+            res = await client.call_tool("search_code", {"query": "disabled user", "k": 5, "tests": "include"})
+            assert TESTS_HEADER not in res.content[0].text  # the caller's `tests` wins
 
     anyio.run(run)
 

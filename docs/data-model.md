@@ -643,7 +643,7 @@ The tool names stay stable, so other front-ends can be compared.
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"` | numbered cards (below), and a closing `Note:` when the search could not include every save or embedding. An opening `Note:` while a new index is being built, or is still a copy of another checkout's |
+| `search_code` | `query: str`, `k: int = 10` (capped at 50), `path_prefix: str \| None`, `kinds: list[str] \| None`, `tests: "include" \| "exclude" \| "only"`, `names: list[str] \| None` (function, class, method or file names the caller knows or guesses: a fourth list of the merge, by keywords alone; without them the search is unchanged) | numbered cards (below), each naming its closest callers and callees, then the next results by name, and a closing `Note:` when the search could not include every save or embedding. An opening `Note:` while a new index is being built, or is still a copy of another checkout's |
 | `get_chunk` | `ref`: a chunk id, `path:line` or `path::qualname` | the full code (a class of 80 lines or more: its outline and members), plus callers and callees as `name (path:lines)`. An opening `Note:` when it is read from a copy of another checkout's index that is not checked yet |
 | `index_status` | none | state and progress, counts, models, local or remote embeddings, an assist endpoint and whether it shares the work or why not, whether the embedding model is in memory, the search index in use (exact or compact, why, and about how much memory each vector type takes), the indexed commit, staleness, pending files and chunks, whether the watcher works, coverage (skipped files and why), the last error |
 | `refresh_index` | none | runs a full check now and waits up to 60 s for embeddings: `Checked every file in 0.5 s: 2 files changed, ...` |
@@ -654,10 +654,46 @@ The tool names stay stable, so other front-ends can be compared.
 3. auth/sessions.py:19-20  revoke_session  [id 14]
    def revoke_session(session_id):
    |     db.sessions.delete(session_id)
+   related: disable_user (auth/users.py:5), logout (api/routes.py:10), Table.delete (auth/db.py:11)
 ```
 
 `N. path:start-end  name  [id X]` (a long function adds `best a-b`, its best window's lines), then
-the signature (not for blocks), the first doc line, and up to 6 preview lines.
+the signature (not for blocks), the first doc line, and up to 6 preview lines. Then one `related:`
+line: up to `card_relations` (3) of the result's callers and callees, the ones closest to the query
+by their stored code vectors, as `qualified name (path:start line)`. A neighbour that is itself one
+of the results is not named, nor a callee with more than 100 callers (whose callers are not
+followed either), nor a chunk the search's filters leave out. A result with no such neighbour has
+no line, and so has every result of a search by keywords alone. In `SearchResponse.to_dict()` each
+card has `related`: a list of `chunk_id`, `qualname`, `path`, `start_line` and `relation` (`calls`
+or `called by`).
+
+**Tests named apart** (`tests_apart`, off by default). When it is on and the caller passes no
+`tests`, test chunks (`is_test`) take no place among the cards: the cards are those of
+`tests="exclude"`. The best `tests_apart_count` (5) test chunks, the same lists with only tests,
+merged, are named after the cards, before the next results, one line each:
+
+```
+Tests that match:
+tests/test_users.py:12  test_disabled_user_loses_sessions
+```
+
+A `tests` argument wins: `include`, `exclude` and `only` mean what they meant, and name no tests
+apart. `SearchResponse.tests` holds them (`to_dict()`: `tests`, the fields of `more`).
+
+**The next results, by name.** After the cards, a block names the results k+1 to k+M
+(`more_results`, 20 by default; 0 for none), one line each, `path:start line  name`, no preview:
+
+```
+More results, by name (ask get_chunk for any of them):
+auth/users.py:5  disable_user
+api/routes.py:1  <imports>
+```
+
+They come from the same merge as the cards, in its order, so the cards are those of a search
+without them. Each list gives `candidates` (50), so k + M up to 50 is always there in an index with
+that many chunks; past that, the block holds what the lists have. `SearchResponse.more` holds them
+(`to_dict()`: `more`, each with `chunk_id`, `path`, `start_line`, `end_line`, `qualname`, `kind`,
+`subkind`, `name`, `score`). On the 381 vLLM issues (the whole issue as the query, k = 10), search_code's answer is 5,801 characters on average (95th percentile 7,660) without the related names and the next results, and 9,332 (11,713) with both at their defaults; on the 17 vague pandas requests 5,125 (6,865) and 7,967 (9,426).
 
 **The freshness note.** `search_code` catches up first (architecture.md §4): the background writer
 applies every save the watcher has seen, then the search embeds the queue, its own keyword results
@@ -767,6 +803,17 @@ A change to any of these must be made together with the eval:
   `CODEMEM_VECTOR_BACKEND` sets it from the environment, for an index that is built in one place
   and opened in another: `auto` picks by the memory of the place it runs in, so the two can
   differ, and every start that begins from the build's files then rebuilds the search index.
+- **`[rrf] weights`:** search-time; signal -> weight, 1 for a signal not named. The signals are
+  `bm25`, each vector type, and `names`, the keyword list of the names a caller passes apart from
+  the query (§12.1); `names = 0` turns that list off.
+- **`card_relations`:** search-time; a whole number, 0 or more; the default is 3. How many callers
+  and callees each card names (§12.1); 0 names none. The ranking does not depend on it.
+- **`tests_apart`:** search-time; true or false; the default is false. **`tests_apart_count`:** a
+  whole number, 0 or more; the default is 5. With `tests_apart`, a search that does not pass `tests`
+  keeps test chunks out of the cards and names the best `tests_apart_count` of them after the cards
+  (§12.1). The default changes nothing.
+- **`more_results`:** search-time; a whole number, 0 or more; the default is 20. How many results
+  after the k cards are named, one line each (§12.1); 0 names none. The cards do not depend on it.
 - **`vector_memory_mb`:** search-time. The memory, in MB of 10^6 bytes, that the exact search
   indexes of one index may take before `auto` uses the compact one. 0, the default, is 2% of the
   machine's memory, and at least 128 MB. A whole number, 0 or more.

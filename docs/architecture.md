@@ -1415,7 +1415,9 @@ and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and bec
         │                                                                       it shares no word)
         ├──► code vectors ───────────► ... 10. revoke_session
         │
-        └──► usage vectors ──────────► ...  2. revoke_session  (its callers match)
+        ├──► usage vectors ──────────► ...  2. revoke_session  (its callers match)
+        │
+        └──► names given apart ──────► (keywords only; when the agent passes some)
                        │
                        ▼
         merge by rank: each list adds 1 / (60 + rank) to a chunk's score
@@ -1430,12 +1432,25 @@ and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and bec
    matches `revoke`, `session` and `revoke_session`. Query stopwords ("the", "in") are dropped.
 2. **Meaning.** The query is embedded once, then compared with every code vector and, separately,
    every usage vector.
-3. **Merge by rank** (reciprocal rank fusion). Ranks are merged, not raw scores, because keyword
+3. **Names, apart from the query.** An agent can pass function, class, method or file names it
+   knows or guesses (`names`) beside a plain-words query. They are ranked by keywords alone, as a
+   fourth list. A short query keeps them that way: with an issue's first line as the query and the
+   issue's identifiers as `names`, a gold function reached the top 10 for 88 of 175 vLLM tasks
+   against 58, and 81 of 162 pandas tasks against 70, on the half of the tasks no setting was chosen
+   on (the weight, 1, was chosen on the other half). With the whole issue as the query as well, they
+   gained vLLM 11 tasks and cost pandas 7 of 179 gold files in the top 10. Without names a search is
+   what it was. `[rrf] weights = { names = 0 }` turns the list off.
+4. **Merge by rank** (reciprocal rank fusion). Ranks are merged, not raw scores, because keyword
    scores and vector similarities aren't comparable. Each list contributes its top 50.
-4. **Filters and weights.** A folder (`path_prefix`), kinds (functions only, say), languages and
+5. **Filters and weights.** A folder (`path_prefix`), kinds (functions only, say), languages and
    tests (include, exclude or only) filter each list. Tests, classes and blocks score like
-   everything else by default, since vague questions often need them; weights can lower them.
-5. **Cards.** Equal scores are ordered by location, so every machine gives the same order:
+   everything else by default, since vague questions often need them; weights can lower them. An
+   option, off by default (`tests_apart`), keeps test chunks out of the cards when the caller does
+   not choose, and names the best 5 of them after the cards: on the held-out halves a gold function
+   was then in the 10 cards for 103 of 175 vLLM tasks against 99 and 100 of 162 pandas tasks
+   against 94, 11 of 16 vague requests against 8; and a named test calls a gold function for 47 and
+   31 of them. The eval's answers are never tests, so these numbers favour it by construction.
+6. **Cards.** Equal scores are ordered by location, so every machine gives the same order:
 
 ```
 3. auth/sessions.py:19-20  revoke_session  [id 14]
@@ -1444,7 +1459,26 @@ and each start imports what is in it. 34,218 vectors (148 MB) take 1.6 s and bec
 ```
 
 A card gives the location, the name, an id for `get_chunk`, the signature, the first doc line and
-a few lines of code; for a long function, the best-matching window.
+a few lines of code; for a long function, the best-matching window. Then a `related:` line names up
+to 3 of the result's callers and callees, the ones closest to the query by their stored code
+vectors (`card_relations`; data-model.md §12.1 has the rules). After the cards, the next 20
+results are named, one line each (`more_results`).
+
+**Why the call graph is shown and not merged into the ranking.** Measured on Nov 26 on the eval's
+vLLM and pandas tasks (the issue as the query), on the half of the tasks no setting was chosen on.
+Merged, as a fourth list of the callers and callees of the top results or as a lift for candidates
+linked to them, the graph moved a gold function into the top 10 for at most 5 more of 162 pandas
+tasks and lost up to 5 of 175 on vLLM, whichever edges it kept, and random neighbours did as well as
+the closest ones. Shown, it puts a gold function on the page that the 10 results alone miss: one
+was among the results or named on a card for 117 of 175 vLLM tasks against 99, and 108 of 162 pandas
+tasks against 94, for 16 to 18 names a search; with the issue's first line as the query, 89 against
+58 and 88 against 70. The agent decides what to open, and the order of the 10 results does not
+change. Callees with more than 100 callers are left out: calls are linked by name, and on vLLM three
+methods named `append` have 4,362 callers each, really `list.append`; keeping every edge reached no
+more tasks and named more functions. The next 20 results, named after the cards, reach about as many
+tasks (116 of 175 vLLM, 108 of 162 pandas, 12 of 16 vague requests against 9 with the related
+names), but other ones: with both, a gold function is on the page for 127 of 175 and 117 of 162.
+On the 381 vLLM issues (the whole issue as the query, k = 10), search_code's answer is 5,801 characters on average (95th percentile 7,660) without the related names and the next results, and 9,332 (11,713) with both at their defaults; on the 17 vague pandas requests 5,125 (6,865) and 7,967 (9,426).
 
 **Long queries stay fast.** BM25 joins every query word with OR, so a whole issue text is costly.
 Dropping stopwords keeps a 250-word query on vLLM at 0.36 s of BM25 with no loss in accuracy.
@@ -1468,7 +1502,7 @@ against the index (or builds it the first time), starts the watcher and loads th
 
 | Tool | Does |
 |---|---|
-| `search_code(query, k, path_prefix, kinds, tests)` | catches up (§4.2), then returns up to `k` cards (10 by default, 50 at most), with a note if something is still pending |
+| `search_code(query, k, path_prefix, kinds, tests, names)` | catches up (§4.2), then returns up to `k` cards (10 by default, 50 at most), each naming its closest callers and callees, then the next results by name, with a note if something is still pending; `names` are searched by keywords apart from the query (§6) |
 | `get_chunk(ref)` | the full code of a chunk, by id, `path:line` or `path::qualname`, with its callers and callees |
 | `index_status()` | what is indexed, what is pending or skipped and why, which model and whether it is in memory, and any error |
 | `refresh_index()` | a full check now, for changes the watcher can't see |

@@ -263,3 +263,227 @@ def test_bm25_queries_drop_stopwords_and_optionally_common_words(index):
     assert '"revoke"' in words and all(0 < docs.get(w.strip('"'), 0) <= 0.5 * total for w in words)
     cfg.bm25_common_share, cfg.bm25_query_terms = 0.0, 0  # every word, stopwords too
     assert bm25_match(store, "revoke the session", cfg) == '"revoke" OR "the" OR "session"'
+
+
+# ---------------------------------------------------------------- related names on the cards
+
+
+def _id(store, key):
+    return store.get_chunk_by_key(key).chunk_id
+
+
+def test_neighbours_go_both_ways_and_leave_out_hub_callees(index):
+    store, _, _ = index
+    revoke, disable = _id(store, "auth/sessions.py::revoke_session"), _id(store, "auth/users.py::disable_user")
+    delete, logout = _id(store, "auth/db.py::Table.delete"), _id(store, "api/routes.py::logout")
+    near = store.neighbours([revoke, disable], max_callers=100)
+    assert {(delete, "calls"), (disable, "called by"), (logout, "called by")} <= set(near[revoke])
+    assert (revoke, "calls") in near[disable]
+    # revoke_session has three callers: over a cap of 2 it is a hub, not listed by its callers
+    # (disable_user loses it) and its callers not followed (it keeps only its own call)
+    capped = store.neighbours([revoke, disable], max_callers=2)
+    assert capped[revoke] == [(delete, "calls")] and (revoke, "calls") not in capped[disable]
+
+
+def test_similarity_is_the_score_vector_search_gives(index):
+    store, cfg, factory = index
+    query = factory(cfg.vectors["code"], cfg).embed_queries([QUERY])[0]
+    hits = store.vector_search("code", query, 8)
+    scores = store.similarity("code", query, [h.chunk_id for h in hits] + [10**9])  # an id with no row is left out
+    assert scores == pytest.approx({h.chunk_id: h.score for h in hits}, abs=1e-5)
+
+
+def _text(resp):
+    from codemem.render import format_results
+
+    return format_results(resp)
+
+
+def test_cards_name_their_callers_and_callees(index):
+    store, cfg, factory = index
+    assert cfg.card_relations == 3  # the default
+    cfg.more_results = 0  # the cards alone
+    on = search(store, "revoke_session", cfg, k=1, embedder_factory=factory)
+    card = on.results[0]
+    assert card.qualname == "revoke_session"
+    assert len(card.related) == 3 and {(r.qualname, r.relation) for r in card.related} <= {
+        ("disable_user", "called by"), ("logout", "called by"), ("test_disabled_user_loses_sessions", "called by"),
+        ("Table.delete", "calls"),
+    }
+    line = _text(on).splitlines()[-1]
+    assert line == "   related: " + ", ".join(f"{r.qualname} ({r.path}:{r.start_line})" for r in card.related)
+    cfg.card_relations = 0
+    off = search(store, "revoke_session", cfg, k=1, embedder_factory=factory)
+    assert not off.results[0].related and "related:" not in _text(off)
+    assert _text(off).splitlines() == _text(on).splitlines()[:-1]  # the line is all that differs
+
+
+def test_related_names_leave_the_ranking_and_the_results_alone(index):
+    store, cfg, factory = index
+    for query in (QUERY, "revoke_session", "table rows", "session"):
+        cfg.card_relations = 3
+        on = search(store, query, cfg, k=5, embedder_factory=factory).results
+        cfg.card_relations = 0
+        off = search(store, query, cfg, k=5, embedder_factory=factory).results
+        assert [(r.key, r.score) for r in on] == [(r.key, r.score) for r in off]  # same results, same order
+        shown = {r.chunk_id for r in on}
+        assert all(x.chunk_id not in shown for r in on for x in r.related)  # a result is never named again
+        assert all(len(r.related) <= 3 for r in on)
+
+
+def test_related_names_leave_out_hubs_and_keep_the_filters(index, monkeypatch):
+    import codemem.search as search_module
+
+    store, cfg, factory = index
+    monkeypatch.setattr(search_module, "RELATION_MAX_CALLERS", 2)  # revoke_session (3 callers) is now a hub
+    card = search(store, "revoke_session", cfg, k=1, embedder_factory=factory).results[0]
+    assert [(r.qualname, r.relation) for r in card.related] == [("Table.delete", "calls")]
+    monkeypatch.setattr(search_module, "RELATION_MAX_CALLERS", 100)
+    card = search(store, "revoke_session", cfg, k=1, tests="exclude", embedder_factory=factory).results[0]
+    assert card.related and not any(r.qualname.startswith("test_") for r in card.related)
+    # no line without neighbours, and none for a search by keywords alone (no query vector to choose by)
+    cards = search(store, "secrets token hex", cfg, k=10, embedder_factory=factory).results
+    assert any(not c.related for c in cards)
+    assert "related:" not in _text(search(store, "revoke_session", cfg, k=3, signals=["bm25"], embedder_factory=factory))
+
+
+def test_card_relations_setting_is_validated():
+    from codemem.config import Config, config_from_dict
+
+    assert Config().card_relations == 3 and config_from_dict({"card_relations": 0}).card_relations == 0
+    for bad in (-1, 1.5, "3", True):
+        with pytest.raises(ValueError, match="card_relations"):
+            config_from_dict({"card_relations": bad})
+
+
+# ---------------------------------------------------------------- the next results, by name
+
+
+def test_the_next_results_follow_the_cards_by_name(index):
+    from codemem.render import MORE_HEADER, card_label
+
+    store, cfg, factory = index
+    assert cfg.more_results == 20  # the default
+    on = search(store, QUERY, cfg, k=3, embedder_factory=factory)
+    deeper = search(store, QUERY, cfg, k=23, embedder_factory=factory).results
+    total = len(search(store, QUERY, cfg, k=50, embedder_factory=factory).results)
+    assert len(on.more) == min(20, total - 3)  # the merge holds k + M when the index has them
+    assert [(m.path, m.start_line, m.qualname, m.score) for m in on.more] == [
+        (r.path, r.start_line, r.qualname, r.score) for r in deeper[3 : 3 + len(on.more)]
+    ]
+    text = _text(on).splitlines()
+    block = text.index(MORE_HEADER)
+    assert text[block - 1] == "" and text[block + 1 :] == [f"{m.path}:{m.start_line}  {card_label(m)}" for m in on.more]
+    assert any(m.kind == "block" for m in on.more) and f"{on.more[0].path}:{on.more[0].start_line}  {on.more[0].qualname}" in text
+    assert on.to_dict()["more"][0]["qualname"] == on.more[0].qualname
+    cfg.more_results = 0
+    off = search(store, QUERY, cfg, k=3, embedder_factory=factory)
+    assert off.more == [] and MORE_HEADER not in _text(off)
+    assert _text(off).splitlines() == text[: block - 1]  # the cards are the same, the block is all that differs
+    assert [(r.key, r.score) for r in off.results] == [(r.key, r.score) for r in on.results]
+
+
+def test_more_results_setting_is_validated():
+    from codemem.config import Config, config_from_dict
+
+    assert Config().more_results == 20 and config_from_dict({"more_results": 0}).more_results == 0
+    for bad in (-1, 2.5, "20", False):
+        with pytest.raises(ValueError, match="more_results"):
+            config_from_dict({"more_results": bad})
+
+
+# ---------------------------------------------------------------- names, apart from the query
+
+
+def test_names_move_a_named_function_up(index):
+    store, cfg, factory = index
+    plain = search(store, "close an account", cfg, k=50, debug=True, embedder_factory=factory)
+    named = search(store, "close an account", cfg, k=50, debug=True, names=["revoke_session"], embedder_factory=factory)
+    assert plain.signals == ["bm25", "code", "usage"] and named.signals == ["bm25", "code", "usage", "names"]
+    place = lambda resp: [r.qualname for r in resp.results].index("revoke_session")  # noqa: E731
+    assert place(named) < place(plain) and place(named) < 3  # moved up, into the first three
+    assert named.results[place(named)].ranks["names"] == 1
+
+
+def test_without_names_the_search_is_what_it_was(index):
+    """No names (none, an empty list, blanks, or a names weight of 0) leaves every result and score
+    as the three lists' merge gives them, the search as it is without the argument."""
+    from codemem.search import bm25_match
+
+    store, cfg, factory = index
+    for query in (QUERY, "revoke_session", "close an account", "table rows"):
+        q = factory(cfg.vectors["code"], cfg).embed_queries([query])[0]
+        match = bm25_match(store, query, cfg)
+        lists = {"bm25": store.bm25_search(match, 50, cfg.bm25_weights5()) if match else []}
+        for vec_type in ("code", "usage"):
+            lists[vec_type] = [h.chunk_id for h in store.vector_search(vec_type, q, 50)]
+        expected = [(c.key, s) for c, s in _pick_top(rrf(lists, k=cfg.rrf_k), 10, store.get_chunks)]
+        for names in (None, [], ["", "  "]):
+            resp = search(store, query, cfg, k=10, names=names, embedder_factory=factory)
+            assert resp.signals == ["bm25", "code", "usage"]
+            assert [(r.key, r.score) for r in resp.results] == expected
+        cfg.rrf_weights = {"names": 0.0}  # the list switched off
+        resp = search(store, query, cfg, k=10, names=["revoke_session"], embedder_factory=factory)
+        assert resp.signals == ["bm25", "code", "usage"] and [(r.key, r.score) for r in resp.results] == expected
+        cfg.rrf_weights = {}
+
+
+def test_every_tool_description_asks_for_names():
+    from codemem import prompts
+
+    for level in ("none", "light", "strong"):
+        text = prompts.tool_description("search_code", level)
+        assert "`names`" in text and "guess" in text
+
+
+# ---------------------------------------------------------------- tests named apart (off by default)
+
+
+def test_tests_apart_is_off_by_default_and_changes_nothing_then(index):
+    from codemem.config import Config
+    from codemem.render import TESTS_HEADER
+
+    store, cfg, factory = index
+    assert Config().tests_apart is False and Config().tests_apart_count == 5
+    plain = search(store, "disabled user", cfg, k=10, embedder_factory=factory)
+    given = search(store, "disabled user", cfg, k=10, tests="include", embedder_factory=factory)
+    assert any(r.is_test for r in plain.results) and plain.tests == []
+    assert [(r.key, r.score) for r in plain.results] == [(r.key, r.score) for r in given.results]
+    assert TESTS_HEADER not in _text(plain)
+
+
+def test_tests_apart_names_the_best_tests_after_the_cards(index):
+    from codemem.render import MORE_HEADER, TESTS_HEADER, card_label
+
+    store, cfg, factory = index
+    cfg.tests_apart, cfg.tests_apart_count = True, 2
+    resp = search(store, "disabled user", cfg, k=5, embedder_factory=factory)
+    excluded = search(store, "disabled user", cfg, k=5, tests="exclude", embedder_factory=factory)
+    only = search(store, "disabled user", cfg, k=2, tests="only", embedder_factory=factory)
+    assert not any(r.is_test for r in resp.results)
+    assert [(r.key, r.score) for r in resp.results] == [(r.key, r.score) for r in excluded.results]  # cards as with tests left out
+    assert [(t.path, t.start_line, t.qualname) for t in resp.tests] == [(r.path, r.start_line, r.qualname) for r in only.results]
+    assert len(resp.tests) == 2 and excluded.tests == [] and only.tests == []
+    text = _text(resp).splitlines()
+    block = text.index(TESTS_HEADER)
+    assert text[block + 1 : block + 3] == [f"{t.path}:{t.start_line}  {card_label(t)}" for t in resp.tests]
+    assert text[block - 1] == "" and text.index(MORE_HEADER) > block  # after the cards, before the next results
+    assert resp.to_dict()["tests"][0]["qualname"] == resp.tests[0].qualname
+    # a `tests` argument wins: include gives today's cards and no block
+    given = search(store, "disabled user", cfg, k=5, tests="include", embedder_factory=factory)
+    cfg.tests_apart = False
+    today = search(store, "disabled user", cfg, k=5, embedder_factory=factory)
+    assert [(r.key, r.score) for r in given.results] == [(r.key, r.score) for r in today.results] and given.tests == []
+    cfg.tests_apart, cfg.tests_apart_count = True, 0  # tests out of the cards, none named
+    none_named = search(store, "disabled user", cfg, k=5, embedder_factory=factory)
+    assert none_named.tests == [] and not any(r.is_test for r in none_named.results)
+
+
+def test_tests_apart_settings_are_validated():
+    from codemem.config import config_from_dict
+
+    cfg = config_from_dict({"tests_apart": True, "tests_apart_count": 3})
+    assert cfg.tests_apart is True and cfg.tests_apart_count == 3
+    for bad in ({"tests_apart": 1}, {"tests_apart": "yes"}, {"tests_apart_count": -1}, {"tests_apart_count": 2.0}):
+        with pytest.raises(ValueError, match="tests_apart"):
+            config_from_dict(bad)

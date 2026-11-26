@@ -151,6 +151,10 @@ vector_memory_mb = 0         # search-time: what the exact search indexes of one
 kinds = ["function", "method"]  # search-time filter; default: every kind
 test_weight = 1.0            # search-time: lower it to rank tests lower
 kind_weights = { class = 1.0, block = 1.0 }  # search-time: lower them to rank classes or blocks lower
+card_relations = 3           # search-time: each result names its 3 callers and callees closest to the query; 0 = none
+more_results = 20            # search-time: after the cards, the next 20 results by name, one line each; 0 = none
+tests_apart = false          # search-time: when true, a search that does not pass `tests` keeps tests out of the
+tests_apart_count = 5        # cards and names the best 5 of them after the cards ("Tests that match:")
 steering = "light"           # none | light | strong: how strongly agents are told to use codemem
 debounce_ms = 500            # the index updates once saves stop for this long,
 debounce_max_wait_ms = 2000  # or at the latest this long after the first save
@@ -177,7 +181,8 @@ common_share = 0.0           # a query over query_terms words also drops words f
                              # this share of chunks: faster, less accurate
 [rrf]
 k = 60
-weights = { bm25 = 1.0, code = 1.0, usage = 1.0 }
+weights = { bm25 = 1.0, code = 1.0, usage = 1.0, names = 1.0 }  # names: the keyword list of search_code's
+                             # `names`, searched apart from the query; 0 turns it off
 [usage]
 max_defs_per_name = 5        # a name defined more often than this is not linked
 max_items = 20               # caller and test lines per usage text

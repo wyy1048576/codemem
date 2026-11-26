@@ -142,6 +142,7 @@ def cmd_search(args) -> int:
         options = dict(
             k=args.k, signals=signals, path_prefix=args.path_prefix, kinds=kinds, languages=languages,
             tests="exclude" if args.exclude_tests else args.tests,
+            names=[s.strip() for s in args.names.split(",") if s.strip()] if args.names else None,
         )
         try:
             note = _follow_checkout(svc, args.query, options)
@@ -354,8 +355,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--path-prefix", help="only results under this repo-relative path")
     sp.add_argument("--kinds", help="comma list of function,method,class,block (default: all)")
     sp.add_argument("--language", help="comma list of languages (default: all)")
-    sp.add_argument("--tests", choices=("include", "exclude", "only"), default="include", help="test code in results")
+    sp.add_argument("--tests", choices=("include", "exclude", "only"), default=None,
+                    help="test code in results (default: include, or named apart with tests_apart)")
     sp.add_argument("--exclude-tests", action="store_true", help="same as --tests exclude")
+    sp.add_argument("--names", help="comma list of function, class, method or file names, known or guessed, searched apart from the query")
     sp.add_argument("--repo", help="repository (default: git root of the current directory)")
     sp.add_argument("--json", action="store_true")
     sp.add_argument("--debug", action="store_true", help="show per-signal ranks and timings")

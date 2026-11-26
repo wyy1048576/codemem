@@ -59,6 +59,17 @@ DTYPES = ("auto", "float32", "float16", "bfloat16")
 # whole classes, while questions like "add OCR to uploads" often need both. The knobs stay for runs.
 DEFAULT_TEST_WEIGHT = 1.0
 DEFAULT_KIND_WEIGHTS: dict[str, float] = {}
+# Each card names up to 3 of its callers and callees, the ones closest to the query (search.py). On the
+# eval's vLLM and pandas tasks that put a gold function in sight for 14 to 18 more of about 170
+# held-out tasks, for 16 to 18 names a search (docs/decisions.md §3). 0 turns it off.
+DEFAULT_CARD_RELATIONS = 3
+# After the k cards, the next 20 results by name: on the same tasks they put a gold function on the
+# page for about as many more tasks as the related names, other ones (docs/decisions.md §3). 0 = none.
+DEFAULT_MORE_RESULTS = 20
+# Off by default (Andre decides with numbers, docs/decisions.md §3): test chunks take no place among
+# the cards, and the best few are named after them instead.
+DEFAULT_TESTS_APART = False
+DEFAULT_TESTS_APART_COUNT = 5
 COMPACT_MAX_DIM = 4096  # the longest compact code: FAISS's RaBitQ calls were checked up to this length
 
 
@@ -206,6 +217,14 @@ class Config:
     test_weight: float = DEFAULT_TEST_WEIGHT  # multiplies the fused score of test chunks; 0 drops them
     # multiplies the fused score of chunks of a kind; a config's table is merged over the defaults
     kind_weights: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_KIND_WEIGHTS))
+    # each card names up to this many of its callers and callees, the ones closest to the query; 0 = none
+    card_relations: int = DEFAULT_CARD_RELATIONS
+    # after the k cards, the next this many results, one line each (location and name); 0 = none
+    more_results: int = DEFAULT_MORE_RESULTS
+    # when true, a search that does not pass `tests` keeps test chunks out of the cards and names the
+    # best `tests_apart_count` of them after the cards ("Tests that match:"); a `tests` argument wins
+    tests_apart: bool = DEFAULT_TESTS_APART
+    tests_apart_count: int = DEFAULT_TESTS_APART_COUNT
     steering: str = "light"  # none | light | strong
     preview_lines: int = 12
     preview_chars: int = 800
@@ -485,7 +504,7 @@ _FLAT_KEYS = (
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
     "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb",
     "vector_cache_max_age_days", "vector_backend", "vector_memory_mb", "kinds", "test_weight", "kind_weights",
-    "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes",
+    "card_relations", "more_results", "tests_apart", "tests_apart_count", "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes",
 )
 
 
@@ -532,6 +551,14 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
+    if type(cfg.card_relations) is not int or cfg.card_relations < 0:
+        raise ValueError(f"card_relations must be a whole number, 0 or more, got {cfg.card_relations!r}")
+    if type(cfg.more_results) is not int or cfg.more_results < 0:
+        raise ValueError(f"more_results must be a whole number, 0 or more, got {cfg.more_results!r}")
+    if type(cfg.tests_apart) is not bool:
+        raise ValueError(f"tests_apart must be true or false, got {cfg.tests_apart!r}")
+    if type(cfg.tests_apart_count) is not int or cfg.tests_apart_count < 0:
+        raise ValueError(f"tests_apart_count must be a whole number, 0 or more, got {cfg.tests_apart_count!r}")
     if not isinstance(cfg.model_idle_minutes, (int, float)) or cfg.model_idle_minutes < 0:
         raise ValueError(f"model_idle_minutes must be a number, 0 or more, got {cfg.model_idle_minutes!r}")
     cap = cfg.vector_cache_max_gb

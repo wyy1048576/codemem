@@ -21,6 +21,30 @@ from .store import ChunkFilter, Store, VectorHit
 from .tokenize import fts_or, tokenize
 
 BM25 = "bm25"
+# The names a caller passes apart from its query (search_code's `names`): a fourth list of the merge,
+# by keywords alone. Built exactly as the lab's experiment 12 built it (.cache/review/lab,
+# bm25_variants.py, Nov 26): the names joined by spaces go through bm25_match(), the query's own
+# keyword rule (identifiers split into words and also kept whole, stopwords dropped, the distinct
+# words OR-ed), then Store.bm25_search() over the five keyword columns (name, path, signature, doc,
+# body, weighted 10, 3, 5, 2, 1 by default) under the search's filters; its top `candidates` (50) are
+# merged by RRF with weight `rrf_weights["names"]`, 1 by default (chosen there among 0.25 to 1).
+NAMES = "names"
+# A card's related names leave out a callee with more callers than this, and do not follow its callers
+# (store.neighbours): calls are linked by name, so such a callee is mostly a common method name
+# (`append`: 4,362 callers on vLLM). 100 is about the 99th percentile of callers per callee on vLLM,
+# and reached as many gold functions in the lab as every edge did, with fewer names.
+RELATION_MAX_CALLERS = 100
+
+
+@dataclass
+class Related:
+    """A caller or callee that a card names: one step along the call graph from the result."""
+
+    chunk_id: int
+    qualname: str
+    path: str
+    start_line: int
+    relation: str  # "calls" (the result calls it) or "called by"
 
 
 @dataclass
@@ -42,6 +66,7 @@ class ResultCard:
     name: str = ""
     is_test: bool = False
     best_lines: tuple[int, int] | None = None  # the best-matching window of a long chunk
+    related: list[Related] = field(default_factory=list)  # callers and callees closest to the query
 
     @property
     def location(self) -> str:
@@ -56,6 +81,21 @@ class ResultCard:
 
 
 @dataclass
+class MoreResult:
+    """A result after the k cards, shown by name only: where it is and what it is."""
+
+    chunk_id: int
+    path: str
+    start_line: int
+    end_line: int
+    qualname: str
+    kind: str
+    subkind: str
+    name: str
+    score: float
+
+
+@dataclass
 class SearchResponse:
     query: str
     signals: list[str]
@@ -67,6 +107,8 @@ class SearchResponse:
     # set with it: why no vector could be used, when that is a failure and not a load in progress
     # (a model that did not load, an embedding endpoint that does not answer)
     models_error: str | None = None
+    more: list[MoreResult] = field(default_factory=list)  # the results after the k cards, by name
+    tests: list[MoreResult] = field(default_factory=list)  # with `tests_apart`: the best test chunks, by name
 
     def to_dict(self) -> dict:
         return {
@@ -74,6 +116,8 @@ class SearchResponse:
             "signals": self.signals,
             "timings": self.timings,
             "results": [r.to_dict() for r in self.results],
+            "more": [asdict(m) for m in self.more],
+            "tests": [asdict(m) for m in self.tests],
         }
 
 
@@ -230,10 +274,15 @@ def search(
     languages: Sequence[str] | None = None,
     test_weight: float | None = None,
     kind_weights: dict[str, float] | None = None,
-    tests: str = "include",
+    tests: str | None = None,
+    names: Sequence[str] | None = None,
 ) -> SearchResponse:
-    """`tests`: "include" (default), "exclude" or "only" test code."""
-    if tests not in TEST_FILTERS:
+    """`tests`: "include", "exclude" or "only" test code. Not given, it is "include", unless the
+    config's `tests_apart` is on: test chunks then take no place among the cards, and the best
+    `tests_apart_count` of them are named after the cards (`SearchResponse.tests`). `names`:
+    function, class, method or file names the caller knows or guesses, ranked by keywords alone as
+    a fourth list (NAMES). Without names (none, or only blanks) the search is what it is without them."""
+    if tests is not None and tests not in TEST_FILTERS:
         raise ValueError(f"tests must be one of {'|'.join(TEST_FILTERS)}, got {tests!r}")
     timings: dict[str, float] = {}
     t_total = time.perf_counter()
@@ -248,11 +297,12 @@ def search(
 
     kinds = kinds if kinds is not None else config.kinds
     test_weight = config.test_weight if test_weight is None else test_weight
+    apart = tests is None and config.tests_apart and test_weight > 0  # tests named apart, not among the cards
     flt = ChunkFilter(
         path_prefix=path_prefix or None,
         kinds=tuple(kinds) if kinds is not None else None,
         languages=tuple(languages) if languages else None,
-        exclude_tests=test_weight <= 0 or tests == "exclude",
+        exclude_tests=test_weight <= 0 or tests == "exclude" or apart,
         only_tests=tests == "only",
     )
     allowed = store.filter_ids(flt) if flt.active else None
@@ -260,16 +310,24 @@ def search(
     ranked: dict[str, list[int]] = {}
     best_part: dict[tuple[str, int], VectorHit] = {}
 
+    query_match = names_match = None
     if BM25 in signals:
         t = time.perf_counter()
-        match = bm25_match(store, query, config)
-        ranked[BM25] = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
+        query_match = bm25_match(store, query, config)
+        ranked[BM25] = store.bm25_search(query_match, n, config.bm25_weights5(), flt=flt) if query_match else []
         timings[BM25] = time.perf_counter() - t
+    names_text = " ".join(x.strip() for x in names or () if x and x.strip())
+    named_list: list[int] | None = None
+    if BM25 in signals and names_text and config.rrf_weights.get(NAMES, 1.0) > 0:
+        t = time.perf_counter()
+        names_match = bm25_match(store, names_text, config)
+        named_list = store.bm25_search(names_match, n, config.bm25_weights5(), flt=flt) if names_match else []
+        timings[NAMES] = time.perf_counter() - t
 
     vec_signals = [s for s in signals if s != BM25]
+    # Embed the query once per distinct model (and plugin and weights), not once per vector set.
+    query_vecs: dict[tuple, np.ndarray] = {}
     if vec_signals and (allowed is None or allowed):
-        # Embed the query once per distinct model (and plugin and weights), not once per vector set.
-        query_vecs: dict[tuple, np.ndarray] = {}
         for vec_type in vec_signals:
             spec = config.vectors[vec_type]
             model = (spec.model, spec.embedder, spec.version)
@@ -288,6 +346,8 @@ def search(
         for vec_type in vec_signals:
             ranked[vec_type] = []
 
+    if named_list is not None:  # merged after the query's own lists
+        ranked[NAMES] = named_list
     t = time.perf_counter()
     fused = rrf(ranked, k=config.rrf_k, weights=config.rrf_weights)
     kind_weights = config.kind_weights if kind_weights is None else kind_weights
@@ -296,7 +356,13 @@ def search(
     rank_of = {s: {doc: r for r, doc in enumerate(ids, start=1)} for s, ids in ranked.items()}
     query_tokens = set(tokenize(query, stopwords=True))
     results: list[ResultCard] = []
-    for chunk, score in _pick_top(fused, k, store.get_chunks):
+    # The next `more_results` come from the same merge: each list gives `candidates` (50), so k + M up
+    # to 50 is always there when the index has that many chunks; past that, what the lists hold. The
+    # first k are the k a search without them returns (_pick_top orders by score, then location).
+    picked = _pick_top(fused, k + max(config.more_results, 0), store.get_chunks)
+    more = [MoreResult(c.chunk_id or 0, c.path, c.start_line, c.end_line, c.qualname, c.kind, c.subkind, c.name, score)
+            for c, score in picked[k:]]
+    for chunk, score in picked[:k]:
         doc = chunk.chunk_id
         ranks = {s: rank_of[s][doc] for s in ranked if doc in rank_of[s]} if debug else None
         hit = best_part.get(("code", doc))
@@ -305,5 +371,57 @@ def search(
             best_lines = (chunk.start_line + hit.start_off, chunk.start_line + hit.end_off)
         results.append(make_card(chunk, score, config, ranks, best_lines, query_tokens))
     timings["fuse"] = time.perf_counter() - t
+    # The related names are chosen by meaning, with the query vector this search already made.
+    by_meaning = next((v for v in ("code", *vec_signals) if ranked.get(v)), None)
+    if config.card_relations > 0 and results and by_meaning is not None:
+        t = time.perf_counter()
+        spec = config.vectors[by_meaning]
+        query_vec = query_vecs[(spec.model, spec.embedder, spec.version)]
+        _add_relations(store, results, by_meaning, query_vec, config.card_relations, None if allowed is None else set(allowed))
+        timings["relations"] = time.perf_counter() - t
+    named_tests: list[MoreResult] = []
+    if apart and config.tests_apart_count > 0:
+        t = time.perf_counter()
+        only = ChunkFilter(flt.path_prefix, flt.kinds, flt.languages, exclude_tests=False, only_tests=True)
+        lists: dict[str, list[int]] = {}
+        if query_match:
+            lists[BM25] = store.bm25_search(query_match, n, config.bm25_weights5(), flt=only)
+        test_ids = store.filter_ids(only)
+        for vec_type in vec_signals:
+            spec = config.vectors[vec_type]
+            model = (spec.model, spec.embedder, spec.version)
+            if model in query_vecs and test_ids:
+                lists[vec_type] = [h.chunk_id for h in store.vector_search(vec_type, query_vecs[model], n, test_ids)]
+        if names_match and NAMES in ranked:
+            lists[NAMES] = store.bm25_search(names_match, n, config.bm25_weights5(), flt=only)
+        fused_tests = rrf(lists, k=config.rrf_k, weights=config.rrf_weights)
+        named_tests = [MoreResult(c.chunk_id or 0, c.path, c.start_line, c.end_line, c.qualname, c.kind, c.subkind, c.name, s)
+                       for c, s in _pick_top(fused_tests, config.tests_apart_count, store.get_chunks)]
+        timings["tests_apart"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
-    return SearchResponse(query=query, signals=list(signals), results=results, timings=timings)
+    used = [*signals, NAMES] if NAMES in ranked else list(signals)
+    return SearchResponse(query=query, signals=used, results=results, timings=timings, more=more, tests=named_tests)
+
+
+def _add_relations(
+    store: Store, cards: list[ResultCard], vec_type: str, query_vec: np.ndarray, per_card: int,
+    allowed: set[int] | None,
+) -> None:
+    """Give each card up to `per_card` of its callers and callees, the ones closest to the query by
+    their stored `vec_type` vectors (ties by location), among the chunks the search's filters allow.
+    A neighbour that is itself one of the results is left out (the agent reads it already), and so
+    is one with no vector of the type. A search by keywords alone has no query vector: no names."""
+    shown = {c.chunk_id for c in cards}
+    near = store.neighbours([c.chunk_id for c in cards], RELATION_MAX_CALLERS)
+    candidates = {o for links in near.values() for o, _ in links if o not in shown and (allowed is None or o in allowed)}
+    if not candidates:
+        return
+    score = store.similarity(vec_type, query_vec, candidates)
+    where = store.refs(c for c in candidates if c in score)
+    for card in cards:
+        best: dict[int, str] = {}
+        for other, relation in near.get(card.chunk_id, []):
+            if other in where and other not in best:
+                best[other] = relation
+        chosen = sorted(best, key=lambda o: (-score[o], where[o][1], where[o][2], where[o][0]))[:per_card]
+        card.related = [Related(o, where[o][0], where[o][1], where[o][2], best[o]) for o in chosen]

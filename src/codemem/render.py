@@ -9,10 +9,14 @@ import json
 import time
 from typing import Any
 
-from .search import ResultCard, SearchResponse
+from .search import MoreResult, ResultCard, SearchResponse
 
 
-def card_label(r: ResultCard) -> str:
+MORE_HEADER = "More results, by name (ask get_chunk for any of them):"
+TESTS_HEADER = "Tests that match:"
+
+
+def card_label(r: ResultCard | MoreResult) -> str:
     if r.kind == "block":
         return f"<{r.subkind or 'block'}> {r.name}" if r.subkind != "imports" else "<imports>"
     if r.kind == "class" and r.subkind and r.subkind != "class":
@@ -40,6 +44,16 @@ def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool =
             if r.kind != "block" and not r.best_lines:
                 body = body[1:]  # first line repeats the signature/decorator
             out.extend(f"   | {line}" for line in body[:6])
+        if r.related:
+            out.append("   related: " + ", ".join(f"{x.qualname} ({x.path}:{x.start_line})" for x in r.related))
+    if resp.tests:
+        out.append("")
+        out.append(TESTS_HEADER)
+        out.extend(f"{m.path}:{m.start_line}  {card_label(m)}" for m in resp.tests)
+    if resp.more:
+        out.append("")
+        out.append(MORE_HEADER)
+        out.extend(f"{m.path}:{m.start_line}  {card_label(m)}" for m in resp.more)
     return "\n".join(out)
 
 

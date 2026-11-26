@@ -38,12 +38,12 @@ def build_server(service: CodememService) -> MCPServer:
     )
     def search_code(
         query: str, k: int = 10, path_prefix: str | None = None, kinds: list[str] | None = None,
-        tests: str = "include",
+        tests: str | None = None, names: list[str] | None = None,
     ) -> str:
         k = max(1, min(int(k), 50))
         if unknown := [kind for kind in kinds or [] if kind not in KINDS]:
             return f"Unknown kinds {unknown}; choose from {list(KINDS)}."
-        if tests not in TEST_FILTERS:
+        if tests is not None and tests not in TEST_FILTERS:
             return f"tests must be one of {', '.join(TEST_FILTERS)}."
         notice = ""
         if service.state == "indexing":
@@ -56,7 +56,8 @@ def build_server(service: CodememService) -> MCPServer:
                 f" Last error: {service.last_error}" if service.last_error else ""
             )
         resp = service.search(
-            query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
+            query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, names=names or None,
+            wait_for_models=False,
         )
         fresh = resp.freshness
         if fresh is not None and fresh.unchecked_copy:
