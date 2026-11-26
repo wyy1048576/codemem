@@ -9,7 +9,9 @@ import pytest
 
 from codemem import agents, prompts
 from codemem.cli import main
+from codemem.config import Config
 from codemem.embedder import make_embedder
+from codemem.render import format_status
 from codemem.service import CodememService
 
 
@@ -408,6 +410,51 @@ def test_cli_index_search_status(sample_repo, tmp_path, fake_env, capsys):
     assert main(["status", str(sample_repo), "--index-dir", idx, "--json"]) == 0
     status = json.loads(capsys.readouterr().out)
     assert status["state"] == "ready" and status["files"] == 6 and status["stale"]["changed_files"] == 0
+
+
+def test_cli_without_pytorch_names_the_remedy_and_status_still_works(sample_repo, tmp_path, monkeypatch, capsys):
+    """The local model in an environment built without its packages: one line on stderr, no traceback."""
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+    monkeypatch.setattr("codemem.embedder._CACHE", {})
+    idx = str(tmp_path / "idx")
+    assert main(["index", str(sample_repo), "--index-dir", idx]) == 1
+    err = capsys.readouterr().err
+    assert "error: The local embedding model cannot run because PyTorch and sentence-transformers are not" in err
+    assert "pip install torch sentence-transformers" in err and "Traceback" not in err
+    assert main(["status", str(sample_repo), "--index-dir", idx]) == 0  # needs no model
+    assert "state: empty" in capsys.readouterr().out
+
+    svc = CodememService(sample_repo, index_dir=idx)
+    try:
+        assert svc.update() is None  # what the MCP server's writer does: the error is kept for index_status
+        assert "pip install torch sentence-transformers" in format_status(svc.status())
+    finally:
+        svc.close()
+
+
+def test_without_pytorch_an_index_keeps_its_vectors_and_answers_from_keywords(sample_repo, tmp_path, monkeypatch):
+    """The MCP server's service in an environment built without PyTorch, with a config that asks
+    for the local model: no update is applied, nothing is dropped, and a search answers from
+    keywords once its wait for the model is over."""
+    monkeypatch.setenv("CODEMEM_MODEL", "fake:64")
+    built = CodememService(sample_repo, index_dir=tmp_path / "idx")
+    built.update()
+    vectors = built.store.counts()["vectors"]
+    built.close()
+
+    monkeypatch.delenv("CODEMEM_MODEL")
+    monkeypatch.setattr("codemem.embedder.find_spec", lambda name: None)
+    monkeypatch.setattr("codemem.embedder._CACHE", {})
+    svc = CodememService(sample_repo, index_dir=tmp_path / "idx", config=Config(catchup_budget_ms=300))
+    try:
+        svc.start(watch=False, prewarm=False)
+        assert _wait_for(lambda: "pip install torch" in (svc.last_error or ""))
+        resp = svc.search("revoke session", k=3, wait_for_models=False)
+        assert resp.signals == ["bm25"] and resp.models_loading
+        assert resp.results[0].qualname == "revoke_session"
+        assert svc.store.counts()["vectors"] == vectors and sum(vectors.values()) > 0
+    finally:
+        svc.close()
 
 
 def test_cli_search_without_index(sample_repo, tmp_path, fake_env, capsys):
@@ -1056,3 +1103,18 @@ def test_the_first_mcp_search_does_not_wait_for_the_model_to_load(sample_repo, t
         anyio.run(run)
     finally:
         svc.close()
+
+
+def test_the_command_line_starts_without_the_search_stack():
+    """`codemem hook` runs on every search an agent makes, so starting `codemem` must not import
+    numpy, faiss or the embedder: the commands that need them import them themselves."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys, codemem.cli; codemem.cli.build_parser(); "
+        "print(sorted(m for m in ('numpy', 'faiss', 'torch', 'codemem.embedder', 'codemem.embedserver', "
+        "'codemem.store') if m in sys.modules))"
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "[]"

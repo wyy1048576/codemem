@@ -20,7 +20,9 @@ dependencies = [
     "numpy>=1.26",
     "watchdog>=5.0",
     "mcp>=2.3,<3",
-    # Heavy, but imported lazily: tests and FakeEmbedder never load them.
+    "httpx>=0.27",  # the client for embedding APIs and for `codemem serve-embeddings`
+    # Heavy, but imported lazily: tests and FakeEmbedder never load them, and a codemem that embeds
+    # through an API or a `serve-embeddings` server runs in an environment built without them.
     "sentence-transformers>=5.0",
     "torch>=2.4",
 ]

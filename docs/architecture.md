@@ -110,6 +110,7 @@ save and one search:
 | storage | `store.py` | §5 |
 | search and cards | `search.py`, `render.py` | §6 |
 | MCP server and CLI | `server.py`, `cli.py`, `prompts.py`, `agents.py` | §7 |
+| serving the local model to other codemem processes | `embedserver.py` | §3.5 |
 
 All logic lives in one library; the MCP server and the CLI are thin front-ends over one object,
 `CodememService`, which owns an index. While an agent session runs, its MCP server owns the index,
@@ -266,6 +267,48 @@ Vectors from different models never mix: each set is named by its model and the 
 shape it, and a new name re-embeds that set only. For a model kept in a local folder the name
 includes a hash of the folder's files, so a fine-tuned model saved over the old one is re-embedded,
 never served from the cache.
+
+**One model for several codemem processes.** A codemem that runs the local model holds about
+2.2 GB of it in memory. Several of them on one machine (one per git worktree, or one per container
+of an eval) would each hold a copy, and a container has no GPU to run it on. So the local model
+can be served: `codemem serve-embeddings` (`embedserver.py`) puts it behind the same OpenAI-style
+endpoint that an embedding API has, and the other processes embed through it with
+`[embedding] provider = "openai"`. They never import PyTorch, so a container's codemem also runs
+in an environment built without it (README).
+
+```
+ codemem in worktree A ──┐
+ codemem in worktree B ──┼── POST /v1/embeddings ──► codemem serve-embeddings ──► one model, one GPU
+ codemem in a container ─┘      prefix + text              one model call at a time
+```
+
+Three choices shape it:
+
+- **The server embeds a text exactly as it is given, and the client says what the text is.** The
+  model embeds a query and a document differently: it puts one prompt before a query and another
+  before a document. The OpenAI request has no field for that. So the server prints the two
+  prompts at start, each client carries them as `query_prefix` and `document_prefix`, and sends
+  prompt and text as one string. The request stays the plain OpenAI one, and a client of any other
+  OpenAI-style endpoint works the same way. For this to give the vectors the model gives in
+  process, the model's prompt must be nothing more than text in front. The server checks that at
+  start, with two texts embedded both ways, and refuses a model for which it does not hold. For
+  `jina-code-embeddings-0.5b` in float16 on an M1, 20 code texts and 20 questions came out as the
+  same numbers both ways. What does move a vector is how texts are grouped into model calls: a
+  text embedded alone and in a batch agree to a cosine of 0.999998, in process as through the
+  server.
+- **An index is tied to a name for its vectors, not to the server's address.** The same server is
+  `127.0.0.1` for the host and another address for a container. An API's vectors are named by its
+  address unless the config gives them a name, `space`; the server prints one that holds its
+  model's settings. An index built through one address then opens through another without
+  embedding anything again (decisions.md §5).
+- **One thread calls the model.** The local embedder locks its loading and its switch of
+  precision, and nothing guards a model call against a second thread. So requests queue, and the
+  model takes at most `batch_size` texts at a time. Between calls the request with the fewest
+  texts left goes first, so a search's one query waits for a single batch of another process's
+  build, not for the build.
+
+The server holds no index and no state. When it is down, its clients behave as with any API that
+is down (decisions.md §2).
 
 ---
 
@@ -470,6 +513,7 @@ and reports any difference.
 | two agent sessions on one repo | one writes at a time (a lock file); each picks up the other's vectors without re-embedding |
 | OS file events don't work (network drives, WSL) | a warning, a full check every 10 s, and a full check before each search (0.5 s on vLLM) |
 | a search while the model is still loading (about 7 s at startup) | it waits within its 4 s, then answers from keywords alone and says so |
+| the embedding API or the `serve-embeddings` server is down | a search waits for its retries, about 31 s, then fails; edits stay queued and are embedded when it is back (decisions.md §2) |
 
 ---
 
@@ -588,7 +632,8 @@ three strengths (`none`, `light`, `strong`): getting agents to use the tool at a
 adoption problem, and the agent study varies it.
 
 The CLI is for people and scripts: `codemem init` registers the MCP server with your agents,
-downloads the model and builds the index; `codemem index`, `search` and `status` do what they say.
+downloads the model and builds the index; `codemem index`, `search` and `status` do what they say;
+`codemem serve-embeddings` serves the local model to other codemem processes (§3.5).
 
 ---
 
@@ -698,6 +743,9 @@ embedding API. After that, updates are small.
 - The CLI (`cli.py main()`): `codemem index` runs `Indexer.update()`, which is stage A, then all of
   stage B, then writing the search index to disk; `--verify` runs `Indexer.verify()`. `codemem
   init` registers the server with agents (`agents.py`, `launch_command()`).
+- `codemem serve-embeddings` ─► `embedserver.serve()`: `local_embedder()` picks the config's local
+  model, `describe()` loads it and checks its prefixes, and `EmbeddingServer` answers
+  `POST /v1/embeddings` through `ModelQueue`, the one thread that calls `Embedder.embed_texts()`.
 - The eval's adapter calls `CodememService.update()` and `search.search()` directly (§8).
 
 **Modules:**
@@ -712,6 +760,7 @@ embedding API. After that, updates are small.
 | `callgraph.py` | linking calls to definitions by name |
 | `texts.py` | the code and usage texts, and windows |
 | `embedder.py` | the embedders: local, API, plugin, and a fake one for tests |
+| `embedserver.py` | `serve-embeddings`: an embedder behind an OpenAI-style HTTP endpoint, for other codemem processes |
 | `plugins.py` | loads `"module:Class"` plugins named in the config |
 | `vectorcache.py` | the shared vector cache |
 | `store.py` | SQLite, the in-memory search index, filters, consistency |

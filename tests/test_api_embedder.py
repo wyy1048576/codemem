@@ -9,8 +9,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import numpy as np
 import pytest
 
-from codemem.config import config_from_dict
-from codemem.embedder import OpenAIEmbedder
+from codemem.config import DEFAULT_MODEL, Config, config_from_dict
+from codemem.embedder import FakeEmbedder, OpenAIEmbedder, SentenceTransformerEmbedder
 from codemem.indexer import Indexer
 from codemem.search import search
 from codemem.store import Store
@@ -25,10 +25,11 @@ def _vec(text: str, dim: int) -> list[float]:
 
 class _Server:
     """A fake `/v1/embeddings`: vectors from each input's words, returned out of order (the API
-    gives an index for each). `fail` holds status codes to answer with first (429, 503, ...)."""
+    gives an index for each). `fail` holds status codes to answer with first (429, 503, ...).
+    With `honours_dimensions = False` it answers with full vectors whatever length is asked for."""
 
     def __init__(self, dim: int = 8):
-        self.dim, self.requests, self.fail = dim, [], []
+        self.dim, self.requests, self.fail, self.honours_dimensions = dim, [], [], True
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -41,7 +42,7 @@ class _Server:
                     self.end_headers()
                     self.wfile.write(b'{"error": {"message": "slow down"}}')
                     return
-                dim = body.get("dimensions") or outer.dim
+                dim = (outer.honours_dimensions and body.get("dimensions")) or outer.dim
                 data = [{"index": i, "embedding": _vec(t, dim)} for i, t in enumerate(body["input"])]
                 out = json.dumps({"data": data[::-1], "model": body["model"]}).encode()
                 self.send_response(200)
@@ -106,6 +107,32 @@ def test_rate_limits_and_server_errors_are_retried(server):
     assert np.isclose(np.linalg.norm(vecs[0]), 1.0)  # normalized
 
 
+def test_a_provider_that_ignores_dimensions_still_gives_vectors_of_that_length(server, sample_repo, tmp_path):
+    """`dimensions` is sent, and what comes back is checked: full vectors are cut to their first
+    numbers and normalized again, so the stored vectors are what the key says they are."""
+    text = "def revoke_session(session_id): pass"
+    honoured = OpenAIEmbedder(_config(server, dimensions=6).embedding).embed_documents([text])
+    full = OpenAIEmbedder(_config(server).embedding).embed_documents([text])
+    server.honours_dimensions = False
+    cut = OpenAIEmbedder(_config(server, dimensions=6).embedding).embed_documents([text])
+    assert cut.shape == (1, 6) and np.isclose(np.linalg.norm(cut[0]), 1.0)
+    np.testing.assert_allclose(cut[0], full[0, :6] / np.linalg.norm(full[0, :6]), rtol=0, atol=1e-6)
+    assert not np.allclose(cut, honoured, atol=1e-3)  # this fake API's short vectors are not a cut of its long ones
+
+    store = Store(tmp_path / "idx")
+    try:
+        Indexer(sample_repo, store, _config(server, dimensions=6)).update()
+        assert store.vector_dim("code") == 6 and store.get_meta("vec.code.embedder").endswith("|dims=6|doc=0")
+    finally:
+        store.close()
+
+
+def test_fewer_numbers_than_dimensions_asks_for_is_an_error(server):
+    server.honours_dimensions = False  # full vectors of 8 numbers
+    with pytest.raises(RuntimeError, match="returned vectors of 8 numbers for test-embed, fewer than .* dimensions = 12"):
+        OpenAIEmbedder(_config(server, dimensions=12).embedding).embed_documents(["x"])
+
+
 def test_other_errors_fail_at_once_with_the_providers_message(server):
     server.fail = [400]
     with pytest.raises(RuntimeError, match="HTTP 400.*slow down"):
@@ -157,10 +184,104 @@ def test_the_local_model_keeps_its_settings_and_the_api_keeps_only_what_shapes_v
     ({"provider": "cohere"}, "provider must be local|openai"),
     ({"provider": "openai", "model": "m"}, "needs model and base_url"),
     ({"provider": "local", "modle": "m"}, "unknown \\[embedding\\] settings"),
+    ({"space": "two words"}, "space must be"),
+    ({"space": "a|b"}, "space must be"),  # `|` separates the parts of a key
+    ({"space": "x" * 65}, "space must be"),
 ])
 def test_bad_embedding_settings_are_refused(embedding, message):
     with pytest.raises(ValueError, match=message):
         config_from_dict({"embedding": embedding})
+
+
+def _api(**embedding):
+    return config_from_dict({"embedding": {"provider": "openai", "model": "m", "base_url": "http://a.example/v1",
+                                           **embedding}})
+
+
+def test_without_a_space_every_key_and_setting_is_the_string_it_was():
+    """Pinned as literals: an index or a cached vector made before `space` existed keeps its name."""
+    nebius = _api(model="Qwen/Qwen3-Embedding-8B", base_url="https://api.studio.nebius.com/v1", dimensions=1024)
+    assert OpenAIEmbedder(nebius.embedding).key == "api:api.studio.nebius.com|Qwen/Qwen3-Embedding-8B|dims=1024|doc=0"
+    assert nebius.index_settings()["embedding"] == {
+        "provider": "openai", "model": "Qwen/Qwen3-Embedding-8B", "base_url": "https://api.studio.nebius.com/v1",
+        "dimensions": 1024, "document_prefix": "",
+    }
+    on_a_port = _api(base_url="http://127.0.0.1:8765/v1", document_prefix="Doc: ")
+    assert OpenAIEmbedder(on_a_port.embedding).key == "api:127.0.0.1:8765|m|dims=full|doc=9c41604f"
+    assert FakeEmbedder(64).key == "fake:64|doc"
+    assert SentenceTransformerEmbedder(DEFAULT_MODEL, device="cpu").key == (
+        "jinaai/jina-code-embeddings-0.5b|doc|L1024|float32|cpu"
+    )
+    folder = SentenceTransformerEmbedder("/models/enc", device="cpu", dtype="float16", version="3fa2b1c9d0e1")
+    assert folder.key == "/models/enc#3fa2b1c9d0e1|doc|L1024|float16|cpu"
+    assert "embedding" not in Config().index_settings()
+    assert Config().index_settings()["vectors"] == {"code": {"model": DEFAULT_MODEL}, "usage": {"model": DEFAULT_MODEL}}
+
+
+def test_a_space_stands_for_the_address_in_the_key_and_in_the_settings():
+    host = _api(base_url="http://127.0.0.1:8791/v1", space="st-L1024-float16-mps")
+    container = _api(base_url="http://host.docker.internal:9000/v1", space="st-L1024-float16-mps")
+    assert OpenAIEmbedder(host.embedding).key == "api:st-L1024-float16-mps|m|dims=full|doc=0"
+    assert OpenAIEmbedder(container.embedding).key == OpenAIEmbedder(host.embedding).key
+    assert host.index_settings() == container.index_settings()
+    assert host.index_settings()["embedding"] == {
+        "provider": "openai", "model": "m", "space": "st-L1024-float16-mps", "dimensions": None, "document_prefix": "",
+    }
+
+
+@pytest.mark.parametrize("change", [
+    {"space": "another"}, {"model": "m2"}, {"dimensions": 256}, {"document_prefix": "Doc: "},
+])
+def test_what_shapes_a_stored_vector_stays_in_the_identity_beside_the_space(change):
+    base, other = _api(space="shared"), _api(**{"space": "shared", **change})
+    assert OpenAIEmbedder(other.embedding).key != OpenAIEmbedder(base.embedding).key
+    assert other.index_settings() != base.index_settings()
+
+
+def test_what_never_shapes_a_stored_vector_is_in_neither():
+    base = _api(space="shared")
+    other = _api(space="shared", query_prefix="Q: ", api_key_env="SOME_KEY", batch_size=8, max_concurrency=1,
+                 timeout_s=5.0)
+    assert OpenAIEmbedder(other.embedding).key == OpenAIEmbedder(base.embedding).key
+    assert other.index_settings() == base.index_settings()
+
+
+def test_an_index_follows_its_space_to_another_address(server, sample_repo, tmp_path):
+    """Built through one address and opened through another, an index with a `space` embeds nothing
+    again; a new index of the same code takes its vectors from the shared cache."""
+    other = _Server()
+    store = Store(tmp_path / "idx")
+    try:
+        built = Indexer(sample_repo, store, _config(server, space="shared")).update()
+        assert sum(built.model_embedded.values()) > 0
+        moved = _config(other, space="shared")
+        again = Indexer(sample_repo, store, moved).update()
+        assert sum(again.embedded.values()) == 0 and other.requests == []
+        assert search(store, "revoke session", moved, k=3).results
+        assert [r["input"] for r in other.requests] == [["revoke session"]]  # the query alone used the new address
+
+        fresh = Store(tmp_path / "idx-worktree")
+        try:
+            stats = Indexer(sample_repo, fresh, moved).update()
+            assert stats.cache_hits == built.embedded and sum(stats.model_embedded.values()) == 0
+            assert len(other.requests) == 1
+        finally:
+            fresh.close()
+    finally:
+        store.close()
+        other.httpd.shutdown()
+
+
+def test_without_a_space_another_address_is_another_embedder(server, sample_repo, tmp_path):
+    other = _Server()
+    store = Store(tmp_path / "idx")
+    try:
+        built = Indexer(sample_repo, store, _config(server)).update()
+        again = Indexer(sample_repo, store, _config(other)).update()
+        assert again.model_embedded == built.model_embedded and sum(again.model_embedded.values()) > 0
+    finally:
+        store.close()
+        other.httpd.shutdown()
 
 
 @pytest.mark.api

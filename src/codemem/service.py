@@ -49,7 +49,7 @@ _CALL_CHARS = 3000
 
 
 def _model_of(embedder_key: str | None) -> str | None:
-    """The model in an embedder key: `jina…|doc|L1024|…` or `api:<host>|<model>|dims=…`."""
+    """The model in an embedder key: `jina…|doc|L1024|…` or `api:<host or space>|<model>|dims=…`."""
     if not embedder_key:
         return None
     parts = embedder_key.split("|")
@@ -552,7 +552,8 @@ class CodememService:
             **store.counts(),
             "embedding": (
                 {"provider": self.config.embedding.provider, "model": self.config.embedding.model,
-                 "host": urlparse(self.config.embedding.base_url).netloc or self.config.embedding.base_url}
+                 "host": urlparse(self.config.embedding.base_url).netloc or self.config.embedding.base_url,
+                 "space": self.config.embedding.space or None}
                 if self.config.embedding.remote else {"provider": "local"}
             ),
             "models": {

@@ -10,6 +10,15 @@ search index, so changing it never re-embeds.
 `Embedder.key` names the embedding space of document vectors (model and its weights version,
 prompt, max length, dtype, device): vectors with equal keys are interchangeable, so the store and
 the vector cache reuse them by (key, text hash).
+
+`embed_texts` and `prefixes` are what `codemem serve-embeddings` needs to put an embedder behind an
+HTTP endpoint (embedserver.py): the endpoint embeds each text as given, and its clients put the
+query or document prefix in front themselves.
+
+The local model's packages (PyTorch, sentence-transformers) are imported only when a local model
+is used. A codemem that embeds through an API or a served model therefore runs in an environment
+built without them, and one that is asked for the local model there names what is missing and the
+two ways out.
 """
 
 from __future__ import annotations
@@ -23,6 +32,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
+from importlib.util import find_spec
 from typing import Any
 from urllib.parse import urlparse
 
@@ -41,13 +51,35 @@ FALLBACK_PROMPTS = {
     QUERY_PROMPT: "Find the most relevant code snippet given the following query:\n",
     DOCUMENT_PROMPT: "Candidate code snippet:\n",
 }
+_AS_GIVEN = ""  # no prompt: the text exactly as given
 _QUERY_CACHE_SIZE = 512
+# The local model's packages, by the name pip installs them under, with the name to print.
+_LOCAL_PACKAGES = {"torch": "PyTorch", "sentence-transformers": "sentence-transformers"}
+
+
+class LocalModelUnavailable(RuntimeError):
+    """The packages the local embedding model runs on are not installed."""
+
+
+def require_local_model() -> None:
+    """Raise, naming what to install and what to set instead, when the local model's packages are
+    missing (an environment built without them, for a client of an API or of a served model)."""
+    missing = [package for package in _LOCAL_PACKAGES if find_spec(package.replace("-", "_")) is None]
+    if missing:
+        names = " and ".join(_LOCAL_PACKAGES[package] for package in missing)
+        raise LocalModelUnavailable(
+            f"The local embedding model cannot run because {names} {'is' if len(missing) == 1 else 'are'} not "
+            f"installed: run `pip install {' '.join(missing)}`, or set `[embedding] provider = \"openai\"` to embed "
+            "through an API or a `codemem serve-embeddings` server."
+        )
 
 
 def l2_normalize(vecs: np.ndarray) -> np.ndarray:
+    """Every row at length 1. A row that already is, to the precision of a float32, comes back as it
+    is: a vector a server has normalized is the same numbers after its client normalizes it again."""
     vecs = np.asarray(vecs, dtype=np.float32)
     norms = np.linalg.norm(vecs, axis=1, keepdims=True)
-    return vecs / np.where(norms == 0, 1.0, norms)
+    return vecs / np.where((norms == 0) | (np.abs(norms - 1.0) < 1e-6), 1.0, norms)
 
 
 class Embedder(ABC):
@@ -68,6 +100,18 @@ class Embedder(ABC):
 
     @abstractmethod
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray: ...
+
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        """Each text exactly as given, with nothing put before it. `codemem serve-embeddings` serves
+        this; an embedder that does not define it cannot be served."""
+        raise NotImplementedError(f"{type(self).__name__} cannot embed a text exactly as given")
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        """What this embedder puts before each query and before each document:
+        `embed_texts([prefix + text])` gives what `embed_queries([text])` and `embed_documents([text])`
+        give. A served model's clients carry the two as `query_prefix` and `document_prefix`."""
+        raise NotImplementedError(f"{type(self).__name__} does not say what it puts before a query or a document")
 
     @property
     def ready(self) -> bool:
@@ -111,12 +155,20 @@ class FakeEmbedder(Embedder):
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         return self._embed(texts)
 
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        return self._embed(texts)
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        return ("", "")
+
 
 def resolve_device(preference: str) -> str:
+    """The device a local model runs on. An environment without PyTorch has nothing to run on a GPU: cpu."""
+    if preference == "cpu" or find_spec("torch") is None:
+        return "cpu"
     import torch
 
-    if preference == "cpu":
-        return "cpu"
     if preference in ("auto", "cuda") and torch.cuda.is_available():
         return "cuda"
     if preference in ("auto", "mps") and torch.backends.mps.is_available():
@@ -162,7 +214,8 @@ class SentenceTransformerEmbedder(Embedder):
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self._model = None
-        self._prompts: dict[str, dict[str, str]] = {}
+        self._prompts: dict[str, dict[str, str]] = {_AS_GIVEN: {"prompt": ""}}  # how each kind of text is encoded
+        self._prefixes = ("", "")  # the query and document prompts as text, known once the model is loaded
         self._lock = threading.Lock()
         self._device: str | None = None
         self._queries: OrderedDict[str, np.ndarray] = OrderedDict()
@@ -174,6 +227,10 @@ class SentenceTransformerEmbedder(Embedder):
     @property
     def device(self) -> str:
         if self._device is None:
+            if self.device_preference != "cpu":
+                # Without PyTorch the answer would be "cpu", and the key would name another set of
+                # vectors: an index built on a GPU would drop its vectors before the model failed.
+                require_local_model()
             self._device = resolve_device(self.device_preference)
         return self._device
 
@@ -190,6 +247,7 @@ class SentenceTransformerEmbedder(Embedder):
     def model(self):
         with self._lock:
             if self._model is None:
+                require_local_model()
                 import torch
                 from sentence_transformers import SentenceTransformer
 
@@ -206,6 +264,10 @@ class SentenceTransformerEmbedder(Embedder):
                     else:
                         log.warning("%s has no %r prompt; using built-in prefix", self.model_name, name)
                         self._prompts[name] = {"prompt": FALLBACK_PROMPTS[name]}
+                self._prefixes = (
+                    available.get(QUERY_PROMPT, FALLBACK_PROMPTS[QUERY_PROMPT]),
+                    available.get(DOCUMENT_PROMPT, FALLBACK_PROMPTS[DOCUMENT_PROMPT]),
+                )
                 self._model = model
             return self._model
 
@@ -241,6 +303,14 @@ class SentenceTransformerEmbedder(Embedder):
 
     def embed_documents(self, texts: Sequence[str]) -> np.ndarray:
         return self._encode(texts, DOCUMENT_PROMPT)
+
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        return self._encode(texts, _AS_GIVEN)
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        _ = self.model  # loads it: the prompts come with the model
+        return self._prefixes
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         """Queries are cached (the eval asks the same query of several systems that share a model)."""
@@ -279,7 +349,9 @@ class OpenAIEmbedder(Embedder):
     def key(self) -> str:
         prefix = self.cfg.document_prefix
         doc = hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:8] if prefix else "0"
-        return f"api:{self.host}|{self.model_name}|dims={self.cfg.dimensions or 'full'}|doc={doc}"
+        # A `space` names the vectors whatever address serves them: the host is then no part of the key.
+        served_by = self.cfg.space or self.host
+        return f"api:{served_by}|{self.model_name}|dims={self.cfg.dimensions or 'full'}|doc={doc}"
 
     @property
     def dim(self) -> int:
@@ -290,10 +362,8 @@ class OpenAIEmbedder(Embedder):
     def _http(self) -> Any:
         with self._lock:
             if self._client is None:
-                try:
-                    import httpx
-                except ImportError as e:  # codemem's own dependencies bring it; a bare environment may not
-                    raise RuntimeError("API embeddings need the httpx package: pip install httpx") from e
+                import httpx
+
                 self._client = httpx.Client(timeout=self.cfg.timeout_s)
             return self._client
 
@@ -336,11 +406,25 @@ class OpenAIEmbedder(Embedder):
             if r.status_code >= 400:
                 raise RuntimeError(f"embedding request to {self.host} failed: HTTP {r.status_code} {r.text[:300]}")
             data = sorted(r.json()["data"], key=lambda d: d["index"])
-            vecs = np.asarray([d["embedding"] for d in data], dtype=np.float32)
-            if vecs.ndim != 2 or len(vecs) != len(texts):
-                raise RuntimeError(f"{self.host} returned {len(vecs)} embeddings for {len(texts)} texts")
-            return l2_normalize(vecs)
+            if len(data) != len(texts):
+                raise RuntimeError(f"{self.host} returned {len(data)} embeddings for {len(texts)} texts")
+            return self._shape([d["embedding"] for d in data])
         raise AssertionError("unreachable")
+
+    def _shape(self, rows: list[list[float]]) -> np.ndarray:
+        """A reply's vectors at the configured length, normalized. `dimensions` goes to the provider,
+        but one that ignores it answers with full vectors: the first numbers of those are the short
+        vector, so they are cut here, and what the key names is what gets stored."""
+        if len({len(row) for row in rows}) != 1:
+            raise RuntimeError(f"{self.host} returned vectors of different lengths")
+        vecs = np.asarray(rows, dtype=np.float32)
+        want = self.cfg.dimensions
+        if want and vecs.shape[1] < want:
+            raise RuntimeError(
+                f"{self.host} returned vectors of {vecs.shape[1]} numbers for {self.model_name}, fewer than "
+                f"[embedding] dimensions = {want}"
+            )
+        return l2_normalize(vecs[:, :want] if want else vecs)
 
     def _embed(self, texts: Sequence[str], prefix: str) -> np.ndarray:
         if not texts:
@@ -406,6 +490,13 @@ class PluginEmbedder(Embedder):
 
     def embed_queries(self, texts: Sequence[str]) -> np.ndarray:
         return l2_normalize(self.inner.embed_queries(texts))
+
+    def embed_texts(self, texts: Sequence[str]) -> np.ndarray:
+        return l2_normalize(self.inner.embed_texts(texts))
+
+    @property
+    def prefixes(self) -> tuple[str, str]:
+        return self.inner.prefixes
 
 
 _CACHE: dict[tuple, Embedder] = {}
