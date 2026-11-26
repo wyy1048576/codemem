@@ -1,0 +1,41 @@
+diff --git a/pandas/core/series.py b/pandas/core/series.py
+index 20e0f31..c86cbb6 100644
+--- a/pandas/core/series.py
++++ b/pandas/core/series.py
+@@ -83,6 +83,7 @@ from pandas.core.dtypes.common import (
+     validate_all_hashable,
+ )
+ from pandas.core.dtypes.dtypes import (
++    DatetimeTZDtype,
+     ExtensionDtype,
+ )
+ from pandas.core.dtypes.generic import (
+@@ -561,6 +562,28 @@ class Series(base.IndexOpsMixin, NDFrame):  # type: ignore[misc]
+ 
+     # ----------------------------------------------------------------------
+ 
++    def __arrow_array__(self, type=None):
++        """
++        Convert the Series to a pyarrow Array (used by ``pyarrow.array``).
++
++        Avoids pyarrow calling ``Series.values``, which would raise a
++        deprecation warning for timezone-aware data, see GH#68426 and
++        apache/arrow#51302.
++        """
++        pa = import_optional_dependency("pyarrow", min_version="16.0.0")
++        values = self._values
++        if isinstance(values.dtype, DatetimeTZDtype):
++            # the underlying i8 data are UTC, matching pyarrow's representation
++            arr = pa.array(
++                values._ndarray,
++                type=pa.timestamp(values.unit, tz=str(values.tz)),
++                from_pandas=True,
++            )
++            return arr if type is None else arr.cast(type)
++        # Series.values is not deprecated for the remaining dtypes
++        with suppress_pyarrow_values_warning():
++            return pa.array(values, type=type, from_pandas=True)
++
+     def __arrow_c_stream__(self, requested_schema=None):
+         """
+         Export the pandas Series as an Arrow C stream PyCapsule.

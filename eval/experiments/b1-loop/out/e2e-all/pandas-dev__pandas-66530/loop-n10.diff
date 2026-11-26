@@ -1,0 +1,12 @@
+diff --git a/pandas/core/arrays/interval.py b/pandas/core/arrays/interval.py
+index fe8c7d9..44eee1a 100644
+--- a/pandas/core/arrays/interval.py
++++ b/pandas/core/arrays/interval.py
+@@ -323,6 +323,7 @@ class IntervalArray(IntervalMixin, ExtensionArray):
+             raise ValueError(msg)
+         if (
+             isinstance(left.dtype, CategoricalDtype)
++            or isinstance(right.dtype, CategoricalDtype)
+             or is_string_dtype(left.dtype)
+             or is_string_dtype(right.dtype)
+         ):

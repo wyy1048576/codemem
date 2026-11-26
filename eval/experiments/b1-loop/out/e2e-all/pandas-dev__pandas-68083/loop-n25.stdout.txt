@@ -1,0 +1,46 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "pandas-dev__pandas-68083",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10
+ },
+ "sonnet_calls": 10,
+ "cost_usd": 0.4054,
+ "seconds": 66,
+ "diff_stat": ""
+}
+round 1: found=False picked=['pandas/tests/extension/test_arrow.py:test_string_to_time_parsing_cast_meridiem', 'pandas/tests/frame/methods/test_between_time.py:test_between_time_space_before_meridiem', 'pandas/tests/tools/test_to_datetime.py:TestTimeConversionFormats.test_to_datetime_format_time', 'pandas/tests/tools/test_to_time.py:TestToTime.test_parsers_time', 'pandas/util/_test_decorators.py:_has_english_lc_time', 'pandas/util/_test_decorators.py:<block>']
+  fix: -
+round 2: found=False picked=['pandas/tests/tslibs/test_parsing.py:test_guess_datetime_format_with_locale_specific_formats']
+  fix: -
+round 3: found=False picked=[]
+  fix: -
+round 4: found=False picked=[]
+  fix: -
+round 5: found=False picked=['pandas/tests/tools/test_to_time.py:TestToTime.test_parsers_time_space_before_meridiem']
+  fix: -
+round 6: found=False picked=['pandas/tests/tools/test_to_time.py:TestToTime']
+  fix: -
+round 7: found=False picked=[]
+  fix: -
+round 8: found=False picked=[]
+  fix: -
+round 9: found=False picked=[]
+  fix: -
+round 10: found=False picked=[]
+  fix: -
+round 11: found=None picked=None
+  fix: -
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  10%|▉         | 28/290 [00:00<00:01, 261.23it/s]
+Loading weights:  19%|█▉        | 55/290 [00:00<00:01, 180.28it/s]
+Loading weights:  26%|██▌       | 75/290 [00:00<00:01, 183.65it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 717.38it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

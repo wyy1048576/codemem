@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["diagnosis", "suspects", "intent", "symptom", "anchors", "stated_location", "guessed_location"],
+  "properties": {
+    "diagnosis": {"type": "string"},
+    "suspects": {"type": "array", "items": {"type": "string"}},
+    "intent": {"type": "string"},
+    "symptom": {"type": "string"},
+    "anchors": {"type": "array", "items": {"type": "string"}},
+    "stated_location": {"type": "array", "items": {"type": "string"}},
+    "guessed_location": {"type": "array", "items": {"type": "string"}}
+  }
+}

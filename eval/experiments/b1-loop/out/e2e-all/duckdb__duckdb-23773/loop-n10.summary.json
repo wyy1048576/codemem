@@ -1,0 +1,176 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "duckdb__duckdb-23773",
+ "fixed": {
+  "round": 2,
+  "explanation": "In HandleExponent's negative-exponent loop, round_up is updated on each division and the loop breaks once the result reaches 0. If the result hits 0 before the final iteration, round_up keeps a stale value from an earlier digit, such as the leading mantissa digit 5. That digit is not the one just past the scale. The fix clears round_up when the loop exits early, because the remaining shifts make the rounding digit 0.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.1118,
+ "seconds": 48,
+ "diff_stat": "src/include/duckdb/common/operator/decimal_cast_operators.hpp | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The VARCHAR to DECIMAL text cast parser handles scientific notation by processing the exponent and mantissa digits; when the negative exponent shifts all digits beyond the decimal scale, the rounding logic wrongly rounds up (using the leading mantissa digit >= 5) instead of yielding zero. Fix the exponent/rounding handling in the decimal cast's TryDecimalStringCast.",
+    "symptom": "Casting a scientific-notation string with a large negative exponent and leading mantissa digit >= 5 to DECIMAL returns 0.0001 instead of 0.0000.",
+    "anchors": [
+     "CAST('5.8207660913467407e-11' AS DECIMAL(18,4))",
+     "CAST('5.5e-11' AS DECIMAL(18,4))",
+     "DECIMAL(18,4)",
+     "VARCHAR",
+     "DECIMAL"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     501,
+     524
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     618,
+     634
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     668,
+     692
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     694,
+     713
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1938,
+     1957
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/decNumber.cpp",
+     5265,
+     5535
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     662,
+     666
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2558,
+     2569
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     751,
+     952
+    ],
+    [
+     "extension/core_functions/scalar/math/numeric.cpp",
+     845,
+     864
+    ]
+   ],
+   "analysis": "The results show the DecimalCastOperation helpers in decimal_cast_operators.hpp (HandleDigit, TruncateExcessiveDecimals, TryDecimalStringCast). The exponent handling (HandleExponent) and the Finalize path that applies a negative exponent are not shown. The bug is probably there, where a negative exponent moves digits past the scale and the rounding uses the wrong digit.",
+   "picked": [
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.TruncateExcessiveDecimals"
+   ],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "DecimalCastOperation::HandleExponent and Finalize in the VARCHAR to DECIMAL cast. It handles a negative exponent by shifting the decimal point and truncating excess decimals, then rounds based on the next digit.",
+    "symptom": "Casting a scientific-notation string with a large negative exponent and leading mantissa digit >= 5 to DECIMAL returns 0.0001 instead of 0.0000.",
+    "anchors": [
+     "TruncateExcessiveDecimals",
+     "excessive_decimals",
+     "DecimalCastOperation",
+     "HandleDigit",
+     "DecimalCastData",
+     "TryDecimalStringCast"
+    ],
+    "look_in": [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     545,
+     589
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     500,
+     660
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     636,
+     659
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     591,
+     616
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     482,
+     498
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     536,
+     543
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     531,
+     534
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     526,
+     529
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     465,
+     465
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     467,
+     470
+    ]
+   ],
+   "analysis": "HandleExponent handles the negative-exponent branch. It moves the decimal point and sets excessive_decimals. Finalize then calls TruncateExcessiveDecimals and rounds. The rounding appears to use the mantissa's leading digit (>=5) instead of the digit that actually lands just past the scale. When the exponent shifts all digits beyond scale+1, that digit is 0, so the result should be 0. The fix most likely belongs in the negative branch of HandleExponent, and possibly in Finalize.",
+   "picked": [
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.HandleExponent",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.Finalize"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 545-589 (duckdb.DecimalCastOperation.HandleExponent)",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 636-659 (duckdb.DecimalCastOperation.Finalize)",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 618-634 (duckdb.DecimalCastOperation.TruncateExcessiveDecimals)"
+   ],
+   "fix_attempt": "applied: In HandleExponent's negative-exponent loop, round_up is updated on each division and the loop breaks once the result reaches 0. If the result hits 0 before the final iteration, round_up keeps a stale value from an earlier digit, such as the leading mantissa digit 5. That digit is not the one just past the scale. The fix clears round_up when the loop exits early, because the remaining shifts make the rounding digit 0."
+  }
+ ]
+}

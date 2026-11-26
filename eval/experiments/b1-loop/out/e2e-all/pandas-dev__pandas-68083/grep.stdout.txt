@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-68083",
+ "exit": 0,
+ "seconds": 31,
+ "cost_usd": 0.086313,
+ "turns": 10,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 11207,
+  "cache_read_input_tokens": 62010,
+  "output_tokens": 3526,
+  "output_tokens_details": {
+   "thinking_tokens": 713
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 11207,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 604,
+    "cache_read_input_tokens": 14700,
+    "cache_creation_input_tokens": 1899,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1899
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 4,
+  "Read": 3,
+  "Edit": 2
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/conftest.py              | 46 +++++++++++++++++++++++++++++++++++++++++\n pandas/util/_test_decorators.py | 10 ++++-----\n 2 files changed, 51 insertions(+), 5 deletions(-)",
+ "final": "I replaced the skip with a fixture that sets an English `LC_TIME` for the test. I haven't run anything, so none of this is tested.\n\n- **Decorator:** `td.skip_if_not_english_lc_time` is now `pytest.mark.english_lc_time` instead of a `skipif`. The five files, including the `pytest.param(marks=...)` uses, keep the same name, so I didn't edit them. The helper is now public as `has_english_lc_time()`.\n- **Fixture:** `pandas/conftest.py` has a new autouse fixture, `_english_lc_time`, and registers the marker. It only acts on tests carrying the marker.\n- **Locale handling:** if `LC_TIME` is already English, the fixture does nothing. Otherwise it tries `C`, `en_US.UTF-8`, `en_US.utf8`, `en_US` and `English_United States.1252`. Each is set with `set_locale(..., lc_var=locale.LC_TIME)` and kept only if `strftime` then gives English names and AM/PM. The fixture restores the previous `LC_TIME` after the test, so nothing leaks into later tests.\n- **Skipping:** a test is skipped only when none of those locales can be set.\n\nI used `set_locale` rather than `can_set_locale` as the guard. `can_set_locale` only says a locale can be set. The fixture also needs to confirm that the result is English, so it tries `set_locale` and checks the output.",
+ "stderr": ""
+}
+

@@ -1,0 +1,21 @@
+diff --git a/pandas/core/computation/expr.py b/pandas/core/computation/expr.py
+index cba995e..7f54926 100644
+--- a/pandas/core/computation/expr.py
++++ b/pandas/core/computation/expr.py
+@@ -600,13 +600,13 @@ class BaseExprVisitor(ast.NodeVisitor):
+         """df.index[slice(4,6)]"""
+         lower = node.lower
+         if lower is not None:
+-            lower = self.visit(lower).value
++            lower = self.visit(lower)(self.env)
+         upper = node.upper
+         if upper is not None:
+-            upper = self.visit(upper).value
++            upper = self.visit(upper)(self.env)
+         step = node.step
+         if step is not None:
+-            step = self.visit(step).value
++            step = self.visit(step)(self.env)
+ 
+         return slice(lower, upper, step)
+ 

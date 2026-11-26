@@ -1,0 +1,32 @@
+diff --git a/pandas/core/arrays/arrow/accessors.py b/pandas/core/arrays/arrow/accessors.py
+index 8f166a3..7826765 100644
+--- a/pandas/core/arrays/arrow/accessors.py
++++ b/pandas/core/arrays/arrow/accessors.py
+@@ -166,7 +166,26 @@ class ListAccessor(ArrowAccessor):
+             # element index to be an array.
+             # if key < 0:
+             #     key = pc.add(key, pc.list_value_length(self._pa_array))
+-            element = pc.list_element(self._pa_array, key)
++            if key < 0:
++                arr = self._pa_array
++                if isinstance(arr, pa.ChunkedArray):
++                    arr = arr.combine_chunks()
++                lengths = pc.list_value_length(arr)
++                lens0 = pc.cast(lengths.fill_null(0), pa.int64())
++                cum = pc.cumulative_sum(lens0)
++                flat = pc.list_flatten(arr)
++                valid = pc.and_(
++                    pc.is_valid(lengths),
++                    pc.greater_equal(pc.add(lens0, key), 0),
++                )
++                idx = pc.if_else(
++                    valid,
++                    pc.add(cum, key),
++                    pa.scalar(None, pa.int64()),
++                )
++                element = pc.take(flat, idx)
++            else:
++                element = pc.list_element(self._pa_array, key)
+             return Series(
+                 element,
+                 dtype=ArrowDtype(element.type),

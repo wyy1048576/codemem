@@ -1,0 +1,14 @@
+diff --git a/pandas/_libs/ops_dispatch.pyx b/pandas/_libs/ops_dispatch.pyx
+index 2b2a411..13d8c37 100644
+--- a/pandas/_libs/ops_dispatch.pyx
++++ b/pandas/_libs/ops_dispatch.pyx
+@@ -44,6 +44,9 @@ UFUNC_ALIASES = {
+     "bitwise_or": "or",
+     "bitwise_and": "and",
+     "bitwise_xor": "xor",
++    "logical_or": "or",
++    "logical_and": "and",
++    "logical_xor": "xor",
+     "negative": "neg",
+     "absolute": "abs",
+     "positive": "pos",

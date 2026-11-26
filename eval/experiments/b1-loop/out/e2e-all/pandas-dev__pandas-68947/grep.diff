@@ -1,0 +1,51 @@
+diff --git a/pandas/io/parsers/python_parser.py b/pandas/io/parsers/python_parser.py
+index d431c79..131c013 100644
+--- a/pandas/io/parsers/python_parser.py
++++ b/pandas/io/parsers/python_parser.py
+@@ -99,6 +99,7 @@ class PythonParser(ParserBase):
+ 
+         self.data: Iterator[list[str]] | list[list[Scalar]] = []
+         self.buf: list = []
++        self._buf_pos: list[int] = []
+         self.pos = 0
+         self.line_pos = 0
+ 
+@@ -927,6 +928,8 @@ class PythonParser(ParserBase):
+ 
+         self.line_pos += 1
+         self.buf.append(line)
++        # raw row position after reading this line, for skipfooter accounting
++        self._buf_pos = [*self._buf_pos, self.pos][-len(self.buf) :]
+         return line
+ 
+     def _alert_malformed(self, msg: str, row_num: int) -> None:
+@@ -1252,6 +1255,11 @@ class PythonParser(ParserBase):
+     def _get_lines(self, rows: int | None = None) -> list[list[Scalar]]:
+         lines = self.buf
+         new_rows = None
++        n_buffered = None
++        buffered_pos: list[int] = []
++        if rows is None:
++            n_buffered = len(self.buf)
++            buffered_pos = list(self._buf_pos)
+ 
+         # already fetched some number
+         if rows is not None:
+@@ -1318,7 +1326,16 @@ class PythonParser(ParserBase):
+             lines = new_rows
+ 
+         if self.skipfooter:
+-            lines = lines[: -self.skipfooter]
++            n_footer_new = len(lines) if n_buffered is None else len(lines) - n_buffered
++            if n_buffered is None or self.skipfooter <= n_footer_new:
++                lines = lines[: -self.skipfooter]
++            else:
++                # The footer reaches into lines already read into the buffer,
++                # which may have skipped blank/comment rows; count in raw rows.
++                cutoff = self.pos - self.skipfooter
++                missing = max(n_buffered - len(buffered_pos), 0)
++                keep = missing + sum(p <= cutoff for p in buffered_pos[-n_buffered:])
++                lines = lines[: min(keep, n_buffered)]
+ 
+         lines = self._check_comments(lines)
+         if self.skip_blank_lines:

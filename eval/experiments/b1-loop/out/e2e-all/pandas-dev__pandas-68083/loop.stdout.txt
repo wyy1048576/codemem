@@ -1,0 +1,39 @@
+{
+ "arm": "codemem-loop",
+ "task": "pandas-dev__pandas-68083",
+ "fixed": {
+  "round": 1,
+  "explanation": "The tests were skipped whenever the ambient LC_TIME wasn't English. I removed the skipif mark and added `td.english_lc_time()` in `pandas/util/_test_decorators.py`. It is a context manager that switches LC_TIME to English (C or en_US) for the test body and restores the previous value on exit, including on failure. It skips only when no English LC_TIME can be set. Every decorated test now wraps the parsing or formatting call in it. I used `locale.setlocale` directly instead of `set_locale`/`can_set_locale`, because I couldn't see those functions' source to check how they restore LC_TIME.",
+  "edits": 12
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1067,
+ "seconds": 35,
+ "diff_stat": "pandas/tests/extension/test_arrow.py            |  4 +--\n pandas/tests/frame/methods/test_between_time.py |  4 +--\n pandas/tests/tools/test_to_datetime.py          |  6 ++---\n pandas/tests/tools/test_to_time.py              | 19 ++++++-------\n pandas/tests/tslibs/test_parsing.py             |  4 +--\n pandas/util/_test_decorators.py                 | 36 ++++++++++++++++++++++---\n 6 files changed, 50 insertions(+), 23 deletions(-)"
+}
+round 1: found=True picked=['pandas/util/_test_decorators.py:_has_english_lc_time', 'pandas/util/_test_decorators.py:<block>', 'pandas/tests/extension/test_arrow.py:test_string_to_time_parsing_cast_meridiem', 'pandas/tests/frame/methods/test_between_time.py:test_between_time_space_before_meridiem', 'pandas/tests/tools/test_to_time.py:TestToTime.test_parsers_time', 'pandas/tests/tools/test_to_datetime.py:TestTimeConversionFormats.test_to_datetime_format_time', 'pandas/tests/tslibs/test_parsing.py:test_guess_datetime_format_with_locale_specific_formats']
+  fix: applied: The tests were skipped whenever the ambient LC_TIME wasn't English. I removed the skipif mark and added `td.english_lc_time()` in `pandas/util/_test_decorators.py`. It is a context manager that switches LC_TIME to English (C or en_US) for the test body and restores the previous value on exit, including on failure. It skips only when no English LC_TIME can be set. Every decorated test now 
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  13%|█▎        | 38/290 [00:00<00:00, 281.45it/s]
+Loading weights:  28%|██▊       | 81/290 [00:00<00:00, 343.11it/s]
+Loading weights:  40%|████      | 116/290 [00:00<00:00, 338.16it/s]
+Loading weights:  53%|█████▎    | 155/290 [00:00<00:00, 349.43it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 637.42it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  14%|█▍        | 41/290 [00:00<00:00, 372.94it/s]
+Loading weights:  27%|██▋       | 79/290 [00:00<00:00, 301.41it/s]
+Loading weights:  38%|███▊      | 110/290 [00:00<00:00, 303.47it/s]
+Loading weights:  49%|████▊     | 141/290 [00:00<00:00, 305.66it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 627.62it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

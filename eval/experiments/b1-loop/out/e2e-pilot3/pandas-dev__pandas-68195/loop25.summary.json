@@ -1,0 +1,178 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "The three guards in _AsOfMerge._validate_tolerance reject only values below zero, so tolerance=0 is valid. The error message said \"must be positive\", which wrongly excludes 0. I changed all three messages to \"tolerance must be non-negative\" and updated the existing test that matches the message.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0565,
+ "seconds": 29,
+ "diff_stat": "pandas/core/reshape/merge.py                  | 6 +++---\n pandas/tests/reshape/merge/test_merge_asof.py | 2 +-\n 2 files changed, 4 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Validation of the tolerance argument in merge_asof's _AsOfMerge (_validate_tolerance / _get_merge_keys) raises MergeError(\"tolerance must be positive\") when tolerance is negative; zero is accepted. The message should be changed to say \"non-negative\".",
+    "symptom": "merge_asof raises MergeError \"tolerance must be positive\" for negative tolerance even though tolerance=0 is accepted, so the message is inconsistent with the guard.",
+    "anchors": [
+     "merge_asof",
+     "tolerance",
+     "tolerance must be positive",
+     "MergeError",
+     "_MergeOperation",
+     "_AsOfMerge",
+     "self.tolerance < Timedelta(0)",
+     "self.tolerance < 0"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/reshape/merge.py",
+     934,
+     2049
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2420,
+     2769
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2599,
+     2634
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     646,
+     930
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     1072,
+     1074
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     1953,
+     1999
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2001,
+     2008
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2045,
+     2056
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2114,
+     2130
+    ],
+    [
+     "pandas/core/indexes/datetimelike.py",
+     442,
+     444
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2756,
+     2774
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2058,
+     2069
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     3291,
+     3305
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2423,
+     2472
+    ],
+    [
+     "pandas/core/indexes/period.py",
+     624,
+     635
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     4059,
+     4077
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2776,
+     2794
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     3340,
+     3365
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     3071,
+     3078
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2033,
+     2043
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     2559,
+     2581
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2132,
+     2146
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2071,
+     2112
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     87,
+     341
+    ],
+    [
+     "pandas/tests/reshape/merge/test_merge_asof.py",
+     2669,
+     2717
+    ]
+   ],
+   "analysis": "_AsOfMerge._validate_tolerance holds the guards that raise \"tolerance must be positive\" for negative values. The message needs to change to \"non-negative\". The existing test test_tolerance_negative_one_nanosecond matches the old message, so it also needs updating.",
+   "picked": [
+    "pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance",
+    "pandas/tests/reshape/merge/test_merge_asof.py:TestAsOfMerge.test_tolerance_negative_one_nanosecond"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/reshape/merge.py lines 2599-2634 (_AsOfMerge._validate_tolerance)",
+    "pandas/tests/reshape/merge/test_merge_asof.py lines 2001-2008 (TestAsOfMerge.test_tolerance_negative_one_nanosecond)"
+   ],
+   "fix_attempt": "applied: The three guards in _AsOfMerge._validate_tolerance reject only values below zero, so tolerance=0 is valid. The error message said \"must be positive\", which wrongly excludes 0. I changed all three messages to \"tolerance must be non-negative\" and updated the existing test that matches the message."
+  }
+ ]
+}

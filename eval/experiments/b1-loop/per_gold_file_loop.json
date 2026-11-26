@@ -1,0 +1,3506 @@
+{
+ "rows": [
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-23604",
+   "path": "src/optimizer/filter_combiner.cpp",
+   "gold_functions": 1,
+   "file_rank": 11,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-23773",
+   "path": "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-23825",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 2,
+   "file_rank": 7,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-23876",
+   "path": "src/function/scalar/string/contains.cpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-23939",
+   "path": "src/common/operator/cast_operators.cpp",
+   "gold_functions": 3,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-23952",
+   "path": "src/execution/join_hashtable.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24101",
+   "path": "extension/parquet/parquet_statistics.cpp",
+   "gold_functions": 2,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24163",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24266",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24382",
+   "path": "src/parser/parsed_data/create_type_info.cpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/include/reader/expression_column_reader.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/reader/expression_column_reader.cpp",
+   "gold_functions": 2,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/include/duckdb/planner/filter/expression_filter.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp",
+    "extension/parquet/parquet_statistics.cpp",
+    "src/optimizer/statistics/operator/propagate_aggregate.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp",
+    "extension/parquet/parquet_statistics.cpp",
+    "src/optimizer/statistics/operator/propagate_aggregate.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24548",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 14,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24557",
+   "path": "src/execution/physical_plan/plan_aggregate.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24582",
+   "path": "extension/core_functions/aggregate/distributive/string_agg.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24693",
+   "path": "src/function/window/window_rank_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24752",
+   "path": "src/include/duckdb/common/multi_file/multi_file_function.hpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24821",
+   "path": "extension/parquet/include/parquet_interval.hpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24875",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 12,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24933",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 10,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/parquet_metadata.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/writer/primitive_column_writer.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25031",
+   "path": "src/function/scalar/variant/variant_extract.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25042",
+   "path": "src/execution/operator/join/physical_iejoin.cpp",
+   "gold_functions": 2,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_extension.h",
+   "gold_functions": 0,
+   "file_rank": 6,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_v2.h",
+   "gold_functions": 0,
+   "file_rank": 9,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/main/extension/extension_load.cpp",
+   "gold_functions": 0,
+   "file_rank": 2,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25101",
+   "path": "src/execution/operator/order/physical_top_n.cpp",
+   "gold_functions": 3,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_storage_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 17,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_sample.cpp",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/catalog/catalog_entry/table_catalog_entry.hpp",
+    "src/include/duckdb/planner/binder.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/include/duckdb/planner/binder.hpp",
+   "gold_functions": 0,
+   "file_rank": 25,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "whole",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/parser/tableref/basetableref.hpp",
+    "src/include/duckdb/planner/binder.hpp",
+    "src/include/duckdb/planner/parsed_data/bound_create_table_info.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23604",
+   "path": "src/optimizer/filter_combiner.cpp",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23773",
+   "path": "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23825",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23876",
+   "path": "src/function/scalar/string/contains.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23939",
+   "path": "src/common/operator/cast_operators.cpp",
+   "gold_functions": 3,
+   "file_rank": 8,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23952",
+   "path": "src/execution/join_hashtable.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24101",
+   "path": "extension/parquet/parquet_statistics.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24163",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 9,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24266",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24382",
+   "path": "src/parser/parsed_data/create_type_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 30,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/include/reader/expression_column_reader.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/reader/expression_column_reader.cpp",
+   "gold_functions": 2,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/include/duckdb/planner/filter/expression_filter.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp",
+    "extension/parquet/parquet_statistics.cpp",
+    "src/optimizer/filter_combiner.cpp",
+    "src/optimizer/remove_unused_columns.cpp",
+    "src/planner/filter/expression_filter.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 1,
+   "file_rank": 9,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24548",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24557",
+   "path": "src/execution/physical_plan/plan_aggregate.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24582",
+   "path": "extension/core_functions/aggregate/distributive/string_agg.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24693",
+   "path": "src/function/window/window_rank_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24752",
+   "path": "src/include/duckdb/common/multi_file/multi_file_function.hpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24821",
+   "path": "extension/parquet/include/parquet_interval.hpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24875",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24933",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/parquet_metadata.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/writer/primitive_column_writer.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25031",
+   "path": "src/function/scalar/variant/variant_extract.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25042",
+   "path": "src/execution/operator/join/physical_iejoin.cpp",
+   "gold_functions": 2,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_extension.h",
+   "gold_functions": 0,
+   "file_rank": 4,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_v2.h",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/main/extension/extension_load.cpp",
+   "gold_functions": 0,
+   "file_rank": 1,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25101",
+   "path": "src/execution/operator/order/physical_top_n.cpp",
+   "gold_functions": 3,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_storage_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 20,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_sample.cpp",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/catalog/catalog_entry/table_catalog_entry.hpp",
+    "src/include/duckdb/planner/binder.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/include/duckdb/planner/binder.hpp",
+   "gold_functions": 0,
+   "file_rank": 15,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/parser/tableref/basetableref.hpp",
+    "src/include/duckdb/planner/binder.hpp",
+    "src/include/duckdb/planner/parsed_data/bound_create_table_info.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-23604",
+   "path": "src/optimizer/filter_combiner.cpp",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-23773",
+   "path": "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-23825",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 2,
+   "file_rank": 3,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-23876",
+   "path": "src/function/scalar/string/contains.cpp",
+   "gold_functions": 1,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-23939",
+   "path": "src/common/operator/cast_operators.cpp",
+   "gold_functions": 3,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-23952",
+   "path": "src/execution/join_hashtable.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24101",
+   "path": "extension/parquet/parquet_statistics.cpp",
+   "gold_functions": 2,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24163",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24266",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 2,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24382",
+   "path": "src/parser/parsed_data/create_type_info.cpp",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/main/capi/logical_types-c.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/include/reader/expression_column_reader.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/include/parquet_reader.hpp",
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/reader/expression_column_reader.cpp",
+   "gold_functions": 2,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/include/parquet_reader.hpp",
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/include/duckdb/planner/filter/expression_filter.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp",
+    "src/include/duckdb/storage/statistics/variant_stats.hpp",
+    "src/optimizer/remove_unused_columns.cpp",
+    "src/planner/filter/expression_filter.cpp",
+    "src/storage/table/row_group.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24548",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24557",
+   "path": "src/execution/physical_plan/plan_aggregate.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24582",
+   "path": "extension/core_functions/aggregate/distributive/string_agg.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24693",
+   "path": "src/function/window/window_rank_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24752",
+   "path": "src/include/duckdb/common/multi_file/multi_file_function.hpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24821",
+   "path": "extension/parquet/include/parquet_interval.hpp",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24875",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24933",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/parquet_metadata.cpp",
+   "gold_functions": 2,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/writer/primitive_column_writer.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25031",
+   "path": "src/function/scalar/variant/variant_extract.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25042",
+   "path": "src/execution/operator/join/physical_iejoin.cpp",
+   "gold_functions": 2,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_extension.h",
+   "gold_functions": 0,
+   "file_rank": 5,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_v2.h",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/main/extension/extension_load.cpp",
+   "gold_functions": 0,
+   "file_rank": 1,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25101",
+   "path": "src/execution/operator/order/physical_top_n.cpp",
+   "gold_functions": 3,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_storage_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 19,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_sample.cpp",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/catalog/catalog_entry/table_catalog_entry.hpp",
+    "src/include/duckdb/planner/binder.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/include/duckdb/planner/binder.hpp",
+   "gold_functions": 0,
+   "file_rank": 15,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "revise",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/parser/tableref/basetableref.hpp",
+    "src/include/duckdb/planner/binder.hpp",
+    "src/include/duckdb/planner/parsed_data/bound_create_table_info.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23604",
+   "path": "src/optimizer/filter_combiner.cpp",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23773",
+   "path": "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23825",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23876",
+   "path": "src/function/scalar/string/contains.cpp",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23939",
+   "path": "src/common/operator/cast_operators.cpp",
+   "gold_functions": 3,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23952",
+   "path": "src/execution/join_hashtable.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24101",
+   "path": "extension/parquet/parquet_statistics.cpp",
+   "gold_functions": 2,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24163",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24266",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24382",
+   "path": "src/parser/parsed_data/create_type_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 19,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/include/reader/expression_column_reader.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/reader/expression_column_reader.cpp",
+   "gold_functions": 2,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/include/duckdb/planner/filter/expression_filter.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/column_reader.cpp",
+    "extension/parquet/parquet_reader.cpp",
+    "extension/parquet/parquet_statistics.cpp",
+    "src/optimizer/remove_unused_columns.cpp",
+    "src/planner/filter/expression_filter.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 1,
+   "file_rank": 11,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24548",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24557",
+   "path": "src/execution/physical_plan/plan_aggregate.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24582",
+   "path": "extension/core_functions/aggregate/distributive/string_agg.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24693",
+   "path": "src/function/window/window_rank_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24752",
+   "path": "src/include/duckdb/common/multi_file/multi_file_function.hpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24821",
+   "path": "extension/parquet/include/parquet_interval.hpp",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24875",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24933",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/parquet_metadata.cpp",
+   "gold_functions": 2,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/writer/primitive_column_writer.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25031",
+   "path": "src/function/scalar/variant/variant_extract.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25042",
+   "path": "src/execution/operator/join/physical_iejoin.cpp",
+   "gold_functions": 2,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_extension.h",
+   "gold_functions": 0,
+   "file_rank": 6,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_v2.h",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/main/extension/extension_load.cpp",
+   "gold_functions": 0,
+   "file_rank": 1,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25101",
+   "path": "src/execution/operator/order/physical_top_n.cpp",
+   "gold_functions": 3,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_storage_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 22,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_sample.cpp",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/catalog/catalog_entry/table_catalog_entry.hpp",
+    "src/include/duckdb/planner/binder.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/include/duckdb/planner/binder.hpp",
+   "gold_functions": 0,
+   "file_rank": 12,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/parser/tableref/basetableref.hpp",
+    "src/include/duckdb/planner/binder.hpp",
+    "src/include/duckdb/planner/parsed_data/bound_create_table_info.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-23604",
+   "path": "src/optimizer/filter_combiner.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-23773",
+   "path": "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-23825",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 2,
+   "file_rank": 6,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-23876",
+   "path": "src/function/scalar/string/contains.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-23939",
+   "path": "src/common/operator/cast_operators.cpp",
+   "gold_functions": 3,
+   "file_rank": 8,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-23952",
+   "path": "src/execution/join_hashtable.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24101",
+   "path": "extension/parquet/parquet_statistics.cpp",
+   "gold_functions": 2,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24163",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24266",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 2,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24382",
+   "path": "src/parser/parsed_data/create_type_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/include/reader/expression_column_reader.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/parquet_reader.cpp",
+   "gold_functions": 1,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24505",
+   "path": "extension/parquet/reader/expression_column_reader.cpp",
+   "gold_functions": 2,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/include/duckdb/planner/filter/expression_filter.hpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "extension/parquet/parquet_reader.cpp",
+    "extension/parquet/parquet_statistics.cpp",
+    "src/include/duckdb/storage/statistics/variant_stats.hpp",
+    "src/planner/filter/expression_filter.cpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24505",
+   "path": "src/planner/filter/expression_filter.cpp",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24548",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24557",
+   "path": "src/execution/physical_plan/plan_aggregate.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24582",
+   "path": "extension/core_functions/aggregate/distributive/string_agg.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24693",
+   "path": "src/function/window/window_rank_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24752",
+   "path": "src/include/duckdb/common/multi_file/multi_file_function.hpp",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24821",
+   "path": "extension/parquet/include/parquet_interval.hpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24875",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24933",
+   "path": "src/function/window/window_rownumber_function.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/parquet_metadata.cpp",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-24957",
+   "path": "extension/parquet/writer/primitive_column_writer.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25031",
+   "path": "src/function/scalar/variant/variant_extract.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25042",
+   "path": "src/execution/operator/join/physical_iejoin.cpp",
+   "gold_functions": 2,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_extension.h",
+   "gold_functions": 0,
+   "file_rank": 4,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/include/duckdb_v2.h",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25055",
+   "path": "src/main/extension/extension_load.cpp",
+   "gold_functions": 0,
+   "file_rank": 1,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25101",
+   "path": "src/execution/operator/order/physical_top_n.cpp",
+   "gold_functions": 3,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_storage_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 20,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_info.cpp",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/function/table/system/pragma_table_sample.cpp",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/catalog/catalog_entry/table_catalog_entry.hpp",
+    "src/include/duckdb/planner/binder.hpp"
+   ]
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/include/duckdb/planner/binder.hpp",
+   "gold_functions": 0,
+   "file_rank": 15,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "duckdb",
+   "arm": "loop",
+   "task": "duckdb__duckdb-25153",
+   "path": "src/planner/binder/statement/bind_create.cpp",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "src/include/duckdb/parser/tableref/basetableref.hpp",
+    "src/include/duckdb/planner/binder.hpp",
+    "src/include/duckdb/planner/parsed_data/bound_create_table_info.hpp"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-66145",
+   "path": "pandas/io/json/_json.py",
+   "gold_functions": 6,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-66234",
+   "path": "pandas/core/reshape/pivot.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-66270",
+   "path": "pandas/core/base.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/generic.py",
+    "pandas/core/groupby/groupby.py",
+    "pandas/core/resample.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-66530",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-67004",
+   "path": "pandas/core/arrays/arrow/accessors.py",
+   "gold_functions": 1,
+   "file_rank": 18,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-67944",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68081",
+   "path": "pandas/api/__init__.py",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68083",
+   "path": "pandas/util/_test_decorators.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68358",
+   "path": "pandas/core/indexes/range.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68575",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 2,
+   "file_rank": 11,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68947",
+   "path": "pandas/io/parsers/python_parser.py",
+   "gold_functions": 4,
+   "file_rank": 12,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69113",
+   "path": "pandas/core/indexes/base.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/datetimelike.py",
+   "gold_functions": 1,
+   "file_rank": 7,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/period.py",
+   "gold_functions": 1,
+   "file_rank": 18,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/internals/blocks.py",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/series.py",
+   "gold_functions": 1,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69478",
+   "path": "pandas/core/arraylike.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/arrays/base.py",
+    "pandas/core/frame.py",
+    "pandas/core/generic.py",
+    "pandas/core/ops/invalid.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69960",
+   "path": "pandas/plotting/_matplotlib/timeseries.py",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70102",
+   "path": "pandas/_testing/asserters.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/ops.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/formats/format.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_config/config.py",
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/arrays/categorical.py",
+    "pandas/core/dtypes/common.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/dtypes/inference.py",
+    "pandas/core/frame.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70530",
+   "path": "pandas/io/formats/style.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70631",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70742",
+   "path": "pandas/core/indexing.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/formats/xml.py",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/xml.py",
+   "gold_functions": 2,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71222",
+   "path": "pandas/core/interchange/from_dataframe.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/_mixins.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/dtypes/common.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/base.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/dtypes/common.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/dtypes/common.py",
+    "pandas/core/indexes/base.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/dtypes/base.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/hashtable.pyi",
+    "pandas/core/dtypes/common.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71442",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 3,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-66145",
+   "path": "pandas/io/json/_json.py",
+   "gold_functions": 6,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-66234",
+   "path": "pandas/core/reshape/pivot.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-66270",
+   "path": "pandas/core/base.py",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-66530",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-67004",
+   "path": "pandas/core/arrays/arrow/accessors.py",
+   "gold_functions": 1,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-67944",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68081",
+   "path": "pandas/api/__init__.py",
+   "gold_functions": 0,
+   "file_rank": 2,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68083",
+   "path": "pandas/util/_test_decorators.py",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68358",
+   "path": "pandas/core/indexes/range.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68575",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 2,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68947",
+   "path": "pandas/io/parsers/python_parser.py",
+   "gold_functions": 4,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69113",
+   "path": "pandas/core/indexes/base.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/datetimelike.py",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/period.py",
+   "gold_functions": 1,
+   "file_rank": 20,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/internals/blocks.py",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/series.py",
+   "gold_functions": 1,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69478",
+   "path": "pandas/core/arraylike.py",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69960",
+   "path": "pandas/plotting/_matplotlib/timeseries.py",
+   "gold_functions": 1,
+   "file_rank": 21,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70102",
+   "path": "pandas/_testing/asserters.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py",
+    "pandas/errors/__init__.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/ops.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/formats/format.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_config/config.py",
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/generic.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/dtypes/inference.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70530",
+   "path": "pandas/io/formats/style.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70631",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70742",
+   "path": "pandas/core/indexing.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/formats/xml.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/xml.py",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71222",
+   "path": "pandas/core/interchange/from_dataframe.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/_mixins.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/sorting.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/base.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/sorting.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/indexes/base.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/dtypes/base.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/hashtable.pyi",
+    "pandas/core/dtypes/common.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71442",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 3,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/util/_validators.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-66145",
+   "path": "pandas/io/json/_json.py",
+   "gold_functions": 6,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-66234",
+   "path": "pandas/core/reshape/pivot.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-66270",
+   "path": "pandas/core/base.py",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-66530",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-67004",
+   "path": "pandas/core/arrays/arrow/accessors.py",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-67944",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-68081",
+   "path": "pandas/api/__init__.py",
+   "gold_functions": 0,
+   "file_rank": 2,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-68083",
+   "path": "pandas/util/_test_decorators.py",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-68358",
+   "path": "pandas/core/indexes/range.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-68575",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 2,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-68947",
+   "path": "pandas/io/parsers/python_parser.py",
+   "gold_functions": 4,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69113",
+   "path": "pandas/core/indexes/base.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/datetimelike.py",
+   "gold_functions": 1,
+   "file_rank": 11,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/period.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/arrays/period.py",
+    "pandas/core/dtypes/dtypes.py",
+    "pandas/core/indexes/datetimelike.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/internals/blocks.py",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/series.py",
+   "gold_functions": 1,
+   "file_rank": 8,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69478",
+   "path": "pandas/core/arraylike.py",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69960",
+   "path": "pandas/plotting/_matplotlib/timeseries.py",
+   "gold_functions": 1,
+   "file_rank": 20,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70102",
+   "path": "pandas/_testing/asserters.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/ops.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/formats/format.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_config/config.py",
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/common.py",
+    "pandas/core/dtypes/common.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/dtypes/inference.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70530",
+   "path": "pandas/io/formats/style.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70631",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70742",
+   "path": "pandas/core/indexing.py",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/formats/xml.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/xml.py",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71222",
+   "path": "pandas/core/interchange/from_dataframe.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/_mixins.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/sorting.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/base.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/sorting.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/indexes/base.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/dtypes/base.py",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "pandas",
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71442",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 3,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/util/_validators.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-66145",
+   "path": "pandas/io/json/_json.py",
+   "gold_functions": 6,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-66234",
+   "path": "pandas/core/reshape/pivot.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-66270",
+   "path": "pandas/core/base.py",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-66530",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-67004",
+   "path": "pandas/core/arrays/arrow/accessors.py",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-67944",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-68081",
+   "path": "pandas/api/__init__.py",
+   "gold_functions": 0,
+   "file_rank": 1,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-68083",
+   "path": "pandas/util/_test_decorators.py",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-68358",
+   "path": "pandas/core/indexes/range.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-68575",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 2,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-68947",
+   "path": "pandas/io/parsers/python_parser.py",
+   "gold_functions": 4,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69113",
+   "path": "pandas/core/indexes/base.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/datetimelike.py",
+   "gold_functions": 1,
+   "file_rank": 7,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/period.py",
+   "gold_functions": 1,
+   "file_rank": 13,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/internals/blocks.py",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/series.py",
+   "gold_functions": 1,
+   "file_rank": 5,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69478",
+   "path": "pandas/core/arraylike.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69960",
+   "path": "pandas/plotting/_matplotlib/timeseries.py",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70102",
+   "path": "pandas/_testing/asserters.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/errors/__init__.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/ops.py",
+   "gold_functions": 1,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/formats/format.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_config/config.py",
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/generic.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/_typing.py",
+    "pandas/core/dtypes/common.py",
+    "pandas/core/dtypes/inference.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70530",
+   "path": "pandas/io/formats/style.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70631",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70742",
+   "path": "pandas/core/indexing.py",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/formats/xml.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/xml.py",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71222",
+   "path": "pandas/core/interchange/from_dataframe.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/_mixins.py",
+   "gold_functions": 0,
+   "file_rank": 18,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/base.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/arrays/_mixins.py",
+    "pandas/core/arrays/arrow/array.py",
+    "pandas/core/sorting.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_libs/lib.pyi",
+    "pandas/core/algorithms.py",
+    "pandas/core/arrays/arrow/array.py",
+    "pandas/core/indexes/base.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/dtypes/base.py",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "pandas",
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71442",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 3,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/util/_validators.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-66145",
+   "path": "pandas/io/json/_json.py",
+   "gold_functions": 6,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-66234",
+   "path": "pandas/core/reshape/pivot.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-66270",
+   "path": "pandas/core/base.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-66530",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-67004",
+   "path": "pandas/core/arrays/arrow/accessors.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-67944",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-68081",
+   "path": "pandas/api/__init__.py",
+   "gold_functions": 0,
+   "file_rank": 1,
+   "bucket": "in_top50_no_gold_function"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-68083",
+   "path": "pandas/util/_test_decorators.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-68358",
+   "path": "pandas/core/indexes/range.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-68575",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 2,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-68947",
+   "path": "pandas/io/parsers/python_parser.py",
+   "gold_functions": 4,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-69113",
+   "path": "pandas/core/indexes/base.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/datetimelike.py",
+   "gold_functions": 1,
+   "file_rank": 6,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/indexes/period.py",
+   "gold_functions": 1,
+   "file_rank": 20,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/internals/blocks.py",
+   "gold_functions": 1,
+   "file_rank": 3,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-69447",
+   "path": "pandas/core/series.py",
+   "gold_functions": 1,
+   "file_rank": 4,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-69478",
+   "path": "pandas/core/arraylike.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-69960",
+   "path": "pandas/plotting/_matplotlib/timeseries.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70102",
+   "path": "pandas/_testing/asserters.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/expr.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py",
+    "pandas/errors/__init__.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70107",
+   "path": "pandas/core/computation/ops.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/computation/eval.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/formats/format.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_config/config.py",
+    "pandas/_typing.py",
+    "pandas/core/common.py",
+    "pandas/tests/io/formats/test_to_html.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70221",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 1,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/_typing.py",
+    "pandas/core/dtypes/inference.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70530",
+   "path": "pandas/io/formats/style.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70631",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70742",
+   "path": "pandas/core/indexing.py",
+   "gold_functions": 1,
+   "file_rank": 2,
+   "bucket": "in_top50_same_file_only"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/formats/xml.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71171",
+   "path": "pandas/io/xml.py",
+   "gold_functions": 2,
+   "file_rank": 2,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71222",
+   "path": "pandas/core/interchange/from_dataframe.py",
+   "gold_functions": 1,
+   "file_rank": 1,
+   "bucket": "in_top50_gold_function_found"
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/_mixins.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/arrays/datetimelike.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/base.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/arrays/datetimelike.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/arrays/interval.py",
+   "gold_functions": 0,
+   "bucket": "near_one_import",
+   "near_via": [
+    "pandas/core/indexes/base.py",
+    "pandas/core/util/hashing.py"
+   ]
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71334",
+   "path": "pandas/core/dtypes/base.py",
+   "gold_functions": 0,
+   "bucket": "far",
+   "near_via": []
+  },
+  {
+   "repo": "pandas",
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71442",
+   "path": "pandas/io/parsers/readers.py",
+   "gold_functions": 3,
+   "bucket": "far",
+   "near_via": []
+  }
+ ],
+ "summary": {
+  "duckdb/whole": {
+   "in_top50_gold_function_found": 16,
+   "gold_files": 36,
+   "top10": 19,
+   "in_top50_same_file_only": 4,
+   "far": 6,
+   "near_one_import": 6,
+   "in_top50_no_gold_function": 4,
+   "control_near_rate": 0.16
+  },
+  "duckdb/oneshot": {
+   "in_top50_gold_function_found": 21,
+   "gold_files": 36,
+   "top10": 24,
+   "in_top50_same_file_only": 3,
+   "near_one_import": 5,
+   "far": 4,
+   "in_top50_no_gold_function": 3,
+   "control_near_rate": 0.153
+  },
+  "duckdb/revise": {
+   "in_top50_gold_function_found": 20,
+   "gold_files": 36,
+   "top10": 24,
+   "in_top50_same_file_only": 3,
+   "near_one_import": 6,
+   "far": 4,
+   "in_top50_no_gold_function": 3,
+   "control_near_rate": 0.133
+  },
+  "duckdb/diagnose": {
+   "in_top50_gold_function_found": 20,
+   "gold_files": 36,
+   "top10": 23,
+   "in_top50_same_file_only": 4,
+   "near_one_import": 5,
+   "far": 4,
+   "in_top50_no_gold_function": 3,
+   "control_near_rate": 0.139
+  },
+  "duckdb/loop": {
+   "in_top50_gold_function_found": 22,
+   "gold_files": 36,
+   "top10": 25,
+   "in_top50_same_file_only": 2,
+   "near_one_import": 5,
+   "far": 4,
+   "in_top50_no_gold_function": 3,
+   "control_near_rate": 0.148
+  },
+  "pandas/whole": {
+   "in_top50_gold_function_found": 18,
+   "gold_files": 34,
+   "top10": 17,
+   "near_one_import": 10,
+   "in_top50_same_file_only": 3,
+   "far": 3,
+   "control_near_rate": 0.67
+  },
+  "pandas/oneshot": {
+   "in_top50_gold_function_found": 21,
+   "gold_files": 34,
+   "top10": 23,
+   "in_top50_same_file_only": 3,
+   "in_top50_no_gold_function": 1,
+   "near_one_import": 9,
+   "control_near_rate": 0.713
+  },
+  "pandas/revise": {
+   "in_top50_gold_function_found": 21,
+   "gold_files": 34,
+   "top10": 22,
+   "in_top50_no_gold_function": 1,
+   "near_one_import": 9,
+   "in_top50_same_file_only": 2,
+   "far": 1,
+   "control_near_rate": 0.658
+  },
+  "pandas/diagnose": {
+   "in_top50_gold_function_found": 22,
+   "gold_files": 34,
+   "top10": 24,
+   "in_top50_no_gold_function": 2,
+   "in_top50_same_file_only": 2,
+   "near_one_import": 6,
+   "far": 2,
+   "control_near_rate": 0.698
+  },
+  "pandas/loop": {
+   "in_top50_gold_function_found": 23,
+   "gold_files": 34,
+   "top10": 24,
+   "in_top50_no_gold_function": 1,
+   "near_one_import": 7,
+   "in_top50_same_file_only": 1,
+   "far": 2,
+   "control_near_rate": 0.681
+  }
+ }
+}

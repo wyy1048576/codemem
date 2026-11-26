@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["can_fix", "edits", "explanation", "intent", "symptom", "anchors", "look_in"],
+  "properties": {
+    "can_fix": {"type": "boolean"},
+    "edits": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["path", "old", "new"],
+              "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}}},
+    "explanation": {"type": "string"},
+    "intent": {"type": "string"},
+    "symptom": {"type": "string"},
+    "anchors": {"type": "array", "items": {"type": "string"}},
+    "look_in": {"type": "array", "items": {"type": "string"}}
+  }
+}

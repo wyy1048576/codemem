@@ -1,0 +1,100 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "pandas-dev__pandas-67944",
+ "fixed": {
+  "round": 1,
+  "explanation": "_validate raised a generic message without identifying which intervals violated left <= right. The fix computes which non-missing positions fail the check, maps them back to positions in the original arrays, and includes up to the first 5 in the message. The original message is kept as a prefix, so existing matches still work.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0351,
+ "seconds": 21,
+ "diff_stat": "pandas/core/arrays/interval.py | 11 +++++++++--\n 1 file changed, 9 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The IntervalArray._validate method checks that left <= right and raises a generic ValueError. It should be changed to compute which intervals violate the ordering and include the offending values or locations (limited to a few) in the error message.",
+    "symptom": "Creating an IntervalArray/IntervalIndex (e.g. via from_breaks) with left > right raises a generic \"left side of interval must be <= right side\" ValueError without showing which values are offending.",
+    "anchors": [
+     "IntervalArray._validate",
+     "IntervalIndex.from_breaks",
+     "left side of interval must be <= right side",
+     "left_mask",
+     "IntervalArray",
+     "_validate",
+     "from_breaks"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/arrays/interval.py",
+     595,
+     623
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1151,
+     1171
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     122,
+     1898
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     399,
+     446
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     346,
+     416
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     448,
+     523
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     148,
+     1316
+    ],
+    [
+     "pandas/_libs/interval.pyi",
+     150,
+     152
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     294,
+     344
+    ],
+    [
+     "pandas/_libs/interval.pyi",
+     52,
+     52
+    ]
+   ],
+   "analysis": "Result 1 is IntervalArray._validate in pandas/core/arrays/interval.py, which raises the generic \"left side of interval must be <= right side\" error. The fix is to compute the offending mask there and include the offending values or locations in the message. I did not see the body of the method in the results, so I'm inferring this from the issue text.",
+   "picked": [
+    "pandas/core/arrays/interval.py:IntervalArray._validate"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/arrays/interval.py lines 595-623 (IntervalArray._validate)"
+   ],
+   "fix_attempt": "applied: _validate raised a generic message without identifying which intervals violated left <= right. The fix computes which non-missing positions fail the check, maps them back to positions in the original arrays, and includes up to the first 5 in the message. The original message is kept as a prefix, so existing matches still work."
+  }
+ ]
+}

@@ -1,0 +1,881 @@
+{
+ "prompt_sha": "a3f1fb713b3d82fd8ec659a3d122707b123a34e6b46a49f8a5c68555fc20144d",
+ "levels": {
+  "function": {
+   "n": 23,
+   "whole": {
+    "mrr": 0.3352,
+    "recall@10": 0.3986,
+    "success@10": 0.3478,
+    "recall@50": 0.5543,
+    "success@50": 0.5217,
+    "found": 0.6087
+   },
+   "oneshot": {
+    "mrr": 0.3954,
+    "recall@10": 0.5109,
+    "success@10": 0.3913,
+    "recall@50": 0.7065,
+    "success@50": 0.6957,
+    "found": 0.7391
+   },
+   "oneshot-guess": {
+    "mrr": 0.3983,
+    "recall@10": 0.5109,
+    "success@10": 0.3913,
+    "recall@50": 0.7065,
+    "success@50": 0.6957,
+    "found": 0.7391
+   },
+   "revise": {
+    "mrr": 0.3949,
+    "recall@10": 0.4674,
+    "success@10": 0.3478,
+    "recall@50": 0.7717,
+    "success@50": 0.7391,
+    "found": 0.7826
+   },
+   "revise-guess": {
+    "mrr": 0.4011,
+    "recall@10": 0.4783,
+    "success@10": 0.3478,
+    "recall@50": 0.7717,
+    "success@50": 0.7391,
+    "found": 0.7826
+   }
+  },
+  "file": {
+   "n": 25,
+   "whole": {
+    "mrr": 0.5425,
+    "recall@10": 0.55,
+    "success@10": 0.52,
+    "recall@50": 0.68,
+    "success@50": 0.68,
+    "found": 0.68
+   },
+   "oneshot": {
+    "mrr": 0.5692,
+    "recall@10": 0.79,
+    "success@10": 0.76,
+    "recall@50": 0.84,
+    "success@50": 0.84,
+    "found": 0.84
+   },
+   "oneshot-guess": {
+    "mrr": 0.579,
+    "recall@10": 0.79,
+    "success@10": 0.76,
+    "recall@50": 0.84,
+    "success@50": 0.84,
+    "found": 0.84
+   },
+   "revise": {
+    "mrr": 0.598,
+    "recall@10": 0.78,
+    "success@10": 0.76,
+    "recall@50": 0.83,
+    "success@50": 0.8,
+    "found": 0.84
+   },
+   "revise-guess": {
+    "mrr": 0.5984,
+    "recall@10": 0.78,
+    "success@10": 0.76,
+    "recall@50": 0.83,
+    "success@50": 0.8,
+    "found": 0.84
+   }
+  }
+ },
+ "primary": {
+  "oneshot": {
+   "mrr_diff": 0.0602,
+   "ci95": [
+    -0.0792,
+    0.1911
+   ],
+   "p": 0.12394499668416256,
+   "wins": 10,
+   "losses": 3,
+   "ties": 10,
+   "p_holm": 0.431032184094766
+  },
+  "oneshot-guess": {
+   "mrr_diff": 0.0631,
+   "ci95": [
+    -0.0768,
+    0.1947
+   ],
+   "p": 0.1077580460236915,
+   "wins": 11,
+   "losses": 2,
+   "ties": 10,
+   "p_holm": 0.431032184094766
+  },
+  "revise": {
+   "mrr_diff": 0.0597,
+   "ci95": [
+    -0.0905,
+    0.1975
+   ],
+   "p": 0.1577089872370102,
+   "wins": 11,
+   "losses": 3,
+   "ties": 9,
+   "p_holm": 0.431032184094766
+  },
+  "revise-guess": {
+   "mrr_diff": 0.0659,
+   "ci95": [
+    -0.0861,
+    0.2043
+   ],
+   "p": 0.1577089872370102,
+   "wins": 11,
+   "losses": 3,
+   "ties": 9,
+   "p_holm": 0.431032184094766
+  }
+ },
+ "buckets": {
+  "whole": {
+   "all_top10": 8,
+   "all_top50": 4,
+   "some_top50": 2,
+   "none_top50": 9
+  },
+  "oneshot": {
+   "all_top10": 9,
+   "all_top50": 7,
+   "some_top50": 1,
+   "none_top50": 6
+  },
+  "oneshot-guess": {
+   "all_top10": 9,
+   "all_top50": 7,
+   "some_top50": 1,
+   "none_top50": 6
+  },
+  "revise": {
+   "all_top10": 8,
+   "all_top50": 9,
+   "some_top50": 1,
+   "none_top50": 5
+  },
+  "revise-guess": {
+   "all_top10": 8,
+   "all_top50": 9,
+   "some_top50": 1,
+   "none_top50": 5
+  }
+ },
+ "per_task": [
+  {
+   "task": "pandas-dev__pandas-66145",
+   "gold_functions": 6,
+   "whole": {
+    "first_rank": 4,
+    "recall@10": 0.333,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 0.833,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 1,
+    "recall@10": 0.833,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 1,
+    "recall@10": 0.833,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 1,
+    "recall@10": 0.833,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-66234",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-66270",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise": {
+    "first_rank": 19,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 19,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-66530",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-67004",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 40,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 22,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 43,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 45,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-67944",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 4,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-68083",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 11,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 11,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 11,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 11,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-68358",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-68575",
+   "gold_functions": 2,
+   "whole": {
+    "first_rank": 17,
+    "recall@10": 0.0,
+    "recall@50": 0.5
+   },
+   "oneshot": {
+    "first_rank": 5,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 7,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 3,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 3,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-68947",
+   "gold_functions": 4,
+   "whole": {
+    "first_rank": 23,
+    "recall@10": 0.0,
+    "recall@50": 0.25
+   },
+   "oneshot": {
+    "first_rank": 31,
+    "recall@10": 0.0,
+    "recall@50": 0.25
+   },
+   "oneshot-guess": {
+    "first_rank": 22,
+    "recall@10": 0.0,
+    "recall@50": 0.25
+   },
+   "revise": {
+    "first_rank": 5,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 3,
+    "recall@10": 0.75,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-69113",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 3,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 3,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-69447",
+   "gold_functions": 4,
+   "whole": {
+    "first_rank": 4,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 3,
+    "recall@10": 0.75,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 3,
+    "recall@10": 0.75,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 9,
+    "recall@10": 0.25,
+    "recall@50": 0.75
+   },
+   "revise-guess": {
+    "first_rank": 9,
+    "recall@10": 0.25,
+    "recall@50": 0.75
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-69478",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 4,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 3,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 3,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 3,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-69960",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-70102",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 41,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 10,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 9,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 22,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 17,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-70107",
+   "gold_functions": 2,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-70221",
+   "gold_functions": 2,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-70530",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 3,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-70631",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 16,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 17,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 17,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 18,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-70742",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-71171",
+   "gold_functions": 3,
+   "whole": {
+    "first_rank": 2,
+    "recall@10": 0.333,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 0.667,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 1,
+    "recall@10": 0.667,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 1,
+    "recall@10": 0.667,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 1,
+    "recall@10": 0.667,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-71222",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "revise-guess": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "pandas-dev__pandas-71442",
+   "gold_functions": 3,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "revise-guess": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  }
+ ],
+ "leak_check": {
+  "oneshot": {
+   "tasks_where_a_guess_names_a_gold_file": 21,
+   "tasks_with_pins": 10,
+   "anchors_dropped": 0
+  },
+  "revise": {
+   "tasks_where_a_guess_names_a_gold_file": 16,
+   "tasks_with_pins": 11,
+   "anchors_dropped": 17
+  }
+ },
+ "missed_by_whole": {
+  "tasks": [
+   "pandas-dev__pandas-66270",
+   "pandas-dev__pandas-67004",
+   "pandas-dev__pandas-69478",
+   "pandas-dev__pandas-69960",
+   "pandas-dev__pandas-70107",
+   "pandas-dev__pandas-70221",
+   "pandas-dev__pandas-70631",
+   "pandas-dev__pandas-70742",
+   "pandas-dev__pandas-71442"
+  ],
+  "oneshot": 3,
+  "oneshot-guess": 3,
+  "revise": 4,
+  "revise-guess": 4
+ },
+ "lost_by_arm": {
+  "oneshot": [],
+  "oneshot-guess": [],
+  "revise": [],
+  "revise-guess": []
+ },
+ "sonnet": {
+  "cached_calls": 101,
+  "list_price_usd": 1.84
+ }
+}

@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "duckdb__duckdb-23773",
+ "exit": 0,
+ "seconds": 27,
+ "cost_usd": 0.07646480000000001,
+ "turns": 9,
+ "usage": {
+  "input_tokens": 16,
+  "cache_creation_input_tokens": 9511,
+  "cache_read_input_tokens": 88988,
+  "output_tokens": 2949,
+  "output_tokens_details": {
+   "thinking_tokens": 660
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 9511,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 427,
+    "cache_read_input_tokens": 14457,
+    "cache_creation_input_tokens": 447,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 447
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Read": 1,
+  "Edit": 5
+ },
+ "subtype": "success",
+ "diff_stat": "src/include/duckdb/common/operator/decimal_cast_operators.hpp | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "final": "I fixed the rounding bug in the VARCHAR \u2192 DECIMAL negative-exponent path. I haven't built or run anything, so it's untested, and I didn't add a regression test.\n\n**Cause:** `DecimalCastOperation::HandleExponent` in `src/include/duckdb/common/operator/decimal_cast_operators.hpp` divides the scaled value by 10 once per unit of the negative exponent. It stops as soon as the value reaches 0, and `round_up` keeps whatever the last digit it removed said. For `5.8207660913467407e-11` into `DECIMAL(18,4)`, the scaled value is 58207. After five divisions the last digit removed is the leading `5`, so it rounded up to 0.0001. That digit was actually many places below the last kept one, so the correct result is 0.\n\n**Fix:** When the value reaches 0 before all the requested digits have been removed, `round_up` is now reset to `false`. A digit is only a rounding digit if it's the last one removed, which is the case when the loop runs its full length. Rounding for values like `5e-5` into `DECIMAL(18,4)` is unchanged.\n\nI made the edit as a single-line insertion, so the file now has a few lines with LF endings among its CRLF ones. You may want to normalize them.",
+ "stderr": ""
+}

@@ -1,0 +1,784 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "duckdb__duckdb-23825",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 2
+ },
+ "sonnet_calls": 12,
+ "cost_usd": 0.4014,
+ "seconds": 125,
+ "diff_stat": "",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The optimizer's filter pushdown / expression rewrite rules fold comparisons and IN expressions with a NULL constant into a constant NULL/false filter, which yields an empty result. Extend this to NOT IN (NULL), i.e. the NOT-wrapped IN operator (COMPARE_NOT_IN, or NOT over COMPARE_IN) with a NULL constant in its list, so the filter becomes constant NULL and the scan is replaced by an empty result.",
+    "symptom": "`WHERE i NOT IN (NULL)` is not simplified to an empty result and still performs a sequential scan with the filter, whereas `i IN (NULL)` is eliminated.",
+    "anchors": [
+     "NOT IN",
+     "NOT (i IN (NULL))",
+     "i NOT IN (NULL)",
+     "IN (NULL)",
+     "Empty Result",
+     "Seq Scan",
+     "Filters"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/storage/compression/numeric_constant.cpp",
+     31,
+     69
+    ],
+    [
+     "src/storage/compression/numeric_constant.cpp",
+     71,
+     182
+    ],
+    [
+     "src/planner/filter/expression_filter.cpp",
+     62,
+     69
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_mark_join.cpp",
+     68,
+     128
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     276,
+     283
+    ],
+    [
+     "src/planner/expression.cpp",
+     67,
+     81
+    ],
+    [
+     "src/planner/expression/bound_subquery_expression.cpp",
+     24,
+     27
+    ],
+    [
+     "src/planner/expression/bound_conjunction_expression.cpp",
+     30,
+     32
+    ],
+    [
+     "src/common/vector_operations/null_operations.cpp",
+     13,
+     30
+    ],
+    [
+     "src/common/vector_operations/null_operations.cpp",
+     32,
+     34
+    ]
+   ],
+   "analysis": "Results show storage compression and null-propagation helpers, not the optimizer rule that folds IN with NULL. The `IN (NULL)` case is eliminated likely in filter_combiner or the expression rewriter's constant folding of IN. NOT IN (NULL) is represented as NOT(IN) (operator NOT over COMPARE_IN), so the rewrite rules or filter pushdown must handle it.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Optimizer code that handles IN-list expressions containing NULL constants and turns the filter into an empty result; extend it for NOT wrapping an IN operator, or the rule that folds NOT over operators with NULL inputs.",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still performs a sequential scan.",
+    "anchors": [
+     "FilterCombiner",
+     "ContainsNull",
+     "PropagatesNullValues"
+    ],
+    "look_in": [
+     "src/optimizer/"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/filter_combiner.cpp",
+     518,
+     585
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     924,
+     948
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     338,
+     378
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     72,
+     100
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     587,
+     660
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_left_join.cpp",
+     77,
+     105
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_mark_join.cpp",
+     18,
+     54
+    ],
+    [
+     "src/optimizer/rule/equal_or_null_simplification.cpp",
+     41,
+     85
+    ],
+    [
+     "src/optimizer/outer_join_simplification.cpp",
+     128,
+     135
+    ],
+    [
+     "src/optimizer/outer_join_simplification.cpp",
+     157,
+     160
+    ]
+   ],
+   "analysis": "Results show filter combiner pushdown and null-rejection helpers, not the rule that folds IN with a NULL constant. FilterCombiner::AddConstantComparison returns UNSATISFIABLE for NULL constants, which probably explains why IN (NULL) becomes empty. NOT IN is NOT over COMPARE_IN (or a negated form), so it likely needs handling in the expression rewriter rules, such as the IN-clause simplification or constant folding rule, or in the filter combiner's AddFilter.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Optimizer rewrite rule that simplifies IN-list expressions with constant children, including NULL constants, and the handling of NOT applied to such expressions or to a NULL constant filter.",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still does a sequential scan.",
+    "anchors": [
+     "FilterCombiner",
+     "AddConstantComparison",
+     "TryPushdownInFilter",
+     "COMPARE_IN",
+     "FilterResult::UNSATISFIABLE"
+    ],
+    "look_in": [
+     "src/optimizer/rule/",
+     "src/optimizer/filter_combiner.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/filter_combiner.cpp",
+     905,
+     922
+    ],
+    [
+     "src/optimizer/rule/comparison_simplification.cpp",
+     73,
+     84
+    ],
+    [
+     "src/optimizer/rule/comparison_simplification.cpp",
+     13,
+     71
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     884,
+     903
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     1051,
+     1161
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     328,
+     336
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     1167,
+     1303
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     387,
+     416
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     455,
+     516
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     950,
+     1049
+    ]
+   ],
+   "analysis": "Results show FilterCombiner internals and comparison simplification, but nothing that handles NOT over an IN operator with a NULL constant. AddFilter handles foldable expressions and comparisons, but NOT(IN(NULL)) is an operator expression that is not folded. The fix likely lives in an expression rewriter rule (in-clause simplification or empty-needle removal) or in filter pushdown's NOT handling.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "Optimizer rewrite rule that simplifies IN operator (COMPARE_IN) with a NULL constant in its list to a NULL constant, and equivalent handling for NOT IN (COMPARE_NOT_IN).",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still performs a sequential scan.",
+    "anchors": [
+     "COMPARE_IN",
+     "FilterCombiner",
+     "AddFilter"
+    ],
+    "look_in": [
+     "src/optimizer/rule/"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/rule/contains_to_in_clause.cpp",
+     20,
+     69
+    ],
+    [
+     "src/optimizer/rule/in_clause_simplification_rule.cpp",
+     86,
+     133
+    ],
+    [
+     "src/optimizer/rule/in_clause_simplification_rule.cpp",
+     163,
+     228
+    ],
+    [
+     "src/optimizer/rule/in_clause_simplification_rule.cpp",
+     135,
+     161
+    ],
+    [
+     "src/optimizer/rule/date_trunc_simplification.cpp",
+     40,
+     294
+    ],
+    [
+     "src/optimizer/rule/equal_or_null_simplification.cpp",
+     10,
+     38
+    ],
+    [
+     "src/optimizer/rule/comparison_simplification.cpp",
+     94,
+     156
+    ],
+    [
+     "src/optimizer/rule/move_constants.cpp",
+     186,
+     197
+    ],
+    [
+     "src/optimizer/rule/move_constants.cpp",
+     174,
+     184
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     1329,
+     1337
+    ]
+   ],
+   "analysis": "These results are enum and in-clause simplification rules, comparison simplification and constant-move rules. None of them handles NULL inside an IN list or NOT over IN. `i IN (NULL)` probably becomes empty in the filter combiner. That could be the IN handling in `FilterCombiner::AddFilter`, or a filter-pushdown step that treats a NULL constant as unsatisfiable. `NOT(IN(NULL))` is an operator expression of type NOT wrapping `COMPARE_IN`, and it probably skips that path. The fix is likely in `FilterCombiner::AddFilter` or in the NOT handling in the filter pushdown code.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Filter combiner or filter pushdown code that handles IN operator expressions with NULL constants and treats the filter as unsatisfiable. Extend it to NOT wrapping an IN operator (NOT IN with a NULL in the list).",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still does a sequential scan with a filter.",
+    "anchors": [
+     "FilterCombiner",
+     "AddFilter",
+     "COMPARE_IN",
+     "FilterResult::UNSATISFIABLE",
+     "BoundOperatorExpression",
+     "AddConstantComparison",
+     "FilterPushdown"
+    ],
+    "look_in": [
+     "src/optimizer/filter_combiner.cpp",
+     "src/optimizer/pushdown/"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/pushdown/pushdown_get.cpp",
+     40,
+     141
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_filter.cpp",
+     9,
+     24
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     150,
+     226
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     102,
+     112
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     314,
+     326
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     1339,
+     1462
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_unnest.cpp",
+     9,
+     50
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     264,
+     269
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     418,
+     453
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_left_join.cpp",
+     107,
+     222
+    ]
+   ],
+   "analysis": "These results are filter pushdown and filter combiner internals. None of them handles NOT wrapped around an IN with a NULL constant. FilterPushdown::AddFilter probably checks whether a filter is a constant false or NULL, and it may treat `i IN (NULL)` differently from `NOT(IN(NULL))`. The fix is likely either in that check, which would need to evaluate NOT(IN(x, NULL)) as NULL, or in a rewrite rule that turns an IN list containing NULL into a NULL constant.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Code in filter pushdown or an expression rewrite rule that checks whether a filter expression is constant NULL or false and replaces the operator with an empty result. It should also cover NOT over IN with a NULL constant.",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still does a sequential scan with a filter.",
+    "anchors": [
+     "FilterPushdown",
+     "AddFilter",
+     "COMPARE_IN",
+     "BoundOperatorExpression",
+     "FilterResult::UNSATISFIABLE",
+     "in_clause_simplification_rule.cpp"
+    ],
+    "look_in": [
+     "src/optimizer/pushdown/pushdown_filter.cpp",
+     "src/optimizer/filter_pushdown.cpp",
+     "src/optimizer/rule/"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/filter_pushdown.cpp",
+     220,
+     231
+    ],
+    [
+     "src/optimizer/filter_pushdown.cpp",
+     233,
+     248
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_filter.cpp",
+     1,
+     3
+    ],
+    [
+     "src/optimizer/filter_pushdown.cpp",
+     294,
+     337
+    ],
+    [
+     "src/optimizer/filter_pushdown.cpp",
+     16,
+     16
+    ],
+    [
+     "src/optimizer/rule/in_clause_simplification_rule.cpp",
+     19,
+     65
+    ],
+    [
+     "src/optimizer/rule/in_clause_simplification_rule.cpp",
+     12,
+     17
+    ],
+    [
+     "src/optimizer/filter_pushdown.cpp",
+     263,
+     283
+    ],
+    [
+     "src/optimizer/filter_pushdown.cpp",
+     285,
+     292
+    ],
+    [
+     "src/optimizer/filter_pushdown.cpp",
+     1,
+     12
+    ]
+   ],
+   "analysis": "The results are the FilterPushdown driver code and the in-clause simplification rule. The driver only forwards the FilterCombiner::AddFilter result, so the decision to treat a filter as unsatisfiable is made in the combiner or in a rewrite rule. I haven't seen the code that turns IN with a NULL into empty. NOT(IN(..., NULL)) is probably not covered by it.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Code in the filter combiner's AddFilter, or an expression rewrite rule, that checks whether a BoundOperatorExpression COMPARE_IN or NOT filter has a NULL constant in its list and reports it as unsatisfiable. It needs the same handling for the NOT-wrapped form.",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still does a sequential scan with a filter.",
+    "anchors": [
+     "FilterCombiner",
+     "AddFilter",
+     "COMPARE_IN",
+     "FilterResult::UNSATISFIABLE",
+     "BoundOperatorExpression",
+     "InClauseSimplificationRule",
+     "PushFilters"
+    ],
+    "look_in": [
+     "src/optimizer/filter_combiner.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/filter_combiner.cpp",
+     1310,
+     1327
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     57,
+     70
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     1,
+     28
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     806,
+     882
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     114,
+     148
+    ],
+    [
+     "src/planner/filter/expression_filter.cpp",
+     469,
+     496
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     32,
+     35
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     228,
+     232
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     271,
+     274
+    ],
+    [
+     "src/optimizer/outer_join_simplification.cpp",
+     137,
+     145
+    ]
+   ],
+   "analysis": "The results are other FilterCombiner internals (transitive filters, equivalence sets, temporal cast pushdown), not the code that handles NULL in IN. The IN (NULL) case may be folded in the expression rewriter (e.g. the in-clause simplification or constant-folding rules) or in the statistics-based filter propagation. NOT(IN(..NULL)) is probably not simplified because the NOT operator over a NULL-producing child isn't folded. Look at the operator-expression statistics propagation, and at the filter pushdown that checks for a constant NULL filter.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Statistics propagation for BoundOperatorExpression and bound comparison IN expressions, where the result is determined to be always NULL or false, and the filter pushdown or filter statistics code that replaces the filter with an empty result. Include NOT over IN.",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still does a sequential scan with a filter.",
+    "anchors": [
+     "BoundOperatorExpression",
+     "COMPARE_IN",
+     "FilterPropagateResult",
+     "CheckNullOperatorStatistics"
+    ],
+    "look_in": [
+     "src/optimizer/statistics/",
+     "src/optimizer/pushdown/"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/statistics/operator/propagate_get.cpp",
+     73,
+     122
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_filter.cpp",
+     229,
+     249
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_get.cpp",
+     33,
+     66
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_filter.cpp",
+     208,
+     227
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_filter.cpp",
+     160,
+     206
+    ],
+    [
+     "src/optimizer/statistics/expression/propagate_comparison.cpp",
+     95,
+     131
+    ],
+    [
+     "src/optimizer/statistics/expression/propagate_between.cpp",
+     9,
+     64
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_filter.cpp",
+     14,
+     16
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_get.cpp",
+     155,
+     228
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_filter.cpp",
+     49,
+     85
+    ]
+   ],
+   "analysis": "Statistics propagation results don't handle IN or NOT over IN. In DuckDB, IN is a BoundOperatorExpression with COMPARE_IN, and NOT is an OPERATOR_NOT over it. The expression rewriter's constant folding or a rule such as the in-clause simplification probably folds IN with NULL; the NOT variant likely needs a rule or handling in the null-propagation of operators (PropagateOperator in statistics/expression). Search the statistics operator propagation next.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "Statistics propagation for BoundOperatorExpression (IN, NOT) that detects NULL constant children and replaces the expression with a NULL constant.",
+    "symptom": "WHERE i NOT IN (NULL) is not simplified to an empty result and still does a sequential scan.",
+    "anchors": [
+     "BoundOperatorExpression",
+     "COMPARE_IN",
+     "PropagateExpression",
+     "StatisticsPropagator",
+     "ExpressionIsConstant",
+     "HandleFilter"
+    ],
+    "look_in": [
+     "src/optimizer/statistics/expression/propagate_operator.cpp",
+     "src/optimizer/rule/"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/statistics/expression/propagate_operator.cpp",
+     7,
+     87
+    ],
+    [
+     "src/optimizer/statistics/expression/propagate_operator.cpp",
+     1,
+     3
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_filter.cpp",
+     33,
+     39
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_filter.cpp",
+     18,
+     31
+    ],
+    [
+     "src/optimizer/rule/not_comparison_simplification.cpp",
+     15,
+     35
+    ],
+    [
+     "src/optimizer/rule/arithmetic_simplification.cpp",
+     26,
+     73
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_get.cpp",
+     133,
+     153
+    ],
+    [
+     "src/optimizer/statistics/operator/propagate_get.cpp",
+     124,
+     131
+    ],
+    [
+     "src/optimizer/rule/move_constants.cpp",
+     40,
+     172
+    ],
+    [
+     "src/planner/filter/expression_filter.cpp",
+     498,
+     532
+    ]
+   ],
+   "analysis": "The statistics propagation for BoundOperatorExpression is the most likely place where IN and NOT over IN get folded when a child is a NULL constant. The earlier filter combiner and rewrite rule results didn't handle this. PropagateExpression for operators is the best candidate to add NULL handling for NOT(IN(..., NULL)). I haven't confirmed this, because I haven't seen the body of the function.",
+   "picked": [
+    "src/optimizer/statistics/expression/propagate_operator.cpp:duckdb.StatisticsPropagator.PropagateExpression"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/optimizer/statistics/expression/propagate_operator.cpp lines 7-87 (duckdb.StatisticsPropagator.PropagateExpression)"
+   ],
+   "fix_attempt": "could not fix: The shown statistics propagation for operators only handles COALESCE, IS NULL and IS NOT NULL. It has no IN or NOT logic, so it is not where `i IN (NULL)` gets folded. `i IN (NULL)` is probably folded earlier by an expression rewriter rule, so a NOT over IN with a NULL needle or list needs a matching rule there. I need to see the optimizer rewrite rules (in-clause simplification, constant folding, comparison simplification) and how the binder or rewriter turns a single-element IN into a comparison."
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "Find the expression rewriter rule that simplifies an IN operator (COMPARE_IN) with NULL constants, and the rules that fold NOT over a constant NULL or over an IN, so NOT IN (NULL) folds to a NULL constant.",
+    "symptom": "`SELECT ... WHERE i NOT IN (NULL)` still does a full sequential scan instead of becoming an empty result like `i IN (NULL)`.",
+    "anchors": [
+     "COMPARE_IN",
+     "InClauseSimplificationRule",
+     "ComparisonSimplificationRule",
+     "BoundOperatorExpression",
+     "Value::BOOLEAN(false)"
+    ],
+    "look_in": [
+     "src/optimizer/rule/",
+     "src/optimizer/expression_rewriter.cpp",
+     "src/optimizer/filter_combiner.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/optimizer/rule/not_comparison_simplification.cpp",
+     1,
+     5
+    ],
+    [
+     "src/optimizer/rule/not_comparison_simplification.cpp",
+     9,
+     13
+    ],
+    [
+     "src/optimizer/rule/in_clause_simplification_rule.cpp",
+     67,
+     84
+    ],
+    [
+     "src/optimizer/rule/comparison_simplification.cpp",
+     86,
+     92
+    ],
+    [
+     "src/optimizer/rule/equal_or_null_simplification.cpp",
+     1,
+     6
+    ],
+    [
+     "src/optimizer/expression_rewriter.cpp",
+     89,
+     100
+    ],
+    [
+     "src/optimizer/expression_rewriter.cpp",
+     82,
+     87
+    ],
+    [
+     "src/optimizer/rule/in_clause_simplification_rule.cpp",
+     2,
+     8
+    ],
+    [
+     "src/optimizer/rule/comparison_simplification.cpp",
+     1,
+     9
+    ],
+    [
+     "src/optimizer/rule/equal_or_null_simplification.cpp",
+     87,
+     110
+    ]
+   ],
+   "analysis": "The NOT-over-operator rule, NotComparisonSimplificationRule, matches OPERATOR_NOT. It currently handles NOT over comparisons. It is the likely place to add folding of NOT(IN(x, NULL)) to a NULL constant. The in-clause rules handle IN but not the NOT-wrapped form. I have not confirmed this by reading the rule body.",
+   "picked": [
+    "src/optimizer/rule/not_comparison_simplification.cpp:duckdb.NotComparisonSimplificationRule.NotComparisonSimplificationRule",
+    "src/optimizer/rule/not_comparison_simplification.cpp:<block>"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/optimizer/rule/not_comparison_simplification.cpp lines 9-13 (duckdb.NotComparisonSimplificationRule.NotComparisonSimplificationRule)",
+    "src/optimizer/rule/not_comparison_simplification.cpp lines 1-5 (<block>)",
+    "src/optimizer/statistics/expression/propagate_operator.cpp lines 7-87 (duckdb.StatisticsPropagator.PropagateExpression)"
+   ],
+   "fix_attempt": "could not fix: The shown code is only the constructor of NotComparisonSimplificationRule, which matches OPERATOR_NOT, and the statistics propagation for operators. The Apply body isn't shown. The statistics code handles only COALESCE, IS NULL and IS NOT NULL. I haven't seen where `i IN (NULL)` is folded to an empty result, so I can't tell where the NOT-wrapped form should be folded. The fix probably belongs in that IN-with-NULL handling, or in the rewrite of IN into a comparison. It would need to treat `NOT (x IN (NULL...))` the same way, as a NULL result that becomes an empty result when used as a filter."
+  },
+  {
+   "round": 11,
+   "query": {
+    "intent": "Find where `x IN (NULL)` is folded to NULL or an empty result. Likely candidates are the IN-list binding, the in-clause or constant-folding rewrite rules, and the filter pushdown or FilterCombiner handling of IN with a NULL constant. Then add the same handling for the negated form (COMPARE_NOT_IN or NOT over IN).",
+    "symptom": "`WHERE i NOT IN (NULL)` is not folded to an empty result and still runs a sequential scan, while `i IN (NULL)` is eliminated.",
+    "anchors": [
+     "NOT IN",
+     "COMPARE_IN",
+     "OPERATOR_NOT",
+     "NotComparisonSimplificationRule",
+     "InClauseSimplificationRule",
+     "FilterCombiner::AddFilter",
+     "UNSATISFIABLE",
+     "BoundOperatorExpression"
+    ],
+    "look_in": [
+     "src/optimizer/rule/",
+     "src/optimizer/filter_combiner.cpp",
+     "src/optimizer/pushdown/"
+    ]
+   }
+  }
+ ]
+}

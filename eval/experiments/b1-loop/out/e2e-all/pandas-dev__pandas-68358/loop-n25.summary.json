@@ -1,0 +1,174 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "pandas-dev__pandas-68358",
+ "fixed": {
+  "round": 1,
+  "explanation": "When other is empty, difference returns self unchanged, and union with an empty right side returns it without sorting. With a negative step, the result stays descending. The edit reverses a descending RangeIndex result, so the default sort=None gives ascending order. That matches the non-range path.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0639,
+ "seconds": 33,
+ "diff_stat": "pandas/core/indexes/range.py | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "RangeIndex.symmetric_difference (and its helper _symmetric_difference) has a shortcut when one side is empty that returns self without applying the sort, so a RangeIndex with negative step is not sorted ascending. It should return the result sorted (e.g. reversed to a positive step) when sort is not False.",
+    "symptom": "RangeIndex(-2, -5, -2).symmetric_difference(RangeIndex(0)) returns the unsorted RangeIndex(start=-2, stop=-5, step=-2) instead of the sorted RangeIndex(start=-4, stop=-1, step=2).",
+    "anchors": [
+     "RangeIndex.symmetric_difference",
+     "symmetric_difference",
+     "RangeIndex",
+     "pd.RangeIndex(-2, -5, -2).symmetric_difference(pd.RangeIndex(0))"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/indexes/range.py",
+     1142,
+     1154
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3651,
+     3751
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     1055,
+     1140
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3634,
+     3643
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     89,
+     1704
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3562,
+     3632
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     419,
+     443
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     905,
+     922
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     264,
+     296
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     846,
+     863
+    ],
+    [
+     "pandas/tests/indexes/base_class/test_setops.py",
+     171,
+     179
+    ],
+    [
+     "pandas/tests/indexes/numeric/test_setops.py",
+     137,
+     150
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     301,
+     335
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     1254,
+     1337
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     886,
+     903
+    ],
+    [
+     "pandas/tests/indexes/multi/test_setops.py",
+     90,
+     109
+    ],
+    [
+     "pandas/tests/indexes/interval/test_setops.py",
+     148,
+     171
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     875,
+     884
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     392,
+     417
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     357,
+     372
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     865,
+     873
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     476,
+     498
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     980,
+     1053
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     13,
+     443
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     140,
+     290
+    ]
+   ],
+   "analysis": "RangeIndex.symmetric_difference with a RangeIndex other and sort=None computes self.difference(other) and other.difference(self), then takes their union. With an empty other, RangeIndex._difference probably takes an early-return path that returns self without sorting a negative-step range. The union of that with an empty result then keeps the descending order. The fix is most likely in _difference or in symmetric_difference, so the result is ascending when sort is not False.",
+   "picked": [
+    "pandas/core/indexes/range.py:RangeIndex._difference",
+    "pandas/core/indexes/range.py:RangeIndex.symmetric_difference"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/indexes/range.py lines 1055-1140 (RangeIndex._difference)",
+    "pandas/core/indexes/range.py lines 1142-1154 (RangeIndex.symmetric_difference)"
+   ],
+   "fix_attempt": "applied: When other is empty, difference returns self unchanged, and union with an empty right side returns it without sorting. With a negative step, the result stays descending. The edit reverses a descending RangeIndex result, so the default sort=None gives ascending order. That matches the non-range path."
+  }
+ ]
+}

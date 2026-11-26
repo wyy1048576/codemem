@@ -1,0 +1,30 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 94c092a..29e7191 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -677,8 +677,23 @@ class BaseGrouper:
+             # This shows unused categories in indices GH#38642
+             result = self.groupings[0].indices
+         else:
+-            codes_list = [ping.codes for ping in self.groupings]
+-            result = get_indexer_dict(codes_list, self.levels)
++            # Build from result_index/ids so labels and row positions agree
++            # (sort=False with Categorical and observed=False)
++            result_index, ids = self.result_index_and_ids
++            ids = np.asarray(ids)
++            ngroups = len(result_index)
++            positions = np.flatnonzero(ids >= 0).astype(np.intp)
++            valid_ids = ids[positions]
++            sorter = np.argsort(valid_ids, kind="stable")
++            sorted_pos = positions[sorter]
++            counts = np.bincount(valid_ids, minlength=ngroups)
++            splits = np.cumsum(counts)[:-1]
++            pieces = np.split(sorted_pos, splits)
++            result = {
++                key: piece
++                for key, piece in zip(result_index, pieces)
++                if len(piece) > 0
++            }
+         if not self.dropna:
+             has_mi = isinstance(self.result_index, MultiIndex)
+             if not has_mi and self.result_index.hasnans:

@@ -1,0 +1,34 @@
+diff --git a/pandas/core/arrays/arrow/accessors.py b/pandas/core/arrays/arrow/accessors.py
+index 8f166a3..59e9635 100644
+--- a/pandas/core/arrays/arrow/accessors.py
++++ b/pandas/core/arrays/arrow/accessors.py
+@@ -162,11 +162,24 @@ class ListAccessor(ArrowAccessor):
+         from pandas import Series
+ 
+         if isinstance(key, int):
+-            # TODO: Support negative key but pyarrow does not allow
+-            # element index to be an array.
+-            # if key < 0:
+-            #     key = pc.add(key, pc.list_value_length(self._pa_array))
+-            element = pc.list_element(self._pa_array, key)
++            pa_type = self._pa_array.type
++            if key < 0 and hasattr(pa_type, "list_size"):
++                # fixed size list: length is constant
++                element = pc.list_element(self._pa_array, key + pa_type.list_size)
++            elif key < 0:
++                chunks = []
++                for chunk in self._pa_array.chunks:
++                    lengths = pc.list_value_length(chunk)
++                    rel = pc.add(lengths, key)
++                    if pc.any(pc.less(rel, 0)).as_py():
++                        raise IndexError(
++                            f"Index {key} is out of bounds for some lists"
++                        )
++                    indices = pc.add(chunk.offsets[:-1], rel)
++                    chunks.append(pc.take(chunk.values, indices))
++                element = pa.chunked_array(chunks, type=pa_type.value_type)
++            else:
++                element = pc.list_element(self._pa_array, key)
+             return Series(
+                 element,
+                 dtype=ArrowDtype(element.type),

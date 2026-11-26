@@ -1,0 +1,22 @@
+diff --git a/src/include/duckdb/common/operator/decimal_cast_operators.hpp b/src/include/duckdb/common/operator/decimal_cast_operators.hpp
+index 3df1b43..38a96a8 100644
+--- a/src/include/duckdb/common/operator/decimal_cast_operators.hpp
++++ b/src/include/duckdb/common/operator/decimal_cast_operators.hpp
+@@ -565,11 +565,16 @@ struct DecimalCastOperation {
+ 		}
+ 		if (exponent < 0) {
+ 			bool round_up = false;
+-			for (idx_t i = 0; i < idx_t(-int64_t(exponent)); i++) {
++			idx_t shift_count = idx_t(-int64_t(exponent));
++			for (idx_t i = 0; i < shift_count; i++) {
+ 				auto mod = state.result % 10;
+ 				round_up = NEGATIVE ? mod <= -5 : mod >= 5;
+ 				state.result /= 10;
+ 				if (state.result == 0) {
++					if (i + 1 < shift_count) {
++						// this digit is not the first dropped digit, so it cannot cause rounding
++						round_up = false;
++					}
+ 					break;
+ 				}
+ 			}

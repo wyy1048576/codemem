@@ -1,0 +1,40 @@
+# Whole issue and four Sonnet arms on one shared DuckDB index. Search settings match cm3-full.
+
+[[system]]
+name = "whole"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "oneshot"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "oneshot"
+guess = false
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "oneshot-guess"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "oneshot"
+guess = true
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "revise"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "revise"
+guess = false
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "revise-guess"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "revise"
+guess = true
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+

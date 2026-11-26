@@ -1,0 +1,319 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "pandas-dev__pandas-66270",
+ "fixed": {
+  "round": 2,
+  "explanation": "__getitem__ converted tuple keys into lists after a deprecation warning, so a tuple selected multiple columns like a list. Removing that branch makes a tuple a single key. It is checked against the object's columns, so a missing key raises KeyError and a real MultiIndex key still works.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0765,
+ "seconds": 36,
+ "diff_stat": "pandas/core/base.py | 9 ---------\n 1 file changed, 9 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Resampler __getitem__ (via _gotitem / SelectionMixin.__getitem__) treats a tuple key as a list of column labels when selecting columns on a resample object. It should deprecate this tuple-as-list behavior and treat a tuple as a single (MultiIndex) key, raising KeyError if absent.",
+    "symptom": "Indexing a Resampler with a tuple like resample(\"h\")[\"A\", \"B\"] is silently treated like the list [\"A\", \"B\"] instead of being a single MultiIndex key that raises KeyError.",
+    "anchors": [
+     "resample",
+     "__getitem__",
+     "test_frame.resample(\"h\")[\"A\", \"B\"]",
+     "MultiIndex",
+     "KeyError"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/tests/resample/test_resample_api.py",
+     141,
+     160
+    ],
+    [
+     "pandas/core/generic.py",
+     9208,
+     9588
+    ],
+    [
+     "pandas/core/indexing.py",
+     1256,
+     1314
+    ],
+    [
+     "pandas/core/indexers/utils.py",
+     350,
+     371
+    ],
+    [
+     "pandas/core/indexing.py",
+     1868,
+     1880
+    ],
+    [
+     "pandas/core/indexing.py",
+     2369,
+     2374
+    ],
+    [
+     "pandas/core/frame.py",
+     4374,
+     4428
+    ],
+    [
+     "pandas/core/indexing.py",
+     1347,
+     1348
+    ],
+    [
+     "pandas/core/resample.py",
+     207,
+     217
+    ],
+    [
+     "pandas/core/base.py",
+     260,
+     273
+    ],
+    [
+     "pandas/core/resample.py",
+     2374,
+     2379
+    ],
+    [
+     "pandas/core/resample.py",
+     2074,
+     2111
+    ],
+    [
+     "pandas/tests/resample/test_datetime_index.py",
+     624,
+     633
+    ],
+    [
+     "pandas/core/series.py",
+     1111,
+     1129
+    ],
+    [
+     "pandas/core/indexing.py",
+     1812,
+     1833
+    ],
+    [
+     "pandas/tests/resample/test_resample_api.py",
+     733,
+     755
+    ],
+    [
+     "pandas/core/indexing.py",
+     1189,
+     1254
+    ],
+    [
+     "pandas/core/indexing.py",
+     1161,
+     1187
+    ],
+    [
+     "pandas/tests/resample/test_resampler_grouper.py",
+     501,
+     518
+    ],
+    [
+     "pandas/core/resample.py",
+     507,
+     533
+    ],
+    [
+     "pandas/tests/resample/test_datetime_index.py",
+     33,
+     43
+    ],
+    [
+     "pandas/tests/resample/test_resample_api.py",
+     678,
+     730
+    ],
+    [
+     "pandas/core/resample.py",
+     593,
+     609
+    ],
+    [
+     "pandas/core/resample.py",
+     2385,
+     2400
+    ],
+    [
+     "pandas/core/resample.py",
+     2204,
+     2219
+    ]
+   ],
+   "analysis": "Results show Resampler._gotitem and SelectionMixin._infer_selection, but not SelectionMixin.__getitem__ in pandas/core/base.py. That method likely has an `isinstance(key, (list, tuple, ABCSeries, ABCIndex, np.ndarray))` branch that treats tuples like lists. That is where the deprecation warning should be added.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "SelectionMixin.__getitem__ that checks if key is list/tuple/Series/Index/ndarray, validates columns are in obj, and calls self._gotitem(list(key), ndim=2).",
+    "symptom": "Indexing a Resampler with a tuple like [\"A\",\"B\"] is treated like a list of columns instead of a single key.",
+    "anchors": [
+     "SelectionMixin",
+     "__getitem__",
+     "_gotitem",
+     "_infer_selection"
+    ],
+    "look_in": [
+     "pandas/core/base.py"
+    ]
+   },
+   "shown": [
+    [
+     "pandas/core/base.py",
+     220,
+     243
+    ],
+    [
+     "pandas/core/base.py",
+     245,
+     258
+    ],
+    [
+     "pandas/core/base.py",
+     173,
+     278
+    ],
+    [
+     "pandas/core/base.py",
+     185,
+     192
+    ],
+    [
+     "pandas/core/base.py",
+     201,
+     204
+    ],
+    [
+     "pandas/core/base.py",
+     194,
+     199
+    ],
+    [
+     "pandas/core/base.py",
+     206,
+     218
+    ],
+    [
+     "pandas/core/base.py",
+     275,
+     276
+    ],
+    [
+     "pandas/core/indexing.py",
+     1900,
+     1966
+    ],
+    [
+     "pandas/core/base.py",
+     297,
+     300
+    ],
+    [
+     "pandas/core/groupby/generic.py",
+     3004,
+     3050
+    ],
+    [
+     "pandas/core/base.py",
+     292,
+     295
+    ],
+    [
+     "pandas/core/base.py",
+     374,
+     376
+    ],
+    [
+     "pandas/core/base.py",
+     302,
+     312
+    ],
+    [
+     "pandas/core/base.py",
+     281,
+     1726
+    ],
+    [
+     "pandas/core/indexing.py",
+     2376,
+     2397
+    ],
+    [
+     "pandas/core/indexing.py",
+     1837,
+     1866
+    ],
+    [
+     "pandas/core/base.py",
+     1721,
+     1726
+    ],
+    [
+     "pandas/core/base.py",
+     1052,
+     1078
+    ],
+    [
+     "pandas/core/frame.py",
+     14988,
+     15010
+    ],
+    [
+     "pandas/core/base.py",
+     1689,
+     1692
+    ],
+    [
+     "pandas/core/base.py",
+     1209,
+     1216
+    ],
+    [
+     "pandas/core/base.py",
+     139,
+     170
+    ],
+    [
+     "pandas/core/arrays/datetimelike.py",
+     366,
+     370
+    ],
+    [
+     "pandas/core/base.py",
+     1694,
+     1699
+    ]
+   ],
+   "analysis": "SelectionMixin.__getitem__ in pandas/core/base.py is the shared path for Resampler and GroupBy column selection. It has a branch for tuple keys that already warns about the tuple deprecation, and it then treats the key as a list. This is the code that decides whether a tuple key is a list or a single key, so it is where the change belongs.",
+   "picked": [
+    "pandas/core/base.py:SelectionMixin.__getitem__"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/base.py lines 220-243 (SelectionMixin.__getitem__)"
+   ],
+   "fix_attempt": "applied: __getitem__ converted tuple keys into lists after a deprecation warning, so a tuple selected multiple columns like a list. Removing that branch makes a tuple a single key. It is checked against the object's columns, so a missing key raises KeyError and a real MultiIndex key still works."
+  }
+ ]
+}

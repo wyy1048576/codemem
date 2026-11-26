@@ -1,0 +1,22 @@
+diff --git a/pandas/core/arrays/interval.py b/pandas/core/arrays/interval.py
+index b20ec06..7f7e1ca 100644
+--- a/pandas/core/arrays/interval.py
++++ b/pandas/core/arrays/interval.py
+@@ -618,8 +618,15 @@ class IntervalArray(IntervalMixin, ExtensionArray):
+                 "location both left and right sides"
+             )
+             raise ValueError(msg)
+-        if not (left[left_mask] <= right[left_mask]).all():
+-            msg = "left side of interval must be <= right side"
++        lte = np.asarray(left[left_mask] <= right[left_mask], dtype=bool)
++        if not lte.all():
++            offending = np.flatnonzero(left_mask)[~lte]
++            shown = offending[:5].tolist()
++            suffix = ", ..." if len(offending) > 5 else ""
++            msg = (
++                "left side of interval must be <= right side. "
++                f"Offending locations: [{', '.join(map(str, shown))}{suffix}]"
++            )
+             raise ValueError(msg)
+ 
+     def _shallow_copy(self, left, right) -> Self:

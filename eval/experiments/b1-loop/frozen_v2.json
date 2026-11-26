@@ -1,0 +1,6 @@
+{
+ "prompt_sha": "91a33faed09ffa19979ed7209d52dd5f5408f32f5b76c12a23daca0c0899d276",
+ "model": "claude-sonnet-5-5",
+ "effort": "medium",
+ "status": "dev: written after reading the DuckDB and pandas fixes, so these two repos are not a clean test"
+}

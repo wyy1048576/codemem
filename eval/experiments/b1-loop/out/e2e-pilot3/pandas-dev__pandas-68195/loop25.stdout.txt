@@ -1,0 +1,31 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "The three guards in _AsOfMerge._validate_tolerance reject only values below zero, so tolerance=0 is valid. The error message said \"must be positive\", which wrongly excludes 0. I changed all three messages to \"tolerance must be non-negative\" and updated the existing test that matches the message.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0565,
+ "seconds": 29,
+ "diff_stat": "pandas/core/reshape/merge.py                  | 6 +++---\n pandas/tests/reshape/merge/test_merge_asof.py | 2 +-\n 2 files changed, 4 insertions(+), 4 deletions(-)"
+}
+round 1: found=True picked=['pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance', 'pandas/tests/reshape/merge/test_merge_asof.py:TestAsOfMerge.test_tolerance_negative_one_nanosecond']
+  fix: applied: The three guards in _AsOfMerge._validate_tolerance reject only values below zero, so tolerance=0 is valid. The error message said "must be positive", which wrongly excludes 0. I changed all three messages to "tolerance must be non-negative" and updated the existing test that matches the message.
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  15%|█▌        | 44/290 [00:00<00:00, 400.93it/s]
+Loading weights:  29%|██▉       | 85/290 [00:00<00:00, 304.81it/s]
+Loading weights:  40%|████      | 117/290 [00:00<00:00, 253.82it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 635.38it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,1188 @@
+{
+ "per_arm": {
+  "whole": {
+   "gold_functions": 80,
+   "fn_in_top50": 44,
+   "fn_not_in_top50": 36,
+   "fn_call_hoppable": 9,
+   "fn_added": 8,
+   "near_import_files": 16,
+   "near_file_call_neighbour": 8,
+   "near_file_added": 7,
+   "near_file_gold_fns": 10,
+   "near_file_gold_fn_added": 0,
+   "median_picks_with_repeats": 212.0,
+   "median_unique_added": 142.0,
+   "max_unique_added": 186
+  },
+  "oneshot": {
+   "gold_functions": 80,
+   "fn_in_top50": 53,
+   "fn_not_in_top50": 27,
+   "fn_call_hoppable": 7,
+   "fn_added": 7,
+   "near_import_files": 14,
+   "near_file_call_neighbour": 8,
+   "near_file_added": 6,
+   "near_file_gold_fns": 10,
+   "near_file_gold_fn_added": 1,
+   "median_picks_with_repeats": 211.0,
+   "median_unique_added": 123.5,
+   "max_unique_added": 186
+  },
+  "revise": {
+   "gold_functions": 80,
+   "fn_in_top50": 55,
+   "fn_not_in_top50": 25,
+   "fn_call_hoppable": 4,
+   "fn_added": 4,
+   "near_import_files": 15,
+   "near_file_call_neighbour": 7,
+   "near_file_added": 5,
+   "near_file_gold_fns": 12,
+   "near_file_gold_fn_added": 1,
+   "median_picks_with_repeats": 206.0,
+   "median_unique_added": 123.5,
+   "max_unique_added": 176
+  },
+  "diagnose": {
+   "gold_functions": 80,
+   "fn_in_top50": 55,
+   "fn_not_in_top50": 25,
+   "fn_call_hoppable": 7,
+   "fn_added": 7,
+   "near_import_files": 11,
+   "near_file_call_neighbour": 4,
+   "near_file_added": 4,
+   "near_file_gold_fns": 9,
+   "near_file_gold_fn_added": 1,
+   "median_picks_with_repeats": 204.0,
+   "median_unique_added": 123.0,
+   "max_unique_added": 187
+  },
+  "loop": {
+   "gold_functions": 80,
+   "fn_in_top50": 58,
+   "fn_not_in_top50": 22,
+   "fn_call_hoppable": 2,
+   "fn_added": 2,
+   "near_import_files": 12,
+   "near_file_call_neighbour": 7,
+   "near_file_added": 2,
+   "near_file_gold_fns": 7,
+   "near_file_gold_fn_added": 0,
+   "median_picks_with_repeats": 211.0,
+   "median_unique_added": 122.5,
+   "max_unique_added": 194
+  },
+  "loop-full": {
+   "gold_functions": 80,
+   "fn_in_top50": 59,
+   "fn_not_in_top50": 21,
+   "fn_call_hoppable": 1,
+   "fn_added": 1,
+   "near_import_files": 12,
+   "near_file_call_neighbour": 5,
+   "near_file_added": 3,
+   "near_file_gold_fns": 9,
+   "near_file_gold_fn_added": 0,
+   "median_picks_with_repeats": 204.5,
+   "median_unique_added": 125.0,
+   "max_unique_added": 185
+  }
+ },
+ "rows": [
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckOperatorStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckConjunctionStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-23876",
+   "gold": "src/function/scalar/string/contains.cpp:duckdb.GetStringContains",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-23952",
+   "gold": "src/execution/join_hashtable.cpp:duckdb.ScanStructure.ApplyResidualPredicate",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24163",
+   "gold": "src/planner/binder/statement/bind_create.cpp:duckdb.Binder.BindCreateTriggerInfo",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24101",
+   "gold": "extension/parquet/parquet_statistics.cpp:duckdb.HasFilterConstants",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24382",
+   "gold": "src/parser/parsed_data/create_type_info.cpp:duckdb.CreateTypeInfo.ToString",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24505",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.TryGetFilterStats",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24752",
+   "gold": "src/include/duckdb/common/multi_file/multi_file_function.hpp:duckdb.MultiFileFunction.MultiFileScanStatsExtended",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-24875",
+   "gold": "src/function/window/window_rownumber_function.cpp:duckdb.WindowRowNumberExecutor.GetData",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.Initialize",
+   "call_hoppable": true,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.MaxThreads",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_storage_info.cpp:duckdb.PragmaStorageInfoBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_table_sample.cpp:duckdb.DuckDBTableSampleBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.EntryShouldBeAdded",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddEntryToHeap",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.Sink",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-66270",
+   "gold": "pandas/core/base.py:SelectionMixin.__getitem__",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68575",
+   "gold": "pandas/core/computation/expr.py:BaseExprVisitor.visit_Subscript",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser.__init__",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser._next_line",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser._get_lines",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-67004",
+   "gold": "pandas/core/arrays/arrow/accessors.py:ListAccessor.__getitem__",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69478",
+   "gold": "pandas/core/arraylike.py:array_ufunc",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/expr.py:BaseExprVisitor._rewrite_membership_op",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/ops.py:BinOp.convert_values",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/formats/format.py:FloatArrayFormatter._fixed_width_format",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70631",
+   "gold": "pandas/core/arrays/interval.py:IntervalArray.__new__",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-69960",
+   "gold": "pandas/plotting/_matplotlib/timeseries.py:use_dynamic_x",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-70742",
+   "gold": "pandas/core/indexing.py:_LocationIndexer._getitem_lowerdim",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "whole",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks._worker",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckOperatorStatistics",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckConjunctionStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-23939",
+   "gold": "src/common/operator/cast_operators.cpp:duckdb.Cast.Operation",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24505",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.TryGetFilterStats",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-24752",
+   "gold": "src/include/duckdb/common/multi_file/multi_file_function.hpp:duckdb.MultiFileFunction.MultiFileScanStatsExtended",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.Initialize",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.MaxThreads",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_storage_info.cpp:duckdb.PragmaStorageInfoBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_table_sample.cpp:duckdb.DuckDBTableSampleBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.EntryShouldBeAdded",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddEntryToHeap",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.Sink",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-66270",
+   "gold": "pandas/core/base.py:SelectionMixin.__getitem__",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser.__init__",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser._next_line",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser._get_lines",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/expr.py:BaseExprVisitor._rewrite_membership_op",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/ops.py:BinOp.convert_values",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/formats/format.py:FloatArrayFormatter._fixed_width_format",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-69960",
+   "gold": "pandas/plotting/_matplotlib/timeseries.py:use_dynamic_x",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-70742",
+   "gold": "pandas/core/indexing.py:_LocationIndexer._getitem_lowerdim",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "oneshot",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks._worker",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckOperatorStatistics",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckConjunctionStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-23939",
+   "gold": "src/common/operator/cast_operators.cpp:duckdb.Cast.Operation",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-24382",
+   "gold": "src/parser/parsed_data/create_type_info.cpp:duckdb.CreateTypeInfo.ToString",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-24505",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.TryGetFilterStats",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-24752",
+   "gold": "src/include/duckdb/common/multi_file/multi_file_function.hpp:duckdb.MultiFileFunction.MultiFileScanStatsExtended",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.Initialize",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.MaxThreads",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_storage_info.cpp:duckdb.PragmaStorageInfoBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_table_sample.cpp:duckdb.DuckDBTableSampleBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.EntryShouldBeAdded",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddEntryToHeap",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.Sink",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69447",
+   "gold": "pandas/core/indexes/period.py:PeriodIndex.values",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/expr.py:BaseExprVisitor._rewrite_membership_op",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/ops.py:BinOp.convert_values",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/formats/format.py:FloatArrayFormatter._fixed_width_format",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-69960",
+   "gold": "pandas/plotting/_matplotlib/timeseries.py:use_dynamic_x",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-70742",
+   "gold": "pandas/core/indexing.py:_LocationIndexer._getitem_lowerdim",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "revise",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks._worker",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckOperatorStatistics",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckConjunctionStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23952",
+   "gold": "src/execution/join_hashtable.cpp:duckdb.ScanStructure.ApplyResidualPredicate",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-23939",
+   "gold": "src/common/operator/cast_operators.cpp:duckdb.Cast.Operation",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24505",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.TryGetFilterStats",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-24752",
+   "gold": "src/include/duckdb/common/multi_file/multi_file_function.hpp:duckdb.MultiFileFunction.MultiFileScanStatsExtended",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.Initialize",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.MaxThreads",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_storage_info.cpp:duckdb.PragmaStorageInfoBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_table_sample.cpp:duckdb.DuckDBTableSampleBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.EntryShouldBeAdded",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddEntryToHeap",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.Sink",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser.__init__",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/expr.py:BaseExprVisitor._rewrite_membership_op",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/ops.py:BinOp.convert_values",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/formats/format.py:FloatArrayFormatter._fixed_width_format",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-69960",
+   "gold": "pandas/plotting/_matplotlib/timeseries.py:use_dynamic_x",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-70742",
+   "gold": "pandas/core/indexing.py:_LocationIndexer._getitem_lowerdim",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "diagnose",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks._worker",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckOperatorStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckConjunctionStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-23939",
+   "gold": "src/common/operator/cast_operators.cpp:duckdb.Cast.Operation",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-24752",
+   "gold": "src/include/duckdb/common/multi_file/multi_file_function.hpp:duckdb.MultiFileFunction.MultiFileScanStatsExtended",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.Initialize",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.MaxThreads",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_storage_info.cpp:duckdb.PragmaStorageInfoBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_table_sample.cpp:duckdb.DuckDBTableSampleBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.EntryShouldBeAdded",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddEntryToHeap",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.Sink",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-68947",
+   "gold": "pandas/io/parsers/python_parser.py:PythonParser.__init__",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/expr.py:BaseExprVisitor._rewrite_membership_op",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/ops.py:BinOp.convert_values",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/formats/format.py:FloatArrayFormatter._fixed_width_format",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-70742",
+   "gold": "pandas/core/indexing.py:_LocationIndexer._getitem_lowerdim",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks._worker",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-23825",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.CheckConjunctionStatistics",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-23939",
+   "gold": "src/common/operator/cast_operators.cpp:duckdb.Cast.Operation",
+   "call_hoppable": true,
+   "added": true
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/parquet_reader.cpp:duckdb.ParquetReader.PrepareRowGroupBuffer",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-24505",
+   "gold": "extension/parquet/reader/expression_column_reader.cpp:duckdb.ExpressionColumnReader.ExpressionColumnReader",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-24505",
+   "gold": "src/planner/filter/expression_filter.cpp:duckdb.TryGetFilterStats",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-24752",
+   "gold": "src/include/duckdb/common/multi_file/multi_file_function.hpp:duckdb.MultiFileFunction.MultiFileScanStatsExtended",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.Initialize",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-25042",
+   "gold": "src/execution/operator/join/physical_iejoin.cpp:duckdb.IEJoinGlobalSourceState.MaxThreads",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_storage_info.cpp:duckdb.PragmaStorageInfoBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-25153",
+   "gold": "src/function/table/system/pragma_table_sample.cpp:duckdb.DuckDBTableSampleBind",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.EntryShouldBeAdded",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddEntryToHeap",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "duckdb__duckdb-25101",
+   "gold": "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.Sink",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "pandas-dev__pandas-70107",
+   "gold": "pandas/core/computation/ops.py:BinOp.convert_values",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/formats/format.py:FloatArrayFormatter._fixed_width_format",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "pandas-dev__pandas-70221",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "pandas-dev__pandas-70742",
+   "gold": "pandas/core/indexing.py:_LocationIndexer._getitem_lowerdim",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks",
+   "call_hoppable": false,
+   "added": false
+  },
+  {
+   "arm": "loop-full",
+   "task": "pandas-dev__pandas-71442",
+   "gold": "pandas/io/parsers/readers.py:_read_csv_chunks._worker",
+   "call_hoppable": false,
+   "added": false
+  }
+ ]
+}

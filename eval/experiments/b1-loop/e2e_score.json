@@ -1,0 +1,177 @@
+{
+ "per_arm": {
+  "hop-feed": {
+   "tasks": 21,
+   "cost_x1000": 7286,
+   "made_a_change": 0,
+   "gold_functions": 36,
+   "seen": 32,
+   "edited": 0,
+   "seen_or_edited": 32
+  },
+  "loop+fix": {
+   "tasks": 21,
+   "cost_x1000": 5586,
+   "made_a_change": 14,
+   "gold_functions": 36,
+   "seen": 33,
+   "edited": 10,
+   "seen_or_edited": 33
+  },
+  "grep": {
+   "tasks": 21,
+   "cost_x1000": 1580,
+   "made_a_change": 21,
+   "gold_functions": 36,
+   "seen": 21,
+   "edited": 17,
+   "seen_or_edited": 24
+  }
+ },
+ "per_task": [
+  {
+   "task": "duckdb__duckdb-23604",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "duckdb__duckdb-23773",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "duckdb__duckdb-23825",
+   "hop-feed": 1,
+   "loop+fix": 2,
+   "grep": 0,
+   "gold": 2
+  },
+  {
+   "task": "duckdb__duckdb-23876",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "duckdb__duckdb-23939",
+   "hop-feed": 3,
+   "loop+fix": 2,
+   "grep": 3,
+   "gold": 3
+  },
+  {
+   "task": "duckdb__duckdb-23952",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "duckdb__duckdb-24163",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-66145",
+   "hop-feed": 6,
+   "loop+fix": 6,
+   "grep": 1,
+   "gold": 6
+  },
+  {
+   "task": "pandas-dev__pandas-66234",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-66270",
+   "hop-feed": 0,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-66530",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-67004",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-67944",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-68081",
+   "gold": 0
+  },
+  {
+   "task": "pandas-dev__pandas-68083",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-68358",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-68575",
+   "hop-feed": 2,
+   "loop+fix": 2,
+   "grep": 2,
+   "gold": 2
+  },
+  {
+   "task": "pandas-dev__pandas-68947",
+   "hop-feed": 4,
+   "loop+fix": 4,
+   "grep": 4,
+   "gold": 4
+  },
+  {
+   "task": "pandas-dev__pandas-69447",
+   "hop-feed": 4,
+   "loop+fix": 4,
+   "grep": 1,
+   "gold": 4
+  },
+  {
+   "task": "pandas-dev__pandas-69478",
+   "hop-feed": 1,
+   "loop+fix": 1,
+   "grep": 1,
+   "gold": 1
+  },
+  {
+   "task": "pandas-dev__pandas-70107",
+   "hop-feed": 0,
+   "loop+fix": 0,
+   "grep": 0,
+   "gold": 2
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+# Full-code judge: the loop as before, but Sonnet sees each result's whole source (cut at 4,000 characters) instead of 500-character previews.
+
+[[system]]
+name = "whole"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "oneshot"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "oneshot"
+guess = false
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "revise"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "revise"
+guess = false
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "diagnose"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "diagnose"
+guess = false
+suspects = true
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "loop"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "loop"
+guess = false
+max_rounds = 5
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "loop-full"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "loop"
+guess = false
+max_rounds = 5
+full_code = true
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }

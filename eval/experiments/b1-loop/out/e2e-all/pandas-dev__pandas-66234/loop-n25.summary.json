@@ -1,0 +1,178 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "pandas-dev__pandas-66234",
+ "fixed": {
+  "round": 1,
+  "explanation": "_compute_grand_margin looked up aggfunc[k] for every column in data[values], so a dict aggfunc missing a column raised an uncaught KeyError. The edit skips columns that aren't keys of a dict aggfunc. This matches the non-margins path, which silently drops them. I haven't checked the later margin-assembly code in pivot.py, which wasn't shown.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.048,
+ "seconds": 20,
+ "diff_stat": "pandas/core/reshape/pivot.py | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The grand margin computation in pivot_table iterates over every column in data[values] and indexes aggfunc[k] for each, raising KeyError when aggfunc is a dict lacking that column. It should skip columns not present in the aggfunc dict, matching the non-margins path.",
+    "symptom": "pivot_table with margins=True and a dict aggfunc that doesn't cover all value columns raises KeyError, whereas margins=False silently drops the uncovered columns.",
+    "anchors": [
+     "pivot_table",
+     "margins=True",
+     "aggfunc",
+     "_compute_grand_margin",
+     "KeyError",
+     "values",
+     "data[values]",
+     "aggfunc[k]",
+     "TypeError",
+     "margins"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/reshape/pivot.py",
+     536,
+     564
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     58,
+     290
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     981,
+     1207
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     429,
+     533
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     293,
+     426
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     666,
+     729
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     567,
+     663
+    ],
+    [
+     "pandas/core/frame.py",
+     13772,
+     13997
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     1021,
+     1089
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     682,
+     685
+    ],
+    [
+     "pandas/core/reshape/pivot.py",
+     585,
+     586
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     2596,
+     2649
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     2435,
+     2436
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     941,
+     968
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     206,
+     226
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     2282,
+     2312
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     21,
+     2937
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     1966,
+     1994
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     1313,
+     1326
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     970,
+     993
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     1349,
+     1364
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     2516,
+     2531
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     1366,
+     1402
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     1328,
+     1347
+    ],
+    [
+     "pandas/tests/reshape/test_pivot.py",
+     3167,
+     3180
+    ]
+   ],
+   "analysis": "`_compute_grand_margin` in pandas/core/reshape/pivot.py iterates over `data[values]` and indexes `aggfunc[k]`. It only catches TypeError, so a dict `aggfunc` that lacks a key for `k` raises KeyError. This is the function the issue names as the root cause, and the fix is to skip columns that aren't in the dict.",
+   "picked": [
+    "pandas/core/reshape/pivot.py:_compute_grand_margin"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/reshape/pivot.py lines 536-564 (_compute_grand_margin)"
+   ],
+   "fix_attempt": "applied: _compute_grand_margin looked up aggfunc[k] for every column in data[values], so a dict aggfunc missing a column raised an uncaught KeyError. The edit skips columns that aren't keys of a dict aggfunc. This matches the non-margins path, which silently drops them. I haven't checked the later margin-assembly code in pivot.py, which wasn't shown."
+  }
+ ]
+}

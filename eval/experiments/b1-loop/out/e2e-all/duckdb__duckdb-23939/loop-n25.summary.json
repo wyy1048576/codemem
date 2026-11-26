@@ -1,0 +1,170 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "duckdb__duckdb-23939",
+ "fixed": {
+  "round": 1,
+  "explanation": "In non-strict mode the function only rejected trailing digits, so other trailing text such as ' garbage' was accepted. The edit requires any remaining text to be whitespace only, or a 'T' or space separator followed by a digit (the start of a time part, which timestamp parsing needs). Anything else returns an incorrect-format error. I haven't compiled or run this.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0887,
+ "seconds": 78,
+ "diff_stat": "src/common/types/date.cpp | 13 +++++++++++++\n 1 file changed, 13 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The date string parser (Date::TryConvertDate) and the cast of VARCHAR to DATE accept trailing characters after a valid date when separated by a space. It should only allow trailing content that is a valid time/timestamp portion (or whitespace), and otherwise fail the conversion.",
+    "symptom": "CAST('2020-01-01 garbage' AS DATE) returns 2020-01-01 instead of throwing a conversion error.",
+    "anchors": [
+     "CAST('2020-01-01 garbage' AS DATE)",
+     "2020-01-01 garbage"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/common/types/date.cpp",
+     206,
+     329
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1471,
+     1473
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1572,
+     1579
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1581,
+     1587
+    ],
+    [
+     "src/common/types/date.cpp",
+     190,
+     204
+    ],
+    [
+     "src/common/types/date.cpp",
+     331,
+     335
+    ],
+    [
+     "src/common/types/date.cpp",
+     349,
+     362
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1607,
+     1613
+    ],
+    [
+     "src/common/enums/date_part_specifier.cpp",
+     7,
+     75
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1514,
+     1521
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1598,
+     1605
+    ],
+    [
+     "src/common/types/date.cpp",
+     345,
+     347
+    ],
+    [
+     "src/function/scalar/date/strftime.cpp",
+     131,
+     134
+    ],
+    [
+     "src/common/types/timestamp.cpp",
+     218,
+     220
+    ],
+    [
+     "src/function/scalar/date/strftime.cpp",
+     136,
+     139
+    ],
+    [
+     "src/include/duckdb/common/types/date.hpp",
+     87,
+     87
+    ],
+    [
+     "src/function/cast/time_casts.cpp",
+     10,
+     22
+    ],
+    [
+     "src/common/types/date.cpp",
+     337,
+     339
+    ],
+    [
+     "src/common/types/date.cpp",
+     341,
+     343
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1843,
+     1849
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1826,
+     1841
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     238,
+     254
+    ],
+    [
+     "src/common/operator/string_cast.cpp",
+     161,
+     224
+    ],
+    [
+     "src/common/types/time.cpp",
+     232,
+     236
+    ],
+    [
+     "test/api/test_results.cpp",
+     196,
+     224
+    ]
+   ],
+   "analysis": "Date::TryConvertDate parses the date and then handles trailing characters. In non-strict mode it appears to accept anything after a space separator. That is why '2020-01-01 garbage' casts to DATE without an error. The fix belongs in the trailing-content handling at the end of this function. TryCast::Operation and TryCastErrorMessage::Operation only call it.",
+   "picked": [
+    "src/common/types/date.cpp:duckdb.Date.TryConvertDate"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/common/types/date.cpp lines 206-329 (duckdb.Date.TryConvertDate)"
+   ],
+   "fix_attempt": "applied: In non-strict mode the function only rejected trailing digits, so other trailing text such as ' garbage' was accepted. The edit requires any remaining text to be whitespace only, or a 'T' or space separator followed by a digit (the start of a time part, which timestamp parsing needs). Anything else returns an incorrect-format error. I haven't compiled or run this."
+  }
+ ]
+}

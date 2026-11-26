@@ -1,0 +1,177 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "duckdb__duckdb-23773",
+ "fixed": {
+  "round": 1,
+  "explanation": "In HandleExponent's negative-exponent loop, the result is divided by 10 once per exponent step and the loop breaks as soon as the result reaches 0. The break left round_up set from the last nonzero digit, usually the leading mantissa digit, even though the digit that decides rounding was a later, zero digit. The edit clears round_up when the loop stops early, so those values truncate to 0. Rounding is unchanged when the final removed digit is the one that decides it.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1017,
+ "seconds": 50,
+ "diff_stat": "src/include/duckdb/common/operator/decimal_cast_operators.hpp | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The VARCHAR to DECIMAL text cast parser handles scientific notation by processing the exponent and mantissa digits; when the negative exponent shifts all digits beyond the decimal scale, the rounding logic wrongly rounds up (using the leading mantissa digit >= 5) instead of yielding zero. Fix the exponent/rounding handling in the decimal cast's TryDecimalStringCast.",
+    "symptom": "Casting a scientific-notation string with a large negative exponent and leading mantissa digit >= 5 to DECIMAL returns 0.0001 instead of 0.0000.",
+    "anchors": [
+     "CAST('5.8207660913467407e-11' AS DECIMAL(18,4))",
+     "CAST('5.5e-11' AS DECIMAL(18,4))",
+     "DECIMAL(18,4)",
+     "VARCHAR",
+     "DECIMAL"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     501,
+     524
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     618,
+     634
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     668,
+     692
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     694,
+     713
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1938,
+     1957
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/decNumber.cpp",
+     5265,
+     5535
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     662,
+     666
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2558,
+     2569
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     751,
+     952
+    ],
+    [
+     "extension/core_functions/scalar/math/numeric.cpp",
+     845,
+     864
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     954,
+     958
+    ],
+    [
+     "src/common/types/bignum.cpp",
+     103,
+     127
+    ],
+    [
+     "src/common/types/cast_helpers.cpp",
+     277,
+     311
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     298,
+     300
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     591,
+     616
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     465,
+     465
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     536,
+     543
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     545,
+     589
+    ],
+    [
+     "src/include/duckdb/common/operator/integer_cast_operator.hpp",
+     166,
+     176
+    ],
+    [
+     "src/function/cast/decimal_cast.cpp",
+     117,
+     130
+    ],
+    [
+     "src/include/duckdb/common/operator/integer_cast_operator.hpp",
+     99,
+     164
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1961,
+     1983
+    ],
+    [
+     "src/include/duckdb/common/operator/integer_cast_operator.hpp",
+     68,
+     72
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     636,
+     659
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2064,
+     2077
+    ]
+   ],
+   "analysis": "The VARCHAR to DECIMAL cast lives in decimal_cast_operators.hpp. DecimalCastOperation::HandleExponent sets excessive_decimals and the rounding state for negative exponents. When the exponent shifts every digit past the scale, the rounding decision is taken from the wrong digit, the leading mantissa digit, so it rounds up. TruncateExcessiveDecimals and Finalize use that state, so they may need a matching change. I only saw truncated snippets of these functions, so this is inferred from the code structure.",
+   "picked": [
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.HandleExponent",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.TruncateExcessiveDecimals",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.Finalize"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 545-589 (duckdb.DecimalCastOperation.HandleExponent)",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 618-634 (duckdb.DecimalCastOperation.TruncateExcessiveDecimals)",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 636-659 (duckdb.DecimalCastOperation.Finalize)"
+   ],
+   "fix_attempt": "applied: In HandleExponent's negative-exponent loop, the result is divided by 10 once per exponent step and the loop breaks as soon as the result reaches 0. The break left round_up set from the last nonzero digit, usually the leading mantissa digit, even though the digit that decides rounding was a later, zero digit. The edit clears round_up when the loop stops early, so those values truncate to 0. Rounding is unchanged when the final removed digit is the one that decides it."
+  }
+ ]
+}

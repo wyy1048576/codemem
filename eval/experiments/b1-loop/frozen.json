@@ -1,0 +1,6 @@
+{
+ "prompt_sha": "a3f1fb713b3d82fd8ec659a3d122707b123a34e6b46a49f8a5c68555fc20144d",
+ "model": "claude-sonnet-5-5",
+ "effort": "medium",
+ "frozen_before": "any DuckDB extraction"
+}

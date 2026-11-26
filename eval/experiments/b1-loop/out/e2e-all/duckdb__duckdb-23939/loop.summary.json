@@ -1,0 +1,294 @@
+{
+ "arm": "codemem-loop",
+ "task": "duckdb__duckdb-23939",
+ "fixed": {
+  "round": 1,
+  "explanation": "In non-strict mode, TryConvertDate only rejected trailing digits, so arbitrary text after the date was accepted. The edit requires any remaining text to be only spaces, or a space or 'T' followed by a digit (the start of a time portion). Other trailing text now returns ERROR_INCORRECT_FORMAT, so '2020-01-01 garbage' fails to cast. I haven't run this, and a date directly followed by a timezone suffix such as '2020-01-01Z' is now rejected too.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1333,
+ "seconds": 44,
+ "diff_stat": "src/common/types/date.cpp | 19 +++++++++++++++++++\n 1 file changed, 19 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The date string parser (Date::TryConvertDate) and the cast of VARCHAR to DATE accept trailing characters after a valid date when separated by a space. It should only allow trailing content that is a valid time/timestamp portion (or whitespace), and otherwise fail the conversion.",
+    "symptom": "CAST('2020-01-01 garbage' AS DATE) returns 2020-01-01 instead of throwing a conversion error.",
+    "anchors": [
+     "CAST('2020-01-01 garbage' AS DATE)",
+     "2020-01-01 garbage"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/common/types/date.cpp",
+     206,
+     329
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1471,
+     1473
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1572,
+     1579
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1581,
+     1587
+    ],
+    [
+     "src/common/types/date.cpp",
+     190,
+     204
+    ],
+    [
+     "src/common/types/date.cpp",
+     331,
+     335
+    ],
+    [
+     "src/common/types/date.cpp",
+     349,
+     362
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1607,
+     1613
+    ],
+    [
+     "src/common/enums/date_part_specifier.cpp",
+     7,
+     75
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1514,
+     1521
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1598,
+     1605
+    ],
+    [
+     "src/common/types/date.cpp",
+     345,
+     347
+    ],
+    [
+     "src/function/scalar/date/strftime.cpp",
+     131,
+     134
+    ],
+    [
+     "src/common/types/timestamp.cpp",
+     218,
+     220
+    ],
+    [
+     "src/function/scalar/date/strftime.cpp",
+     136,
+     139
+    ],
+    [
+     "src/include/duckdb/common/types/date.hpp",
+     87,
+     87
+    ],
+    [
+     "src/function/cast/time_casts.cpp",
+     10,
+     22
+    ],
+    [
+     "src/common/types/date.cpp",
+     337,
+     339
+    ],
+    [
+     "src/common/types/date.cpp",
+     341,
+     343
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1843,
+     1849
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1826,
+     1841
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     238,
+     254
+    ],
+    [
+     "src/common/operator/string_cast.cpp",
+     161,
+     224
+    ],
+    [
+     "src/common/types/time.cpp",
+     232,
+     236
+    ],
+    [
+     "test/api/test_results.cpp",
+     196,
+     224
+    ],
+    [
+     "src/common/types/time.cpp",
+     238,
+     240
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1464,
+     1469
+    ],
+    [
+     "src/common/types/timestamp.cpp",
+     202,
+     206
+    ],
+    [
+     "src/common/enums/date_part_specifier.cpp",
+     77,
+     83
+    ],
+    [
+     "src/include/duckdb/common/types/cast_helpers.hpp",
+     196,
+     216
+    ],
+    [
+     "src/function/scalar/date/strftime.cpp",
+     167,
+     188
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/vtzone.cpp",
+     222,
+     281
+    ],
+    [
+     "tools/shell/tests/test_rendering_mode_regression.py",
+     1327,
+     1525
+    ],
+    [
+     "extension/icu/icu-strptime.cpp",
+     46,
+     50
+    ],
+    [
+     "extension/json/include/json_transform.hpp",
+     54,
+     60
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1491,
+     1497
+    ],
+    [
+     "tools/shell/tests/test_rendering_mode_regression.py",
+     1301,
+     1325
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1566,
+     1570
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     1479,
+     1483
+    ],
+    [
+     "src/function/scalar/strftime_format.cpp",
+     483,
+     668
+    ],
+    [
+     "src/function/cast_rules.cpp",
+     233,
+     245
+    ],
+    [
+     "src/function/cast/time_casts.cpp",
+     37,
+     57
+    ],
+    [
+     "src/include/duckdb/common/types/timestamp.hpp",
+     83,
+     86
+    ],
+    [
+     "src/optimizer/rule/date_trunc_simplification.cpp",
+     421,
+     440
+    ],
+    [
+     "src/function/cast/time_casts.cpp",
+     24,
+     33
+    ],
+    [
+     "third_party/mbedtls/library/aes.cpp",
+     1,
+     181
+    ],
+    [
+     "tools/shell/tests/test_errors.py",
+     36,
+     66
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1945,
+     1962
+    ],
+    [
+     "src/common/types/date.cpp",
+     498,
+     522
+    ],
+    [
+     "third_party/mbedtls/library/rsa.cpp",
+     2845,
+     2887
+    ]
+   ],
+   "analysis": "Date::TryConvertDate in src/common/types/date.cpp parses the date and then handles whatever follows it. The trailing-content check at the end of that function (after a space, in non-strict mode) is the likely cause of the bug. It seems to accept any text after the space instead of checking that it is a valid time portion. The cast operators TryCast and TryCastErrorMessage call this function, so a fix there covers the VARCHAR to DATE cast.",
+   "picked": [
+    "src/common/types/date.cpp:duckdb.Date.TryConvertDate"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/common/types/date.cpp lines 206-329 (duckdb.Date.TryConvertDate)"
+   ],
+   "fix_attempt": "applied: In non-strict mode, TryConvertDate only rejected trailing digits, so arbitrary text after the date was accepted. The edit requires any remaining text to be only spaces, or a space or 'T' followed by a digit (the start of a time portion). Other trailing text now returns ERROR_INCORRECT_FORMAT, so '2020-01-01 garbage' fails to cast. I haven't run this, and a date directly followed by a timezone suffix such as '2020-01-01Z' is now rejected too."
+  }
+ ]
+}

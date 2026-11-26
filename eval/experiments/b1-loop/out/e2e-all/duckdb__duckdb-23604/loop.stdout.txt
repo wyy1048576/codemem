@@ -1,0 +1,52 @@
+{
+ "arm": "codemem-loop",
+ "task": "duckdb__duckdb-23604",
+ "fixed": {
+  "round": 1,
+  "explanation": "TryPushdownPrefixFilter only matches a function named \"prefix\". The function that starts_with and ^@ bind to is registered under the name \"starts_with\", so the name check fails and no range filter is created. The edit also accepts \"starts_with\" and \"^@\", so these filters become range filters, as LIKE already does. I couldn't see the function registration, so the exact name is inferred.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1179,
+ "seconds": 33,
+ "diff_stat": "src/optimizer/filter_combiner.cpp | 3 ++-\n 1 file changed, 2 insertions(+), 1 deletion(-)"
+}
+round 1: found=True picked=['src/optimizer/filter_combiner.cpp:duckdb.FilterCombiner.TryPushdownPrefixFilter', 'src/optimizer/filter_combiner.cpp:duckdb.FilterCombiner.TryPushdownLikeFilter']
+  fix: applied: TryPushdownPrefixFilter only matches a function named "prefix". The function that starts_with and ^@ bind to is registered under the name "starts_with", so the name check fails and no range filter is created. The edit also accepts "starts_with" and "^@", so these filters become range filters, as LIKE already does. I couldn't see the function registration, so the exact name is inferred.
+
+std/common/compiler.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/cpu.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/error_private.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/fse.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/huf.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/mem.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/portability_macros.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/xxhash.hpp; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/zstd_internal.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/common/zstd_trace.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/compress/clevels.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/compress/zstd_compress_internal.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/compress/zstd_cwksp.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/compress/zstd_ldm_geartab.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/compress/zstdmt_compress.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/decompress/zstd_decompress_internal.h; chunking what tree-sitter recovered
+parse errors in third_party/zstd/include/zstd/deprecated/zbuff.h; chunking what tree-sitter recovered
+parse errors in tools/shell/shell.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/shell_metadata_command.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/shell_profiler_renderer.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/shell_renderer.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/linenoise/include/linenoise.h; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  13%|█▎        | 38/290 [00:00<00:00, 275.41it/s]
+Loading weights:  23%|██▎       | 66/290 [00:00<00:01, 208.03it/s]
+Loading weights:  30%|███       | 88/290 [00:00<00:01, 200.84it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 576.93it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

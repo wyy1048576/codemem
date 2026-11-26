@@ -1,0 +1,304 @@
+{
+ "arm": "codemem-loop",
+ "task": "pandas-dev__pandas-66530",
+ "fixed": {
+  "round": 1,
+  "explanation": "`_ensure_simple_new_inputs` only checked `left.dtype` for categorical, object and string dtypes. An object-dtype right side, such as the one from `2**64`, passed that check, and the dtype was then built from the left side alone. The edit applies the same check to `right.dtype`. The same `TypeError` is now raised whichever endpoint has the unsupported dtype, so the declared subtype can no longer disagree with the data. I haven't run this or the test suite.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0771,
+ "seconds": 18,
+ "diff_stat": "pandas/core/arrays/interval.py | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "IntervalArray._ensure_simple_new_inputs validates and derives the interval dtype only from left.dtype; it should also check right.dtype for object/category/string rejection and derive the subtype from both endpoints, so the signed/unsigned mismatch guard handles object right side.",
+    "symptom": "IntervalArray([Interval(0, 2**64)]) yields dtype interval[int64] while right.dtype is object, whereas an oversized left endpoint raises TypeError.",
+    "anchors": [
+     "IntervalArray",
+     "_ensure_simple_new_inputs",
+     "left.dtype",
+     "right.dtype",
+     "left_dtype.kind",
+     "right_dtype.kind",
+     "IntervalIndex",
+     "dtype.subtype",
+     "arr.astype(arr.dtype)",
+     "category, object, and string subtypes are not supported for IntervalArray",
+     "length",
+     "mid"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/arrays/interval.py",
+     274,
+     379
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     122,
+     1894
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     444,
+     519
+    ],
+    [
+     "pandas/core/dtypes/dtypes.py",
+     1240,
+     1520
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     346,
+     416
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     209,
+     258
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     521,
+     589
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1897,
+     1932
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     294,
+     344
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     260,
+     272
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     418,
+     467
+    ],
+    [
+     "pandas/tests/extension/test_interval.py",
+     121,
+     126
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     1347,
+     1535
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     1333,
+     1344
+    ],
+    [
+     "pandas/core/indexes/interval.py",
+     148,
+     1316
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     621,
+     635
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     395,
+     442
+    ],
+    [
+     "pandas/_testing/asserters.py",
+     638,
+     664
+    ],
+    [
+     "pandas/tests/indexes/interval/test_astype.py",
+     218,
+     237
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1870,
+     1890
+    ],
+    [
+     "pandas/tests/arrays/interval/test_interval.py",
+     274,
+     283
+    ],
+    [
+     "pandas/tests/arithmetic/test_interval.py",
+     30,
+     53
+    ],
+    [
+     "pandas/tests/arrays/interval/test_interval.py",
+     18,
+     35
+    ],
+    [
+     "pandas/core/dtypes/common.py",
+     538,
+     594
+    ],
+    [
+     "pandas/core/dtypes/cast.py",
+     1157,
+     1225
+    ],
+    [
+     "pandas/_libs/interval.pyi",
+     54,
+     148
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1406,
+     1440
+    ],
+    [
+     "pandas/tests/dtypes/test_dtypes.py",
+     592,
+     597
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     908,
+     967
+    ],
+    [
+     "pandas/tests/indexes/interval/test_constructors.py",
+     70,
+     90
+    ],
+    [
+     "pandas/tests/arithmetic/test_interval.py",
+     56,
+     62
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     591,
+     619
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1313,
+     1343
+    ],
+    [
+     "pandas/_libs/interval.pyi",
+     150,
+     152
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1246,
+     1279
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1147,
+     1167
+    ],
+    [
+     "pandas/tests/indexes/interval/test_constructors.py",
+     521,
+     532
+    ],
+    [
+     "pandas/tests/indexes/interval/test_astype.py",
+     153,
+     166
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1485,
+     1551
+    ],
+    [
+     "pandas/_libs/interval.pyi",
+     154,
+     175
+    ],
+    [
+     "pandas/tests/indexes/interval/test_interval_range.py",
+     227,
+     239
+    ],
+    [
+     "pandas/tests/indexes/interval/test_astype.py",
+     178,
+     187
+    ],
+    [
+     "pandas/tests/dtypes/test_dtypes.py",
+     591,
+     885
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1442,
+     1483
+    ],
+    [
+     "pandas/tests/indexes/interval/test_astype.py",
+     168,
+     176
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1210,
+     1244
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1281,
+     1311
+    ],
+    [
+     "pandas/tests/dtypes/test_dtypes.py",
+     748,
+     773
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     979,
+     1002
+    ],
+    [
+     "pandas/_testing/asserters.py",
+     1629,
+     1642
+    ]
+   ],
+   "analysis": "Result 1, IntervalArray._ensure_simple_new_inputs, is the function the issue names. It checks only left.dtype for the object/category/string rejection. It also derives the dtype from the left side alone, and its signed/unsigned guard needs both kinds to be in \"iu\". Changing those checks fixes the issue.",
+   "picked": [
+    "pandas/core/arrays/interval.py:IntervalArray._ensure_simple_new_inputs"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/arrays/interval.py lines 274-379 (IntervalArray._ensure_simple_new_inputs)"
+   ],
+   "fix_attempt": "applied: `_ensure_simple_new_inputs` only checked `left.dtype` for categorical, object and string dtypes. An object-dtype right side, such as the one from `2**64`, passed that check, and the dtype was then built from the left side alone. The edit applies the same check to `right.dtype`. The same `TypeError` is now raised whichever endpoint has the unsupported dtype, so the declared subtype can no longer disagree with the data. I haven't run this or the test suite."
+  }
+ ]
+}

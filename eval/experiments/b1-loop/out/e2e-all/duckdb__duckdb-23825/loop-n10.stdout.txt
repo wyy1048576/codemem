@@ -1,0 +1,55 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "duckdb__duckdb-23825",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 2
+ },
+ "sonnet_calls": 12,
+ "cost_usd": 0.4014,
+ "seconds": 125,
+ "diff_stat": ""
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=False picked=[]
+  fix: -
+round 3: found=False picked=[]
+  fix: -
+round 4: found=False picked=[]
+  fix: -
+round 5: found=False picked=[]
+  fix: -
+round 6: found=False picked=[]
+  fix: -
+round 7: found=False picked=[]
+  fix: -
+round 8: found=False picked=[]
+  fix: -
+round 9: found=True picked=['src/optimizer/statistics/expression/propagate_operator.cpp:duckdb.StatisticsPropagator.PropagateExpression']
+  fix: could not fix: The shown statistics propagation for operators only handles COALESCE, IS NULL and IS NOT NULL. It has no IN or NOT logic, so it is not where `i IN (NULL)` gets folded. `i IN (NULL)` is probably folded earlier by an expression rewriter rule, so a NOT over IN with a NULL needle or list needs a matching rule there. I need to see the optimizer rewrite rules (in-clause simplification, co
+round 10: found=True picked=['src/optimizer/rule/not_comparison_simplification.cpp:duckdb.NotComparisonSimplificationRule.NotComparisonSimplificationRule', 'src/optimizer/rule/not_comparison_simplification.cpp:<block>']
+  fix: could not fix: The shown code is only the constructor of NotComparisonSimplificationRule, which matches OPERATOR_NOT, and the statistics propagation for operators. The Apply body isn't shown. The statistics code handles only COALESCE, IS NULL and IS NOT NULL. I haven't seen where `i IN (NULL)` is folded to an empty result, so I can't tell where the NOT-wrapped form should be folded. The fix probab
+round 11: found=None picked=None
+  fix: -
+
+parse errors in src/include/duckdb/common/operator/decimal_cast_operators.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/execution/join_hashtable.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/main/database.hpp; chunking what tree-sitter recovered
+parse errors in src/storage/table/row_group_collection.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_scalar_function_decimal_return.cpp; chunking what tree-sitter recovered
+parse errors in test/arrow/arrow_dict_nested_offset.cpp; chunking what tree-sitter recovered
+parse errors in test/common/test_logical_type_is_complete.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  16%|█▌        | 45/290 [00:00<00:00, 416.56it/s]
+Loading weights:  30%|███       | 87/290 [00:00<00:00, 298.85it/s]
+Loading weights:  41%|████      | 119/290 [00:00<00:00, 287.68it/s]
+Loading weights:  52%|█████▏    | 151/290 [00:00<00:00, 296.46it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 557.33it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

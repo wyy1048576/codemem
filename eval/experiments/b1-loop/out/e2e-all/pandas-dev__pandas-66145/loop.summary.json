@@ -1,0 +1,304 @@
+{
+ "arm": "codemem-loop",
+ "task": "pandas-dev__pandas-66145",
+ "fixed": {
+  "round": 1,
+  "explanation": "`read_json` accepted `convert_dates` and `keep_default_dates` with real defaults, so it couldn't tell whether the caller passed them. The edit changes both defaults to `lib.no_default` and emits a `FutureWarning` when either is passed explicitly. It then resolves them to the old defaults (`True`) before the pyarrow validation and `JsonReader` construction, so behavior is otherwise unchanged. The docstring now marks both parameters as deprecated.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1023,
+ "seconds": 24,
+ "diff_stat": "pandas/io/json/_json.py | 29 +++++++++++++++++++++++++++--\n 1 file changed, 27 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The read_json implementation in pandas.io.json parses with ujson then converts dtypes and dates via separate options (dtype, convert_dates, keep_default_dates). Deprecate convert_dates and keep_default_dates (emit FutureWarning) and make dtype the sole conversion control in the Parser's _try_convert_data/_try_convert_dates/_process_converter logic.",
+    "symptom": "Overlapping options convert_dates, keep_default_dates and dtype in read_json conflict when a column matches both date conversion rules and a dtype specification; the date options should be deprecated.",
+    "anchors": [
+     "read_json",
+     "keep_default_dates",
+     "convert_dates",
+     "dtypes",
+     "dtype",
+     "infer_dtype",
+     "astype",
+     "ujson"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/io/json/_json.py",
+     616,
+     960
+    ],
+    [
+     "pandas/io/json/_json.py",
+     568,
+     589
+    ],
+    [
+     "pandas/io/json/_json.py",
+     592,
+     613
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1713,
+     1737
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1486,
+     1576
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1695,
+     1710
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1392,
+     1636
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1653,
+     1655
+    ],
+    [
+     "pandas/io/json/_json.py",
+     449,
+     517
+    ],
+    [
+     "pandas/io/json/_json.py",
+     544,
+     565
+    ],
+    [
+     "pandas/io/json/_table_schema.py",
+     162,
+     235
+    ],
+    [
+     "pandas/io/json/_json.py",
+     520,
+     541
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1405,
+     1439
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1483,
+     1484
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1247,
+     1275
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     887,
+     921
+    ],
+    [
+     "pandas/tests/io/json/test_readlines.py",
+     622,
+     625
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     982,
+     988
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1222,
+     1245
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1277,
+     1300
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     958,
+     980
+    ],
+    [
+     "pandas/io/json/_json.py",
+     963,
+     1389
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1578,
+     1636
+    ],
+    [
+     "pandas/io/json/_table_schema.py",
+     126,
+     159
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     1799,
+     1838
+    ],
+    [
+     "pandas/tests/io/json/test_readlines.py",
+     613,
+     619
+    ],
+    [
+     "pandas/core/generic.py",
+     6857,
+     7009
+    ],
+    [
+     "pandas/core/generic.py",
+     2371,
+     2706
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1658,
+     1710
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1063,
+     1139
+    ],
+    [
+     "pandas/tests/io/json/test_readlines.py",
+     738,
+     755
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     1389,
+     1390
+    ],
+    [
+     "pandas/tests/io/json/test_json_table_schema.py",
+     207,
+     217
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     1224,
+     1240
+    ],
+    [
+     "pandas/tests/io/json/test_readlines.py",
+     706,
+     723
+    ],
+    [
+     "pandas/tests/io/json/test_ujson.py",
+     31,
+     44
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     840,
+     843
+    ],
+    [
+     "pandas/_libs/src/vendored/ujson/python/ujson.c",
+     216,
+     234
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1460,
+     1461
+    ],
+    [
+     "pandas/_libs/src/vendored/ujson/python/ujson.c",
+     369,
+     390
+    ],
+    [
+     "pandas/io/json/_json.py",
+     1639,
+     1655
+    ],
+    [
+     "pandas/tests/io/json/test_json_table_schema.py",
+     547,
+     579
+    ],
+    [
+     "pandas/io/json/_table_schema.py",
+     56,
+     99
+    ],
+    [
+     "pandas/tests/extension/json/test_json.py",
+     22,
+     24
+    ],
+    [
+     "pandas/io/stata.py",
+     1040,
+     1085
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     2441,
+     2463
+    ],
+    [
+     "pandas/io/_util.py",
+     135,
+     211
+    ],
+    [
+     "pandas/tests/io/json/test_json_table_schema.py",
+     162,
+     173
+    ],
+    [
+     "pandas/tests/io/json/test_json_table_schema_ext_dtype.py",
+     69,
+     70
+    ],
+    [
+     "pandas/tests/io/json/test_pandas.py",
+     2381,
+     2439
+    ]
+   ],
+   "analysis": "The read_json function in pandas/io/json/_json.py takes convert_dates and keep_default_dates. These are passed to JsonReader and Parser, where _try_convert_data and _should_convert_dates use them. The deprecation needs a FutureWarning in read_json and the docs updated. The Parser logic should also be changed so that dtype is the only conversion control.",
+   "picked": [
+    "pandas/io/json/_json.py:read_json",
+    "pandas/io/json/_json.py:Parser._try_convert_data",
+    "pandas/io/json/_json.py:_should_convert_dates"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/io/json/_json.py lines 616-960 (read_json)",
+    "pandas/io/json/_json.py lines 1486-1576 (Parser._try_convert_data)",
+    "pandas/io/json/_json.py lines 1713-1737 (_should_convert_dates)"
+   ],
+   "fix_attempt": "applied: `read_json` accepted `convert_dates` and `keep_default_dates` with real defaults, so it couldn't tell whether the caller passed them. The edit changes both defaults to `lib.no_default` and emits a `FutureWarning` when either is passed explicitly. It then resolves them to the old defaults (`True`) before the pyarrow validation and `JsonReader` construction, so behavior is otherwise unchanged. The docstring now marks both parameters as deprecated."
+  }
+ ]
+}

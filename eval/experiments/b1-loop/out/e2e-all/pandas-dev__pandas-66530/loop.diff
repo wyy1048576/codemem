@@ -1,0 +1,18 @@
+diff --git a/pandas/core/arrays/interval.py b/pandas/core/arrays/interval.py
+index 12fdaa8..45b02a6 100644
+--- a/pandas/core/arrays/interval.py
++++ b/pandas/core/arrays/interval.py
+@@ -321,7 +321,12 @@ class IntervalArray(IntervalMixin, ExtensionArray):
+                 f"right [{type(right).__name__}] types"
+             )
+             raise ValueError(msg)
+-        if isinstance(left.dtype, CategoricalDtype) or is_string_dtype(left.dtype):
++        if (
++            isinstance(left.dtype, CategoricalDtype)
++            or is_string_dtype(left.dtype)
++            or isinstance(right.dtype, CategoricalDtype)
++            or is_string_dtype(right.dtype)
++        ):
+             # GH 19016
+             msg = (
+                 "category, object, and string subtypes are not supported "

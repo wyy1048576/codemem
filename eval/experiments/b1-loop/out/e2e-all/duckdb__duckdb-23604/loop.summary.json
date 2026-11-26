@@ -1,0 +1,299 @@
+{
+ "arm": "codemem-loop",
+ "task": "duckdb__duckdb-23604",
+ "fixed": {
+  "round": 1,
+  "explanation": "TryPushdownPrefixFilter only matches a function named \"prefix\". The function that starts_with and ^@ bind to is registered under the name \"starts_with\", so the name check fails and no range filter is created. The edit also accepts \"starts_with\" and \"^@\", so these filters become range filters, as LIKE already does. I couldn't see the function registration, so the exact name is inferred.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1179,
+ "seconds": 33,
+ "diff_stat": "src/optimizer/filter_combiner.cpp | 3 ++-\n 1 file changed, 2 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Optimizer rule that rewrites LIKE 'prefix%' into range comparisons (s >= 'prefix' AND s < 'prefix+1') for filter pushdown and row group pruning should also handle starts_with(s, 'prefix') and the prefix operator ^@, which are currently left as opaque filters.",
+    "symptom": "starts_with(s, 'x') and s ^@ 'x' filters are not converted into range filters so zone-map pruning scans all row groups, unlike LIKE 'x%'.",
+    "anchors": [
+     "starts_with",
+     "^@",
+     "LIKE",
+     "Row Groups Scanned",
+     "prefix"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/optimizer/rule/like_optimizations.cpp",
+     33,
+     53
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     370,
+     386
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     163,
+     202
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     409,
+     423
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     528,
+     532
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     307,
+     320
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     212,
+     214
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     454,
+     515
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     418,
+     452
+    ],
+    [
+     "extension/core_functions/scalar/string/starts_with.cpp",
+     31,
+     36
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     487,
+     509
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     249,
+     262
+    ],
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     1339,
+     1354
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     425,
+     454
+    ],
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     1383,
+     1399
+    ],
+    [
+     "src/planner/filter/prefix_range_filter.cpp",
+     1,
+     6
+    ],
+    [
+     "src/optimizer/rule/like_optimizations.cpp",
+     55,
+     75
+    ],
+    [
+     "src/include/duckdb/planner/filter/prefix_range_filter.hpp",
+     1,
+     14
+    ],
+    [
+     "src/planner/table_filter_state.cpp",
+     360,
+     430
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     396,
+     407
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     579,
+     581
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     10,
+     53
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     330,
+     394
+    ],
+    [
+     "src/include/duckdb/planner/filter/table_filter_functions.hpp",
+     246,
+     252
+    ],
+    [
+     "src/include/duckdb/planner/filter/prefix_range_filter.hpp",
+     18,
+     18
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     245,
+     247
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     239,
+     243
+    ],
+    [
+     "extension/core_functions/scalar/string/starts_with.cpp",
+     9,
+     17
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     543,
+     567
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     362,
+     368
+    ],
+    [
+     "extension/core_functions/include/core_functions/scalar/string_functions.hpp",
+     28,
+     32
+    ],
+    [
+     "extension/core_functions/scalar/string/starts_with.cpp",
+     19,
+     29
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     571,
+     573
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     355,
+     360
+    ],
+    [
+     "src/planner/table_filter_state.cpp",
+     409,
+     416
+    ],
+    [
+     "src/include/duckdb/function/scalar/tablefilter_functions.hpp",
+     48,
+     56
+    ],
+    [
+     "src/include/duckdb/common/types/string_type.hpp",
+     98,
+     104
+    ],
+    [
+     "extension/core_functions/scalar/string/starts_with.cpp",
+     32,
+     35
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     60,
+     227
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     584,
+     621
+    ],
+    [
+     "third_party/utf8proc/utf8proc_wrapper.cpp",
+     472,
+     515
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     264,
+     328
+    ],
+    [
+     "extension/core_functions/include/core_functions/scalar/string_functions.hpp",
+     18,
+     26
+    ],
+    [
+     "src/main/profiler/metrics_manager.cpp",
+     25,
+     73
+    ],
+    [
+     "src/include/duckdb/optimizer/rule/like_optimizations.hpp",
+     17,
+     26
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     575,
+     577
+    ],
+    [
+     "src/include/duckdb/execution/index/art/prefix.hpp",
+     21,
+     90
+    ],
+    [
+     "src/execution/index/art/prefix.cpp",
+     34,
+     38
+    ],
+    [
+     "src/planner/filter/prefix_range_filter.cpp",
+     16,
+     23
+    ],
+    [
+     "src/common/string_util.cpp",
+     139,
+     144
+    ]
+   ],
+   "analysis": "FilterCombiner::TryPushdownPrefixFilter and TryPushdownLikeFilter turn prefix-style filters into range table filters (s >= 'x' AND s < 'x+1'). The LIKE path reaches the prefix function and gets pruned. starts_with and ^@ probably aren't matched by the function-name check in the pushdown, so they stay as opaque filters. I only saw the signatures of these functions, not their bodies, so this is an inference.",
+   "picked": [
+    "src/optimizer/filter_combiner.cpp:duckdb.FilterCombiner.TryPushdownPrefixFilter",
+    "src/optimizer/filter_combiner.cpp:duckdb.FilterCombiner.TryPushdownLikeFilter"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/optimizer/filter_combiner.cpp lines 418-452 (duckdb.FilterCombiner.TryPushdownPrefixFilter)",
+    "src/optimizer/filter_combiner.cpp lines 454-515 (duckdb.FilterCombiner.TryPushdownLikeFilter)"
+   ],
+   "fix_attempt": "applied: TryPushdownPrefixFilter only matches a function named \"prefix\". The function that starts_with and ^@ bind to is registered under the name \"starts_with\", so the name check fails and no range filter is created. The edit also accepts \"starts_with\" and \"^@\", so these filters become range filters, as LIKE already does. I couldn't see the function registration, so the exact name is inferred."
+  }
+ ]
+}

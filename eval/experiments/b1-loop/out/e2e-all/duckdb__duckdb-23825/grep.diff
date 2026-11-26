@@ -1,0 +1,31 @@
+diff --git a/src/optimizer/matcher/expression_matcher.cpp b/src/optimizer/matcher/expression_matcher.cpp
+index b993a39..f8a75e8 100644
+--- a/src/optimizer/matcher/expression_matcher.cpp
++++ b/src/optimizer/matcher/expression_matcher.cpp
+@@ -61,8 +61,8 @@ bool InClauseExpressionMatcher::Match(Expression &expr_p, vector<reference<Expre
+ 		return false;
+ 	}
+ 	auto &expr = expr_p.Cast<BoundOperatorExpression>();
+-	if (expr.GetExpressionType() != ExpressionType::COMPARE_IN ||
+-	    expr.GetExpressionType() == ExpressionType::COMPARE_NOT_IN) {
++	if (expr.GetExpressionType() != ExpressionType::COMPARE_IN &&
++	    expr.GetExpressionType() != ExpressionType::COMPARE_NOT_IN) {
+ 		return false;
+ 	}
+ 	return SetMatcher::Match(matchers, expr.GetChildrenMutable(), bindings, policy);
+diff --git a/src/optimizer/rule/in_clause_simplification_rule.cpp b/src/optimizer/rule/in_clause_simplification_rule.cpp
+index e840300..b09219d 100644
+--- a/src/optimizer/rule/in_clause_simplification_rule.cpp
++++ b/src/optimizer/rule/in_clause_simplification_rule.cpp
+@@ -19,6 +19,11 @@ InClauseSimplificationRule::InClauseSimplificationRule(ExpressionRewriter &rewri
+ unique_ptr<Expression> InClauseSimplificationRule::Apply(LogicalOperator &op, vector<reference<Expression>> &bindings,
+                                                          bool &changes_made, bool is_root) {
+ 	auto &expr = bindings[0].get().Cast<BoundOperatorExpression>();
++	if (expr.GetChildren().size() == 2 && expr.GetChildren()[1]->GetExpressionClass() == ExpressionClass::BOUND_CONSTANT &&
++	    expr.GetChildren()[1]->Cast<BoundConstantExpression>().GetValue().IsNull()) {
++		// x IN (NULL) / x NOT IN (NULL) is always NULL
++		return make_uniq<BoundConstantExpression>(Value(LogicalType::BOOLEAN));
++	}
+ 	if (expr.GetChildrenMutable()[0]->GetExpressionClass() != ExpressionClass::BOUND_CAST) {
+ 		return nullptr;
+ 	}
