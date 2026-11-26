@@ -906,6 +906,13 @@ does not.**
   read at search time whatever the size. `"compact"` is always the compact one. `"module:Class"`
   plugs in another: an approximate index (HNSW or IVF, which trade a little accuracy for speed
   on very large repos) is a class away.
+- **An index built in one place and opened in another names one too.** The pick follows the
+  memory of the place codemem runs in. So a build on a host and a start in a container with a
+  memory limit can pick differently for the same index, and the container then rebuilds the
+  search index at every start that begins from the build's files. The environment variable
+  `CODEMEM_VECTOR_BACKEND` names the search index without a config file. The end-to-end eval
+  sets it to `faiss` for the build of a task's index and for every run on it
+  (`eval/src/cmeval/e2e_index.py`).
 - **An older FAISS.** The compact index needs FAISS 1.15.1, which codemem's dependencies ask
   for. In an environment that still has an older one, `auto` always picks the exact index;
   `vector_backend = "compact"` is refused with one sentence.
