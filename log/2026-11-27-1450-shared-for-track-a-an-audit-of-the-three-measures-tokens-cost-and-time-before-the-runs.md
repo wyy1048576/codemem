@@ -2,7 +2,7 @@
 
 - **Track:** shared: from Andre, for track A
 - **Who:** Andre, with Claude Code
-- **When:** 2026-11-27 15:20 UTC
+- **When:** 2026-11-27 14:50 UTC
 - **Work package:** A4 (the integrity checks), §4.5 and §5 of track A's plan
 - **Branch, commits, pull request:** none
 
