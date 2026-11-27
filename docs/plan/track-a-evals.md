@@ -402,6 +402,7 @@ numbers for its adoption check ([track B](track-b-retrieval.md) §5).
 | Setup | The agent has | Why |
 |---|---|---|
 | `grep` | its shipped tools: grep, file listing, file reads, a shell, and its own built-in search subagent if it has one | the baseline is the agent as people use it |
+| `codemem` | `tool`, and the first message also holds the top results of one codemem search on the prompt, made for the agent before it starts | the comparison of the runs ([runs.md](runs.md) §1): what codemem gives, whether or not the agent asks for a search by itself |
 | `tool` | the same, plus codemem's tools, loaded before the first turn, with the wording that ships, which is `light` today and is track B's to set ([track B](track-b-retrieval.md) §5). The agent decides whether to call them | this is how codemem ships |
 | `upfront` | the same as `grep`, but the first message also holds the top results of one codemem search on the prompt. No codemem tool | separates two questions that `tool` mixes: does the information help, and does the agent choose to ask for it |
 | `placebo` | a tool with codemem's name and card format that returns random chunks | is a gain from what codemem returns, or from merely having one more tool? |
@@ -409,8 +410,8 @@ numbers for its adoption check ([track B](track-b-retrieval.md) §5).
 | `grep-nosub` | `grep`, with the built-in search subagent switched off | does codemem replace what that subagent does? |
 | `grep-map` | `grep`, plus a short generated map of the repo in the agent's context | is a map enough on its own? |
 
-`grep` and `tool` are the two that matter most. The others exist because of what other studies
-found *(reported)*:
+`grep` and `codemem` are the two that the runs compare. The others exist because of what other
+studies found *(reported)*:
 - Every published end-to-end gain for mid-size models put the search results into the prompt up
   front (CodeNib, CodeGrep, Physical Cost of Context).
 - Tools that the agent may choose are often left unused: 0 to 6% of runs in one study of a
@@ -419,7 +420,8 @@ found *(reported)*:
 - In Bellam's study, a placebo tool that returned random code hurt two small models.
 
 If `upfront` helps and `tool` does not, the problem is adoption, not retrieval, and the fix is
-different.
+different. In our own sessions that is what happened, and `codemem` is that fix: the first search
+is made for the agent.
 
 ### 4.2 The agents
 
