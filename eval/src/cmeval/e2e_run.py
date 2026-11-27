@@ -98,6 +98,7 @@ from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commi
 from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
 from .files import write_json
 from .generate import NO_CORE_DUMPS, GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
+from .images import missing_image_hint
 from .paths import cmeval_home, e2e_dir
 from .proxy import AGENT_CLASSES, DEFAULT_UPSTREAM, TOKEN_CLASSES, RecordingProxy, cross_check, read_log, summarize
 from .status import NullStatus
@@ -380,7 +381,7 @@ def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setu
     setup what codemem_preconditions returns (else None)."""
     tag = task_tag(recipe, task)
     if not image_exists(tag):
-        raise GenerateError(f"{task.id}: image {tag} does not exist; build it with cmeval generate")
+        raise GenerateError(f"{task.id}: image {tag} does not exist; {missing_image_hint(recipe, task)}")
     if not tests_path(recipe, task).exists():
         raise GenerateError(f"{task.id}: no tests.json; validate the task with cmeval generate first")
     codemem = codemem_preconditions(recipe, task, settings) if setup and setup.codemem else None

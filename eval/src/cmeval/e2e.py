@@ -36,6 +36,7 @@ from typing import Callable
 from .generate import (PASS, GenerateError, Recipe, build_number, image_exists, image_fingerprint, image_id,
                        image_label, read_results, read_times, refresh_lines, run_in_container, task_tag, test_run_line,
                        tests_path, validation_fingerprint)
+from .images import missing_image_hint
 from .patches import diff_sections as _sections, file_paths
 from .paths import e2e_dir
 from .tasks import Task
@@ -152,8 +153,7 @@ def grade(recipe: Recipe, task: Task, agent_patch: str, out: Path, cpus: int = 8
     tests = load_tests(recipe, task)
     tag = task_tag(recipe, task)
     if not image_exists(tag):
-        raise GenerateError(f"{task.id}: image {tag} does not exist; build it again with cmeval generate "
-                            f"{recipe.name} --tasks FILE --id {task.id} --rebuild")
+        raise GenerateError(f"{task.id}: image {tag} does not exist; {missing_image_hint(recipe, task)}")
     if image_label(tag) != image_fingerprint(recipe, task):
         raise GenerateError(f"{task.id}: image {tag} was built from another version of the recipe or the task; "
                             "run cmeval generate again")
