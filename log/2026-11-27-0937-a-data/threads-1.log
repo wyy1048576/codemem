@@ -1,0 +1,40 @@
+codemem 532d188 2026-11-27T09:30:51Z load 2.00 5.10 7.44
+codemem 0.2.0 at /home/ripst/codemem-project/codemem-threads/src/codemem (git 532d188 on HEAD) | FAISS 1.16.0 | numpy 2.4.6, BLAS scipy-openblas 0.3.31.188.0 (OpenBLAS 0.3.31.188.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64) | Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64 | AMD Ryzen 9 3950X 16-Core Processor | 16 CPUs | Python 3.11.18
+Each timing child gets OPENBLAS_NUM_THREADS, MKL_NUM_THREADS, VECLIB_MAXIMUM_THREADS = the BLAS threads and OMP_NUM_THREADS = the FAISS threads in its environment, then calls faiss.omp_set_num_threads(FAISS threads) after its imports. This shell has OMP_NUM_THREADS=unset, OPENBLAS_NUM_THREADS=unset, MKL_NUM_THREADS=unset, VECLIB_MAXIMUM_THREADS=unset.
+100,000 vectors: built in 12 s; timing 4 settings
+500,000 vectors: built in 53 s; timing 4 settings
+
+== FAISS on 1 thread, numpy's BLAS on 1 thread == (OMP_NUM_THREADS=1, OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=1; BLAS as the child sees it: openblas 0.3.31.188.0: 1 threads (pthreads), openblas 0.3.15: 1 threads (openmp))
+  vectors  rotate  coarse    fine    read   score   other  search |   exact   ms, medians of 50
+  100,000    0.24    3.77   16.37    2.63    0.20    0.32   23.49 |   24.29
+  500,000    0.24   16.15   40.19    2.84    0.19    0.37   59.97 |  115.86
+FAISS's threads inside a compact search: 1
+
+== FAISS on 1 thread, numpy's BLAS on 16 threads == (OMP_NUM_THREADS=1, OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=16; BLAS as the child sees it: openblas 0.3.15: 1 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads))
+  vectors  rotate  coarse    fine    read   score   other  search |   exact   ms, medians of 50
+  100,000    0.12    3.97   17.28    2.76    0.20    0.34   24.73 |   24.38
+  500,000    0.35   20.33   60.92    2.99    0.20    0.38   86.05 |  103.89
+FAISS's threads inside a compact search: 1
+
+== FAISS on 16 threads, numpy's BLAS on 1 thread == (OMP_NUM_THREADS=16, OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=1; BLAS as the child sees it: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 1 threads (pthreads))
+  vectors  rotate  coarse    fine    read   score   other  search |   exact   ms, medians of 50
+  100,000    0.24    3.93   17.82    2.70    0.20    0.34   25.45 |   25.19
+  500,000    0.24   17.09   41.19    2.98    0.20    0.39   62.16 |  120.31
+FAISS's threads inside a compact search: 16
+
+== FAISS on 16 threads, numpy's BLAS on 16 threads == (OMP_NUM_THREADS=16, OPENBLAS_NUM_THREADS=MKL_NUM_THREADS=VECLIB_MAXIMUM_THREADS=16; BLAS as the child sees it: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp))
+  vectors  rotate  coarse    fine    read   score   other  search |   exact   ms, medians of 50
+  100,000    4.71   10.12   54.70    2.91    0.20    0.35   74.56 |   23.81
+  500,000    3.38   21.05   59.92    3.13    0.22    0.41   87.79 |  107.65
+FAISS's threads inside a compact search: 16
+
+== a compact search, ms more than with FAISS and BLAS both on 1 thread (the exact search's in brackets) ==
+  vectors     FAISS 1, BLAS 16     FAISS 16, BLAS 1    FAISS 16, BLAS 16
+  100,000          +1.2 (+0.1)          +2.0 (+0.9)         +51.1 (-0.5)
+  500,000        +26.1 (-12.0)          +2.2 (+4.4)         +27.8 (-8.2)
+
+results: every setting returned the same hits (ids and scores, 50 searches of 50 per size; compact 100,000: 92a1561d63a3, 500,000: ef9e374f8b48; exact 2 fingerprints). Compare them between two branches: a fix must not change them.
+faiss.omp_set_num_threads changes the calling thread's count only, on this machine: yes
+=> On this machine numpy's BLAS threads carry the overhead: with numpy's BLAS on 16 threads instead of 1 (FAISS on 1) a compact search takes +1.2 ms at 100,000 vectors and +26.1 ms at 500,000 vectors, mostly in the fine ranking (+10.8 ms) and the coarse scan (+2.2 ms); with FAISS on 16 threads instead of 1 (BLAS on 1) +2.0 ms at 100,000 vectors and +2.2 ms at 500,000 vectors; with both on all threads +51.1 ms at 100,000 vectors and +27.8 ms at 500,000 vectors.
+took 2 min 54 s (65 s building or reading the indexes)
+exit=0 2026-11-27T09:33:45Z
