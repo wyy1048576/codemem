@@ -2,7 +2,7 @@
 
 - **Track:** shared: Andre's decisions, for track A. It narrows the announcement of 12:40 UTC and the request of 12:45 UTC
 - **Who:** Andre, with Claude Code
-- **When:** 2026-11-27 13:05 UTC
+- **When:** 2026-11-27 12:50 UTC
 - **Work package:** the run plan (`docs/plan/runs.md` §4, §5, §7, §8)
 - **Branch, commits, pull request:** none yet. The plan's text follows as a pull request (`andre/run-plan-nov27`)
 
