@@ -4,10 +4,11 @@ One run (run_one) has these steps:
 
   1. check the preconditions: the task's image and tests.json, the login token file, the Claude Code binary,
      and an internal Docker network. For a codemem setup also the codemem program, the task's index (from
-     `cmeval e2e index`), the Hugging Face cache, and the GPU setting
+     `cmeval e2e index`), the Hugging Face cache, and the GPU setting. For a setup with a block (codemem,
+     upfront) also its block of codemem results (from `cmeval e2e block`; e2e_block.read_block)
   2. write the prompt, the MCP config and the container script (agent.sh) to the run's folder. For a codemem
      setup, copy the task's index to cmindex/ in the run's folder. The container gets it at /cmindex, and the
-     copy is deleted after the run
+     copy is deleted after the run. For a setup with a block, the prompt starts with the block
   3. start a recording proxy on the network's gateway, then the container. On the network the container
      reaches the proxy and nothing else. A thread follows the stream of events and stops the agent after
      the turn limit
@@ -30,6 +31,13 @@ discarded run is not graded, and the next batch does it again. When the warm-up 
 start, and the run ends in an error: three of them in a row stop the batch. A run that ended at the time or
 turn limit is graded like any other.
 
+A setup with a block (e2e_block.py) is another setup plus one codemem search made for the agent before it
+starts, with the results at the top of the first message: codemem is tool plus the block, and upfront is grep
+plus the block (grep's container, MCP config and checks). The block is made before the batch, so its search is
+in no clock of the run. The proxy says of each model request whether its first user message begins with the
+block (proxy.opens_with). A run whose first model request did not, or whose proxy log has no model request, gets
+a flag. A batch with such a setup does not start while the block of one of its tasks cannot be used.
+
 The login token goes to the container only through the environment of the docker client (docker run -e NAME
 with no value). It is never written to a file or put on a command line. Before anything is read from the
 run's folder, every file there is searched for the token, and a copy of it is replaced.
@@ -47,13 +55,18 @@ run.json has these fields:
   identity            prompt level, frame and hash, harness and its version, binary, image tag and id, split, cmeval
                       commit, machine, limits, start time (UTC), the task's gold files. codemem: null for a setup
                       without codemem; else the codemem commit, the program, the task's index.json, the steering
-                      level, and the bytes of the index copy before and after the run
+                      level, and the bytes of the index copy before and after the run. block: null for a setup
+                      without a block; else e2e_block.record_entry: its file and sha256, its result lines, the
+                      search's seconds and codemem commit, searches_made_for_agent (1), the ranks of the first
+                      result in a gold file and on a gold function, and the results (rank, path, line, name)
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
                       network, the removed configuration files, the files where the token was found and replaced,
                       gpus (the container had the GPU). codemem setups only, else null: codemem_warm (the gate's
                       ready file: ok, seconds, warmup_searches, the index_status answer, or the error) and
                       codemem_fallback_searches (e2e_steps.codemem_fallbacks: the search_code results with one
-                      of codemem's notes, with their turns; `cmeval e2e recount` computes it again)
+                      of codemem's notes, with their turns; `cmeval e2e recount` computes it again).
+                      block_in_first_message: for a setup with a block (else null), whether the first user message
+                      of the run's first model request began with the block; null when the log has no such request
   result_event        subtype, is_error, num_turns, duration_ms, duration_api_ms, total_cost_usd
   usage_limit         the evidence of a usage limit (429 answers and their reset headers, the result text), or null
   turn_limit          the turn at which the runner stopped the agent, and how, or null
@@ -66,7 +79,8 @@ run.json has these fields:
                       preparation step, codemem_warm_s (the wait for codemem, a part of prep_s; null without
                       codemem), container_start_s, collect_s, container_s, grade_s
   steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
-                      command), and num_turns_result from the result event. `cmeval e2e recount` computes it again
+                      command), and num_turns_result from the result event. In a setup with a block, the block is
+                      one codemem search at turn 0. `cmeval e2e recount` computes it again
   outcome             completed, the grader's record, the patch's files and changed lines, status_lines, and
                       unexpected_paths (files of the patch that codemem could have written, such as .codemem*)
 """
@@ -93,6 +107,7 @@ from typing import Callable
 
 from . import codemem_gate
 from .e2e import grade, patch_files
+from .e2e_block import read_block, record_entry
 from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_python_root, hf_cache, \
     index_root, index_state, read_index_meta
 from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
@@ -100,7 +115,8 @@ from .files import write_json
 from .generate import NO_CORE_DUMPS, GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
 from .images import missing_image_hint
 from .paths import cmeval_home, e2e_dir
-from .proxy import AGENT_CLASSES, DEFAULT_UPSTREAM, TOKEN_CLASSES, RecordingProxy, cross_check, read_log, summarize
+from .proxy import AGENT_CLASSES, DEFAULT_UPSTREAM, MESSAGES_PATH, TOKEN_CLASSES, RecordingProxy, cross_check, \
+    read_log, summarize
 from .status import NullStatus
 from .tasks import Task, load_tasks
 
@@ -199,6 +215,8 @@ class Setup:
     checks: tuple[Callable[[dict], list[str]], ...] = ()  # more checks of the init event: failed checks
     # codemem's MCP server. Its config holds paths of the host, so codemem_mcp_config makes it for each run.
     codemem: bool = False
+    # The block of codemem results at the top of the first message (e2e_block.py), made before the run.
+    block: bool = False
 
     @property
     def built(self) -> bool:
@@ -226,7 +244,9 @@ def _codemem_loaded(init: dict) -> list[str]:
 SETUPS = {s.name: s for s in (
     Setup("grep", {"mcpServers": {}}, checks=(_no_mcp_tools,)),
     Setup("tool", None, ("codemem",), checks=(_codemem_loaded,), codemem=True),
-    Setup("upfront", None),
+    # tool and grep, each with the block of codemem results at the top of the first message
+    Setup("codemem", None, ("codemem",), checks=(_codemem_loaded,), codemem=True, block=True),
+    Setup("upfront", {"mcpServers": {}}, checks=(_no_mcp_tools,), block=True),
     Setup("placebo", None, ("codemem",)),
     Setup("tool-strong", None, ("codemem",)),
     Setup("grep-nosub", None),
@@ -282,13 +302,22 @@ def load_prompts(path: Path, level: str) -> PromptSet:
     return PromptSet(level=level, texts=texts, source=Path(path).name, sha256=hashlib.sha256(data).hexdigest())
 
 
-def make_prompt(task: Task, prompts: PromptSet | None = None) -> str:
-    """The task's text in frame v1: the issue as written (L0), or the rewrite of the prompt set's level."""
+def prompt_text(task: Task, prompts: PromptSet | None = None) -> str:
+    """The task's text at the prompt set's level: the issue as written (L0), or the rewrite. It goes into the
+    frame, and it is the query of the block's search (e2e_block.py)."""
     if prompts is None or prompts.level == PROMPT_LEVEL:
-        return FRAME_V1.format(query=task.query.strip())
+        return task.query.strip()
     if task.id not in prompts.texts:
         raise GenerateError(f"{task.id}: no {prompts.level} prompt in {prompts.source}")
-    return FRAME_V1.format(query=prompts.texts[task.id].strip())
+    return prompts.texts[task.id].strip()
+
+
+def make_prompt(task: Task, prompts: PromptSet | None = None, block: str | None = None) -> str:
+    """The task's text in frame v1: the issue as written (L0), or the rewrite of the prompt set's level. With the
+    text of a block (e2e_block.block_text, which ends in a newline): the block, one empty line, and then that
+    same prompt."""
+    prompt = FRAME_V1.format(query=prompt_text(task, prompts))
+    return prompt if block is None else block + "\n" + prompt
 
 
 # ---- preconditions
@@ -376,19 +405,24 @@ def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> 
             "commit": codemem_commit(checkout)}
 
 
-def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setup | None = None) -> dict:
-    """Check what a run needs. Returns the image tag, the token file, the binary, the gateway, and for a codemem
-    setup what codemem_preconditions returns (else None)."""
+def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setup | None = None,
+                  prompts: PromptSet | None = None) -> dict:
+    """Check what a run needs. Returns the image tag, the token file, the binary, the gateway, for a codemem
+    setup what codemem_preconditions returns (else None), and for a setup with a block the block and its file
+    (e2e_block.read_block, for the prompt text of the run's level; else None)."""
     tag = task_tag(recipe, task)
     if not image_exists(tag):
         raise GenerateError(f"{task.id}: image {tag} does not exist; {missing_image_hint(recipe, task)}")
     if not tests_path(recipe, task).exists():
         raise GenerateError(f"{task.id}: no tests.json; validate the task with cmeval generate first")
     codemem = codemem_preconditions(recipe, task, settings) if setup and setup.codemem else None
+    block = None
+    if setup and setup.block:
+        block = read_block(recipe, task, prompts.level if prompts else PROMPT_LEVEL, prompt_text(task, prompts))
     path = token_file()
     check_token_file(path)
     return {"tag": tag, "token_file": path, "claude_bin": claude_bin(), "gateway": ensure_network(settings.network),
-            "codemem": codemem}
+            "codemem": codemem, "block": block}
 
 
 # ---- codemem in the container
@@ -621,6 +655,14 @@ def codemem_checks(warm: dict | None, fallbacks: dict) -> list[str]:
     return failed
 
 
+def block_opened(proxy_records: list[dict]) -> bool | None:
+    """Whether the first user message of the run's first model request began with the block: opens_with_text of
+    the first /v1/messages request in the proxy log. None when the log has no such request."""
+    first = min((r for r in proxy_records if r.get("path") == MESSAGES_PATH and "opens_with_text" in r),
+                key=lambda r: r.get("seq", 0), default=None)
+    return None if first is None else first["opens_with_text"] is True
+
+
 _USAGE_TEXT = re.compile(r"usage limit|limit reached|hit your limit|rate limit|resets? at", re.I)
 
 
@@ -778,14 +820,15 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     """One run of Claude Code on one task. `out` is made again. Returns the record, also saved as run.json."""
     spec = get_setup(setup)
     check_model(model)
-    ready = preconditions(recipe, task, settings, spec)
+    ready = preconditions(recipe, task, settings, spec, prompts)
     codemem = ready["codemem"]
+    block, block_file = ready["block"] or (None, None)
     token = read_token(ready["token_file"])
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     out = out.resolve()
-    prompt = make_prompt(task, prompts)
+    prompt = make_prompt(task, prompts, block["text"] if block else None)
     (out / "prompt.txt").write_text(prompt, encoding="utf-8")
     mcp_config = gated_mcp_config(codemem, settings) if codemem else spec.mcp_config
     (out / "mcp.json").write_text(json.dumps(mcp_config) + "\n", encoding="utf-8")
@@ -816,7 +859,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             copy_index(codemem["index"], index_copy)
             index_bytes["before"] = tree_bytes(index_copy)
         with RecordingProxy(out / "proxy.jsonl", host=gateway, port=0, upstream=settings.upstream,
-                            bodies_dir=out / "bodies" if keep_bodies() else None) as proxy:
+                            bodies_dir=out / "bodies" if keep_bodies() else None,
+                            opening_text=block["text"] if block else None) as proxy:
             cmd = ["docker", "run", "--rm", "--name", name, "--network", settings.network,
                    f"--cpus={settings.cpus}", f"--memory={settings.memory}", *NO_CORE_DUMPS,
                    *(["--device", GPU_DEVICE] if settings.gpus else []),
@@ -889,6 +933,11 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
         flags.append("cross-check disagrees")
     if summary and not summary["proxy_complete"] and end == "finished":
         flags.append("proxy log not complete")
+    opened = block_opened(records) if block else None
+    if block and opened is False:
+        flags.append("block not in the first message")
+    elif block and opened is None:
+        flags.append("block not checked: no model request in the proxy log")
 
     record = {
         "schema": SCHEMA,
@@ -931,6 +980,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 "index_bytes_after": index_bytes.get("after"),
                 "index_copy_removed": index_removed,
             } if codemem else None,
+            "block": record_entry(block, block_file, task) if block else None,
         },
         "integrity": {
             "setup_ok": not failed,
@@ -950,6 +1000,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "gpus": settings.gpus,
             "codemem_warm": warm,
             "codemem_fallback_searches": fallbacks,
+            "block_in_first_message": opened,
         },
         "result_event": {k: (result or {}).get(k) for k in ("subtype", "is_error", "num_turns", "duration_ms",
                                                              "duration_api_ms", "total_cost_usd")},
@@ -973,7 +1024,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "container_s": round(container_s, 1),
             "grade_s": grade_s,
         },
-        "steps": count_steps(stream["events"], task.gold.files),
+        "steps": count_steps(stream["events"], task.gold.files,
+                             block_paths=[r["path"] for r in block["results"]] if block else None),
         "outcome": {
             "completed": graded["completed"] if graded else None,
             "grade": graded,
@@ -1014,7 +1066,8 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
     """Compute `steps` of each run of a run id again from its stream.jsonl, with the rules of today, and write
     it into run.json. For a codemem setup also integrity.codemem_fallback_searches. Nothing else in the record
     changes: a run is not discarded after the fact. The gold files come from the record (identity), or
-    from the task file for records that do not have them. Returns the number of runs counted again."""
+    from the task file for records that do not have them; the block of a setup with a block from the record
+    (identity.block). Returns the number of runs counted again."""
     root = e2e_dir() / "runs" / run_id
     if not root.is_dir():
         raise FileNotFoundError(f"no run folder {root}")
@@ -1033,7 +1086,8 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
             continue
         old = record.get("steps") or {}
         events = parse_stream(path.parent / "stream.jsonl")["events"]
-        steps = count_steps(events, gold)
+        block = (record.get("identity") or {}).get("block")
+        steps = count_steps(events, gold, block_paths=[r["path"] for r in block["results"]] if block else None)
         steps["num_turns_result"] = old.get("num_turns_result", (record.get("result_event") or {}).get("num_turns"))
         record["steps"] = steps
         fallbacks, old_fallbacks = None, None
@@ -1106,12 +1160,31 @@ class BatchResult:
     records: list[dict] = field(default_factory=list)
 
 
+def check_blocks(recipe: Recipe, tasks: list[Task], setups: list[str], prompts: PromptSet | None = None) -> None:
+    """Refuse a batch with a setup that has a block while the block of one of its tasks cannot be used, before
+    the first run (e2e_block.read_block). Each run checks its own block again."""
+    if not any(SETUPS[name].block for name in setups if name in SETUPS):
+        return
+    level = prompts.level if prompts else PROMPT_LEVEL
+    problems = []
+    for task in tasks:
+        try:
+            read_block(recipe, task, level, prompt_text(task, prompts))
+        except GenerateError as exc:
+            problems.append(str(exc))
+    if problems:
+        raise GenerateError(f"{len(problems)} of {len(tasks)} tasks have no block that a run can use; the first: "
+                            f"{problems[0]}")
+
+
 def run_batch(recipe: Recipe, tasks: list[Task], *, run_id: str, setups: list[str], model: str, reps: int = 1,
               settings: RunSettings = RunSettings(), progress: Callable[[str], None] = lambda message: None,
               status=None, prompts: PromptSet | None = None) -> BatchResult:
     """The runs of a batch, one at a time, in the order of plan_runs. Stops at a usage limit (exit code 4)
-    and after three runs in a row that ended in an error (exit code 5)."""
+    and after three runs in a row that ended in an error (exit code 5). Does not start while a block that one
+    of its setups needs cannot be used (check_blocks)."""
     status = status or NullStatus()
+    check_blocks(recipe, tasks, setups, prompts)
     order = plan_runs(tasks, setups, reps)
     status.total(len(order), "runs")
     batch = BatchResult()

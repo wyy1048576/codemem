@@ -469,3 +469,32 @@ def test_a_closed_client_connection_prints_no_traceback(capsys):
     except ConnectionResetError:
         server.handle_error(None, ("127.0.0.1", 1))
     assert capsys.readouterr().err == ""
+
+
+def test_opening_text_is_checked_and_never_kept(tmp_path, fake_api):
+    block = "Possibly relevant code, from a search by meaning (it may be wrong):\nauth/secret_path.py:3  f\n"
+    prompt = block + "\nThe repository in the current directory"
+    first = {"role": "user", "content": [{"type": "text", "text": "<system-reminder>\nA note.\n</system-reminder>"},
+                                         {"type": "text", "text": prompt}]}
+    later = [first, {"role": "assistant", "content": [{"type": "text", "text": "ok"}]}]
+    log = tmp_path / "proxy.jsonl"
+    with RecordingProxy(log, upstream=fake_api.url, opening_text=block) as p:
+        for messages in (later, [{"role": "user", "content": prompt[len(block) + 1:]}]):
+            conn, response = post(p.port, {**REQUEST, "stream": False, "messages": messages}, {})
+            response.read()
+            conn.close()
+    with_block, without = records(log)
+    assert with_block["opens_with_text"] is True and without["opens_with_text"] is False
+    assert "secret_path" not in log.read_text()  # only true or false is kept
+    # Without an opening text (grep and tool), the line has no such field.
+    plain = tmp_path / "plain.jsonl"
+    with RecordingProxy(plain, upstream=fake_api.url) as p:
+        conn, response = post(p.port, {**REQUEST, "stream": False, "messages": later}, {})
+        response.read()
+        conn.close()
+    assert "opens_with_text" not in records(plain)[0]
+    # The rule: the first user message, any of its text blocks, or its text.
+    assert proxy.opens_with(later, block) and proxy.opens_with([{"role": "user", "content": block + "x"}], block)
+    assert not proxy.opens_with([{"role": "assistant", "content": block}, {"role": "user", "content": "x"}], block)
+    assert not proxy.opens_with([], block) and not proxy.opens_with([{"role": "user", "content": None}], block)
+    assert not proxy.opens_with([{"role": "user", "content": [{"type": "text", "text": "x" + block}]}], block)

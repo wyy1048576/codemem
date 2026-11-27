@@ -46,7 +46,7 @@ def test_setups_and_models():
     assert e2e_run.get_setup("grep").mcp_config == {"mcpServers": {}}
     assert e2e_run.get_setup("tool").codemem and not e2e_run.get_setup("grep").codemem
     with pytest.raises(gen.GenerateError, match="not built yet"):
-        e2e_run.get_setup("upfront")
+        e2e_run.get_setup("placebo")
     with pytest.raises(gen.GenerateError, match="no such setup"):
         e2e_run.get_setup("nope")
     e2e_run.check_model("claude-haiku-5-5")
@@ -550,7 +550,7 @@ def test_run_one_preconditions(make_task, monkeypatch, tmp_path):
     with pytest.raises(gen.GenerateError, match="no tests.json"):
         e2e_run.run_one(recipe, task, setup="grep", model="claude-haiku-5-5", rep=1, out=out)
     with pytest.raises(gen.GenerateError, match="not built yet"):
-        e2e_run.run_one(recipe, task, setup="upfront", model="claude-haiku-5-5", rep=1, out=out)
+        e2e_run.run_one(recipe, task, setup="placebo", model="claude-haiku-5-5", rep=1, out=out)
     assert not out.exists()
 
 
@@ -602,7 +602,7 @@ def test_cli_run_batch(make_task, tmp_path, monkeypatch, capsys):
     args = ["e2e", "run", "pandas", "--tasks", str(path), "--run-id", "b1"]
     assert main(args + ["--model", "sonnet"]) == 1
     assert "full model id" in capsys.readouterr().err
-    assert main(args + ["--setup", "upfront"]) == 1
+    assert main(args + ["--setup", "placebo"]) == 1
     assert "not built yet" in capsys.readouterr().err
 
     assert main(args + ["--dry-run"]) == 0

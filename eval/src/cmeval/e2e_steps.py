@@ -45,7 +45,8 @@ The counts, one line each (all of the main agent; the repo is the folder /testbe
                   write_outside actions, edits.reverts counts revert actions; neither is an edit
   surfaced        first turn in which the file reaches the agent: a tool result shows its path (also relative
                   to the shell's folder, or its name in a listing of its folder), or the agent views it or
-                  greps inside it by name
+                  greps inside it by name. Turn 0 in a setup with a block: the block of codemem results at the
+                  top of the first message (e2e_block.py) shows the path
   opened          first turn with a view of the file (Read, cat, sed -n, head, ...)
   edited          first turn with an edit of the file (an Edit whose old text was not found counts)
   named_by_agent  first turn in which the agent wrote the path in a tool call
@@ -1433,7 +1434,8 @@ def _first(current: int | None, turn: int) -> int:
     return turn if current is None else current
 
 
-def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT) -> dict:
+def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT,
+                block_paths: list[str] | None = None) -> dict:
     """What the agent did: turns, tool calls, searches, views, edits, tests, and when it met the gold files.
 
     The counts are those of the main agent. A subagent's turns, tool calls and actions are counted apart; a
@@ -1453,8 +1455,13 @@ def count_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO
     not run, so that anyone can count again. gold_file_read and first_gold_read_turn are the names
     of version 1. They are kept as copies of gold_opened and first_gold_opened_turn, so that e2e_score and
     older readers still work.
+
+    block_paths, for a setup with a block (e2e_block.py): the paths of the block's results. The block is one
+    codemem search made for the agent before its first turn, at turn 0: it counts in codemem_calls,
+    first_codemem_turn is 0, and a gold file among the paths is surfaced at turn 0. mcp_tools counts the
+    agent's own calls only. Without block_paths nothing changes.
     """
-    return _walk(events, gold_files, repo_root)[0]
+    return _walk(events, gold_files, repo_root, block_paths)[0]
 
 
 def turn_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT) -> list[dict]:
@@ -1472,7 +1479,8 @@ def turn_steps(events: list[dict], gold_files: list[str], repo_root: str = REPO_
     return _walk(events, gold_files, repo_root)[1]
 
 
-def _walk(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT) -> tuple[dict, list[dict]]:
+def _walk(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT,
+          block_paths: list[str] | None = None) -> tuple[dict, list[dict]]:
     """The counts of count_steps and the turns of turn_steps, from one walk through the events."""
     root = repo_root.rstrip("/") or "/"
     gold_list = [_norm_gold(g, root) for g in gold_files]
@@ -1486,6 +1494,11 @@ def _walk(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT)
     blocked_ids: set[str] = set()
     short: dict[str, dict[str, list[re.Pattern]]] = {}  # call id -> gold file -> patterns of shorter forms
     marks = {"first_edit_turn": None, "first_test_turn": None, "first_mcp_turn": None, "first_codemem_turn": None}
+    if block_paths is not None:  # the codemem search made for the agent, before its first turn
+        marks["first_codemem_turn"] = 0
+        for g in gold_list:
+            if g in block_paths:
+                gold[g]["surfaced"] = 0
     commands = []
     per_turn: list[dict] = []
     cwd = root
@@ -1605,7 +1618,8 @@ def _walk(events: list[dict], gold_files: list[str], repo_root: str = REPO_ROOT)
         "blocked_calls": main.blocked_calls,
         "actions": main.kinds(),
         "mcp_tools": dict(main.mcp_tools),
-        "codemem_calls": sum(n for t, n in main.mcp_tools.items() if t.startswith(CODEMEM_PREFIX)),
+        "codemem_calls": sum(n for t, n in main.mcp_tools.items() if t.startswith(CODEMEM_PREFIX))
+        + (0 if block_paths is None else 1),
         "searches": {"content": main.actions["search_content"], "files": main.actions["search_files"],
                      "programs": dict(main.programs)},
         "views": {"count": main.views["count"], "files_viewed": main.files_viewed,
