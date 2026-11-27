@@ -197,6 +197,8 @@ A fact is the result of a check that was run for a task, for example how the ver
 
 `tasks/screen/pilot18.jsonl` holds the two reads of the 18 valid pilot tasks (2026-11-25, made by hand before this step existed, under rules version `pilot-2026-11-25`): 9 fair, 9 not; pandas keeps 4 of 10, playwright 5 of 8. pandas 70742 was reopened on 2026-11-26 by a fact about its reference version: with `--tasks`, its two reads are stale, and 17 tasks are decided (8 fair, 9 not; pandas keeps 3 of 9 decided).
 
+**The run sample.** `cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl` numbers the fair tasks of each repo in each tier and marks the ones that are run (`docs/plan/runs.md` section 3). The order is seeded, with the test split first; the easy tier follows the label pattern of the plan. The file has one row per task (`repo`, `id`, `tier`, `label`, `split`, `number`, `run`, `has_prompts`), and its `.meta.json` holds the seed, the sha256 of each input and the counts. The same inputs and seed give the same file. The list is fixed after the first run, so the command does not write over a file that holds another sample without `--force`. The rules are in `src/cmeval/run_sample.py`.
+
 ### Diagnostic runs
 
 Two environment variables are for diagnostic batches. A run made with either is not comparable with other runs; `run.json` records them in `identity.diagnostic`. Use a run ID of its own.

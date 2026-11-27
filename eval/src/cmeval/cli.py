@@ -801,6 +801,27 @@ def cmd_e2e_screen_table(args) -> int:
     return 0
 
 
+def cmd_e2e_sample(args) -> int:
+    import shlex
+
+    from .e2e_screen import ScreenError
+    from .run_sample import SampleError, format_table, run_sample
+
+    try:
+        result = run_sample(args.out, seed=args.seed, task_files=args.tasks, screens=args.screen, facts=args.facts,
+                            prompts=args.prompts, repos=args.repo, command=shlex.join(["cmeval", *sys.argv[1:]]),
+                            force=args.force)
+    except (SampleError, ScreenError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e sample: {exc}", file=sys.stderr)
+        return 1
+    print(format_table(result.samples))
+    if result.stale_reads:
+        print(f"note: {result.stale_reads} stale reads left out (the task or its facts changed after the read)")
+    rows = sum(len(s.rows) for s in result.samples)
+    print(f"{result.out}: {rows} tasks" + ("" if result.written else " (unchanged; nothing written)"))
+    return 0
+
+
 def cmd_e2e_replay(args) -> int:
     from . import e2e_replay
     from .e2e_index import codemem_bin
@@ -1215,6 +1236,27 @@ def build_parser() -> argparse.ArgumentParser:
                    help="characters of the command column (default 100, 60 side by side; 0: no cut)")
     p.add_argument("--tasks", type=Path, help="the task file, for a run.json that does not hold its gold files")
     p.set_defaults(func=cmd_e2e_turns)
+    p = e2e_sub.add_parser(
+        "sample", help="draw the run sample of each repo from its fair tasks (docs/plan/runs.md section 3)",
+        description="Number the fair tasks of each repo in each tier in a seeded order (the test split first) and "
+                    "mark the ones that are run: 6 easy, 4 medium, 4 hard, with more medium when hard is short. "
+                    "The same inputs and seed give the same file. A file that holds another sample is not written "
+                    "over without --force, because the list is fixed after the first run.")
+    p.add_argument("--seed", required=True, help="seed of the draw, for example runs-v1")
+    p.add_argument("--out", type=Path, required=True,
+                   help="the sample file (.jsonl), for example tasks/run-sample-v1.jsonl; a .meta.json is written next to it")
+    p.add_argument("--repo", action="append",
+                   help="only this repo (owner/name or name); can be given more than once (default: every repo "
+                        "with a fair task)")
+    p.add_argument("--tasks", type=Path, action="append",
+                   help="task file; can be given more than once (default: every file in tasks/e2e)")
+    p.add_argument("--screen", type=Path, action="append",
+                   help="screen file; can be given more than once (default: tasks/screen/b7, b10a and ruff1)")
+    p.add_argument("--facts", type=Path, help="facts file (default tasks/screen/facts.jsonl)")
+    p.add_argument("--prompts", type=Path, action="append",
+                   help="file of L1 and L2 prompts; can be given more than once (default: tasks/vague-*-v3.jsonl)")
+    p.add_argument("--force", action="store_true", help="write over a file that holds another sample")
+    p.set_defaults(func=cmd_e2e_sample)
 
     p = sub.add_parser("dashboard", help="a local web page with the live progress of long jobs")
     p.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port on 127.0.0.1 (default {DEFAULT_PORT})")
