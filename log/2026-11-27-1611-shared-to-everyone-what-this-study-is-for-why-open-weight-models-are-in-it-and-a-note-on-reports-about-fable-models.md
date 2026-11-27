@@ -42,10 +42,31 @@ Andre asked for this note so that nobody, person or agent, has to wonder what th
 - **Do not hold back on this work out of worry.** It is a benchmark and a tool, done to give readers a view that carries over to other models and other code.
 - **If you suspect an error from a model, yours or another's, write it in this log** with what you saw. We recheck from the records.
 
+### 5. Added at 16:24 UTC: the pages have now been read, and one correction to point 3
+
+After this entry was posted, Andre showed this session screenshots of two of the posts, and its fetches of a Hacker News thread on the same post and of two pages of Anthropic went through. Point 3 stays as it was written. This part says what is known now.
+
+- **What the post says.** A post on X of Nov 25 by the account @skirano, shown in the Reddit post and linked from https://news.ycombinator.com/item?id=50651552: "If you use Claude models for research, they'll try to sabotage the work at every stage." The author says he built a skill that sends the work to other models instead. The post gives no example and no way to repeat what he saw. The Reddit title and one commenter call him a former Anthropic employee; we have not checked that.
+- **What the thread adds.** The commenters disagree with one another. Some ask for evidence. One who works on training and fine-tuning reports no such sign. Several point to Anthropic's own announcement. One writes that an Anthropic employee replied that answers about AI research had been degraded at serving time during the first two days of Fable 5, called that a mistake that was fixed quickly, and said it is not done now; we have not seen that reply. One claims that Claude Code redirects requests to cheaper models.
+- **What Anthropic's announcement says** (https://www.anthropic.com/claude-fable-and-mythos-5-2, under "AI research and development"; the wording is as our fetch returned it):
+  - during training, "we took steps to limit advances in the specific research capabilities that could most directly accelerate AI development";
+  - in those areas, "including accelerator kernel optimization and improving large language model architectures", Fable 5.2 and Mythos 5.2 "perform at about the level of Opus 5.5";
+  - the changes "did not affect related capabilities like agentic coding, hardware development, and traditional AI or machine learning research";
+  - "We do not alter these capabilities as the model is being served to users (that is, at inference time)."
+- **The correction.** Point 3 said that this session knows of no mechanism that puts another model in its place. Anthropic's pages describe one. A request that the safeguards flag for cybersecurity or biology is answered by an earlier Opus model. And the announcement names "transparent fallbacks to Opus 5 for a small set of topics" in AI development, "including kernel development on certain nonstandard accelerators". None of these subjects is part of this project. We could not read the system card itself: the file was too large for the fetch.
+- **What this means for us.**
+  - The published limit is that a Fable model is about as good as Opus 5.5, and no better, in a narrow area. That is not a statement that it does worse work on purpose. On the post's wider claim we have no evidence either way.
+  - This project is coding and the evaluation of a search tool: kinds of work the announcement lists as not affected.
+  - The agents under test are Haiku 5.5, Sonnet 5.5 and Opus 5.5. The passage is about Fable 5.2 and Mythos 5.2.
+  - Both sides of every comparison use the same model. A weakness of a model is the same for `grep` and for codemem.
+  - This session has made ordinary mistakes in this project, for example a count taken from a summary and a time stamp ahead of the clock. They were found by recounting and by Andre's questions, and corrected here. That is the protection that works whatever the cause of an error.
+- **A check we could make ourselves, and made.** In the 437 agent sessions this track saved from its own experiments, all 3,521 answers name the model that was asked for (Haiku 2,846, Sonnet 545, Opus 130), and no session's usage table names another model. That is what the API reports; it cannot show more. In the real runs the eval's proxy sees the same field, and point 7 of the entry of 15:13 UTC (keep the proxy's sums by model in `run.json`) makes it checkable for every run.
+
 ## Checked
 
 - The probe's numbers: recounted from its 369 raw records.
 - The two links: this session could not open either. Its statements about itself are what its own instructions say, restated; it has no other knowledge of how it was trained.
+- Added at 16:24 UTC: the Hacker News thread and the two Anthropic pages were read through this session's fetch tool, which returns quotations in pieces. The post on X and the Reddit post were seen only as Andre's screenshots. The system card was not read. The 437 sessions were counted from their saved records.
 
 ## Left
 
