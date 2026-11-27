@@ -500,6 +500,7 @@ def test_run_one_locally(make_task, tmp_path, monkeypatch):
     assert ["docker", "rm", "-f", run[run.index("--name") + 1]] in calls
     # The GPU in both setups, and no codemem mount for grep.
     assert run[run.index("--device") + 1] == "nvidia.com/gpu=all" and run.count("-v") == 2
+    assert run[run.index("--ulimit"):run.index("--ulimit") + 2] == list(gen.NO_CORE_DUMPS)
     assert record["identity"]["codemem"] is None and record["integrity"]["gpus"] is True
     assert record["outcome"]["unexpected_paths"] == []
 

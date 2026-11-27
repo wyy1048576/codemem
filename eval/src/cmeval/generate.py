@@ -89,6 +89,13 @@ FAIL, PASS, SKIP = "fail", "pass", "skip"
 TIMEOUT_CODES = (124, 137)
 BUILD_TIMEOUT_MIN = 60  # the limit for one docker build
 FINGERPRINT_LABEL = "cmeval.fingerprint"
+# Every container that the package starts gets this limit, so that a process that crashes leaves no
+# core dump. On WSL 2, core_pattern is a pipe to a crash handler that writes the dump to the Windows
+# drive (three dumps of 47 GB each on 2026-11-26). The kernel skips a piped dump only when the limit
+# is exactly 1; with 0 it still pipes the dump. With a file pattern, 1 byte is less than one page, so
+# no core file is written either. It is not part of a fingerprint: it does not change an image or a
+# test result, only the dump of a process that dies.
+NO_CORE_DUMPS = ("--ulimit", "core=1:1")
 # Change this number when the validation script or the rules of judge() change, so old records are not used.
 VALIDATION_VERSION = 1
 
@@ -392,8 +399,8 @@ def run_in_container(tag: str, work: Path, *, prefix: str, limit: float, cpus: i
     does not stop when its client is killed). Returns False when the limit passed."""
     name = f"{prefix}-{uuid.uuid4().hex[:12]}"
     try:
-        _run(["docker", "run", "--rm", "--name", name, "--network", "none", f"--cpus={cpus}", "-v", f"{work}:/work",
-              tag, "bash", "/work/run.sh"], log=work / "docker.log", timeout=limit)
+        _run(["docker", "run", "--rm", "--name", name, "--network", "none", f"--cpus={cpus}", *NO_CORE_DUMPS,
+              "-v", f"{work}:/work", tag, "bash", "/work/run.sh"], log=work / "docker.log", timeout=limit)
     except subprocess.TimeoutExpired:
         _run(["docker", "rm", "-f", name])
         return False

@@ -528,6 +528,7 @@ def test_validate_task_writes_tests_with_the_fingerprint(make_task, monkeypatch)
     [(run, kwargs)] = [(c, k) for c, k in calls if c[:2] == ["docker", "run"]]
     assert kwargs["timeout"] == 10 * 60 * (2 * 3 * 1 + 1)
     assert run[run.index("--name") + 1].startswith("cmeval-validate-")
+    assert run[run.index("--ulimit"):run.index("--ulimit") + 2] == list(gen.NO_CORE_DUMPS)
     # The slowest suite run took 3 s; with one suite the slowest whole run is the same.
     assert record["slowest_test_run_s"] == 3.0 and record["slowest_whole_run_s"] == 3.0
 

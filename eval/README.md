@@ -86,6 +86,8 @@ ANTHROPIC_BASE_URL=http://127.0.0.1:8787 claude -p "..."
 
 **Validated once, checked again on the image that the runs use.** A task image can be removed after its validation to save disk, and built again with `cmeval generate --rebuild` before the runs. The new image is not validated again: `cmeval e2e grader-check` compares it test by test with the saved `tests.json`, and only this check counts. A task whose tests differ goes back to validation or leaves the completion score.
 
+**No crash dumps.** Every container that cmeval starts (validation, grading, the agent's run, and the helper that removes an index copy) runs with `--ulimit core=1:1`. A process that crashes in it leaves no core dump. On WSL 2 the limit must be 1, not 0: the kernel pipes the dump to WSL's crash handler, which writes it to the Windows drive, and it skips a piped dump only at the limit 1. The limit is not part of a fingerprint.
+
 `cmeval e2e run` starts Claude Code on a real issue in the task's container and records completion, tokens and time (`docs/plan/track-a-evals.md`, sections 4 to 7). The machine needs:
 
 - Docker, and the task images from `cmeval generate`. The runner makes the Docker network `cmeval-run` with `--internal` if it does not exist. A container on it reaches only the recording proxy, which listens on the network's gateway address on the host.
