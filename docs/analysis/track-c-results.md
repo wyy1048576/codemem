@@ -130,8 +130,9 @@ at ranks 45 and 44. No top 10 was touched, and on vLLM the whole search still re
 | | The exact index (a full scan) | The compact index |
 |---|---|---|
 | memory held for the search index | 278 MB | 106 MB |
-| the saved copy of the search index on disk | 261 MB | 86 MB |
-| the whole index folder on disk | 909 MB | 734 MB |
+| the saved copy of the search index on disk | 261 MB (197.2 for the code vectors, 63.3 for the usage vectors) | 86 MB |
+| the database on disk, the same with either index | 648 MB | 648 MB |
+| the whole index folder on disk: the database and the saved copy | 909 MB | 734 MB |
 | loading it at a start | 0.3 s | 0.3 s |
 | building it from the database (a first start) | 1.8 s | 18.6 s |
 | one search over the 109,562 code vectors | 8.1 ms | 7.5 ms |
@@ -143,9 +144,20 @@ question so that both saw the same machine.
 **Memory is the saving today: 3 times less at every size.** Per 100,000 vectors the exact index
 holds 186 MB and the compact one 63 MB.
 
-**On disk the saving is small.** The full 2-byte vectors stay in the database with either index
-(648 MB for vLLM): they are what step 3 reads, and what a search index is rebuilt from. Only the
-saved copy of the search index shrinks, so the folder is a fifth smaller, not three times.
+**On disk the saving is small.** The database is the same with either index. For vLLM its 648 MB
+are:
+
+| In the database | Size |
+|---|---|
+| the full 2-byte vectors | 297 MB |
+| the text of every function and class | 196 MB |
+| the keyword index | 58 MB |
+| the call graph and the lookup tables | 97 MB |
+
+The vectors there are what step 3 reads, and what a search index is rebuilt from, so they stay.
+Only the saved copy of the search index shrinks, so the folder is a fifth smaller, not three
+times. With the exact index the vectors are on disk twice: 297 MB in the database and 261 MB in
+the saved copy.
 
 **What the saved copy is for.** It is the search index as a file, so that a start loads it in
 0.3 s instead of building it from the database's rows (1.8 s for the exact index on vLLM, 18.6 s
