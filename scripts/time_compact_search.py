@@ -83,6 +83,12 @@ took. bench_search_scale.py times each query the first time it is asked, so its 
 includes reads from the disk wherever the index file is not all in memory: read its numbers
 against the disk line as well.
 
+--check: a guard to run by hand on a quiet machine, like scripts/check_faiss_calls.py (it is not
+a pytest test). The script then exits with status 1, and one line that says why, when at any size
+a compact search on all cores is more than SLOWER_SHARE (15%) and more than SLOWER_MS (2 ms)
+slower than on one thread (warmed timings only: the faster of a and k against d, so a cold disk
+cannot fail it), or when two configurations returned different hits for the same query. Without
+it, nothing changes.
 
 THE INDEXES are built as scripts/bench_search_scale.py builds them (the same synthetic vectors: 896
 numbers, around 2,000 centres, 1.25 vectors per chunk), and the compact search index (4 bits,
@@ -98,7 +104,7 @@ may add configurations.
 
 Options: --sizes (default 100000,500000), --configs (default abcdefghijk), --threads (what "all"
 means; default every CPU), --queries (default 50), --build-sizes (default the smallest size;
-"none" skips it), --keep-indexes. It needs numpy, faiss and codemem only.
+"none" skips it), --keep-indexes, --check. It needs numpy, faiss and codemem only.
 """
 
 from __future__ import annotations
@@ -501,6 +507,30 @@ def _same_results(results: dict, sizes: list[int], keys: list[str], field: str) 
     return lines
 
 
+def _check(results: dict, sizes: list[int]) -> str:
+    """Why --check fails, or "": all cores slower than one (warmed timings: the faster of a and k), or
+    two configurations' hits that differ for the same query."""
+    for n in sizes:
+        if (n, "a") not in results or (n, "d") not in results:
+            return f"configurations a and d did not both run at {n:,} vectors"
+        one = results[(n, "d")]["ms"]["search"]["p50"]
+        runs = {k: results[(n, k)]["ms"]["search"]["p50"] for k in "ak" if (n, k) in results}
+        k, every = min(runs.items(), key=lambda kv: kv[1])
+        if every - one > SLOWER_MS and every > one * (1 + SLOWER_SHARE):
+            return (f"at {n:,} vectors a compact search takes {every:.2f} ms on all cores ({k}) against {one:.2f} on one "
+                    f"thread (d): more than {SLOWER_SHARE:.0%} and {SLOWER_MS:g} ms slower")
+    for field, keys in (("hits", SAME_QUERIES), ("exact_hits", "ad")):
+        for n in sizes:
+            runs = {k: results[(n, k)][field] for k in keys if (n, k) in results and field in results[(n, k)]}
+            for k, run in runs.items():
+                ref = next(iter(runs))
+                if run != runs[ref]:
+                    differ = sum(x != y for x, y in zip(run, runs[ref]))
+                    return (f"at {n:,} vectors configuration {k} returned other hits than {ref} for {differ} of "
+                            f"{len(run)} queries ({'exact' if field == 'exact_hits' else 'compact'} index)")
+    return ""
+
+
 def _closing(results: dict, sizes: list[int], n_all: int) -> list[str]:
     """The closing block, in plain words: threads (which pool, by which configurations, which fix),
     the disk (a first read of rows), or neither."""
@@ -639,6 +669,8 @@ def run(args: argparse.Namespace) -> None:
     build_sizes = ([] if args.build_sizes == "none" else [int(s) for s in args.build_sizes.split(",")]
                    if args.build_sizes else [min(sizes)])
     keys = [k for k in args.configs if k in CONFIGS]
+    if args.check and not {"a", "d"} <= set(keys):
+        raise SystemExit("--check needs configurations a and d")
     work = Path(args.work)
     work.mkdir(parents=True, exist_ok=True)
     blas = np.show_config(mode="dicts")["Build Dependencies"]["blas"]
@@ -755,6 +787,11 @@ def run(args: argparse.Namespace) -> None:
         print(line)
     took = time.monotonic() - started
     print(f"took {took // 60:.0f} min {took % 60:.0f} s ({built_s:.0f} s building or reading the indexes)")
+    if args.check:
+        why = _check(results, sizes)
+        print(f"check: {'FAILED: ' + why if why else 'passed: on all cores no slower than on one, and the same hits everywhere'}")
+        if why:
+            sys.exit(1)
 
 
 def main() -> None:
@@ -766,6 +803,7 @@ def main() -> None:
     p.add_argument("--queries", type=int, default=50)
     p.add_argument("--build-sizes", default="", help="sizes at which a and d time a build from the rows (default: the smallest)")
     p.add_argument("--keep-indexes", action="store_true")
+    p.add_argument("--check", action="store_true", help="exit with status 1 when all cores are slower or results differ")
     sub = p.add_subparsers(dest="cmd")  # the steps `run` starts, each in a process of its own
     for name, fn in (("build", cmd_build), ("prepare", cmd_prepare), ("time", cmd_time)):
         s = sub.add_parser(name)
