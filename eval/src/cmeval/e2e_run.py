@@ -85,7 +85,9 @@ run.json has these fields:
   proxy_errors        the errors of the proxy log
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
                       preparation step, codemem_warm_s (the wait for codemem, a part of prep_s; null without
-                      codemem), container_start_s, collect_s, container_s, grade_s
+                      codemem), container_start_s, collect_s, container_s, grade_s, host_load_start and
+                      host_load_end (the host's load averages right before and right after docker run; null
+                      where /proc/loadavg does not exist)
   steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
                       command), and num_turns_result from the result event. In a setup with a block, the block is
                       one codemem search at turn 0. `cmeval e2e recount` computes it again
@@ -902,6 +904,16 @@ def _cmeval_commit() -> str | None:
     return head.stdout.strip() + ("-dirty" if dirty.stdout.strip() else "")
 
 
+def host_load(path: Path = Path("/proc/loadavg")) -> list[float] | None:
+    """The host's load averages over 1, 5 and 15 minutes (/proc/loadavg). None where the file does not exist,
+    as on a Mac. Other work on the machine, such as an image build, shows here."""
+    try:
+        values = [float(v) for v in path.read_text(encoding="utf-8").split()[:3]]
+    except (OSError, ValueError):
+        return None
+    return values if len(values) == 3 else None
+
+
 def _machine() -> dict:
     return {"hostname": socket.gethostname(), "platform": platform.platform(), "arch": platform.machine(),
             "cpu_count": os.cpu_count()}
@@ -987,7 +999,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             turn_limit["how"] = "docker kill"
 
     host_start_ns, host_timeout, docker_exit = time.time_ns(), False, None
-    index_bytes, index_removed = {}, None
+    index_bytes, index_removed, load = {}, None, {}
     t0 = time.monotonic()
     try:
         if codemem:
@@ -1006,6 +1018,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                                        args=(out / "stream.jsonl", counter, settings.turn_limit, stop, stop_agent,
                                              settings.poll_s))
             watcher.start()
+            load["start"] = host_load()
             try:
                 # The token is only in the environment of the docker client, which hands it to the container.
                 docker_exit = _run(cmd, log=out / "docker.log", env={**os.environ, TOKEN_ENV: token},
@@ -1015,6 +1028,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 host_timeout = True
                 _run(["docker", "rm", "-f", name])
             finally:
+                load["end"] = host_load()
                 stop.set()
                 watcher.join()
     finally:
@@ -1166,6 +1180,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                           if "collected" in prep["marks_ns"] and "agent_end" in clock else None),
             "container_s": round(container_s, 1),
             "grade_s": grade_s,
+            "host_load_start": load.get("start"),
+            "host_load_end": load.get("end"),
         },
         "steps": count_steps(stream["events"], task.gold.files,
                              block_paths=[r["path"] for r in block["results"]] if block else None),

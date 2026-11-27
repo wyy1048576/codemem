@@ -492,11 +492,15 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
 
 def test_run_one_locally(make_task, tmp_path, monkeypatch):
     recipe, task, calls, graded = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events())
+    loads = iter([[1.0, 1.5, 2.0], [3.0, 2.5, 2.0]])
+    monkeypatch.setattr(e2e_run, "host_load", lambda: next(loads))
     out = e2e_run.run_dir("r1", task.id, "grep", 1)
     record = e2e_run.run_one(recipe, task, setup="grep", model="claude-haiku-5-5", rep=1, out=out,
                              settings=RunSettings(poll_s=0.05))
 
     assert record["end"] == "finished" and record["completed"] is True and not record["discard"]
+    # The host's load right before and right after the container, in every setup.
+    assert record["time"]["host_load_start"] == [1.0, 1.5, 2.0] and record["time"]["host_load_end"] == [3.0, 2.5, 2.0]
     assert record["integrity"]["codemem_mount_proof"] is None
     assert record["run_id"] == "r1" and record["rep"] == 1 and record["identity"]["harness_version"] == "2.1.332"
     assert record["identity"]["prompt_frame"] == "v1" and record["identity"]["image_id"] == "sha256:abc"
@@ -1319,3 +1323,12 @@ def test_run_one_tool_stops_when_the_checkout_holds_more(make_task, tmp_path, mo
     assert record["integrity"]["setup_failures"][1:] == [
         f"mount proof: {checkout}/eval is present in the container",
         f"mount proof: {checkout} holds ['.venv', 'eval', 'src'] in the container, expected ['.venv', 'src']"]
+
+
+def test_host_load(tmp_path):
+    path = tmp_path / "loadavg"
+    path.write_text("0.52 1.25 2.00 3/812 41234\n")
+    assert e2e_run.host_load(path) == [0.52, 1.25, 2.0]
+    assert e2e_run.host_load(tmp_path / "none") is None
+    path.write_text("")
+    assert e2e_run.host_load(path) is None
