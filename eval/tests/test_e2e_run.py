@@ -578,8 +578,12 @@ def test_run_one_preconditions(make_task, monkeypatch, tmp_path):
 def test_plan_runs_by_repetition_with_setups_taking_turns(make_task):
     a, b = make_task(id="acme__auth-1"), make_task(id="acme__auth-2")
     order = [(t.id[-1], s, r) for t, s, r in e2e_run.plan_runs([a, b], ["grep", "tool"], 2)]
-    assert order == [("1", "grep", 1), ("1", "tool", 1), ("2", "grep", 1), ("2", "tool", 1),
-                     ("1", "tool", 2), ("1", "grep", 2), ("2", "tool", 2), ("2", "grep", 2)]
+    # The setup that goes first moves from task to task, and again at each repetition.
+    assert order == [("1", "grep", 1), ("1", "tool", 1), ("2", "tool", 1), ("2", "grep", 1),
+                     ("1", "tool", 2), ("1", "grep", 2), ("2", "grep", 2), ("2", "tool", 2)]
+    c = make_task(id="acme__auth-3")
+    order = e2e_run.plan_runs([a, b, c], ["grep", "tool", "codemem"], 2)
+    assert [s for _, s, _ in order[0::3]] == ["grep", "tool", "codemem", "tool", "codemem", "grep"]
     assert [s for _, s, _ in e2e_run.plan_runs([a], ["grep"], 3)] == ["grep"] * 3
 
 
@@ -994,7 +998,7 @@ def test_cli_dry_run_shows_the_index(make_task, tmp_path, monkeypatch, capsys):
     assert main(args) == 0
     assert capsys.readouterr().out.splitlines()[:4] == [
         "pandas-dev__pandas-1 grep 1 todo", "pandas-dev__pandas-1 tool 1 todo index ok",
-        "pandas-dev__pandas-2 grep 1 todo", "pandas-dev__pandas-2 tool 1 todo index missing"]
+        "pandas-dev__pandas-2 tool 1 todo index missing", "pandas-dev__pandas-2 grep 1 todo"]
 
 
 # ---- cmeval e2e index

@@ -1254,12 +1254,14 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
 
 def plan_runs(tasks: list[Task], setups: list[str], reps: int) -> list[tuple[Task, str, int]]:
     """The order of a batch: all of repetition 1 before repetition 2 (plan section 3.3). Inside one task the
-    setups take turns, and the setup that goes first moves by one at each repetition (plan 4.5, rule 8)."""
+    setups take turns (plan 4.5, rule 8). The setup that goes first moves by one from task to task and from
+    repetition to repetition, so that no setup always goes first or last: a later run can find the image's files
+    in the host's page cache."""
     order = []
     for rep in range(1, reps + 1):
-        shift = (rep - 1) % len(setups)
-        turn = setups[shift:] + setups[:shift]
-        order += [(task, setup, rep) for task in tasks for setup in turn]
+        for i, task in enumerate(tasks):
+            shift = (rep - 1 + i) % len(setups)
+            order += [(task, setup, rep) for setup in setups[shift:] + setups[:shift]]
     return order
 
 

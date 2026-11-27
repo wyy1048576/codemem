@@ -264,10 +264,10 @@ def test_setups_codemem_and_upfront(make_task):
 
 def test_plan_runs_with_the_two_setups(make_task):
     a, b = make_task(id="acme__auth-1"), make_task(id="acme__auth-2")
-    # grep and tool: the plan of before.
+    # grep and tool: the setup that goes first moves from task to task and at each repetition.
     assert [(t.id[-1], s, r) for t, s, r in e2e_run.plan_runs([a, b], ["grep", "tool"], 2)] == [
-        ("1", "grep", 1), ("1", "tool", 1), ("2", "grep", 1), ("2", "tool", 1),
-        ("1", "tool", 2), ("1", "grep", 2), ("2", "tool", 2), ("2", "grep", 2)]
+        ("1", "grep", 1), ("1", "tool", 1), ("2", "tool", 1), ("2", "grep", 1),
+        ("1", "tool", 2), ("1", "grep", 2), ("2", "grep", 2), ("2", "tool", 2)]
     four = e2e_run.plan_runs([a], ["grep", "tool", "codemem", "upfront"], 2)
     assert [(s, r) for _, s, r in four] == [("grep", 1), ("tool", 1), ("codemem", 1), ("upfront", 1),
                                             ("tool", 2), ("codemem", 2), ("upfront", 2), ("grep", 2)]
