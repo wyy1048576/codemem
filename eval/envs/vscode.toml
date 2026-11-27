@@ -7,7 +7,11 @@
 repo = "microsoft/vscode"
 # .nvmrc is 24.17.0 to 24.22.0 in the task window. The repo accepts its .nvmrc version or a newer
 # one with the same major version (build/npm/preinstall.ts), so the newest one serves all tasks.
-base_image = "node:24.22.0-bookworm"
+# Debian trixie, not bookworm: native-keymap includes the V8 headers, and the headers of Electron 43
+# put a GNU attribute after a standard attribute in a class head (v8-primitive.h). GCC 12 of
+# bookworm rejects this order; GCC 14 of trixie accepts it. The package names below also work on
+# trixie (apt selects the t64 packages).
+base_image = "node:24.22.0-trixie"
 
 base_setup = [
     # Build tools for the native modules (the list in the repo's wiki for Linux), the X server for
@@ -15,6 +19,26 @@ base_setup = [
     "apt-get update && apt-get install -y --no-install-recommends build-essential g++ python-is-python3 pkg-config libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev xvfb xauth libgtk-3-0 libnss3 libgbm1 libasound2 libxss1 libxtst6 libxshmfence1 libdrm2 libatk-bridge2.0-0 libcups2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libpango-1.0-0 libcairo2 libatspi2.0-0 libdbus-1-3 fonts-dejavu-core && rm -rf /var/lib/apt/lists/*",
     # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
     "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+    # cmeval-vscode-headers: download the Node.js and Electron headers of each .npmrc that names a
+    # target, one version at a time, before npm ci. npm ci runs node-gyp for many native modules in
+    # parallel. When the headers are not in the cache yet, each node-gyp downloads them into the same
+    # folder, and one can read a file that another still writes (an empty common.gypi). The lock
+    # keeps two builds that share the cache mount apart. --ensure keeps headers that are complete.
+    '''printf '%s\n' \
+    '#!/bin/bash' \
+    'set -eu' \
+    'cd /testbed' \
+    'mkdir -p /root/.cache' \
+    'exec 9>/root/.cache/node-gyp.lock' \
+    'flock 9' \
+    'for f in $(git ls-files | grep -E "(^|/)\.npmrc$"); do' \
+    '  t=$(sed -n "s/^target=\"*\([^\"]*\)\"*$/\1/p" "$f")' \
+    '  d=$(sed -n "s/^disturl=\"*\([^\"]*\)\"*$/\1/p" "$f")' \
+    '  if [ -n "$t" ] && [ -n "$d" ]; then' \
+    '    node /usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js install --ensure --target="$t" --dist-url="$d"' \
+    '  fi' \
+    'done' \
+    > /usr/local/bin/cmeval-vscode-headers && chmod +x /usr/local/bin/cmeval-vscode-headers''',
     # cmeval-vscode-out: transpile src/ to out/ with the step of the repo's CI unit test job, but only
     # when src/ differs from the last transpile. The tests load out/, and the validation applies the
     # test patch with no refresh after it, so each test command calls this first.
@@ -72,12 +96,13 @@ base_setup = [
 
 # The lock files fix every package version. The root postinstall installs the packages of every
 # folder in build/npm/dirs.ts (build, remote, extensions, test), and builds the native modules
-# against the Electron headers of .npmrc. The npm cache is in /root/.cache (a build cache, not in
-# the image), so it does not make the image larger and later builds reuse it. The Electron and
-# browser downloads of the npm packages are off, as in the repo's CI: scripts/test.sh uses the
-# Electron of `npm run electron` in .build/electron, at the version of .npmrc.
+# against the Electron headers of .npmrc (cmeval-vscode-headers downloads them first). The npm
+# cache is in /root/.cache (a build cache, not in the image), so it does not make the image larger
+# and later builds reuse it. The Electron and browser downloads of the npm packages are off, as in
+# the repo's CI: scripts/test.sh uses the Electron of `npm run electron` in .build/electron, at the
+# version of .npmrc.
 build = [
-    "ELECTRON_SKIP_BINARY_DOWNLOAD=1 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm_config_cache=/root/.cache/npm npm ci",
+    "cmeval-vscode-headers && ELECTRON_SKIP_BINARY_DOWNLOAD=1 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm_config_cache=/root/.cache/npm npm ci",
     "npm run electron && test -x .build/electron/code-oss",
     "cmeval-vscode-out",
 ]
