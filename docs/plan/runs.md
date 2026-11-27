@@ -151,7 +151,8 @@ Every model runs a part of the same sample, so that models are compared on the s
 - The three Claude models are for the presentation. Codex is considered for the paper.
 - **The Claude runs go on Andrew's PC, and they come first there.**
 - **The open models run on a rented GPU** (Nebius), in their own harness, started by Andre. They
-  use none of the Claude seats and nothing of the PC.
+  use none of the Claude seats and nothing of the PC. The harness and the models are expected to
+  be ready on Sat Nov 28.
 
 **What every run records:** whether the hidden tests pass; tokens; time; and the turn at which
 the agent first sees a gold file in a result, first opens one, and first edits one. The last
@@ -268,8 +269,8 @@ track C the index, before any more seats are spent.
 
 **What fits.** codemem is locked on Nov 27 at 16:30 Pacific. The runs start at 17:00 Pacific
 (Nov 28, 01:00 UTC), and the results are frozen on Nov 30 at 23:59 Pacific (Dec 1, 07:59 UTC):
-79 hours. Steps 1 to 4 take 53 to 74 of
-them without a pause, which leaves 5 to 26 hours for steps 5 to 7.
+79 hours. Sat Nov 28 and Sun Nov 29 are reserved for running. Steps 1 to 4 take 53 to 74 of the
+79 hours without a pause, which leaves 5 to 26 hours for steps 5 to 7.
 
 - **The 5 to 7 minutes are an assumption.** The pilot measured 4.3 to 5.5 minutes for Haiku at
   L0. Nobody has measured Sonnet or Opus, vague prompts took more tokens in the pilot, and a

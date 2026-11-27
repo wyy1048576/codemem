@@ -30,9 +30,11 @@ give it a good system to test.
 - the retrieval eval kept short, with a vague query per task and two stronger baselines (§12.2);
 - a release with the paper: the generator, the pipeline, the tasks and the run records.
 
-**When.** The pipeline is being tested on two repos with today's codemem now. The improved codemem
-is frozen on the evening of Nov 25. The full runs start on Nov 26, and the model gap runs beside
-them on its own endpoint. The freeze is aimed at Nov 30, 23:59. The
+**When.** The improved codemem is frozen on Nov 27 at 16:30 Pacific. The full runs start the same
+day at 17:00 Pacific, with the check run: its report is read before the batches run unattended
+overnight ([runs.md](runs.md) §6). Sat Nov 28 and Sun Nov 29 are reserved for running. The model
+gap runs beside them on its own endpoint, once the open harness and the open models are ready,
+which is expected on Sat Nov 28. The freeze is aimed at Nov 30, 23:59. The
 hard limit is the presentation on Dec 1 at 14:00. Six more
 days of refining follow, to the paper on December 7. The schedule, night by night, is in §14.
 
@@ -351,7 +353,7 @@ shrinks to 15 per repo, then to 12. The languages stay. The number of tasks give
 
 **Dev and test.** Every task is marked dev or test, and our own tasks keep the mark they already
 carry from the retrieval eval (§8.1). The sample holds both. Tracks B and C tune on dev tasks
-only, so the test tasks of the sample are run once, with the configuration frozen on Nov 25
+only, so the test tasks of the sample are run once, with the configuration frozen on Nov 27
 ([overview.md](overview.md) §8).
 
 **Runs are scheduled by repetition.** Repetition 1 of every task in every setup comes first, then
@@ -1505,9 +1507,9 @@ The dates are in [overview.md](overview.md) §8.
 
 | By | Packages | What it gives the team |
 |---|---|---|
-| **Nov 25** | A1, A2, A3 and the integrity checks of A4; A9 for pandas and playwright, then ruff, kubernetes and duckdb; from A6, mini-SWE-agent and the localization tier; the computed labels of A7; the sample and the analysis plan | the pipeline tested end to end on two repos with today's codemem; validated tasks for every repo that is ready; the open harness working with one model; the sample of tasks and the measures fixed before the full runs. Tracks B and C can run the pipeline themselves |
-| **Nov 26–30, first:** the runs for the presentation | A12, with a first A5; A11 with the 9B model | baseline and final on the sample of every repo that is up, three repetitions; today's codemem on the medium tasks; the model gap for at least one open model. The freeze is aimed at Nov 30, 23:59. The hard limit is the presentation of Dec 1 at 14:00 |
-| **Nov 26–30, beside the runs** | the rest of A6 and A11; A9 for further repos; A10; A7 and A8 completed; the rest of A4 and A5; the part of A13 that goes with a paper | everything else in the track, as far as the lanes allow without slowing the runs: the other open models, more repos, the retrieval table with Go and Rust, its vague column and its two baselines, a vague version of every prompt. The aim is to leave nothing open after December 1 |
+| **Nov 27, 16:30 Pacific** | A1, A2, A3 and the integrity checks of A4; A9 for pandas and playwright, then ruff, kubernetes and duckdb; from A6, mini-SWE-agent and the localization tier; the computed labels of A7; the sample and the analysis plan | the pipeline tested end to end on two repos with today's codemem; validated tasks for every repo that is ready; the open harness working with one model, which is expected on Sat Nov 28; the sample of tasks and the measures fixed before the full runs. Tracks B and C can run the pipeline themselves |
+| **Nov 27, 17:00 Pacific, to Nov 30, first:** the runs for the presentation | A12, with a first A5; A11 with the 9B model | the runs of [runs.md](runs.md), in its order, with the check run first; the model gap for at least one open model, once the open harness and the open models are ready. The freeze is aimed at Nov 30, 23:59. The hard limit is the presentation of Dec 1 at 14:00 |
+| **Nov 27–30, beside the runs** | the rest of A6 and A11; A9 for further repos; A10; A7 and A8 completed; the rest of A4 and A5; the part of A13 that goes with a paper | everything else in the track, as far as the lanes allow without slowing the runs: the other open models, more repos, the retrieval table with Go and Rust, its vague column and its two baselines, a vague version of every prompt. The aim is to leave nothing open after December 1 |
 | **Dec 7:** the paper and final report | the writing, and whatever is still open | the paper, with the code, the task list and the run records |
 | **No date** | Java, in A9 and A10, as a bonus. As future work: a generator that takes any repo without a recipe, and the rest of A13 | a sixth language; tasks from any GitHub link; a dataset release with its datasheet |
 
@@ -1544,15 +1546,10 @@ It does not wait for the date.
 
 | Night of | Lane 1: seats | Lane 2: Docker | Lane 3: GPU | Lane 4: endpoint | Lane 5 |
 |---|---|---|---|---|---|
-| **Sun Nov 22** | bring-up runs on a few pandas tasks, with Haiku, in `grep` and `tool` | pandas: the recipe and its admission check, then validation of 60 candidates. Then playwright | index the pandas and playwright task commits with today's codemem | — | `collect` for ruff and kubernetes; the file-level labeler; the Rust rule for tests |
-| **Mon Nov 23** | the first end-to-end test (§2.2) on pandas and playwright: Haiku, then Sonnet | playwright: validation. ruff: the recipe and its admission check | — | the harness trial with the 9B model (§4.6) | labels; draw the sample for the two repos |
-| **Tue Nov 24** | today's codemem against the baseline on both repos, three repetitions, turn about. The iteration plan for tracks B and C | ruff and kubernetes: validation. duckdb: the recipe | index the medium tasks of every validated repo with today's codemem | localization with the 9B model on pandas and playwright | the plan file and a dry run of it; the analysis plan |
-| **Wed Nov 25** | the canary; the adoption check for track B | duckdb: validation. home-assistant: the recipe | after the evening freeze: index every sampled task with `codemem-final`, pandas and playwright first | localization with the 9B model on every repo that is up | the sample and the analysis plan committed, before the freeze |
-| **Thu Nov 26** | **the main batch, repetition 1:** `grep`, final and today's turn about, repo by repo in the order of §8.3 | grading as runs finish. home-assistant and vscode: validation | index the next repos | end to end with the 9B model, easy and medium, repetition 1 | a first report, after repetition 1 of the first two repos |
-| **Fri Nov 27** | repetition 1 for the remaining repos; repetition 2 starts | grading; further repos | index what is left | the 9B model: repetitions 2 and 3, and the hard probe | the Go and Rust labelers; the retrieval eval on ruff and kubernetes |
-| **Sat Nov 28** | repetitions 2 and 3 | grading | — | the 27B model: localization, then end to end | vague rewrites for a subset, with their checks |
-| **Sun Nov 29** | repetition 3; then the vague subset | grading | — | the 14B model, if the 27B is done | the tables, per language and overall |
-| **Mon Nov 30** | only what is missing. No new run after 18:00 | grading | — | only what is missing | the final tables, by 23:59 |
+| **Fri Nov 27** | 16:30 Pacific: codemem is frozen. 17:00: **the check run** ([runs.md](runs.md) §6), and its report. When it has passed, **repetition 1 of Haiku and of Sonnet** starts, repo by repo in the order of [runs.md](runs.md) §7, and runs unattended overnight | grading as runs finish. The hard tier of the repos that are run | index the tasks that are about to run, with the frozen codemem | — | the sample of each repo committed before its first run |
+| **Sat Nov 28:** reserved for running | repetition 1 goes on; then Opus; then repetitions 2 and 3 of Haiku start | grading; the hard tier, and the medium tier where a repo is short | index the hard tasks as they are ready | the open harness and the open models are expected to be ready: end to end with the 9B model, repetition 1 | a first report, after repetition 1 of the first two repos |
+| **Sun Nov 29:** reserved for running | repetitions 2 and 3 of Haiku; then kubernetes, once | grading | — | the 9B model: repetitions 2 and 3, and the probe; then the 27B model | the tables, per language and overall |
+| **Mon Nov 30** | only what is missing; repetitions 2 and 3 of Sonnet if time is left. No new run after 18:00 | grading | — | the 14B model, if the 27B is done; only what is missing | the final tables, by 23:59 |
 
 **Nov 30, 23:59 is the freeze we aim for.** The hard limit is Dec 1, before the presentation at
 14:00, and that morning is for preparing the presentation, not for runs.
@@ -1630,7 +1627,7 @@ That entry is what the three of us read in the morning.
 
 | With | A needs | A gives |
 |---|---|---|
-| **Track B** | `codemem-today` frozen now, the final configuration on the evening of Nov 25; a timing log from codemem for each search (§5.5); no change to tool names or card layout without notice; a note in the work log each time a new piece of retrieval has passed its gate on the retrieval eval and can run | the iteration plan (§3.4); vague rewrites of the dev tasks, a first subset by Nov 24 if it is to count for the freeze; end-to-end comparisons of card formats; the adoption numbers track B needs |
+| **Track B** | `codemem-today` frozen now, the final configuration on Nov 27 at 16:30 Pacific; a timing log from codemem for each search (§5.5); no change to tool names or card layout without notice; a note in the work log each time a new piece of retrieval has passed its gate on the retrieval eval and can run | the iteration plan (§3.4); vague rewrites of the dev tasks, a first subset by Nov 24 if it is to count for the freeze; end-to-end comparisons of card formats; the adoption numbers track B needs |
 | **Track C** | a note in the work log as soon as the compact store works on one repo; before the first runs that embed through an API, a codemem install that works in a container without PyTorch; the compact configuration frozen; the embedding configuration for each batch, a local model first and Qwen through Nebius later; memory, disk and build-time numbers per repo | the same iteration plan and vague rewrites |
 
 **The eval stays independent of codemem.** `cmeval` never imports codemem except in its one
