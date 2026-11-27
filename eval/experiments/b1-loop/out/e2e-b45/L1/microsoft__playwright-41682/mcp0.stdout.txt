@@ -1,0 +1,66 @@
+{
+ "arm": "mcp",
+ "task": "microsoft__playwright-41682",
+ "exit": 0,
+ "seconds": 35,
+ "cost_usd": 0.08544600000000001,
+ "turns": 7,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 14758,
+  "cache_read_input_tokens": 64960,
+  "output_tokens": 1989,
+  "output_tokens_details": {
+   "thinking_tokens": 340
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 14758,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 417,
+    "cache_read_input_tokens": 12991,
+    "cache_creation_input_tokens": 1767,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1767
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 3,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/isomorphic/urlMatch.ts | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "final": "The fix is complete. Every caller goes through `resolveGlobToRegexPattern`, which calls `resolveGlobBase`. That covers `page.route`, `context.route`, `routeWebSocket`, `waitForURL` and `toHaveURL`. I found no other copy of the placeholder logic, so no other file needs a matching change.\n\n**Change:** in `packages/isomorphic/urlMatch.ts`, the `mapToken` helper inside `resolveGlobBase` now replaces a part of the pattern with a placeholder only if it contains `*`, `?`, `{`, `}` or a backslash. Literal parts (host, port, path segments) go through URL resolution as they did in 1.50.\n\n**Effect:**\n- `http://localhost:80/**` now resolves to `http://localhost/**`, so the route matches again.\n- A space in a pattern becomes `%20`, as it does in the request URL.\n- `m\u00fcnchen.de` becomes its punycode form `xn--mnchen-3ya.de`.\n- Patterns with glob characters in a segment are still protected. The earlier fix for question marks still works, because the `?` suffix always contains `?` and is always replaced.\n\nI haven't run anything, including the tests, and I didn't add a test for these cases.",
+ "stderr": "",
+ "hook_events": [
+  {
+   "hook": "Stop",
+   "tool": null,
+   "event": "review",
+   "diff_chars": 706
+  }
+ ],
+ "codemem_searches": 0,
+ "codemem_ks": [],
+ "codemem_keyword_only": 0
+}
+

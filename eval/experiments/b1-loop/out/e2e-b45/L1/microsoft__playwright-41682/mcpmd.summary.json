@@ -1,0 +1,58 @@
+{
+ "arm": "mcpmd",
+ "task": "microsoft__playwright-41682",
+ "exit": 0,
+ "seconds": 35,
+ "cost_usd": 0.058848700000000004,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 11536,
+  "cache_read_input_tokens": 29087,
+  "output_tokens": 978,
+  "output_tokens_details": {
+   "thinking_tokens": 193
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 11536,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 249,
+    "cache_read_input_tokens": 11000,
+    "cache_creation_input_tokens": 536,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 536
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/isomorphic/urlMatch.ts | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "final": "I changed `resolveGlobBase` in `packages/isomorphic/urlMatch.ts` so only the parts of a pattern that contain glob characters (`*`, `?`, `{`, `}`, `\\`) are swapped for placeholders. Parts with none of those characters now go through URL resolution unchanged. I haven't built or run anything, and I didn't add tests.\n\nWith this, `http://localhost:80/**` resolves with the default port dropped, so it can match the request URL. Spaces become `%20`, and `m\u00fcnchen.de` becomes its punycode form. Parts with a `?` still use the existing placeholder handling, so the earlier fix for question marks in patterns is untouched.\n\nThe one rule I added is that a part with none of those characters is returned as is.",
+ "stderr": "",
+ "hook_events": [],
+ "codemem_searches": 0,
+ "codemem_ks": [],
+ "codemem_keyword_only": 0
+}

@@ -1,0 +1,15 @@
+diff --git a/packages/isomorphic/urlMatch.ts b/packages/isomorphic/urlMatch.ts
+index 30cd9a9..b54e235 100644
+--- a/packages/isomorphic/urlMatch.ts
++++ b/packages/isomorphic/urlMatch.ts
+@@ -215,6 +215,10 @@ function resolveGlobBase(baseURL: string | undefined, match: string): string {
+     function mapToken(original: string, replacement: string) {
+       if (original.length === 0)
+         return '';
++      // Literal parts go through URL resolution as is, so that default ports,
++      // percent-encoding and punycode are normalized like in the request url.
++      if (!/[*?{}\\]/.test(original))
++        return original;
+       tokenMap.set(replacement, original);
+       return replacement;
+     }

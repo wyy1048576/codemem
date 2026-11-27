@@ -70,8 +70,8 @@ def reset(task):
 
 def run_arm(task, arm, out):
     copy = copy_dir(task)
-    if arm == "grep":
-        cmd, env = [PY, str(HERE / "e2e_run.py"), str(tasks_file), task["id"], "grep", str(copy), str(out)], os.environ.copy()
+    if arm in ("grep", "mcp", "mcp0", "mcpmd"):  # mcp: Claude Code + codemem MCP + hooks + instructions (e2e_run.py)
+        cmd, env = [PY, str(HERE / "e2e_run.py"), str(tasks_file), task["id"], arm, str(copy), str(out)], os.environ.copy()
     elif arm == "hybrid_v2":  # e2e_hybrid2.py: grep / codemem / open in one cached conversation (plan A-G, 2026-11-27)
         cmd = [PY, str(HERE / "e2e_hybrid2.py"), str(tasks_file), task["id"], str(copy), str(out)]
         env = os.environ.copy() | {"LOOP_TAG": arm}
