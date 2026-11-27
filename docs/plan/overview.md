@@ -1,6 +1,6 @@
 # codemem, the next phase: overall plan
 
-**Status:** a plan, written Nov 22, 2026. Nothing in this folder is built yet. How codemem works
+**Status:** a plan, written Nov 22, 2026. Built since: see the work log. How codemem works
 today is in [architecture.md](../architecture.md).
 
 **In one sentence.** codemem becomes the system under test for one question: *when does an index
@@ -69,10 +69,12 @@ product.
 6. **What runs on what.** The baseline and the final codemem on a fixed sample of tasks from
    every repo, in several languages. Today's codemem on the medium tasks only. An open model, the
    9B first, on easy and medium tasks, with a few hard ones as a probe.
-7. **Dates.** November 25, evening: tracks B and C have delivered, and the improved codemem is
-   frozen. November 26: the full runs start. November 30, 23:59: the freeze we aim for.
-   December 1, 14:00: the presentation, which is the hard deadline. December 7: the paper, after
-   six more days of refining. Bonus goals and future work have no date (§8.3).
+7. **Dates.** November 27, 16:30 Pacific: tracks B and C have delivered, and the improved codemem
+   is frozen. November 27, 17:00 Pacific: the full runs start. November 30, 23:59: the freeze we
+   aim for. December 1, 14:00: the presentation, which is the hard deadline. December 7: the first
+   submission of the paper, after six more days of refining; the date is soft. December 10, at
+   the latest: the paper at the level of a conference. Bonus goals and future work have no date
+   (§8.3).
 
 **Seven things the research changed.** Each is explained where it is used. The middle column is
 *(reported)*, except the last row.
@@ -321,8 +323,8 @@ three places a new stage must touch, in one search.
 | The embedding configuration the eval uses: a local model first, Qwen through Nebius later | C → A, B | with each frozen configuration |
 | A note in the work log each time a new piece of retrieval or a new index format can run | B, C → A | as soon as it works on one repo, not only at a freeze |
 | A codemem install without PyTorch, for the `api` embedding option | C → A | before track A's first runs that embed through an API. Its first runs use the local model |
-| `codemem-final`, frozen for the full runs | B, C → A | Nov 25, evening |
-| The analysis plan: the measures and the tests, fixed before the full runs | A → everyone | Nov 25 |
+| `codemem-final`, frozen for the full runs | B, C → A | Nov 27, 16:30 Pacific |
+| The analysis plan: the measures and the tests, fixed before the full runs | A → everyone | Nov 27, before the first run |
 | Memory, disk and build-time numbers per repo | C → A | with each frozen configuration |
 | Vague rewrites of the retrieval eval's dev tasks | A → B, C | a first subset by Nov 24 if it is to count for the freeze; the rest during the full runs |
 | End-to-end verdicts on card formats and on reranking | A → B, C | after the first full batches |
@@ -396,9 +398,9 @@ is a saving, the difference between two runs of one task, so both runs are alway
 same instrument ([track A](track-a-evals.md) §5).
 
 **Dev and test.** Everything is built and tuned on the dev split. The configuration is frozen on
-Nov 25, and the analysis plan is written down the same day. From Nov 26 the frozen configuration
-runs on every task, and the test tasks are run once. Writing the plan first is what
-"pre-registered" means, and the strongest prior study did it.
+Nov 27 at 16:30 Pacific, and the analysis plan is written down before the first run. From 17:00
+Pacific on that day the frozen configuration runs on every task, and the test tasks are run once.
+Writing the plan first is what "pre-registered" means, and the strongest prior study did it.
 
 **Names for configurations.** No version numbers.
 
@@ -407,7 +409,7 @@ runs on every task, and the test tasks are run once. Writing the plan first is w
 | `codemem-today` | the current default, frozen on Nov 23. The "simple version" in every comparison |
 | `codemem-layered` | track B's retrieval on today's storage |
 | `codemem-compact` | track C's storage under today's retrieval |
-| `codemem-final` | both together: the configuration we present. Frozen on Nov 25, before the full runs. A later change is a new freeze, and its date goes into the report |
+| `codemem-final` | both together: the configuration we present. Frozen on Nov 27 at 16:30 Pacific, before the full runs. A later change is a new freeze, and its date goes into the report |
 
 **What runs on what.** The baseline (the agent without codemem) and `codemem-final` run on a fixed
 sample of the prepared tasks: 20 per repo, spread over easy, medium and hard. `codemem-today` runs
@@ -449,30 +451,32 @@ pipeline's first runs give us, and it sizes everything after it.
 
 ## 8. Timeline
 
-Four dates. The aim is to leave nothing open after December 1 except the paper. Nothing in this plan
+Six dates. The aim is to leave nothing open after December 1 except the paper. Nothing in this plan
 is sized in working days: these are the deadlines, and we work towards them.
 
 | Date | What is due | What "done" means |
 |---|---|---|
-| **Wed Nov 25, evening** | **the improved codemem is frozen** as `codemem-final` | tracks B and C have delivered. The configuration holds what has passed its gate, and nothing else. The analysis plan is written down |
+| **Fri Nov 27, 16:30 Pacific** | **the improved codemem is frozen** as `codemem-final` | tracks B and C have delivered. The configuration holds what has passed its gate, and nothing else. The analysis plan is written down |
+| **Fri Nov 27, 17:00 Pacific** | **the full runs start** | the check run comes first, and its report is read before the batches run unattended overnight ([runs.md](runs.md) §6). Sat Nov 28 and Sun Nov 29 are reserved for running |
 | **Mon Nov 30, 23:59** | **the freeze we aim for** | the full runs have finished on a sample of tasks from every repo that is up, in several languages; the model gap has at least one open model; the tables and the slides are final. This date is soft |
 | **Tue Dec 1, 14:00** | **the presentation: the hard deadline** | the slides are submitted and everything is ready before then. The morning is for preparing the presentation, which is why the freeze is aimed at the night before |
-| **Mon Dec 7** | **the paper and final report,** in the style of a conference paper | the same results, refined for six more days, with the runs that were still open and the limits stated plainly |
+| **Mon Dec 7** | **the paper and final report: the first submission,** in the style of a conference paper. This date is soft, for all of us | the same results, refined for six more days, with the runs that were still open and the limits stated plainly |
+| **Thu Dec 10** | **the paper at the level of a conference,** at the latest | what the first submission left open is closed, or stated plainly as a limit |
 | no date | bonus goals and future work (§8.3) | a bonus is taken up if time is left; future work is beyond this timeline |
 
 ### 8.1 Now to November 30
 
 Three of us, working long days. The full runs need the most clock time, so everything else is
-arranged to let them start on Nov 26.
+arranged to let them start on Nov 27 at 17:00 Pacific.
 
 | Days | Track A | Track B | Track C | Check at the end |
 |---|---|---|---|---|
-| **Nov 23–25** | the pipeline tested end to end on two repos with today's codemem, which is running now: A1, A2, A3 and the integrity checks of A4. A9: tasks for the next repos, with ruff (Rust) and kubernetes (Go) next. From A6: the open harness for the model gap. A7: the labels that can be computed. The sample and the analysis plan | `codemem-today` tagged on day 1. B1, then B2, B8, B4, and B3 for Python, TypeScript, Go, Rust, C and C++. B8 is tools loaded up front and the text that ships, with an adoption check on track A's two repos. Each piece passes its gate on the retrieval eval before it goes in | C1, then C2 and C3. C8: the `api` and `light` embedding presets | **Nov 25, evening: `codemem-final` is frozen.** It holds what has passed its gate |
-| **Nov 26–30** | **the full runs start on Nov 26:** baseline and final on the sample of every repo that is up, three repetitions; today's codemem on the medium tasks; the vague subset. **The model gap runs beside them** on its own endpoint, with the 9B model first. More repos join as their tasks validate. Reports as batches finish | the retrieval table, layer by layer, and everything else in the track. Help with the runs. No change to the frozen configuration | memory, disk and scan time from 100,000 to 1,000,000 vectors, and what each embedding option costs. The rest of the track: the third embedding option, the cache cap, branches. Help with the runs | **Nov 30, 23:59: the freeze we aim for.** The hard limit is the presentation on Dec 1 |
+| **Nov 23–27** | the pipeline tested end to end on two repos with today's codemem, which is running now: A1, A2, A3 and the integrity checks of A4. A9: tasks for the next repos, with ruff (Rust) and kubernetes (Go) next. From A6: the open harness for the model gap. A7: the labels that can be computed. The sample and the analysis plan | `codemem-today` tagged on day 1. B1, then B2, B8, B4, and B3 for Python, TypeScript, Go, Rust, C and C++. B8 is tools loaded up front and the text that ships, with an adoption check on track A's two repos. Each piece passes its gate on the retrieval eval before it goes in | C1, then C2 and C3. C8: the `api` and `light` embedding presets | **Nov 27, 16:30 Pacific: `codemem-final` is frozen.** It holds what has passed its gate |
+| **Nov 27–30** | **the full runs start on Nov 27 at 17:00 Pacific,** with the check run first: its report is read before the batches run unattended overnight. What runs, and in what order, is in [runs.md](runs.md). Sat Nov 28 and Sun Nov 29 are reserved for running. **The model gap runs beside them** on its own endpoint, with the 9B model first, once the open harness and the open models are ready, which is expected on Sat Nov 28. More repos join as their tasks validate. Reports as batches finish | the retrieval table, layer by layer, and everything else in the track. Help with the runs. No change to the frozen configuration | memory, disk and scan time from 100,000 to 1,000,000 vectors, and what each embedding option costs. The rest of the track: the third embedding option, the cache cap, branches. Help with the runs | **Nov 30, 23:59: the freeze we aim for.** The hard limit is the presentation on Dec 1 |
 | **Dec 1, 14:00** | the presentation | | | |
 
 **The order within tracks B and C.** Each track works in the order below. The freeze takes what
-has passed its gate by the evening of Nov 25. A piece that passes later goes into the retrieval
+has passed its gate by Nov 27, 16:30 Pacific. A piece that passes later goes into the retrieval
 table, and into a later freeze if there is one.
 - **Track B:** B1, then B2 (keywords and exact lookup), then B8 (the integration), then B4 (the
   query path), then B3 (the linking rule, for Python, TypeScript, Go, Rust, C and C++), then the
@@ -494,9 +498,10 @@ perfect.
 | Days | What happens |
 |---|---|
 | **Dec 2–6** | Write the paper and the final report. Finish what is still open: the other open models of the model gap and the second open harness ([track A](track-a-evals.md) §4.6 and §11); what explains the headline, each on a subset (results up front, the placebo, the vague prompts); any repos left on the list; anything in tracks B and C that was not finished by December 1. Fix what the presentation exposed |
-| **Dec 7** | the paper and final report are finished, with the code, the task list and the run records |
+| **Dec 7** | the paper and final report are submitted for the first time, with the code, the task list and the run records. The date is soft |
+| **Dec 8–10** | the paper is brought to the level of a conference, by Dec 10 at the latest |
 
-**If codemem changes after the freeze of Nov 25,** the changed configuration is run on the same
+**If codemem changes after the freeze of Nov 27,** the changed configuration is run on the same
 tasks, and the paper reports both and says which numbers belong to which. No number from the
 first run is replaced silently.
 
@@ -550,8 +555,9 @@ Cut scope, never the checks.
 
 ## 9. The paper
 
-**One paper, targeted for December 7, 2026,** written in the style of a conference paper, with
-its limits stated (§8.2). It is also the course's final report.
+**One paper, first submitted on December 7, 2026,** a soft date, written in the style of a
+conference paper, with its limits stated (§8.2). It has until December 10 to reach the level of
+a conference. It is also the course's final report.
 
 **Where it could go afterwards.** This is not part of the plan's deadlines. It is listed so the
 paper is written with a venue's rules in mind. All *(reported)*.
@@ -684,7 +690,7 @@ documents. Decide from that whether it is an extension of this paper or a second
 | 1 | Who takes which track | decided: A is Andrew's, B is Wilson's, C is Andre's ([CONTRIBUTING.md](../../CONTRIBUTING.md)) |
 | 2 | The order of the repos our tasks come from | pandas, playwright, ruff, kubernetes and duckdb for five languages, then home-assistant, vscode, airflow and vllm. A Java repo is a bonus ([track A](track-a-evals.md) §8.3). kafka cannot be collected, because its issues are not on GitHub; keycloak, quarkus and trino are the candidates *(probed by track A)*. Godot has 7 tasks with tests and stays in the retrieval eval only. llama.cpp is the reserve for C++ |
 | 3 | Where containers run | the team's x86 machine; a rented Linux machine if it is not free in time |
-| 4 | Which Claude model carries the main comparison | Sonnet 5.5 for the matrix; Haiku 5.5 for building the pipeline and for the loop B and C run |
+| 4 | Which Claude model carries the main comparison | Haiku 5.5: every task of the sample, three repetitions. Sonnet 5.5 runs four of the repos once, and its repetitions are a bonus; Opus 5.5 runs a part of the tasks ([runs.md](runs.md) §4) |
 | 5 | Is agent localization in scope | yes: it needs no containers, and it is the measure small models need |
 | 6 | The small models | Qwen3.5-9B and Qwen3-14B, on our Macs |
 | 7 | The frozen reference | `codemem-today` = the current `main`, tagged on Nov 23 |

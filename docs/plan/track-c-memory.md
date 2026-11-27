@@ -1,6 +1,6 @@
 # Track C: memory and disk, embedding models, branches
 
-**Status:** a plan, written Nov 22, 2026. Nothing here is built yet, except the small pilot in §5.
+**Status:** a plan, written Nov 22, 2026. Built since: see [the results](../analysis/track-c-results.md).
 The shared context is in [overview.md](overview.md). How codemem stores vectors today is in
 [architecture.md](../architecture.md) §5.
 
@@ -540,7 +540,7 @@ none.
 - **Each model needs its own query prefix** (§6.3, rule 4). Today codemem gives jina's prefixes to
   every local model, so a fair test of another model needs that fixed first.
 - **A switch means every index is built again,** because vectors from two models never share an
-  index (§6.3). So the choice has to be made before the freeze of Nov 25, or the full runs use
+  index (§6.3). So the choice has to be made before the freeze of Nov 27, or the full runs use
   today's model.
 
 ---
@@ -677,7 +677,7 @@ Nothing is sized in working days: the deadlines are below.
 | By | Packages | What it gives |
 |---|---|---|
 | when track A moves to API embeddings | from C5, the install without PyTorch for API users | track A's task containers need it then. Its first runs use the local model |
-| **Nov 25, evening:** the freeze | C1, C2, C3, then from C8 the `api` and `light` presets, in that order | the compression table; the compact store and one copy on disk, in the configuration that is frozen; two embedding options. Each piece is in only if it has passed its check by then |
+| **Nov 27, 16:30 Pacific:** the freeze | C1, C2, C3, then from C8 the `api` and `light` presets, in that order | the compression table; the compact store and one copy on disk, in the configuration that is frozen; two embedding options. Each piece is in only if it has passed its check by then |
 | **Nov 30** | C6; all of C5; the rest of C8 (the local Qwen 8B preset, and the test of API against local vectors); C4 and C9 (the cache cap, the shared vector store, branches); C7 if its gate opens; anything that missed the freeze | memory, disk and scan time from 100,000 to 1,000,000 vectors, and what each embedding option costs in memory, for the presentation; the third embedding option; the cache cap and branch switching, built; a model that leaves memory when idle; the reranker study, if its gate opens. Nothing in this track is planned for later than this |
 
 The aim is to leave nothing open after December 1. What is still open then is finished in the week
