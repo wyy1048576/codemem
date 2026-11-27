@@ -21,18 +21,26 @@ The draw, for each repo and tier:
     other label.
   - Every fair task gets a number, so the spares are fixed too.
 
+One task per issue: two fair tasks of a repo can fix the same issue (the same issue text and often the same hidden
+test). Before the draw, the fair tasks of a repo are grouped by their issue (see issue_key). The task with the lowest
+pull request number of each group stays. The others are not drawn: they take no number and no place in a tier, and
+they are not run. Their rows have duplicate_of, the id of the task that stays.
+
 The tasks that are run: 6 easy, 4 medium and 4 hard. A repo with fewer than 4 fair hard tasks runs more medium
 ones, so that medium and hard together are 8. A repo that is still short in a tier runs all it has.
 
-Output: one JSON row for each numbered task (repo, id, tier, label, split, number, run, has_prompts), sorted by
-repo, tier and number. has_prompts is true when the prompt files hold an L1 and an L2 text for the task. Beside it,
-a .meta.json with the seed, the sha256 of each input, the date, the command line and the counts of each repo.
+Output: one JSON row for each fair task (repo, id, tier, label, split, number, run, has_prompts, duplicate_of),
+sorted by repo, tier and number. has_prompts is true when the prompt files hold an L1 and an L2 text for the task.
+duplicate_of is null, except on a dropped duplicate: there it is the id that stays, number is null and the row comes
+after the numbered rows of its tier. Beside it, a .meta.json with the seed, the sha256 of each input, the date, the
+command line, the counts of each repo and the dropped duplicates.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -59,6 +67,39 @@ EASY_PATTERN = ("medium", "easy", "medium", "medium", "easy", "medium")
 
 class SampleError(ValueError):
     """The sample cannot be drawn or written."""
+
+
+def issue_key(task: Task) -> tuple[str, str]:
+    """What identifies the issue of a task: the issue URL, else the issue number, else the issue text without the
+    white space at its ends. Compare keys only inside one repo."""
+    if task.issue.url:
+        return ("url", task.issue.url.strip().lower())
+    if task.issue.number is not None:
+        return ("number", str(task.issue.number))
+    return ("query", task.query.strip())
+
+
+def pr_number(task: Task) -> int:
+    """The pull request number of the fix: fix.pr_number, else the number at the end of the id."""
+    if task.fix.pr_number is not None:
+        return task.fix.pr_number
+    match = re.search(r"(\d+)$", task.id)
+    if match is None:
+        raise SampleError(f"{task.id}: no pull request number")
+    return int(match.group(1))
+
+
+def one_per_issue(tasks: list[Task]) -> tuple[list[Task], dict[str, str]]:
+    """The tasks of one repo with one task per issue, and the dropped ones: id -> the id that stays. The task with
+    the lowest pull request number of each issue stays."""
+    groups: dict[tuple[str, str], list[Task]] = {}
+    for task in tasks:
+        groups.setdefault(issue_key(task), []).append(task)
+    dropped = {}
+    for group in groups.values():
+        first, *others = sorted(group, key=lambda t: (pr_number(t), t.id))
+        dropped.update({t.id: first.id for t in others})
+    return [t for t in tasks if t.id not in dropped], dropped
 
 
 def rank(seed: str, repo: str, task_id: str) -> str:
@@ -110,9 +151,10 @@ class RepoSample:
 
     def counts(self) -> dict:
         tiers = {}
-        target = run_targets({name: sum(1 for r in self.rows if r["tier"] == name) for name in TIERS})
+        drawn = [r for r in self.rows if r["duplicate_of"] is None]
+        target = run_targets({name: sum(1 for r in drawn if r["tier"] == name) for name in TIERS})
         for name in TIERS:
-            rows = [r for r in self.rows if r["tier"] == name]
+            rows = [r for r in drawn if r["tier"] == name]
             run = sum(1 for r in rows if r["run"])
             tiers[name] = {"fair": len(rows), "target": target[name], "run": run, "spare": len(rows) - run,
                            "test": sum(1 for r in rows if r["split"] == "test"),
@@ -121,19 +163,24 @@ class RepoSample:
                                       for label in sorted({r["label"] for r in rows})}}
         return {"tiers": tiers,
                 "run_without_prompts": [r["id"] for r in self.rows if r["run"] and not r["has_prompts"]],
+                "duplicates": {r["id"]: r["duplicate_of"] for r in self.rows if r["duplicate_of"] is not None},
                 "notes": self.notes}
 
 
 def sample_repo(repo: str, tasks: list[Task], seed: str, prompted: set[str]) -> RepoSample:
-    """Number the fair tasks of one repo in each tier, and mark the ones that are run."""
+    """Number the fair tasks of one repo in each tier, and mark the ones that are run. A second task of an issue
+    gets no number (one_per_issue)."""
     by_tier: dict[str, list[Task]] = {name: [] for name in TIERS}
     result = RepoSample(repo)
+    in_tiers = []
     for task in tasks:
-        name = tier(task.patch)
-        if name is None:
+        if tier(task.patch) is None:
             result.notes.append(f"{task.id}: the real fix is larger than the hard tier; left out")
         else:
-            by_tier[name].append(task)
+            in_tiers.append(task)
+    kept, dropped = one_per_issue(in_tiers)
+    for task in kept:
+        by_tier[tier(task.patch)].append(task)
     order = {name: seeded(group, seed) for name, group in by_tier.items()}
     order["easy"], notes = easy_order(by_tier["easy"], seed)
     result.notes += notes
@@ -146,11 +193,15 @@ def sample_repo(repo: str, tasks: list[Task], seed: str, prompted: set[str]) -> 
         if run[name] < target[name]:
             result.notes.append(f"{name} tier: {fair[name]} fair tasks, fewer than the target of {target[name]}; "
                                 f"all of them are run")
+    duplicates = sorted((t for t in in_tiers if t.id in dropped), key=lambda t: (pr_number(t), t.id))
     for name in TIERS:
-        for number, task in enumerate(order[name], start=1):
+        numbered = list(enumerate(order[name], start=1))
+        numbered += [(None, task) for task in duplicates if tier(task.patch) == name]
+        for number, task in numbered:
             result.rows.append({"repo": repo, "id": task.id, "tier": name, "label": difficulty(task.patch),
-                                "split": task.split, "number": number, "run": number <= run[name],
-                                "has_prompts": task.id in prompted})
+                                "split": task.split, "number": number,
+                                "run": number is not None and number <= run[name],
+                                "has_prompts": task.id in prompted, "duplicate_of": dropped.get(task.id)})
     return result
 
 
@@ -261,6 +312,9 @@ def run_sample(out: Path | str, *, seed: str, task_files: list[Path] | None = No
         "run_per_tier": RUN,
         "medium_and_hard": MEDIUM_AND_HARD,
         "fair_rule": "status fair in e2e_screen.completion_set; reads with another content hash (with facts) are stale",
+        "issue_rule": "one task per issue in each repo: the fair tasks with the same issue (issue URL, else issue "
+                      "number, else the issue text) keep the lowest pull request number; the others are not drawn",
+        "duplicates": {s.repo: s.counts()["duplicates"] for s in samples if s.counts()["duplicates"]},
         "stale_reads": stale,
         "inputs": {"task_files": _hashes(task_files), "screens": _hashes(screens),
                    "facts": _hashes([facts_path]) if facts_path.exists() else [], "prompts": _hashes(prompts)},
@@ -288,5 +342,8 @@ def format_table(samples: list[RepoSample]) -> str:
                          f"{labels}")
         missing = counts["run_without_prompts"]
         lines.append(f"  run tasks without L1 and L2: {len(missing)}" + (f" ({', '.join(missing)})" if missing else ""))
+        dupes = counts["duplicates"]
+        lines.append(f"  not run, another task of the same issue: {len(dupes)}"
+                     + (f" ({', '.join(f'{d} -> {k}' for d, k in dupes.items())})" if dupes else ""))
         lines += [f"  note: {n}" for n in s.notes]
     return "\n".join(lines)
