@@ -117,7 +117,7 @@ from typing import Callable
 
 from . import codemem_gate
 from .e2e import grade, patch_files
-from .e2e_block import read_block, record_entry
+from .e2e_block import codemem_program_commit, read_block, record_entry
 from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_mount_paths, \
     codemem_python_root, hf_cache, index_root, index_state, read_index_meta
 from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
@@ -439,7 +439,8 @@ def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setu
     codemem = codemem_preconditions(recipe, task, settings) if setup and setup.codemem else None
     block = None
     if setup and setup.block:
-        block = read_block(recipe, task, prompts.level if prompts else PROMPT_LEVEL, prompt_text(task, prompts))
+        block = read_block(recipe, task, prompts.level if prompts else PROMPT_LEVEL, prompt_text(task, prompts),
+                           codemem["commit"] if codemem else codemem_program_commit())
     path = token_file()
     check_token_file(path)
     return {"tag": tag, "token_file": path, "claude_bin": claude_bin(), "gateway": ensure_network(settings.network),
@@ -1327,10 +1328,11 @@ def check_blocks(recipe: Recipe, tasks: list[Task], setups: list[str], prompts: 
     if not any(SETUPS[name].block for name in setups if name in SETUPS):
         return
     level = prompts.level if prompts else PROMPT_LEVEL
+    commit = codemem_program_commit()
     problems = []
     for task in tasks:
         try:
-            read_block(recipe, task, level, prompt_text(task, prompts))
+            read_block(recipe, task, level, prompt_text(task, prompts), commit)
         except GenerateError as exc:
             problems.append(str(exc))
     if problems:

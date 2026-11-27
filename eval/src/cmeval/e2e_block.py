@@ -22,7 +22,10 @@ worktree of `cmeval e2e index`, with a private copy of the task's index and the 
 embed_query:.
 
 Before anything of a run starts, the run refuses a block that is missing, empty, made without the embedding
-model, made from another prompt text, or whose text does not match its sha256 (read_block).
+model, made from another prompt text, or whose text does not match its sha256 (read_block, check_block). It also
+refuses a stale block: one made by another codemem commit than the program of the runs, or on another build of
+the task's index. A rebuild of the index (`cmeval e2e index`) deletes the blocks beside it. A new block replaces
+the old file only when a run can use it.
 
 The file of a block, beside the task's index: CMEVAL_HOME/e2e/indexes/<recipe>/<task id>/block-<level>.json
 
@@ -40,6 +43,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -93,18 +97,36 @@ def make_block(task: Task, level: str, query: str, answer: dict, *, search_s: fl
             "index": index, "made_utc": datetime.now(timezone.utc).isoformat(timespec="seconds")}
 
 
-def read_block(recipe: Recipe, task: Task, level: str, query: str) -> tuple[dict, Path]:
-    """The block of a task and level and its file, for a run that sends `query` at that level. Raises
-    GenerateError when a run cannot use it, so that no run starts without its block."""
+def codemem_program_commit() -> str | None:
+    """The commit of the codemem program that makes the blocks and serves the runs (e2e_index.codemem_bin)."""
+    return codemem_commit(codemem_checkout(codemem_bin()))
+
+
+def read_block(recipe: Recipe, task: Task, level: str, query: str, commit: str | None) -> tuple[dict, Path]:
+    """The block of a task and level and its file, for a run that sends `query` at that level with the codemem
+    program at `commit`. Raises GenerateError when a run cannot use it (check_block), so that no run starts
+    without its block."""
     path = block_path(recipe, task, level)
-    where = f"{task.id}: the block at {level} ({path})"
-    hint = f"make it with cmeval e2e block {recipe.name}"
     if not path.exists():
-        raise GenerateError(f"{where} does not exist; {hint}")
+        raise GenerateError(f"{task.id}: the block at {level} ({path}) does not exist; make it with cmeval e2e "
+                            f"block {recipe.name}")
     try:
         block = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         block = None
+    check_block(block, path, recipe, task, level, query, commit)
+    return block, path
+
+
+def check_block(block: object, path: Path, recipe: Recipe, task: Task, level: str, query: str,
+                commit: str | None) -> None:
+    """Raise GenerateError when a run cannot use the block: it is empty or of another task or level, it was made
+    without the embedding model or from another prompt text, its text does not match its sha256, or it is stale.
+    A stale block was made by another codemem commit than `commit`, or on another build of the task's index
+    (its index.json is not the one of the index now)."""
+    where = f"{task.id}: the block at {level} ({path})"
+    hint = f"make it with cmeval e2e block {recipe.name}"
+    again = f"make it again with cmeval e2e block {recipe.name} --force"
     if (not isinstance(block, dict) or block.get("task_id") != task.id or block.get("level") != level
             or not isinstance(block.get("text"), str) or not isinstance(block.get("results"), list)
             or not block["results"]):
@@ -116,13 +138,18 @@ def read_block(recipe: Recipe, task: Task, level: str, query: str) -> tuple[dict
         raise GenerateError(f"{where} was made from another prompt text than this run's; {hint}")
     if _sha256(block["text"]) != block.get("sha256"):
         raise GenerateError(f"{where} has a text that does not match its sha256; {hint}")
-    return block, path
+    if block.get("codemem_commit") != commit:
+        raise GenerateError(f"{where} was made by codemem {block.get('codemem_commit')}, and the codemem program "
+                            f"of the runs is at {commit}; {again}")
+    if block.get("index") != read_index_meta(recipe, task):
+        raise GenerateError(f"{where} was made on another build of the task's index (its index.json is not the "
+                            f"one in {index_root(recipe, task)}); {again}")
 
 
-def block_problem(recipe: Recipe, task: Task, level: str, query: str) -> str | None:
+def block_problem(recipe: Recipe, task: Task, level: str, query: str, commit: str | None) -> str | None:
     """Why a run could not use the block of this task and level, or None when it can."""
     try:
-        read_block(recipe, task, level, query)
+        read_block(recipe, task, level, query, commit)
     except GenerateError as exc:
         return str(exc)
     return None
@@ -158,9 +185,12 @@ def record_entry(block: dict, path: Path, task: Task) -> dict:
 
 
 def build_blocks(recipe: Recipe, task: Task, queries: dict[str, str], *, program: Path, commit: str | None,
-                 search: Callable[..., dict] | None = None, timeout: float = SEARCH_TIMEOUT_S) -> dict[str, dict]:
-    """Search the text of each level of `queries` (level: text) on one private copy of the task's index, and
-    save each block. Returns the blocks by level. The task's index and src/ are never written."""
+                 search: Callable[..., dict] | None = None, timeout: float = SEARCH_TIMEOUT_S
+                 ) -> dict[str, tuple[dict, str | None]]:
+    """Search the text of each level of `queries` (level: text) on one private copy of the task's index. Returns
+    each level's block and why a run could not use it (check_block; None when it can). Only a block that a run
+    can use replaces the file of its level, through a temporary file; else the old file stays as it was. The
+    task's index and src/ are never written."""
     search = search or e2e_replay.cli_search_json
     root = index_root(recipe, task)
     state = index_state(recipe, task)
@@ -180,9 +210,20 @@ def build_blocks(recipe: Recipe, task: Task, queries: dict[str, str], *, program
         for level, query in queries.items():
             t0 = time.monotonic()
             answer = search(program, root / "src", copy, env, {"query": query}, K, timeout)
-            made[level] = make_block(task, level, query, answer, search_s=round(time.monotonic() - t0, 3),
-                                     program=program, commit=commit, index=meta)
-            write_json(block_path(recipe, task, level), made[level])
+            block = make_block(task, level, query, answer, search_s=round(time.monotonic() - t0, 3),
+                               program=program, commit=commit, index=meta)
+            path = block_path(recipe, task, level)
+            temporary = path.with_name(f".{path.name}.new")
+            write_json(temporary, block)
+            try:
+                check_block(json.loads(temporary.read_text(encoding="utf-8")), path, recipe, task, level, query,
+                            commit)
+            except GenerateError as exc:
+                temporary.unlink()
+                made[level] = (block, str(exc))
+                continue
+            os.replace(temporary, path)
+            made[level] = (block, None)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return made
@@ -199,7 +240,7 @@ def block_tasks(recipe: Recipe, jobs: list[tuple[Task, dict[str, str]]], *, forc
     failed = 0
     for task, queries in jobs:
         todo = {level: query for level, query in queries.items()
-                if force or block_problem(recipe, task, level, query)}
+                if force or block_problem(recipe, task, level, query, commit)}
         for level in queries:
             if level not in todo:
                 progress(f"{task.id} {level}: skipped, the block exists")
@@ -211,11 +252,11 @@ def block_tasks(recipe: Recipe, jobs: list[tuple[Task, dict[str, str]]], *, forc
             failed += len(todo)
             progress(f"{task.id}: failed: {exc}")
             continue
-        for level, block in made.items():
-            problem = block_problem(recipe, task, level, todo[level])
+        for level, (block, problem) in made.items():
             if problem:
                 failed += 1
-                progress(f"{task.id} {level}: made, but a run cannot use it: {problem}")
+                progress(f"{task.id} {level}: made, but a run cannot use it, and the file was not changed: "
+                         f"{problem}")
             else:
                 progress(f"{task.id} {level}: {len(block['results'])} results in {block['search_s']} s")
     return failed

@@ -1066,11 +1066,14 @@ def test_cli_index(remote, make_task, tmp_path, monkeypatch, capsys):
     assert Path(f"{calls}.env").read_text().split() == ["faiss", str(tmp_path / "codemem-home")]
     assert e2e_index.index_state(recipe, tasks[0]) == "ok"
 
-    # The same commits: skipped. --force builds again. A change in codemem's src/ builds again.
+    # The same commits: skipped. --force builds again, and deletes the blocks made on the old index. A change in
+    # codemem's src/ builds again.
+    (root / "block-L0.json").write_text("{}")
     assert main(args) == 0
     assert "acme__demo-42: skipped" in capsys.readouterr().err and len(calls.read_text().splitlines()) == 1
+    assert (root / "block-L0.json").exists()
     assert main(args + ["--force"]) == 0
-    assert len(calls.read_text().splitlines()) == 2
+    assert len(calls.read_text().splitlines()) == 2 and not (root / "block-L0.json").exists()
     (checkout / "src" / "a.py").write_text("A = 2\n")
     assert main(args) == 0
     assert len(calls.read_text().splitlines()) == 3

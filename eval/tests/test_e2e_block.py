@@ -42,11 +42,19 @@ TEXT = ("Possibly relevant code, from a search by meaning (it may be wrong):\n"
 L2 = e2e_run.PromptSet(level="L2", texts={"acme__auth-42": "Fix login after reset.\n"}, source="vague.jsonl")
 
 
-def _write_block(task, level="L0", query=None, answer=ANSWER, **changes):
-    """A block file as `cmeval e2e block` writes it, for the run's prompt text (or another query)."""
+@pytest.fixture(autouse=True)
+def no_codemem_program(monkeypatch):
+    """The setup upfront has no codemem program in its preconditions. Its runs compare the block with the commit
+    of the program that the eval names (e2e_block.codemem_program_commit); here that is no git checkout."""
+    monkeypatch.setattr(e2e_run, "codemem_program_commit", lambda: None)
+
+
+def _write_block(task, level="L0", query=None, answer=ANSWER, commit=None, **changes):
+    """A block file as `cmeval e2e block` writes it, for the run's prompt text (or another query), on the task's
+    index as it is now (none: None). The codemem of the tests is no git checkout, so its commit is None."""
     query = e2e_run.prompt_text(task, L2 if level == "L2" else None) if query is None else query
     block = e2e_block.make_block(task, level, query, answer, search_s=12.5, program=Path("/x/codemem"),
-                                 commit="463171c", index={"base_commit": task.base_commit})
+                                 commit=commit, index=e2e_index.read_index_meta(RECIPE, task))
     block.update(changes)
     path = e2e_block.block_path(RECIPE, task, level)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -101,13 +109,13 @@ def test_read_block_refuses_what_a_run_cannot_use(make_task):
     task = make_task()
     query = task.query.strip()
 
-    def refused(match, level="L0", text=query):
+    def refused(match, level="L0", text=query, commit=None):
         with pytest.raises(gen.GenerateError, match=match):
-            e2e_block.read_block(RECIPE, task, level, text)
+            e2e_block.read_block(RECIPE, task, level, text, commit)
 
     refused(r"acme__auth-42: the block at L0 \(.*block-L0.json\) does not exist; make it with cmeval e2e block r")
     block, path = _write_block(task)
-    assert e2e_block.read_block(RECIPE, task, "L0", query) == (block, path)
+    assert e2e_block.read_block(RECIPE, task, "L0", query, None) == (block, path)
     path.write_text("")
     refused("is empty or not a block of this task and level")
     _write_block(task, results=[], text=e2e_block.HEADER + "\n")
@@ -119,12 +127,23 @@ def test_read_block_refuses_what_a_run_cannot_use(make_task):
     refused("the block at L2 .* does not exist", level="L2", text="Fix login after reset.")
     _write_block(task, text=TEXT.replace(":12 ", ":13 "))
     refused("has a text that does not match its sha256")
-    assert e2e_block.block_problem(RECIPE, task, "L0", query).endswith("make it with cmeval e2e block r")
+    assert e2e_block.block_problem(RECIPE, task, "L0", query, None).endswith("make it with cmeval e2e block r")
+    # A stale block: made by another codemem commit, or on another build of the task's index.
+    _write_block(task, commit="463171c")
+    assert e2e_block.read_block(RECIPE, task, "L0", query, "463171c")[0]["codemem_commit"] == "463171c"
+    refused(r"was made by codemem 463171c, and the codemem program of the runs is at 5a5b5c5; make it again with "
+            r"cmeval e2e block r --force", commit="5a5b5c5")
+    root, meta = _fake_index(task)
+    refused("was made on another build of the task's index", commit="463171c")  # made before there was an index
+    _write_block(task)
+    assert e2e_block.read_block(RECIPE, task, "L0", query, None)[0]["index"] == meta
+    (root / "index.json").write_text(json.dumps({**meta, "seconds": 99.0}))  # built again
+    refused(r"was made on another build of the task's index .*; make it again with cmeval e2e block r --force")
 
 
 def test_record_entry_and_gold_ranks(make_task):
     task = make_task()
-    block, path = _write_block(task)
+    block, path = _write_block(task, commit="463171c")
     assert e2e_block.record_entry(block, path, task) == {
         "file": str(path), "sha256": block["sha256"], "lines": 4, "search_s": 12.5, "codemem_commit": "463171c",
         "searches_made_for_agent": 1, "first_gold_file_rank": 2, "first_gold_function_rank": 3,
@@ -167,9 +186,17 @@ def test_build_blocks_with_a_fake_search(make_task):
     assert sorted(p.name for p in root.iterdir()) == ["block-L0.json", "block-L2.json", "index", "index.json", "src"]
     assert [p.name for p in (root / "index").iterdir()] == ["index.sqlite"]
     for level, query in queries.items():
-        block, _ = e2e_block.read_block(RECIPE, task, level, query)
-        assert block == made[level] and block["text"] == TEXT and block["index"] == meta
+        block, _ = e2e_block.read_block(RECIPE, task, level, query, "463171c")
+        assert made[level] == (block, None) and block["text"] == TEXT and block["index"] == meta
         assert block["codemem_commit"] == "463171c" and block["search_s"] >= 0 and block["query"] == query
+    # A block that a run could not use does not replace the file: the good block stays as it was.
+    before = e2e_block.block_path(RECIPE, task, "L0").read_bytes()
+    keywords = {**ANSWER, "timings": {"bm25": 0.01, "total": 0.02}}
+    again = e2e_block.build_blocks(RECIPE, task, {"L0": queries["L0"]}, program=Path("/x/codemem"), commit="463171c",
+                                   search=lambda *args: keywords)
+    assert again["L0"][0]["embedded"] is False and "was made without the embedding model" in again["L0"][1]
+    assert e2e_block.block_path(RECIPE, task, "L0").read_bytes() == before
+    assert sorted(p.name for p in root.iterdir()) == ["block-L0.json", "block-L2.json", "index", "index.json", "src"]
     with pytest.raises(gen.GenerateError, match=r"no index for base commit 0123456789ab .*\(missing\); run cmeval "
                                                 r"e2e index r first"):
         e2e_block.build_blocks(RECIPE, make_task(id="acme__auth-7"), queries, program=Path("/x"), commit=None,
@@ -215,7 +242,7 @@ def test_cli_block(make_task, tmp_path, monkeypatch, capsys):
     assert "acme__auth-43: failed: acme__auth-43: no index for base commit" in captured.err
     assert "acme__auth-42 L2: 4 results in" in captured.err and "r: 3 of 4 blocks ready" in captured.out
     for level, query in levels:
-        block, _ = e2e_block.read_block(RECIPE, one, level, query)
+        block, _ = e2e_block.read_block(RECIPE, one, level, query, None)
         assert block["text"] == TEXT and block["codemem_bin"] == str(program)
 
     # A block that a run can use is skipped. --force makes it again.
@@ -226,12 +253,19 @@ def test_cli_block(make_task, tmp_path, monkeypatch, capsys):
     assert asked == [(one.query.strip(), 20)]
     capsys.readouterr()
 
-    # A search without the embedding model gives a block that no run can use, and the next call makes it again.
+    # A search without the embedding model gives a block that no run can use. It does not replace the good block,
+    # so the next call skips it.
     answer["timings"] = {"bm25": 0.01, "total": 0.02}
     assert main(args + ["--prompt-level", "L0", "--id", one.id, "--force"]) == 1
-    assert "acme__auth-42 L0: made, but a run cannot use it" in capsys.readouterr().err
+    assert ("acme__auth-42 L0: made, but a run cannot use it, and the file was not changed"
+            in capsys.readouterr().err)
     answer["timings"] = ANSWER["timings"]
     asked.clear()
+    assert main(args + ["--prompt-level", "L0", "--id", one.id]) == 0 and asked == []
+    assert e2e_block.read_block(RECIPE, one, "L0", one.query.strip(), None)[0]["embedded"]
+    # A rebuild of the index makes every block of the task stale, and the next call makes them again.
+    meta_path = e2e_index.index_root(RECIPE, one) / "index.json"
+    meta_path.write_text(json.dumps({**json.loads(meta_path.read_text()), "seconds": 5.0}))
     assert main(args + ["--prompt-level", "L0", "--id", one.id]) == 0 and len(asked) == 1
 
     # --sample: only the tasks of this repo that the run sample runs.

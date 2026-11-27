@@ -227,7 +227,8 @@ def _summary(log: Path) -> str | None:
 
 def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None, force: bool = False) -> dict | None:
     """Build the task's index. Returns index.json, or None when it exists for the same base commit and the same
-    codemem commit (and force is off). A build always starts from an empty index folder."""
+    codemem commit (and force is off). A build always starts from an empty index folder, and deletes the blocks
+    of e2e_block beside the old index."""
     root = index_root(recipe, task)
     meta = read_index_meta(recipe, task)
     if (not force and meta and meta.get("base_commit") == task.base_commit and meta.get("codemem_commit") == commit
@@ -236,6 +237,8 @@ def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None,
     src, index, log = root / "src", root / "index", root / "index.log"
     ensure_worktree(task, src)
     (root / "index.json").unlink(missing_ok=True)
+    for block in root.glob("block-*.json"):  # blocks of e2e_block, made on the old index
+        block.unlink()
     if index.exists():
         shutil.rmtree(index)
     log.unlink(missing_ok=True)
