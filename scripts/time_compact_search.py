@@ -1,52 +1,95 @@
-"""Which thread pool makes a compact search slower on many cores than on one: FAISS's OpenMP
-threads, numpy's BLAS threads, or the two together. Step by step, on this machine.
+"""Which thread pool makes codemem's compact search slower on many cores than on one, step by
+step, on this machine; and whether a candidate fix removes it.
 
     uv run python scripts/time_compact_search.py --work <a folder with free disk>
 
-Everything else has a default:
+WHAT IS MEASURED. codemem has two vector indexes. The exact one (FaissVectorStore in
+src/codemem/store.py) holds every vector in 2-byte numbers and answers a query with one FAISS
+search. The compact one (CompactVectorStore) holds RaBitQ codes in FAISS and reads the full
+vectors back from SQLite. One search of the compact index, for one query, goes through these
+steps; each is a column of the tables:
 
-  --sizes          vectors per index (default 100000,500000)
-  --faiss-threads  FAISS's OpenMP threads to try (default 1,all; all = every CPU this process may use)
-  --blas-threads   numpy's BLAS threads to try (default 1,all)
-  --queries        searches timed per index and setting, after 10 that warm up (default 50)
-  --keep-indexes   keep the indexes: a later run with the same --work reuses them, so that another
-                   branch is timed on the same vectors without building them again
+  rotate  the query cut, scaled to length 1 and rotated: a (1 x 896) by (896 x 896) float32
+          product, `rows @ rotation` in `_coded`, which numpy hands to its BLAS (OpenBLAS on
+          Linux runs a product of this size on all of its threads)
+  coarse  FAISS scans every vector's 1-bit code for the query (`_scan`: IndexRaBitQ.search of one
+          query; the best 4,000 at 100,000 vectors, 10,000 at 500,000)
+  fine    those are ranked again by their 4-bit codes (in `_candidates`: IndexRaBitQ.range_search
+          of the one query under a bitmap that selects them; numpy keeps the best 256)
+  read    the 256 candidates' full vectors read from SQLite (`fetch`)
+  score   numpy scores them exactly (an elementwise product and a row sum, no BLAS) and sorts
+  other   what Store.vector_search does around the index (a lock, a read of the epoch, bookkeeping)
+  search  the whole Store.vector_search(type, query, 50): what bench_search_scale.py reports as
+          "search ms", the number that was 34 to 58 ms slower on 16 cores than on one
+  exact   the exact index's whole search of the same queries: the reference (one FAISS call that
+          opens a parallel region too; it was as fast on 16 cores as on one)
 
-It builds each index as scripts/bench_search_scale.py does (the same synthetic vectors: 896
-numbers, 1.25 vectors per chunk; about 2.5 GB of disk per million vectors, in --work, which should
-be on a local disk: under WSL, not under /mnt/c) and saves its compact search index (4 bits,
-rescore 200). Then it starts one child process for each pair of thread counts. A child never
-imports torch, so several OpenMP threads are safe in it, on macOS too.
+A clock is wrapped around each of the store's own methods, on the instance, so the search runs
+its own code. A cell is the median of 50 searches with the 10th and 90th percentiles under it: a
+cost of waking threads shows as spread. Each cell is a median of its own, so the steps need not
+add up to `search`. Before it times them, a child asks its 50 queries once untimed: the rows they
+read are then in the operating system's page cache in every configuration. (Without that, the
+first child to read an index whose pages were pushed out of memory pays reads from the disk in
+`read`, whatever its threads: on a Mac short of memory that looked like a 15 to 25 ms overhead of
+one thread setting or another, depending only on which child ran first. Configuration i measures
+that cost on purpose.)
 
-- numpy's BLAS: the child's environment sets OPENBLAS_NUM_THREADS, MKL_NUM_THREADS and
-  VECLIB_MAXIMUM_THREADS (OpenBLAS, MKL, Apple's Accelerate) to the count, so they hold before
-  numpy is imported.
-- FAISS: OMP_NUM_THREADS is set to its count (OpenBLAS reads that one too, but only when
-  OPENBLAS_NUM_THREADS is unset), and the child calls faiss.omp_set_num_threads after its imports
-  (on macOS, importing codemem sets OMP_NUM_THREADS to 1).
+THE CONFIGURATIONS, each in a child process of its own that never imports torch (several OpenMP
+threads are safe in it, on macOS too). "All" is every CPU this process may use (--threads):
 
-The child loads the compact index from its file and builds the exact one from the rows. After 10
-searches of each, it times 50 searches of the compact index in a row, as bench_search_scale.py
-times them (Store.vector_search, 50 results: its "search ms"), with each step on its own clock,
-then 50 searches of the exact index:
+  a  both pools on all cores: the fault as measured
+  b  numpy's BLAS on 1 thread, FAISS on all: tests the rotation's product
+  c  FAISS on 1 thread, numpy's BLAS on all: tests FAISS's parallel regions (one per query and call)
+  d  both pools on 1 thread: the reference
+  e  as a, with OpenMP's waiting threads passive (OMP_WAIT_POLICY=passive, and GOMP_SPINCOUNT=0
+     for GNU OpenMP, KMP_BLOCKTIME=0 for LLVM's or Intel's): tests FAISS's threads that keep
+     spinning after a region, holding cores that another pool's threads need
+  f  as a, with OpenBLAS's waiting threads passive (OPENBLAS_THREAD_TIMEOUT=4: they sleep after
+     2^4 cycles instead of 2^28): tests OpenBLAS's threads that keep spinning after the rotation
+     while FAISS works. Run only where numpy's BLAS is OpenBLAS
+  g  as a, with candidate fix (ii) applied inside the child, the store's code untouched: the
+     compact search's FAISS calls on one OpenMP thread (faiss.omp_set_num_threads(1) around
+     `_candidates`, the count put back after; the count is each thread's own)
+  h  as a, with candidate fix (i) applied inside the child: the one query row rotated by numpy's
+     own loop (np.einsum) instead of the BLAS; a batch of rows (a build) keeps the BLAS
+  i  as a, with 50 other queries, each asked for the first time and timed then: their rows come
+     from the disk unless the operating system keeps the whole index file in memory. Tests reads
+     from the disk, not threads. Its hits are not compared with the others' (other queries)
 
-  rotate  the query cut, scaled and rotated (`_coded`: a 1 x 896 by 896 x 896 product in numpy's BLAS)
-  coarse  the scan of every 1-bit code (`_scan`: one FAISS search, of one query)
-  fine    the scan's best ranked again by their 4-bit codes (one FAISS range search under a bitmap)
-  read    the candidates' rows, read from SQLite (`fetch`)
-  score   their exact scores (numpy, no BLAS)
-  other   what Store.vector_search does around the index
-  search  the whole Store.vector_search
-  exact   the exact index's whole search of the same queries, the reference
+How a pool is set: numpy's BLAS by OPENBLAS_NUM_THREADS, MKL_NUM_THREADS and
+VECLIB_MAXIMUM_THREADS (OpenBLAS, MKL, Apple's Accelerate) in the child's environment, so before
+numpy is imported. FAISS by OMP_NUM_THREADS there (OpenBLAS reads that one only when
+OPENBLAS_NUM_THREADS is unset) and by faiss.omp_set_num_threads after the imports (on macOS,
+importing codemem sets OMP_NUM_THREADS to 1). The variables above are taken out of every child's
+environment first, so the shell's own settings change nothing. Each table prints the variables its
+child was given and what the libraries report from inside it: faiss.omp_get_max_threads(), the
+same read inside a compact search, and numpy's BLAS through threadpoolctl when that is importable.
+The header names the OpenMP library FAISS loads.
 
-Each column is a median of its own, so the steps need not add up to `search` exactly. Then it
-compares every setting with FAISS and BLAS both on one thread, checks that all of them returned
-the same results, and ends with one line that says which pool carries the overhead here, and how
-long the run took. Send back everything it prints.
+The exact index is searched in a and d only (in the others its column shows "-").
 
-To compare two branches (main and a fix), run the script on each with the same flags: the first
-with --keep-indexes, so that the second reuses the indexes in --work. The results' fingerprints
-must be equal in the two runs. Later commits may add configurations.
+AFTER THE TABLES: what each configuration adds to a search against d; whether every
+configuration returned the same hits (ids and scores) for each query, with a fingerprint per size
+to compare with another run; the time to build the compact index from the rows on all cores (a)
+and on one (d), at the smallest size (--build-sizes), so that a fix that slows builds shows; and a
+closing block in plain words: the step that carries the overhead, the configurations where it
+disappears, so which fix applies; and how long the run took.
+
+THE INDEXES are built as scripts/bench_search_scale.py builds them (the same synthetic vectors: 896
+numbers, around 2,000 centres, 1.25 vectors per chunk), and the compact search index (4 bits,
+rescore 200) is saved once. About 2.5 GB of disk per million vectors, in --work, which should be
+on a local disk (under WSL: not under /mnt/c). About 2.5 minutes on an 8-core M1 at the default
+sizes, so about 4 on 16 cores (the run is mostly one thread's work), a third of it building the
+indexes; a run that reuses them (--keep-indexes) saves that third.
+
+TO COMPARE TWO BRANCHES (main, and a fix in src/), run the script on each with the same flags,
+the first with --keep-indexes so that the second reuses the indexes. On the fix branch,
+configuration a is the fix as it would ship; its fingerprints must equal main's. Later commits
+may add configurations.
+
+Options: --sizes (default 100000,500000), --configs (default abcdefghi), --threads (what "all"
+means; default every CPU), --queries (default 50), --build-sizes (default the smallest size;
+"none" skips it), --keep-indexes. It needs numpy, faiss and codemem only.
 """
 
 from __future__ import annotations
@@ -75,10 +118,30 @@ COMPACT = {"bits": 4, "dim": 0, "rescore": 200}
 RESULTS = 50  # results asked of each search, as bench_search_scale.py asks
 WARM_UP = 10
 BLAS_VARS = ("OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "VECLIB_MAXIMUM_THREADS")
+WAIT_VARS = ("OMP_WAIT_POLICY", "GOMP_SPINCOUNT", "KMP_BLOCKTIME", "OPENBLAS_THREAD_TIMEOUT")
 STEPS = ("rotate", "coarse", "fine", "read", "score", "other", "search")
 NAMES = {"rotate": "the rotation", "coarse": "the coarse scan", "fine": "the fine ranking", "read": "reading the rows",
          "score": "the exact scores", "other": "the store around the index"}
 FORMAT = 1  # of the indexes in --work: an index built by another version of this script is built again
+# key: (FAISS threads, BLAS threads, waiting threads made passive, fix tried, what it is, what it tests)
+CONFIGS = {
+    "a": ("all", "all", None, None, "both pools on all cores", "the fault as measured"),
+    "b": ("all", 1, None, None, "BLAS on 1 thread, FAISS on all", "the rotation's product in numpy's BLAS"),
+    "c": (1, "all", None, None, "FAISS on 1 thread, BLAS on all", "FAISS's parallel regions, one per query"),
+    "d": (1, 1, None, None, "both pools on 1 thread", "the reference"),
+    "e": ("all", "all", "openmp", None, "as a, OpenMP's waiting threads passive",
+          "FAISS's threads that spin after a region"),
+    "f": ("all", "all", "openblas", None, "as a, OpenBLAS's waiting threads passive",
+          "OpenBLAS's threads that spin after the rotation"),
+    "g": ("all", "all", None, "faiss-one-thread", "as a, trying fix (ii): FAISS calls on 1 thread",
+          "fix (ii) without editing the store"),
+    "h": ("all", "all", None, "rotation-numpy", "as a, trying fix (i): the query rotated without BLAS",
+          "fix (i) without editing the store"),
+    "i": ("all", "all", None, None, "as a, 50 other queries asked for the first time",
+          "reads from the disk instead of the page cache"),
+}
+FIXES = {"ii": "(ii) the compact search's FAISS calls on one OpenMP thread",
+         "i": "(i) the query row rotated without the BLAS"}
 
 
 def cpus() -> int:
@@ -102,6 +165,34 @@ def synthetic(n: int, seed: int) -> np.ndarray:
         x /= np.linalg.norm(x, axis=1, keepdims=True)
         out[start : start + m] = x
     return out
+
+
+def openmp_libraries() -> list[str]:
+    """The OpenMP runtimes loaded in this process: FAISS's (numpy's OpenBLAS runs on pthreads)."""
+    names: list[str] = []
+    try:
+        with open("/proc/self/maps", encoding="utf-8") as f:
+            names = [line.split()[-1] for line in f if "/" in line]
+    except OSError:
+        if sys.platform == "darwin":
+            try:
+                dyld = ctypes.CDLL(None)
+                dyld._dyld_image_count.restype = ctypes.c_uint32
+                dyld._dyld_get_image_name.restype = ctypes.c_char_p
+                dyld._dyld_get_image_name.argtypes = [ctypes.c_uint32]
+                names = [dyld._dyld_get_image_name(i).decode() for i in range(dyld._dyld_image_count())]
+            except (OSError, AttributeError):
+                pass
+    return sorted({os.path.basename(n) for n in names
+                   if any(k in os.path.basename(n).lower() for k in ("gomp", "libomp", "iomp", "vcomp"))})
+
+
+def openmp_kind(libraries: list[str]) -> str:
+    text = " ".join(libraries).lower()
+    for key, kind in (("gomp", "GNU"), ("iomp", "Intel"), ("libomp", "LLVM"), ("vcomp", "MSVC")):
+        if key in text:
+            return kind
+    return "unknown"
 
 
 # --------------------------------------------------------------------------- the children
@@ -150,6 +241,39 @@ def cmd_prepare(args: argparse.Namespace) -> None:
     print(json.dumps({"torch": "torch" in sys.modules}))
 
 
+def _try(cs, name: str, faiss) -> None:
+    """A candidate fix, applied to this one index in this process: the store's code is not edited."""
+    if name == "faiss-one-thread":  # (ii)
+        candidates = cs._candidates
+
+        def one_thread(*args, **kwargs):
+            before = faiss.omp_get_max_threads()
+            faiss.omp_set_num_threads(1)
+            try:
+                return candidates(*args, **kwargs)
+            finally:
+                faiss.omp_set_num_threads(before)
+
+        cs._candidates = one_thread
+    elif name == "rotation-numpy":  # (i)
+        from codemem.store import prepare
+
+        coded = cs._coded
+
+        def numpy_rotation(vecs, *args, **kwargs):
+            rows = np.asarray(vecs, dtype=np.float32)
+            if rows.ndim == 2 and len(rows) > 1:  # a batch (a build): the BLAS, as before
+                return coded(vecs, *args, **kwargs)
+            with np.errstate(invalid="ignore"):
+                rows = prepare(rows, cs.code_dim)
+            rows[~np.isfinite(rows).all(axis=1)] = 0.0
+            return np.einsum("ij,jk->ik", rows, cs._rotation)  # numpy's own loop, one thread
+
+        cs._coded = numpy_rotation
+    else:
+        raise ValueError(f"no candidate fix called {name}")
+
+
 def _instrument(cs, faiss) -> tuple[dict[str, float], dict]:
     """Clocks on the steps of a CompactVectorStore's search: its methods are wrapped on the instance,
     so the search runs its own code and each step adds what it took to `spent`."""
@@ -182,12 +306,10 @@ def _instrument(cs, faiss) -> tuple[dict[str, float], dict]:
     return spent, seen
 
 
-def _fingerprint(searches: list) -> str:
-    """Every hit of every search (chunk, vector and the score's exact bits) in 12 hex digits."""
-    h = hashlib.sha1()
-    for hits in searches:
-        h.update(";".join(f"{x.chunk_id},{x.vector_id},{float(x.score).hex()}" for x in hits).encode() + b"|")
-    return h.hexdigest()[:12]
+def _hits_hash(hits) -> str:
+    """One search's hits (chunk, vector and the score's exact bits) in 12 hex digits."""
+    text = ";".join(f"{x.chunk_id},{x.vector_id},{float(x.score).hex()}" for x in hits)
+    return hashlib.sha1(text.encode()).hexdigest()[:12]
 
 
 def _per_thread(faiss) -> bool:
@@ -207,29 +329,20 @@ def _per_thread(faiss) -> bool:
 
 
 def _blas_seen() -> str:
-    """numpy's BLAS and its thread count as this process has them, where that can be read."""
+    """numpy's BLAS and its threads as threadpoolctl reads them from inside this process."""
     try:
-        from threadpoolctl import threadpool_info  # optional, only to show that the setting took
+        from threadpoolctl import threadpool_info
+    except ImportError:
+        return "threadpoolctl is not importable here: see the variables given"
+    pools = [p for p in threadpool_info() if p.get("user_api") == "blas"]
+    if not pools:
+        return "threadpoolctl reads no BLAS here (it cannot read Accelerate): see the variables given"
+    return ", ".join(f"{p.get('internal_api')} {p.get('version') or ''}: {p.get('num_threads')} threads"
+                     + (f" ({p['threading_layer']})" if p.get("threading_layer") else "") for p in pools)
 
-        pools = [p for p in threadpool_info() if p.get("user_api") == "blas"]
-        if pools:
-            return ", ".join(f"{p.get('internal_api')} {p.get('version') or ''}: {p.get('num_threads')} threads"
-                             + (f" ({p['threading_layer']})" if p.get("threading_layer") else "") for p in pools)
-    except Exception:  # not installed, or a library it cannot read
-        pass
-    try:  # Linux without threadpoolctl: ask OpenBLAS itself
-        with open("/proc/self/maps", encoding="utf-8") as f:
-            paths = sorted({line.split()[-1] for line in f if "openblas" in line.lower() and ".so" in line})
-        for path in paths:
-            lib = ctypes.CDLL(path)
-            for name in ("scipy_openblas_get_num_threads64_", "openblas_get_num_threads64_",
-                         "scipy_openblas_get_num_threads", "openblas_get_num_threads"):
-                fn = getattr(lib, name, None)
-                if fn is not None:
-                    return f"OpenBLAS ({os.path.basename(path)}): {fn()} threads"
-    except OSError:
-        pass
-    return "not readable here"
+
+def _spread(values: list[float]) -> dict[str, float]:
+    return {k: round(float(np.percentile(values, p)), 3) for k, p in (("p10", 10), ("p50", 50), ("p90", 90))}
 
 
 def cmd_time(args: argparse.Namespace) -> None:
@@ -239,50 +352,59 @@ def cmd_time(args: argparse.Namespace) -> None:
 
     faiss.omp_set_num_threads(args.faiss)
     index_dir = Path(args.index)
-    t = time.perf_counter()
     compact = Store(index_dir, vector_backend="compact", vector_options=COMPACT)
     compact.load_vectors()
     ti = compact._types[VEC_TYPE]
     from_file = not ti.dirty  # a rebuild from the rows leaves it dirty
-    exact = Store(index_dir, vector_backend="faiss")  # built from the rows: the folder's file is the compact one
-    exact.load_vectors()
-    load_s = time.perf_counter() - t
-    queries = synthetic(WARM_UP + args.queries, 7).astype(np.float32)
-    for q in queries[:WARM_UP]:
+    if args.try_fix:
+        _try(ti.store, args.try_fix, faiss)
+    if args.cold:  # other queries, asked for the first time when they are timed; 10 more warm the threads up
+        queries = synthetic(args.queries, 11).astype(np.float32)
+        warm_up = synthetic(WARM_UP, 13).astype(np.float32)
+    else:  # each query asked once before it is timed: the rows it reads are in the page cache
+        queries = warm_up = synthetic(args.queries, 7).astype(np.float32)
+    for q in warm_up:
         compact.vector_search(VEC_TYPE, q, RESULTS)
-        exact.vector_search(VEC_TYPE, q, RESULTS)
     spent, seen = _instrument(ti.store, faiss)
-    ms: dict[str, list[float]] = {name: [] for name in (*STEPS, "exact")}
-    found_compact, found_exact = [], []
-    for q in queries[WARM_UP:]:  # one after the other, as bench_search_scale.py's `measure` asks them
+    ms: dict[str, list[float]] = {name: [] for name in STEPS}
+    found = []
+    for q in queries:  # one after the other, as bench_search_scale.py's `measure` asks them
         spent.clear()
         t = time.perf_counter()
         hits = compact.vector_search(VEC_TYPE, q, RESULTS)
         whole = time.perf_counter() - t
-        found_compact.append(hits)
+        found.append(_hits_hash(hits))
         rotate, coarse, candidates = spent.get("rotate", 0.0), spent.get("coarse", 0.0), spent.get("candidates", 0.0)
         read, index = spent.get("read", 0.0), spent.get("index", 0.0)
         for name, s in (("rotate", rotate), ("coarse", coarse), ("fine", candidates - rotate - coarse), ("read", read),
                         ("score", index - candidates - read), ("other", whole - index), ("search", whole)):
             ms[name].append(s * 1000)
-    for q in queries[WARM_UP:]:
-        t = time.perf_counter()
-        found_exact.append(exact.vector_search(VEC_TYPE, q, RESULTS))
-        ms["exact"].append((time.perf_counter() - t) * 1000)
-    print(json.dumps({
-        "faiss_threads": faiss.omp_get_max_threads(), "faiss_threads_in_search": sorted(seen["faiss_threads_in_search"]),
-        "index_searches_per_search": seen["index_searches"] / args.queries,
-        "coarse_scans_per_search": seen["coarse_scans"] / args.queries,
-        "ms": {name: round(float(np.median(v)), 3) for name, v in ms.items()},
-        "p90_search_ms": round(float(np.percentile(ms["search"], 90)), 3),
-        "compact_from_file": from_file, "load_s": round(load_s, 2), "vectors": len(ti.store),
-        "fingerprint": _fingerprint(found_compact), "exact_fingerprint": _fingerprint(found_exact),
-        "top10_as_exact": round(float(np.mean([{h.chunk_id for h in a[:10]} == {h.chunk_id for h in b[:10]}
-                                               for a, b in zip(found_compact, found_exact)])), 3),
-        "per_thread": _per_thread(faiss), "blas": _blas_seen(), "torch": "torch" in sys.modules,
-    }))
+    out = {"ms": {name: _spread(v) for name, v in ms.items()}, "hits": found, "compact_from_file": from_file,
+           "faiss_threads": faiss.omp_get_max_threads(), "faiss_threads_in_search": sorted(seen["faiss_threads_in_search"]),
+           "index_searches_per_search": seen["index_searches"] / args.queries,
+           "coarse_scans_per_search": seen["coarse_scans"] / args.queries}
+    if args.exact:
+        exact = Store(index_dir, vector_backend="faiss")  # built from the rows: the folder's file is the compact one
+        exact.load_vectors()
+        for q in queries[:WARM_UP]:
+            exact.vector_search(VEC_TYPE, q, RESULTS)
+        took, exact_found = [], []
+        for q in queries:
+            t = time.perf_counter()
+            exact_found.append(_hits_hash(exact.vector_search(VEC_TYPE, q, RESULTS)))
+            took.append((time.perf_counter() - t) * 1000)
+        out["ms"]["exact"] = _spread(took)
+        out["exact_hits"] = exact_found
+        exact.close()
     compact.close()
-    exact.close()
+    if args.build:  # the compact index from the rows, as a start without its file builds it; kept nowhere
+        store = Store(index_dir, vector_backend="compact", vector_options=COMPACT)
+        t = time.perf_counter()
+        store._rebuild(VEC_TYPE, store._epoch(VEC_TYPE), store.vector_dim(VEC_TYPE))
+        out["build_s"] = round(time.perf_counter() - t, 2)
+        store.close()
+    out.update(per_thread=_per_thread(faiss), blas=_blas_seen(), openmp=openmp_libraries(), torch="torch" in sys.modules)
+    print(json.dumps(out))
 
 
 # --------------------------------------------------------------------------- the parent
@@ -296,14 +418,31 @@ def _child(env: dict, *argv: object) -> dict:
     return json.loads(out.stdout.strip().splitlines()[-1])
 
 
-def _env(faiss_threads: int | None = None, blas_threads: int | None = None) -> dict:
-    """This process's environment, with the thread counts of one child (None: as it is)."""
+def _env(given: dict[str, str] | None = None) -> dict:
+    """This process's environment for a child: as it is (None), or without any thread variable but `given`."""
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
-    if blas_threads is not None:
-        env.update(dict.fromkeys(BLAS_VARS, str(blas_threads)))
-    if faiss_threads is not None:
-        env["OMP_NUM_THREADS"] = str(faiss_threads)
+    if given is not None:
+        for name in ("OMP_NUM_THREADS", *BLAS_VARS, *WAIT_VARS):
+            env.pop(name, None)
+        env.update(given)
     return env
+
+
+def _given(key: str, n_all: int, omp: str) -> dict[str, str]:
+    """The variables configuration `key` sets."""
+    faiss_threads, blas_threads, wait = CONFIGS[key][:3]
+    f = n_all if faiss_threads == "all" else faiss_threads
+    b = n_all if blas_threads == "all" else blas_threads
+    given = {"OMP_NUM_THREADS": str(f), **dict.fromkeys(BLAS_VARS, str(b))}
+    if wait == "openmp":
+        given["OMP_WAIT_POLICY"] = "passive"
+        if omp == "GNU":
+            given["GOMP_SPINCOUNT"] = "0"
+        elif omp in ("LLVM", "Intel"):
+            given["KMP_BLOCKTIME"] = "0"
+    elif wait == "openblas":
+        given["OPENBLAS_THREAD_TIMEOUT"] = "4"
+    return given
 
 
 def _cpu_name() -> str:
@@ -329,50 +468,122 @@ def _git(*args: str) -> str:
         return "?"
 
 
-def _label(f: int, b: int) -> str:
-    return f"FAISS {f}, BLAS {b}"
+def _same_results(results: dict, sizes: list[int], keys: list[str], field: str) -> list[str]:
+    """Per size: whether every configuration returned the same hits for each query."""
+    lines = []
+    for n in sizes:
+        runs = {k: results[(n, k)][field] for k in keys if (n, k) in results and field in results[(n, k)]}
+        if not runs:
+            continue
+        first = next(iter(runs.values()))
+        same = sum(len({run[i] for run in runs.values()}) == 1 for i in range(len(first)))
+        ref = "a" if "a" in runs else next(iter(runs))
+        differ = [f"{k} differs from {ref} in {sum(x != y for x, y in zip(run, runs[ref]))}" for k, run in runs.items()
+                  if run != runs[ref]]
+        whole = hashlib.sha1("".join(runs[ref]).encode()).hexdigest()[:12]
+        lines.append(f"{n:,} vectors: {'yes' if same == len(first) else 'NO'}, {same} of {len(first)} queries, in "
+                     f"{', '.join(runs)}" + (f" ({'; '.join(differ)})" if differ else "") + f"; fingerprint of {ref}: {whole}")
+    return lines
 
 
-def _verdict(results: dict, sizes: list[int], faiss_counts: list[int], blas_counts: list[int]) -> str:
-    """One line, in plain words: which pool makes a compact search slower on many threads here."""
-    F, B = max(faiss_counts), max(blas_counts)
-    if 1 not in faiss_counts or 1 not in blas_counts or F == 1 or B == 1:
-        return "=> no verdict: it needs 1 and several threads of each pool (--faiss-threads 1,all --blas-threads 1,all)"
-    sizes = [n for n in sizes if all((n, f, b) in results for f, b in ((1, 1), (F, 1), (1, B), (F, B)))]
-    if not sizes:
-        return "=> no verdict: no size was timed in all four settings"
+def _closing(results: dict, sizes: list[int], n_all: int) -> list[str]:
+    """The closing block, in plain words."""
+    def have(key: str) -> bool:
+        return all((n, key) in results for n in sizes)
 
-    def extra(n: int, f: int, b: int, step: str = "search") -> float:
-        return results[(n, f, b)]["ms"][step] - results[(n, 1, 1)]["ms"][step]
+    if not sizes or not (have("a") and have("d")):
+        return ["=> no verdict: it needs configurations a and d at every size"]
 
-    def big(f: int, b: int) -> bool:  # more than noise at some size: 2 ms, and 15% of the search on one thread
-        return any(extra(n, f, b) > max(2.0, 0.15 * results[(n, 1, 1)]["ms"]["search"]) for n in sizes)
+    def med(key: str, n: int, step: str = "search") -> float:
+        return results[(n, key)]["ms"][step]["p50"]
 
-    def at(f: int, b: int) -> str:
-        return " and ".join(f"{extra(n, f, b):+.1f} ms at {n:,} vectors" for n in sizes)
+    def extra(key: str, n: int, step: str = "search") -> float:
+        return med(key, n, step) - med("d", n, step)
 
-    def where(f: int, b: int) -> str:
-        grown = sorted(((np.mean([extra(n, f, b, s) for n in sizes]), s) for s in STEPS[:-1]), reverse=True)
-        named = [f"{NAMES[s]} ({g:+.1f} ms)" for g, s in grown[:2] if g > 1.0]
-        return "mostly in " + " and ".join(named) if named else "spread over the steps"
+    def at(key: str) -> str:
+        return " and ".join(f"{extra(key, n):+.1f} ms at {n:,}" for n in sizes)
 
-    faiss_alone, blas_alone, both = big(F, 1), big(1, B), big(F, B)
-    pools = f"FAISS on {F} threads instead of 1 (BLAS on 1)", f"numpy's BLAS on {B} threads instead of 1 (FAISS on 1)"
-    if faiss_alone and not blas_alone:
-        return (f"=> On this machine FAISS's OpenMP threads carry the overhead: with {pools[0]} a compact search takes "
-                f"{at(F, 1)}, {where(F, 1)}; with {pools[1]} {at(1, B)}; with both on all threads {at(F, B)}.")
-    if blas_alone and not faiss_alone:
-        return (f"=> On this machine numpy's BLAS threads carry the overhead: with {pools[1]} a compact search takes "
-                f"{at(1, B)}, {where(1, B)}; with {pools[0]} {at(F, 1)}; with both on all threads {at(F, B)}.")
-    if faiss_alone and blas_alone:
-        return (f"=> On this machine each pool adds its own overhead: with {pools[0]} a compact search takes {at(F, 1)}, "
-                f"{where(F, 1)}; with {pools[1]} {at(1, B)}, {where(1, B)}; with both {at(F, B)}.")
-    if both:
-        return (f"=> On this machine neither pool alone carries the overhead, the two together do: with both on all "
-                f"threads a compact search takes {at(F, B)}, {where(F, B)}, while {pools[0]} takes {at(F, 1)} and "
-                f"{pools[1]} {at(1, B)}.")
-    return (f"=> On this machine neither pool makes a compact search slower: with FAISS on {F} and BLAS on {B} threads "
-            f"it takes {at(F, B)} against both on 1 (FAISS alone {at(F, 1)}, BLAS alone {at(1, B)}).")
+    fault = {n: extra("a", n) for n in sizes}
+    lines = []
+    disk = ""
+    if have("i"):
+        cold = {n: med("i", n) - med("a", n) for n in sizes}
+        cold_read = " and ".join(f"{med('i', n, 'read') - med('a', n, 'read'):+.1f} ms" for n in sizes)
+        disk = (f"Reads from the disk: 50 queries asked for the first time (i) take "
+                + " and ".join(f"{cold[n]:+.1f} ms at {n:,}" for n in sizes) + f" against a ({cold_read} in reading "
+                f"the rows): " + ("the index file was not all in memory, so a first search of each query paid reads "
+                "from the disk, whatever the threads." if any(cold[n] > max(2.0, 0.15 * med("a", n)) for n in sizes)
+                else "the operating system keeps the index file in memory here."))
+    exact = " and ".join(f"{extra('a', n, 'exact'):+.1f} ms" for n in sizes) if all("exact" in results[(n, k)]["ms"]
+                                                                                  for n in sizes for k in "ad") else "not run"
+    if not any(fault[n] > max(2.0, 0.15 * med("d", n)) for n in sizes):
+        lines.append(f"1. No overhead here: on all {n_all} cores (a) a compact search takes {at('a')} vectors against one core "
+                     f"each (d); the exact search {exact}. Nothing to fix on this machine, and the other configurations "
+                     "then say nothing either way.")
+        if disk:
+            lines.append("2. " + disk)
+        lines.append("=> On this machine neither pool makes a compact search slower.")
+        return lines
+    grown = sorted(((float(np.mean([extra("a", n, s) for n in sizes])), s) for s in STEPS[:-1]), reverse=True)
+    big = max(1.0, 0.1 * float(np.mean(list(fault.values()))))
+    steps = [f"{NAMES[s]} ({g:+.1f} ms)" for g, s in grown if g > big][:3]
+    where = ", ".join(steps) if steps else "no one step (it is spread over all of them)"
+    lines.append(f"1. The fault: on all {n_all} cores (a) a compact search takes {at('a')} vectors more than on one core each "
+                 f"(d); the exact search {exact}.")
+    quiet = [s for g, s in grown[:1] if g > big and s in ("read", "score", "other")]
+    lines.append(f"2. It sits in {where}, against d, as a mean over the sizes."
+                 + (f" {NAMES[quiet[0]].capitalize()} runs no thread of its own: it waits, for cores that other "
+                    "threads hold or for the disk (configuration i tells which)." if quiet else ""))
+    verdicts: dict[str, str] = {}
+    for key in "bcefgh":  # i is not a thread setting: it has a line of its own below
+        if not have(key):
+            continue
+        if all(extra(key, n) <= max(2.0, 0.25 * fault[n]) for n in sizes):
+            verdicts[key] = "gone"
+        elif all(extra(key, n) <= 0.75 * fault[n] for n in sizes):
+            verdicts[key] = "partly"
+        else:
+            verdicts[key] = "stays"
+
+    def listed(kind: str) -> str:
+        keys = [k for k, v in verdicts.items() if v == kind]
+        return "; ".join(f"{k}, {CONFIGS[k][4]} ({at(k)})" for k in keys) or "none"
+
+    lines.append(f"3. It disappears in: {listed('gone')}.")
+    lines.append(f"   It shrinks to between a quarter and three quarters in: {listed('partly')}.")
+    lines.append(f"   It stays in: {listed('stays')}.")
+    gone = {k for k, v in verdicts.items() if v == "gone"}
+    if "c" in gone and "b" not in gone:
+        cause, detail, fix = "FAISS's OpenMP threads", "a parallel region for each FAISS call of one query", "ii"
+    elif "b" in gone and "c" not in gone:
+        cause, detail, fix = "numpy's BLAS threads", "the rotation's product", "i"
+    elif "b" in gone and "c" in gone:
+        cause, detail, fix = "the two pools together", "either one on 1 thread removes it", None
+    else:
+        cause, detail, fix = "neither pool's thread count alone", "see e and f: threads that spin", None
+    notes = []
+    if "e" in gone:
+        notes.append("OpenMP's waiting threads made passive remove it as well: FAISS's threads spin and hold cores")
+    if "f" in gone:
+        notes.append("OpenBLAS's waiting threads made passive remove it as well: OpenBLAS's threads spin and hold cores")
+    tried = {"g": "ii", "h": "i"}
+    measured = [f"fix {FIXES[tried[k]]} leaves {at(k)} (configuration {k}: {verdicts[k]})" for k in "gh" if k in verdicts]
+    if fix is None:
+        works = [tried[k] for k in "gh" if verdicts.get(k) == "gone"]
+        if works:
+            fix = works[0]
+    lines.append(f"4. So the overhead comes from {cause} ({detail})." + (f" {'; '.join(notes)}." if notes else ""))
+    if measured:
+        lines.append(f"   Measured here: {'; '.join(measured)}.")
+    passive = [f"making {CONFIGS[k][4][6:]} (configuration {k}, a setting of the whole process)" for k in "ef" if k in gone]
+    instead = ("neither candidate removes it; " + (" or ".join(passive) + " does" if passive else "look at e and f"))
+    lines.append(f"5. The fix that applies: {FIXES[fix] if fix else instead}"
+                 + (". It must also leave the results the same and the build time as it was (both above)." if fix else "."))
+    if disk:
+        lines.append("6. " + disk)
+    lines.append(f"=> On this machine the overhead comes from {cause}, in {where}; "
+                 + (f"fix {FIXES[fix]} applies." if fix else f"{instead}."))
+    return lines
 
 
 def run(args: argparse.Namespace) -> None:
@@ -381,24 +592,28 @@ def run(args: argparse.Namespace) -> None:
     import codemem
 
     started = time.monotonic()
-    n_cpu = cpus()
-
-    def counts(text: str) -> list[int]:
-        return sorted({n_cpu if t.strip() == "all" else int(t) for t in text.split(",")})
-
-    faiss_counts, blas_counts = counts(args.faiss_threads), counts(args.blas_threads)
+    n_all = args.threads or cpus()
     sizes = [int(s) for s in args.sizes.split(",")]
+    build_sizes = ([] if args.build_sizes == "none" else [int(s) for s in args.build_sizes.split(",")]
+                   if args.build_sizes else [min(sizes)])
+    keys = [k for k in args.configs if k in CONFIGS]
     work = Path(args.work)
     work.mkdir(parents=True, exist_ok=True)
     blas = np.show_config(mode="dicts")["Build Dependencies"]["blas"]
+    openblas = "openblas" in str(blas.get("name", "")).lower()
+    if "f" in keys and not openblas:
+        keys.remove("f")
+    omp_libs = openmp_libraries()
+    omp = openmp_kind(omp_libs)
     print(f"codemem {codemem.__version__} at {os.path.dirname(codemem.__file__)} (git {_git('rev-parse', '--short', 'HEAD')} "
-          f"on {_git('rev-parse', '--abbrev-ref', 'HEAD')}) | FAISS {faiss.__version__} | numpy {np.__version__}, BLAS "
-          f"{blas.get('name')} {blas.get('version')} ({blas.get('openblas configuration')}) | {platform.platform()} "
-          f"{platform.machine()} | {_cpu_name()} | {n_cpu} CPUs | Python {platform.python_version()}", flush=True)
-    print(f"Each timing child gets {', '.join(BLAS_VARS)} = the BLAS threads and OMP_NUM_THREADS = the FAISS threads in "
-          f"its environment, then calls faiss.omp_set_num_threads(FAISS threads) after its imports. This shell has "
-          + ", ".join(f"{k}={os.environ.get(k, 'unset')}" for k in ("OMP_NUM_THREADS", *BLAS_VARS)) + ".", flush=True)
-    results: dict[tuple[int, int, int], dict] = {}
+          f"on {_git('rev-parse', '--abbrev-ref', 'HEAD')}) | FAISS {faiss.__version__}, OpenMP: {', '.join(omp_libs) or '?'} "
+          f"({omp}) | numpy {np.__version__}, BLAS {blas.get('name')} {blas.get('version')} "
+          f"({blas.get('openblas configuration')}) | {platform.platform()} {platform.machine()} | {_cpu_name()} | "
+          f"{cpus()} CPUs, all = {n_all} | Python {platform.python_version()}", flush=True)
+    print("This shell has " + ", ".join(f"{k}={os.environ.get(k, 'unset')}" for k in ("OMP_NUM_THREADS", *BLAS_VARS, *WAIT_VARS))
+          + "; every timing child gets only the variables its table names." + ("" if openblas else
+          " numpy's BLAS is not OpenBLAS here, so configuration f is not run."), flush=True)
+    results: dict[tuple[int, str], dict] = {}
     built_s = 0.0
     for n in sizes:
         index = work / f"n{n}"
@@ -417,73 +632,97 @@ def run(args: argparse.Namespace) -> None:
         _child(_env(), "prepare", "--index", index)  # reads the saved compact index back when it is current
         made.write_text(json.dumps({"format": FORMAT, "n": n}), "utf-8")
         built_s += time.monotonic() - t
-        print(f"{n:,} vectors: {'reused' if reuse else 'built'} in {time.monotonic() - t:.0f} s; timing "
-              f"{len(faiss_counts) * len(blas_counts)} settings", flush=True)
-        for f in faiss_counts:
-            for b in blas_counts:
-                results[(n, f, b)] = r = _child(_env(f, b), "time", "--index", index, "--faiss", f, "--queries", args.queries)
-                if r["torch"]:
-                    print("torch was loaded in a timing child: several OpenMP threads are not safe there on macOS")
+        print(f"{n:,} vectors: index {'reused' if reuse else 'built'} in {time.monotonic() - t:.0f} s; timing "
+              f"configurations {', '.join(keys)}", flush=True)
+        for key in keys:
+            given = _given(key, n_all, omp)
+            argv: list[object] = ["time", "--index", index, "--faiss", given["OMP_NUM_THREADS"], "--queries", args.queries]
+            if key in "ad":
+                argv.append("--exact")
+            if key == "i":
+                argv.append("--cold")
+            if key in "ad" and n in build_sizes:
+                argv.append("--build")
+            if CONFIGS[key][3]:
+                argv += ["--try-fix", CONFIGS[key][3]]
+            results[(n, key)] = r = _child(_env(given), *argv)
+            r["given"] = given
+            if r["torch"]:
+                print(f"torch was loaded in the child of {key}: several OpenMP threads are not safe there on macOS")
         if not args.keep_indexes:
             shutil.rmtree(index, ignore_errors=True)
 
-    for f in faiss_counts:
-        for b in blas_counts:
-            rows = [(n, results[(n, f, b)]) for n in sizes if (n, f, b) in results]
-            if not rows:
-                continue
-            first = rows[0][1]
-            print(f"\n== FAISS on {f} thread{'s' * (f > 1)}, numpy's BLAS on {b} thread{'s' * (b > 1)} == "
-                  f"(OMP_NUM_THREADS={f}, {'='.join(BLAS_VARS)}={b}; BLAS as the child sees it: {first['blas']})")
-            print(f"{'vectors':>9} " + " ".join(f"{s:>7}" for s in STEPS) + f" | {'exact':>7}   ms, medians of {args.queries}")
-            for n, r in rows:
-                notes = [] if r["compact_from_file"] else ["compact index rebuilt from the rows"]
-                if r["index_searches_per_search"] > 1.05 or r["coarse_scans_per_search"] > 1.05:
-                    notes.append(f"{r['index_searches_per_search']:.2f} index searches and {r['coarse_scans_per_search']:.2f} "
-                                 "coarse scans per search")
-                print(f"{n:>9,} " + " ".join(f"{r['ms'][s]:>7.2f}" for s in STEPS) + f" | {r['ms']['exact']:>7.2f}"
-                      + (f"   ({'; '.join(notes)})" if notes else ""))
-            inside = sorted({t for _, r in rows for t in r["faiss_threads_in_search"]})
-            print(f"FAISS's threads inside a compact search: {', '.join(map(str, inside))}"
-                  + ("" if inside == [f] else f" (the store runs its per-query FAISS calls on {inside[0]}, of {f})"))
+    for key in keys:
+        rows = [(n, results[(n, key)]) for n in sizes if (n, key) in results]
+        if not rows:
+            continue
+        first = rows[0][1]
+        inside = sorted({t for _, r in rows for t in r["faiss_threads_in_search"]})
+        print(f"\n== {key}: {CONFIGS[key][4]} (tests: {CONFIGS[key][5]}) ==")
+        print("given: " + " ".join(f"{k}={v}" for k, v in first["given"].items()))
+        print(f"inside: faiss.omp_get_max_threads() = {first['faiss_threads']}, inside a compact search "
+              f"{', '.join(map(str, inside))}; BLAS: {first['blas']}")
+        print(f"{'vectors':>9} {'':>6} " + " ".join(f"{s:>7}" for s in STEPS) + f" | {'exact':>7}   ms over {args.queries} searches")
+        for n, r in rows:
+            for stat in ("p50", "p10", "p90"):
+                exact = f"{r['ms']['exact'][stat]:>7.2f}" if "exact" in r["ms"] else f"{'-':>7}"
+                label = {"p50": "median", "p10": "p10", "p90": "p90"}[stat]
+                print(f"{f'{n:,}' if stat == 'p50' else '':>9} {label:>6} "
+                      + " ".join(f"{r['ms'][s][stat]:>7.2f}" for s in STEPS) + f" | {exact}")
+            notes = [] if r["compact_from_file"] else ["the compact index was rebuilt from the rows: its file was refused"]
+            if r["index_searches_per_search"] > 1.05 or r["coarse_scans_per_search"] > 1.05:
+                notes.append(f"{r['index_searches_per_search']:.2f} index searches and {r['coarse_scans_per_search']:.2f} "
+                             "coarse scans per search")
+            if "build_s" in r:
+                notes.append(f"building the compact index from the rows: {r['build_s']:.1f} s")
+            for note in notes:
+                print(f"{'':>17}{note}")
 
-    if (1, 1) in {(f, b) for _, f, b in results}:
-        print(f"\n== a compact search, ms more than with FAISS and BLAS both on 1 thread (the exact search's in brackets) ==")
-        others = [(f, b) for f in faiss_counts for b in blas_counts if (f, b) != (1, 1)]
-        print(f"{'vectors':>9} " + " ".join(f"{_label(f, b):>20}" for f, b in others))
-        for n in sizes:
-            if (n, 1, 1) not in results:
+    print("\n== a compact search, ms more than in d (both pools on 1 thread); the exact search's in brackets ==")
+    others = [k for k in keys if k != "d"]
+    print(f"{'vectors':>9} " + " ".join(f"{k:>15}" for k in others))
+    for n in sizes:
+        if (n, "d") not in results:
+            continue
+        base = results[(n, "d")]["ms"]
+        cells = []
+        for k in others:
+            r = results.get((n, k))
+            if r is None:
+                cells.append("")
                 continue
-            base = results[(n, 1, 1)]["ms"]
-            cells = []
-            for f, b in others:
-                r = results.get((n, f, b))
-                cells.append("" if r is None else f"{r['ms']['search'] - base['search']:+.1f} ({r['ms']['exact'] - base['exact']:+.1f})")
-            print(f"{n:>9,} " + " ".join(f"{c:>20}" for c in cells))
-    prints = {r["fingerprint"] for r in results.values()}
-    exact_prints = {r["exact_fingerprint"] for r in results.values()}
-    by_size = {n: {r["fingerprint"] for (m, _, _), r in results.items() if m == n} for n in sizes}
-    same = all(len(v) <= 1 for v in by_size.values())
-    print(f"\nresults: every setting returned {'the same' if same else 'DIFFERENT'} hits (ids and scores, {args.queries} "
-          f"searches of {RESULTS} per size; compact {', '.join(f'{n:,}: ' + '/'.join(sorted(v)) for n, v in by_size.items() if v)}"
-          f"; exact {len(exact_prints)} fingerprint{'s' * (len(exact_prints) > 1)}). Compare them between two branches: "
-          f"a fix must not change them.")
+            ex = f" ({r['ms']['exact']['p50'] - base['exact']['p50']:+.1f})" if "exact" in r["ms"] and "exact" in base else ""
+            cells.append(f"{r['ms']['search']['p50'] - base['search']['p50']:+.1f}{ex}")
+        print(f"{n:>9,} " + " ".join(f"{c:>15}" for c in cells))
+    print("\nsame results (ids and scores of every hit, query by query), compact index:")
+    for line in _same_results(results, sizes, [k for k in keys if k != "i"], "hits"):
+        print("  " + line)
+    print("same results, exact index (a, d):")
+    for line in _same_results(results, sizes, keys, "exact_hits"):
+        print("  " + line)
+    print("  Compare the fingerprints with another run (main against a fix branch): a fix must not change them.")
+    builds = [(n, k, results[(n, k)]["build_s"]) for n in sizes for k in "ad" if (n, k) in results and "build_s" in results[(n, k)]]
+    if builds:
+        print("building the compact index from the rows: " + "; ".join(
+            f"{n:,} vectors on {'all cores (a)' if k == 'a' else 'one core (d)'}: {s:.1f} s" for n, k, s in builds))
     per_thread = {r["per_thread"] for r in results.values()}
     print(f"faiss.omp_set_num_threads changes the calling thread's count only, on this machine: "
           f"{'yes' if per_thread == {True} else 'NO' if per_thread == {False} else 'not in every child'}")
-    print(_verdict(results, sizes, faiss_counts, blas_counts))
+    print("\n== what this says ==")
+    for line in _closing(results, [n for n in sizes if (n, "a") in results], n_all):
+        print(line)
     took = time.monotonic() - started
     print(f"took {took // 60:.0f} min {took % 60:.0f} s ({built_s:.0f} s building or reading the indexes)")
-    del prints
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--work", help="a folder with free disk for the indexes (about 2.5 GB per million vectors)")
     p.add_argument("--sizes", default="100000,500000")
-    p.add_argument("--faiss-threads", default="1,all")
-    p.add_argument("--blas-threads", default="1,all")
+    p.add_argument("--configs", default="abcdefghi", help="which configurations to run (letters, see above)")
+    p.add_argument("--threads", type=int, default=0, help="what 'all' means (default: every CPU this process may use)")
     p.add_argument("--queries", type=int, default=50)
+    p.add_argument("--build-sizes", default="", help="sizes at which a and d time a build from the rows (default: the smallest)")
     p.add_argument("--keep-indexes", action="store_true")
     sub = p.add_subparsers(dest="cmd")  # the steps `run` starts, each in a process of its own
     for name, fn in (("build", cmd_build), ("prepare", cmd_prepare), ("time", cmd_time)):
@@ -492,6 +731,10 @@ def main() -> None:
         s.add_argument("--n", type=int, default=0)
         s.add_argument("--faiss", type=int, default=1)
         s.add_argument("--queries", type=int, default=50)
+        s.add_argument("--exact", action="store_true")
+        s.add_argument("--build", action="store_true")
+        s.add_argument("--cold", action="store_true")
+        s.add_argument("--try-fix", default="")
         s.set_defaults(fn=fn)
     args = p.parse_args()
     if args.cmd:
