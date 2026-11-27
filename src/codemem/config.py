@@ -528,8 +528,8 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"device must be {'|'.join(DEVICES)}, got {cfg.device!r}")
     if cfg.dtype not in DTYPES:
         raise ValueError(f"dtype must be {'|'.join(DTYPES)}, got {cfg.dtype!r}")
-    if cfg.steering not in {"none", "light", "strong"}:
-        raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
+    if cfg.steering not in {"none", "light", "detailed", "strong"}:
+        raise ValueError(f"steering must be none|light|detailed|strong, got {cfg.steering!r}")
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
     if not isinstance(cfg.model_idle_minutes, (int, float)) or cfg.model_idle_minutes < 0:

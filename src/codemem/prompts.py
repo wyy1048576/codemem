@@ -25,6 +25,30 @@ _SEARCH_CODE = {
         "blocks with file:line, signature and a short preview. Once you have an exact identifier or "
         "string, use grep." + _FILTERS
     ),
+    "detailed": (
+        "Search every function, class and code block of this repository by meaning and by keywords at "
+        "once (the index follows your edits). One call returns the 10 best matches, ranked, each as "
+        "`path:start-end  name  [id N]` with its signature and up to 6 lines of its code: about 2,000 "
+        "tokens for 10 results, the cost of one or two file reads.\n\n"
+        "Call search_code INSTEAD OF Grep or Glob when:\n"
+        "- the task describes a behaviour, bug or feature in words and you do not know yet which file or "
+        "function implements it. Make it your first call, before any Grep or Glob;\n"
+        "- the names you would grep for are guesses: a function you think exists, or a word from the task "
+        "that may not appear in the code;\n"
+        "- you are about to try a second variant of a grep for the same idea, or a grep returned nothing, "
+        "or more files than you would read;\n"
+        "- the code you need is spread over several files (\"where are options checked before a request "
+        "is sent\").\n"
+        "One search usually replaces several exploratory greps and reads: that is where it saves turns.\n\n"
+        "Use Grep or Read INSTEAD when you already hold something exact: an identifier, path, error "
+        "message or string that appears verbatim in the task or in code you have read; to list every use "
+        "of a known name; to open a file you already know.\n\n"
+        "How to call it: describe the behaviour in plain words with the nouns of the task, not one "
+        "keyword; leave k at 10. Read the previews before anything else: the function to change is often "
+        "among them. Then open only what you need: Read with the path and lines given, or get_chunk(id). "
+        "Search again only in different words, when you lose the trail; the same query returns the same "
+        "results." + _FILTERS
+    ),
     "strong": (
         "Use search_code FIRST to find the code for a task, bug or feature described in plain words, "
         "even when you know no identifier: \"where do users log in?\", \"add OCR to the upload "
@@ -41,6 +65,12 @@ _GET_CHUNK = {
         "Return the full source of one function plus its callers and callees. `ref` is a chunk id "
         "from search_code, a `path:line` location, or a `path::qualname` key."
     ),
+    "detailed": (
+        "Return the full source of one function or class plus the names of its callers and callees. "
+        "`ref` is a chunk id from search_code (`[id N]`), a `path:line` location, or a `path::qualname` "
+        "key. Use it for a search result whose preview is not enough: it costs less than reading the "
+        "whole file. A class of 80 lines or more comes back as its outline."
+    ),
     "strong": (
         "Return the full source of one function plus its callers and callees. `ref` is a chunk id "
         "from search_code, a `path:line` location, or a `path::qualname` key. Use this to inspect "
@@ -52,14 +82,14 @@ _INDEX_STATUS = {
     level: "Report whether the code index is ready or still indexing (with progress), counts, "
     "models in use, the indexed git commit, anything still being indexed, and which files are not "
     "indexed and why (too large, generated, not code, ignored)."
-    for level in ("none", "light", "strong")
+    for level in ("none", "light", "detailed", "strong")
 }
 
 _REFRESH_INDEX = {
     level: "Check every file now and index what changed. The index follows your edits on its own; "
     "call this after git checkout, pull or rebase, or when results look out of date. Waits up to "
     "a minute and says what changed."
-    for level in ("none", "light", "strong")
+    for level in ("none", "light", "detailed", "strong")
 }
 
 _INSTRUCTIONS = {
@@ -75,6 +105,18 @@ _INSTRUCTIONS = {
         "Once you have an exact name, path or error string, grep or read the file directly.\n"
         "- get_chunk(ref): read one result in full with its callers and callees.\n"
         "- refresh_index(): after git checkout, pull or rebase (the index follows your own edits)."
+    ),
+    "detailed": (
+        "codemem searches this repository's functions, classes and code blocks by meaning and keywords.\n"
+        "Choose between search_code and Grep before your first search, not after:\n"
+        "- no exact name yet (the task describes behaviour, or your names are guesses): start with ONE "
+        "search_code call in plain words, read its previews, then Read or Grep precisely;\n"
+        "- an exact identifier, path or string from the task or from code you have read: Grep or Read "
+        "it directly, with no search_code first;\n"
+        "- lost the trail later (a grep found nothing or too much, or you are guessing a second variant): "
+        "search_code again in different words rather than another guess.\n"
+        "get_chunk(ref) reads one result in full with its callers and callees. refresh_index() is only "
+        "for after git checkout, pull or rebase."
     ),
     "strong": (
         "codemem indexes every function and class in this repository (code, callers, tests) for "
