@@ -109,7 +109,7 @@
       },
       {
         "path": "tasks/screen/hard-playwright.jsonl",
-        "sha256": "0eb72ff6e35ee7cd4dd8c400329fd41a0ced08393a9b3fca5f452be305052433"
+        "sha256": "bec67b16e67d60b31365ddb886c8f389d205c8abbb0eaa937272901690fd9b67"
       }
     ],
     "facts": [
@@ -278,9 +278,9 @@
         },
         "medium": {
           "fair": 8,
-          "target": 8,
-          "run": 8,
-          "spare": 0,
+          "target": 6,
+          "run": 6,
+          "spare": 2,
           "test": 7,
           "dev": 1,
           "labels": {
@@ -288,19 +288,24 @@
           }
         },
         "hard": {
-          "fair": 0,
+          "fair": 2,
           "target": 4,
-          "run": 0,
+          "run": 2,
           "spare": 0,
-          "test": 0,
+          "test": 2,
           "dev": 0,
-          "labels": {}
+          "labels": {
+            "hard": 2
+          }
         }
       },
-      "run_without_prompts": [],
+      "run_without_prompts": [
+        "microsoft__playwright-43482",
+        "microsoft__playwright-43342"
+      ],
       "notes": [
-        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
-        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
+        "medium tier: the target is 6, because the hard tier runs 2 (medium and hard together are 8)",
+        "hard tier: 2 fair tasks, fewer than the target of 4; all of them are run"
       ]
     },
     "pandas-dev/pandas": {
@@ -346,12 +351,12 @@
       ]
     }
   },
-  "rows": 123,
+  "rows": 125,
   "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --screen tasks/screen/hard-duckdb.jsonl --screen tasks/screen/hard-playwright.jsonl --force",
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "de3ec3550cf8a1cf0acd9e8ea24785f73b9e8169",
+    "sha": "f0a1574e74114e639532bb399ac87ff659498751",
     "dirty": false
   },
-  "created": "2026-11-27T12:03:24+00:00"
+  "created": "2026-11-27T12:39:43+00:00"
 }
