@@ -462,12 +462,18 @@ class CompactVectorStore(VectorStore):
     def bind(self, fetch: Fetch) -> None:
         self._fetch = fetch
 
-    def _coded(self, vecs: np.ndarray) -> np.ndarray:
+    def _coded(self, vecs: np.ndarray, *, query: bool = False) -> np.ndarray:
         """Rows as FAISS takes them: the first `code_dim` numbers, scaled to length 1 and rotated,
-        as contiguous float32. A row with a NaN or an infinity is coded as a zero vector."""
+        as contiguous float32. A row with a NaN or an infinity is coded as a zero vector. A query
+        (one row, never stored) is rotated by numpy's own loop, not the BLAS: OpenBLAS runs a
+        product of this size on all of its threads, and for one row waking them costs more than
+        the product. Its numbers can then differ from the BLAS's in the last bits; no stored code
+        is made this way."""
         with np.errstate(invalid="ignore"):
             rows = prepare(vecs, self.code_dim)
         rows[~np.isfinite(rows).all(axis=1)] = 0.0
+        if query:
+            return np.ascontiguousarray(np.einsum("ij,jk->ik", rows, self._rotation), dtype=np.float32)
         return np.ascontiguousarray(rows @ self._rotation, dtype=np.float32)
 
     def _in_step(self) -> None:
@@ -571,7 +577,7 @@ class CompactVectorStore(VectorStore):
         """Positions of the `size` best codes for a query, and of every code that ties with the
         last of them. Which they are depends on the codes held, never on their order."""
         self._in_step()
-        x = self._coded(q)
+        x = self._coded(q, query=True)
         if self._fine is None:
             return self._scan(x, size, allowed)
         qualifying = len(self._ids) if allowed is None else int(np.count_nonzero(allowed))
