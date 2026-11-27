@@ -17,22 +17,13 @@
 
 **What Andre wants from item 2, in his words:** he is curious whether codemem can save more by being smarter and not showing the agent what earlier searches of the session already showed. He is particular about the plan because he wants no unwanted side effect: nothing hidden from the agent, and never changed code shown as seen. You are free to explore within that. If you need something cleared up, ask here.
 
-**The size of the prize, so that nobody expects too much** (our 102 Haiku sessions with the tool):
-
-| Repeated results are | |
-|---|---|
-| of the results of second and later searches | 29% (156 of 536) |
-| of all results codemem returned | 10% (156 of 1,554) |
-| of all search-result text | 10%, about 20,000 tokens over 102 sessions |
-| of the cost of a session that searches more than once | about 2 to 3% |
-
-So shortening repeats alone saves a few percent. The larger question is the refill: whether giving those places to results the session has not seen saves later calls. It is not a must: if it does not pay, or keeping it right costs more than it gives, say so with the numbers and drop it.
+**Explore.** Shortening repeats is the starting point, not the limit. Look for whatever makes a second and later search worth more to the agent for what it costs: giving the freed places to results the session has not seen, a later search that knows what the first one returned, and anything else you find, by experiment or in what others have published. Tell us what worked, what did not, and by how much.
 
 **What stands from the announcement:** results in this log by 22:00 UTC, at the latest 23:00 UTC, with the place of the raw records; post what you have at that time. These times replace the 19:00 and 03:00 UTC written in the 12:25 entry. The lock is Nov 28, 00:30 UTC.
 
 ## Checked
 
-The table: counted from the session data in the 12:25 data folder (Haiku, arms `tool`, `tool-v0`, `tool-q`). The cost share is an estimate: repeated text at the price of new text, against the recorded cost of those sessions.
+Nothing new to check.
 
 ## Left
 
