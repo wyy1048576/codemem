@@ -1087,14 +1087,25 @@ vectors it has to compare exactly. A search has three steps:
   FAISS learns that average from the vectors it is shown. A learned average ties every code to the
   vectors the index held at that moment: an index patched edit by edit and one rebuilt from its
   rows would hold different codes, and could return different results. With the centre fixed at
-  zero, a code depends only on its own vector. A learned centre did not help at 896 numbers (98.5%
-  against 99.3%); at 512 numbers it added 3 points.
-- **The order of the codes never matters.** Copies of one vector have the same codes, and so the
-  same estimates. A cut through them, in step 1 or in step 2, takes them all. So the candidates
-  depend only on the vectors an index holds: one patched edit by edit, one rebuilt from its rows
-  and one that holds the same vectors under other ids return the same results (768 searches on
-  two indexes whose ids differ: no difference at any setting). The codes are also kept in the
-  order of their vector ids, so two indexes with the same rows hold the same bytes.
+  zero, a code depends only on its own vector, up to the rotation's rounding (below). A learned
+  centre did not help at 896 numbers (98.5% against 99.3%); at 512 numbers it added 3 points.
+- **The order of the codes never matters.** A cut through codes that tie, in step 1 or in step 2,
+  takes them all, and the codes are kept in the order of their vector ids. So the candidates
+  depend on the codes an index holds, not on where they sit: one that holds the same vectors
+  under other ids returns the same results (768 searches on two indexes whose ids differ: no
+  difference at any setting).
+- **A vector's code is the same to the last bit of a float only.** The rotation is a float32
+  matrix product in numpy's BLAS, and a BLAS can round a row's numbers differently in a call of
+  another size. Accelerate does at 32 and 40 numbers, for calls of 8 to 15 rows, and at none of
+  the other lengths tried (8 to 128, 768, 896, 1,024). FAISS then stores per-vector factors that
+  differ in their last bits (1 to 7 ulp); in those checks no sign bit or extra bit changed. So an
+  index patched edit by edit and one rebuilt from its rows can hold other bytes, and copies of
+  one vector coded in two such calls do not tie exactly: a cut through them can keep some of them
+  and not others. Scores do not change, since they are read from the rows: only which of two
+  codes whose estimates differ in the last bit becomes a candidate. The tests that hold two
+  indexes to the same bytes use a rotation no BLAS rounds (a signed permutation).
+  `scripts/diagnose_compact_store.py` shows, on any machine, which stage of the coding path
+  depends on the call.
 - **Filters** become one bit per vector, which FAISS tests while it scans.
 - **Deleted rows.** If another process deletes a candidate's row before this process has caught
   up, the vector is left out and the search takes more candidates.
