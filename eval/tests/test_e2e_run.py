@@ -2,6 +2,7 @@
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -46,7 +47,7 @@ def test_setups_and_models():
     assert e2e_run.get_setup("grep").mcp_config == {"mcpServers": {}}
     assert e2e_run.get_setup("tool").codemem and not e2e_run.get_setup("grep").codemem
     with pytest.raises(gen.GenerateError, match="not built yet"):
-        e2e_run.get_setup("upfront")
+        e2e_run.get_setup("placebo")
     with pytest.raises(gen.GenerateError, match="no such setup"):
         e2e_run.get_setup("nope")
     e2e_run.check_model("claude-haiku-5-5")
@@ -285,6 +286,18 @@ PROXY_LINES = [
 ]
 
 
+# The hidden tests of the task of a local run. Two added lines are long enough for the mount proof.
+TEST_PATCH = """\
+diff --git a/tests/test_sessions.py b/tests/test_sessions.py
+--- /dev/null
++++ b/tests/test_sessions.py
+@@ -0,0 +1,3 @@
++def test_revoke_session_removes_every_session_of_the_user(manager, user):
++    manager.revoke_session(user)
++    assert manager.db.sessions_for(user) == [], "a session of a disabled user is left"
+"""
+
+
 def _git(root, *args):
     return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True).stdout
 
@@ -432,7 +445,12 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
         text = Path(out, "agent.sh").read_text()
         assert e2e_run.KILL_AGENT in text
         gate_dir = tempfile.mkdtemp(prefix="cmg-", dir="/tmp")
-        moves = ((e2e_run.GATE_DIR, gate_dir), ("/testbed", str(testbed)), ("/out", out))
+        for i, part in enumerate(cmd[:-1]):  # the paths that the mount proof searches, where the host has them
+            host, target = cmd[i + 1].split(":")[:2] if part == "-v" else ("", "")
+            if host != target and target != "/out":
+                text = text.replace(f" {shlex.quote(target)} ", f" {shlex.quote(host)} ")
+        moves = ((e2e_run.GATE_DIR, gate_dir), ("/testbed", str(testbed)), ("/out", out),
+                 (e2e_run.PROOF_DIR, str(tmp_path / "cmproof")))
         for old, new in ((e2e_run.KILL_AGENT, "true"), *moves, ("/run/claude-empty", str(tmp_path / "claude-empty")),
                          ("/tmp/mcp.json", f"{tmp_path}/mcp.json")):
             text = text.replace(old, new)
@@ -466,7 +484,7 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
 
     monkeypatch.setattr(e2e_run, "grade", fake_grade)
     recipe = gen.Recipe(name="r", repo="acme/auth", base_image="i", test="pytest {files}")
-    task = make_task()
+    task = make_task(test_patch=TEST_PATCH)
     gen.task_dir(recipe, task).mkdir(parents=True)
     gen.tests_path(recipe, task).write_text(json.dumps({"fail_to_pass": ["t::a"], "pass_to_pass": []}))
     return recipe, task, calls, graded
@@ -474,13 +492,19 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
 
 def test_run_one_locally(make_task, tmp_path, monkeypatch):
     recipe, task, calls, graded = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events())
+    loads = iter([[1.0, 1.5, 2.0], [3.0, 2.5, 2.0]])
+    monkeypatch.setattr(e2e_run, "host_load", lambda: next(loads))
     out = e2e_run.run_dir("r1", task.id, "grep", 1)
     record = e2e_run.run_one(recipe, task, setup="grep", model="claude-haiku-5-5", rep=1, out=out,
                              settings=RunSettings(poll_s=0.05))
 
     assert record["end"] == "finished" and record["completed"] is True and not record["discard"]
+    # The host's load right before and right after the container, in every setup.
+    assert record["time"]["host_load_start"] == [1.0, 1.5, 2.0] and record["time"]["host_load_end"] == [3.0, 2.5, 2.0]
+    assert record["integrity"]["codemem_mount_proof"] is None
     assert record["run_id"] == "r1" and record["rep"] == 1 and record["identity"]["harness_version"] == "2.1.332"
     assert record["identity"]["prompt_frame"] == "v1" and record["identity"]["image_id"] == "sha256:abc"
+    assert record["identity"]["seat"] == "claude-token"  # the name of the token file, not its text
     integrity = record["integrity"]
     assert integrity["setup_ok"] and integrity["proxy_complete"] and integrity["cross_check"]["agree"]
     assert sorted(integrity["removed_config_files"]) == ["CLAUDE.md", "sub/.claude/settings.json", "sub/AGENTS.md"]
@@ -550,7 +574,7 @@ def test_run_one_preconditions(make_task, monkeypatch, tmp_path):
     with pytest.raises(gen.GenerateError, match="no tests.json"):
         e2e_run.run_one(recipe, task, setup="grep", model="claude-haiku-5-5", rep=1, out=out)
     with pytest.raises(gen.GenerateError, match="not built yet"):
-        e2e_run.run_one(recipe, task, setup="upfront", model="claude-haiku-5-5", rep=1, out=out)
+        e2e_run.run_one(recipe, task, setup="placebo", model="claude-haiku-5-5", rep=1, out=out)
     assert not out.exists()
 
 
@@ -559,8 +583,12 @@ def test_run_one_preconditions(make_task, monkeypatch, tmp_path):
 def test_plan_runs_by_repetition_with_setups_taking_turns(make_task):
     a, b = make_task(id="acme__auth-1"), make_task(id="acme__auth-2")
     order = [(t.id[-1], s, r) for t, s, r in e2e_run.plan_runs([a, b], ["grep", "tool"], 2)]
-    assert order == [("1", "grep", 1), ("1", "tool", 1), ("2", "grep", 1), ("2", "tool", 1),
-                     ("1", "tool", 2), ("1", "grep", 2), ("2", "tool", 2), ("2", "grep", 2)]
+    # The setup that goes first moves from task to task, and again at each repetition.
+    assert order == [("1", "grep", 1), ("1", "tool", 1), ("2", "tool", 1), ("2", "grep", 1),
+                     ("1", "tool", 2), ("1", "grep", 2), ("2", "grep", 2), ("2", "tool", 2)]
+    c = make_task(id="acme__auth-3")
+    order = e2e_run.plan_runs([a, b, c], ["grep", "tool", "codemem"], 2)
+    assert [s for _, s, _ in order[0::3]] == ["grep", "tool", "codemem", "tool", "codemem", "grep"]
     assert [s for _, s, _ in e2e_run.plan_runs([a], ["grep"], 3)] == ["grep"] * 3
 
 
@@ -602,7 +630,7 @@ def test_cli_run_batch(make_task, tmp_path, monkeypatch, capsys):
     args = ["e2e", "run", "pandas", "--tasks", str(path), "--run-id", "b1"]
     assert main(args + ["--model", "sonnet"]) == 1
     assert "full model id" in capsys.readouterr().err
-    assert main(args + ["--setup", "upfront"]) == 1
+    assert main(args + ["--setup", "placebo"]) == 1
     assert "not built yet" in capsys.readouterr().err
 
     assert main(args + ["--dry-run"]) == 0
@@ -684,18 +712,27 @@ def test_score_tables_and_paired_difference(capsys):
 
 # ---- the setup tool: codemem's MCP server in the container
 
+# The first lines of a script that uv makes when the path of its Python holds a space.
+UV_SCRIPT = "#!/bin/sh\n'''exec' '{python}' \"$0\" \"$@\"\n' '''\n"
+
 def _codemem_install(tmp_path, monkeypatch, recipe, task):
-    """Stand-ins for the codemem program in a virtual environment, its uv Python, the Hugging Face cache and the
-    task's index. Returns the checkout, the Python root, the cache and index.json."""
+    """Stand-ins for the codemem program in a virtual environment made by `uv sync` (a script in uv's form for a
+    path with a space, and the editable install's .pth file that names <checkout>/src), its uv Python, the
+    Hugging Face cache and the task's index. Returns the checkout, the Python root, the cache and index.json."""
     checkout = tmp_path / "codemem"
     bin_dir = checkout / ".venv" / "bin"
     bin_dir.mkdir(parents=True)
-    (bin_dir / "fake_codemem.py").write_text(FAKE_MCP_SERVER)
-    _shim(bin_dir, "codemem", f"#!/bin/sh\nexec '{sys.executable}' '{bin_dir / 'fake_codemem.py'}' \"$@\"\n")
+    _shim(bin_dir, "codemem", UV_SCRIPT.format(python=bin_dir / "python") + FAKE_MCP_SERVER)
+    site = checkout / ".venv" / "lib" / "python3.12" / "site-packages"
+    site.mkdir(parents=True)
+    (site / "_editable_impl_codemem.pth").write_text(f"{checkout / 'src'}\n")
+    (site / "_virtualenv.pth").write_text("import _virtualenv\n")
+    (checkout / "src" / "codemem").mkdir(parents=True)
+    (checkout / "src" / "codemem" / "__init__.py").write_text("")
     monkeypatch.setenv("FAKE_SERVER_LOG", str(tmp_path / "server-calls.log"))
     python = tmp_path / "uv" / "python" / "cpython-3.12-linux" / "bin" / "python3.12"
     python.parent.mkdir(parents=True)
-    python.write_text("")
+    _shim(python.parent, "python3.12", f"#!/bin/sh\nexec '{sys.executable}' \"$@\"\n")
     (bin_dir / "python").symlink_to(python)
     monkeypatch.setenv("CMEVAL_CODEMEM_BIN", str(bin_dir / "codemem"))
     hf = tmp_path / "hf"
@@ -725,9 +762,12 @@ def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
                 "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0",
                 "CODEMEM_VECTOR_BACKEND": "faiss", "OMP_NUM_THREADS": "4", "MKL_NUM_THREADS": "4"},
         "alwaysLoad": True}}}
+    venv, src = checkout / ".venv", checkout / "src"
+    assert codemem["mounts"] == [venv, src]
+    # Only the environment and the source of the checkout, never the checkout itself (its eval/ holds the fixes).
     assert e2e_run.codemem_mounts(codemem, Path("/runs/x/cmindex")) == [
-        "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",
-        "-v", "/runs/x/cmindex:/cmindex"]
+        "-v", f"{venv}:{venv}:ro", "-v", f"{src}:{src}:ro", "-v", f"{python_root}:{python_root}:ro",
+        "-v", f"{hf}:/hf:ro", "-v", "/runs/x/cmindex:/cmindex"]
     monkeypatch.setenv("CMEVAL_CODEMEM_STEERING", "strong")
     env = e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4))["mcpServers"]["codemem"]["env"]
     assert env["CODEMEM_STEERING"] == "strong"
@@ -825,11 +865,11 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
     assert warm["ok"] and warm["warmup_searches"] == 2 and warm["status"]["state"] == "ready"
     assert "watching for changes" in warm["status_text"]
     prep = record["time"]["prep_steps_s"]
-    assert list(prep) == ["remove_config", "chown", "codemem_warm", "ready"]
+    assert list(prep) == ["remove_config", "chown", "mount_proof", "codemem_warm", "ready"]
     assert record["time"]["codemem_warm_s"] == prep["codemem_warm"] >= 1.0
     marks = dict(line.split() for line in (out / "prep.txt").read_text().splitlines())
     clock = e2e_run.read_clock(out)
-    assert int(marks["codemem_warm"]) < int(marks["ready"]) <= clock["agent_start"]
+    assert int(marks["mount_proof"]) < int(marks["codemem_warm"]) < int(marks["ready"]) <= clock["agent_start"]
     assert "warm after" in (out / "codemem-gate.log").read_text()
     # The agent's first search went through the bridge to the warm server, and got a full search.
     assert e2e_run.codemem_gate.note_kinds((tmp_path / "agent-search.txt").read_text()) == []
@@ -847,9 +887,23 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
     assert fallbacks["searches"] == 2 and fallbacks["fell_back"] == 0 and not fallbacks["first_keywords_only"]
     run = seen["cmd"]
     assert run[run.index("--device") + 1] == "nvidia.com/gpu=all"
+    venv, src = checkout / ".venv", checkout / "src"
     assert run[run.index(f"{out}:/out") + 1:run.index(record["identity"]["image"])] == [
-        "-v", f"{checkout}:{checkout}:ro", "-v", f"{python_root}:{python_root}:ro", "-v", f"{hf}:/hf:ro",
-        "-v", f"{out / 'cmindex'}:/cmindex"]
+        "-v", f"{venv}:{venv}:ro", "-v", f"{src}:{src}:ro", "-v", f"{python_root}:{python_root}:ro",
+        "-v", f"{hf}:/hf:ro", "-v", f"{out / 'cmindex'}:/cmindex"]
+    # The mount proof passed before codemem started: the checkout held only .venv and src, and no mounted path
+    # held a line of the fix. The phrases file is gone, and no file of the run holds a phrase.
+    proof = record["integrity"]["codemem_mount_proof"]
+    assert proof["ok"] and proof["found"] and proof["script_says"] == "ok" and proof["hits"] == []
+    assert proof["checkout"] == str(checkout) and proof["checkout_eval"] == "absent"
+    assert proof["checkout_entries"] == proof["expected_entries"] == [".venv", "src"]
+    assert proof["paths"] == ["/usr/local/bin/claude", "/out", str(venv), str(src), str(python_root), "/hf",
+                              "/cmindex"]
+    assert proof["phrases"] == {"patch": 0, "test_patch": 2} and proof["grep_exit"] == 1
+    assert proof["seconds"] == prep["mount_proof"]
+    assert not (out / e2e_run.PROOF_PHRASES).exists()
+    for path in out.rglob("*"):
+        assert not path.is_file() or b"disabled user is left" not in path.read_bytes(), path
     # The copy was there during the run, open to all users, and is gone after it.
     assert seen["files"] == ["index.sqlite", "vectors", "vectors/code.faiss"] and seen["modes"] == {"0o666", "0o777"}
     assert not (out / "cmindex").exists()
@@ -949,7 +1003,7 @@ def test_cli_dry_run_shows_the_index(make_task, tmp_path, monkeypatch, capsys):
     assert main(args) == 0
     assert capsys.readouterr().out.splitlines()[:4] == [
         "pandas-dev__pandas-1 grep 1 todo", "pandas-dev__pandas-1 tool 1 todo index ok",
-        "pandas-dev__pandas-2 grep 1 todo", "pandas-dev__pandas-2 tool 1 todo index missing"]
+        "pandas-dev__pandas-2 tool 1 todo index missing", "pandas-dev__pandas-2 grep 1 todo"]
 
 
 # ---- cmeval e2e index
@@ -1013,11 +1067,14 @@ def test_cli_index(remote, make_task, tmp_path, monkeypatch, capsys):
     assert Path(f"{calls}.env").read_text().split() == ["faiss", str(tmp_path / "codemem-home")]
     assert e2e_index.index_state(recipe, tasks[0]) == "ok"
 
-    # The same commits: skipped. --force builds again. A change in codemem's src/ builds again.
+    # The same commits: skipped. --force builds again, and deletes the blocks made on the old index. A change in
+    # codemem's src/ builds again.
+    (root / "block-L0.json").write_text("{}")
     assert main(args) == 0
     assert "acme__demo-42: skipped" in capsys.readouterr().err and len(calls.read_text().splitlines()) == 1
+    assert (root / "block-L0.json").exists()
     assert main(args + ["--force"]) == 0
-    assert len(calls.read_text().splitlines()) == 2
+    assert len(calls.read_text().splitlines()) == 2 and not (root / "block-L0.json").exists()
     (checkout / "src" / "a.py").write_text("A = 2\n")
     assert main(args) == 0
     assert len(calls.read_text().splitlines()) == 3
@@ -1140,3 +1197,142 @@ def test_prompt_levels(make_task, tmp_path):
     with pytest.raises(gen.GenerateError, match="not a prompt row"):
         e2e_run.load_prompts(path, "L1")
 
+
+
+# ---- what the container of a codemem setup can read
+
+def test_codemem_mount_paths_refuses_another_layout(make_task, tmp_path, monkeypatch):
+    from cmeval.e2e_index import codemem_mount_paths
+
+    recipe, task = gen.Recipe(name="r", repo="acme/auth", base_image="i", test="pytest"), make_task()
+    checkout, _, _, _ = _codemem_install(tmp_path, monkeypatch, recipe, task)
+    venv, program = checkout / ".venv", checkout / ".venv" / "bin" / "codemem"
+    site = venv / "lib" / "python3.12" / "site-packages"
+    assert codemem_mount_paths(program) == [venv, checkout / "src"]
+
+    def fails(match):
+        with pytest.raises(gen.GenerateError, match=match):
+            codemem_mount_paths(program)
+
+    # The plain shebang form is read too; another Python is refused.
+    text = program.read_text()
+    program.write_text(f"#!{venv / 'bin' / 'python'}\n" + text.split("\n", 3)[3])
+    assert codemem_mount_paths(program) == [venv, checkout / "src"]
+    program.write_text(f"#!/bin/sh\nexec '{sys.executable}' \"$@\"\n")
+    fails("does not start the Python of its environment")
+    program.write_text(text)
+    # A .pth path outside the environment that is not <checkout>/src: the container would not have it.
+    (checkout / "eval" / "src").mkdir(parents=True)
+    (site / "extra.pth").write_text(f"{checkout / 'eval' / 'src'}\n")
+    fails(r"extra.pth adds .*eval/src to the path")
+    # A path in the environment is fine, and a path that does not exist is skipped, as Python does.
+    (site / "extra.pth").write_text(f"# note\n{venv / 'lib'}\n{tmp_path / 'gone'}\n")
+    assert codemem_mount_paths(program) == [venv, checkout / "src"]
+    (site / "__editable___codemem_0_2_0_finder.py").write_text("MAPPING = {}\n")
+    fails("editable finder modules")
+    (site / "__editable___codemem_0_2_0_finder.py").unlink()
+    # Not editable: a codemem folder in site-packages needs no source folder.
+    (site / "_editable_impl_codemem.pth").unlink()
+    fails("codemem is not installed")
+    (site / "codemem").mkdir()
+    assert codemem_mount_paths(program) == [venv]
+    (venv / "lib" / "python3.11" / "site-packages").mkdir(parents=True)
+    fails("2 site-packages folders")
+    (venv / "lib" / "python3.11" / "site-packages").rmdir()
+    # A Python install in the checkout, outside the environment: the container would not have it.
+    (checkout / "pythons").mkdir()
+    (checkout / "pythons" / "python3.12").write_text("")
+    (venv / "bin" / "python").unlink()
+    (venv / "bin" / "python").symlink_to(checkout / "pythons" / "python3.12")
+    fails("in the checkout, but outside the environment")
+
+
+def test_proof_phrases(make_task):
+    patch = ("--- a/x.py\n+++ b/x.py\n@@ -1 +1,5 @@\n-    value = compute_the_value_of_this(thing, other)\n"
+             "+    value = compute_the_value_of_this(thing, other)\n+    short = 1\n"
+             "+    result = a_very_long_function_name_for_the_fix(first, second)\n"
+             "+\tsecond_long_line_of_the_real_fix_for_the_proof(x)\r\n"
+             "+    this_line_is_in_the_issue_text_as_well_so_skip_it()\n")
+    task = make_task(patch=patch, test_patch=None)
+    phrases = e2e_run.proof_phrases(task, avoid="see this_line_is_in_the_issue_text_as_well_so_skip_it() fail")
+    # Long added lines only, without the moved line, the short line and the line of the issue text.
+    assert phrases == {"patch": ["result = a_very_long_function_name_for_the_fix(first, second)",
+                                 "second_long_line_of_the_real_fix_for_the_proof(x)"], "test_patch": []}
+    many = "".join(f"+line_{i}_of_the_hidden_tests_which_is_long_enough_{'x' * i}\n" for i in range(5))
+    phrases = e2e_run.proof_phrases(make_task(test_patch=many), avoid="")
+    assert phrases["patch"] == [] and len(phrases["test_patch"]) == 3
+    assert phrases["test_patch"][0].startswith("line_4_")
+
+
+def test_mount_targets_and_proof_checks():
+    volumes = ["-v", "/h/claude:/usr/local/bin/claude:ro", "-v", "/runs/1:/out", "-v", "/a/.venv:/a/.venv:ro"]
+    assert e2e_run.mount_targets(volumes) == ["/usr/local/bin/claude", "/out", "/a/.venv"]
+    good = {"found": True, "checkout": "/a", "expected_entries": [".venv", "src"], "script_says": "ok",
+            "checkout_eval": "absent", "checkout_entries": [".venv", "src"], "grep_exit": 1, "other_errors": 0,
+            "hits": [], "grep_errors": []}
+    assert e2e_run.proof_checks(good) == []
+    # Files that the agent's user cannot read are no exposure.
+    assert e2e_run.proof_checks({**good, "grep_exit": 2, "grep_errors": ["grep: /hf/x: Permission denied"]}) == []
+    assert e2e_run.proof_checks({**good, "grep_exit": 2, "other_errors": 1,
+                                 "grep_errors": ["grep: /cmindex: No such file or directory"]}) == [
+        "mount proof: the search failed (exit 2): grep: /cmindex: No such file or directory"]
+    assert e2e_run.proof_checks({**good, "found": False}) == ["mount proof: no mount-proof.txt; the proof did not run"]
+    bad = {**good, "script_says": "failed", "checkout_eval": "present", "grep_exit": 0,
+           "checkout_entries": [".venv", "eval", "src"], "hits": ["/a/src/tasks.jsonl"]}
+    assert e2e_run.proof_checks(bad) == [
+        "mount proof: /a/eval is present in the container",
+        "mount proof: /a holds ['.venv', 'eval', 'src'] in the container, expected ['.venv', 'src']",
+        "mount proof: a line of the real fix or the hidden tests is in /a/src/tasks.jsonl",
+        "mount proof: the search failed (exit 0): no message"]
+    assert e2e_run.proof_checks({**good, "script_says": "failed"}) == ["mount proof: the container script says failed"]
+
+
+def test_read_proof(tmp_path):
+    assert e2e_run.read_proof(tmp_path) is None
+    (tmp_path / "mount-proof.txt").write_text(
+        "proof failed\ncheckout_eval absent\ncheckout_entries .venv src \ngrep_exit 0\nother_errors 0\n"
+        "hit /a/src/x y.txt\ngrep_error grep: /hf/z: Permission denied\n")
+    assert e2e_run.read_proof(tmp_path) == {
+        "script_says": "failed", "checkout_eval": "absent", "checkout_entries": [".venv", "src"], "grep_exit": 0,
+        "other_errors": 0, "hits": ["/a/src/x y.txt"], "grep_errors": ["grep: /hf/z: Permission denied"]}
+
+
+def test_run_one_tool_stops_when_a_mounted_path_holds_the_fix(make_task, tmp_path, monkeypatch):
+    recipe, task, _, graded = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events(TOOL_STREAM))
+    checkout, _, _, _ = _codemem_install(tmp_path, monkeypatch, recipe, task)
+    # A copy of the task's line in a mounted folder, as eval/tasks/e2e/*.jsonl was in the old mount.
+    leak = checkout / "src" / "tasks.jsonl"
+    leak.write_text(json.dumps({"id": task.id, "test_patch": TEST_PATCH}) + "\n")
+    out = e2e_run.run_dir("r1", task.id, "tool", 1)
+    record = e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
+                             settings=RunSettings(poll_s=0.05))
+    assert not (tmp_path / "argv.txt").exists() and not (tmp_path / "server-calls.log").exists()
+    assert record["end"] == "error" and record["discard"] and not graded
+    assert record["integrity"]["setup_failures"] == [
+        "no init event", f"mount proof: a line of the real fix or the hidden tests is in {leak}",
+        "mount proof: the search failed (exit 0): no message"]
+    proof = record["integrity"]["codemem_mount_proof"]
+    assert proof["ok"] is False and proof["script_says"] == "failed" and proof["hits"] == [str(leak)]
+    assert record["integrity"]["codemem_warm"] is None and not (out / e2e_run.PROOF_PHRASES).exists()
+
+
+def test_run_one_tool_stops_when_the_checkout_holds_more(make_task, tmp_path, monkeypatch):
+    recipe, task, _, graded = _local_run(monkeypatch, tmp_path, make_task, stream_lines=_events(TOOL_STREAM))
+    checkout, _, _, _ = _codemem_install(tmp_path, monkeypatch, recipe, task)
+    (checkout / "eval" / "tasks").mkdir(parents=True)
+    out = e2e_run.run_dir("r1", task.id, "tool", 1)
+    record = e2e_run.run_one(recipe, task, setup="tool", model="claude-haiku-5-5", rep=1, out=out,
+                             settings=RunSettings(poll_s=0.05))
+    assert not (tmp_path / "argv.txt").exists() and record["discard"] and not graded
+    assert record["integrity"]["setup_failures"][1:] == [
+        f"mount proof: {checkout}/eval is present in the container",
+        f"mount proof: {checkout} holds ['.venv', 'eval', 'src'] in the container, expected ['.venv', 'src']"]
+
+
+def test_host_load(tmp_path):
+    path = tmp_path / "loadavg"
+    path.write_text("0.52 1.25 2.00 3/812 41234\n")
+    assert e2e_run.host_load(path) == [0.52, 1.25, 2.0]
+    assert e2e_run.host_load(tmp_path / "none") is None
+    path.write_text("")
+    assert e2e_run.host_load(path) is None

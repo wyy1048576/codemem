@@ -27,6 +27,9 @@ One log line has these fields. A field is left out when it has no value.
   request_bytes          size of the request body; response_bytes: size of the answer body
   model, stream, max_tokens, messages, tools, has_system, has_metadata
                          from the request JSON: messages and tools are counts, never the content
+  opens_with_text        only for a proxy given an opening_text (the block of codemem results of a run, e2e_block.py):
+                         whether the request's first user message begins with that text, in one of its text blocks.
+                         Only true or false is kept, never a text
   has_authorization, has_x_api_key
                          whether the request had these headers (their values are never kept)
   request_headers        values of a short list of headers that are not secret (KEPT_REQUEST_HEADERS)
@@ -89,8 +92,8 @@ AGENT_CLASSES = {"input_tokens": "inputTokens", "output_tokens": "outputTokens",
                  "cache_read_input_tokens": "cacheReadInputTokens"}
 FIELDS = ("seq", "start", "method", "path", "query", "status", "ms_headers", "ms_first_byte", "ms_end",
           "request_bytes", "response_bytes", "model", "stream", "max_tokens", "messages", "tools", "has_system",
-          "has_metadata", "has_authorization", "has_x_api_key", "request_headers", "response_model", "message_id",
-          "stop_reason", "usage", "usage_start", "usage_delta", "stream_complete", "counted_input_tokens",
+          "has_metadata", "opens_with_text", "has_authorization", "has_x_api_key", "request_headers", "response_model",
+          "message_id", "stop_reason", "usage", "usage_start", "usage_delta", "stream_complete", "counted_input_tokens",
           "request_id", "rate_limit_headers", "error", "proxy_error", "client_closed", "parse_note", "unfinished")
 
 _LINE_END = re.compile(rb"\r\n|\r|\n")
@@ -279,8 +282,22 @@ def _decoded(body: bytes, encoding: str) -> bytes | None:
     return None
 
 
-def request_facts(body: bytes, headers) -> dict:
-    """Fields for the log line from the request: its shape, never its content and never a credential."""
+def opens_with(messages: list, text: str) -> bool:
+    """Whether the first user message of a request begins with text. Claude Code puts its own reminders before
+    the prompt, each in a text block of its own, so the prompt can be any text block of that message."""
+    first = next((m for m in messages if isinstance(m, dict) and m.get("role") == "user"), None)
+    content = first.get("content") if first else None
+    if isinstance(content, str):
+        return content.startswith(text)
+    if not isinstance(content, list):
+        return False
+    return any(isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)
+               and b["text"].startswith(text) for b in content)
+
+
+def request_facts(body: bytes, headers, opening_text: str | None = None) -> dict:
+    """Fields for the log line from the request: its shape, never its content and never a credential. With
+    opening_text, also whether the first user message begins with it (opens_with_text)."""
     facts: dict = {
         "has_authorization": "authorization" in headers,
         "has_x_api_key": "x-api-key" in headers,
@@ -299,6 +316,8 @@ def request_facts(body: bytes, headers) -> dict:
         facts["tools"] = len(data["tools"]) if isinstance(data.get("tools"), list) else None
         facts["has_system"] = "system" in data
         facts["has_metadata"] = "metadata" in data
+        if opening_text is not None and isinstance(data.get("messages"), list):
+            facts["opens_with_text"] = opens_with(data["messages"], opening_text)
     return {k: v for k, v in facts.items() if v is not None}
 
 
@@ -367,7 +386,7 @@ class _Handler(BaseHTTPRequestHandler):
             finally:
                 response.close()
         # The request is read for the log only after the answer, so that reading it adds no delay.
-        record.update(request_facts(body, self.headers))
+        record.update(request_facts(body, self.headers, proxy.opening_text))
         if proxy.bodies_dir is not None:
             (proxy.bodies_dir / f"{record['seq']:06d}.request").write_bytes(body)
 
@@ -478,15 +497,18 @@ class RecordingProxy:
         summary = summarize(log_path)
 
     The log is opened for appending. Sequence numbers go on from the lines that are already in it. progress, when
-    given, gets one short line for each request.
+    given, gets one short line for each request. opening_text, when given, is the text that the first user message
+    of each request should begin with: each log line then says whether it does (opens_with_text).
     """
 
     def __init__(self, log_path: str | Path, host: str = "127.0.0.1", port: int = 0, upstream: str = DEFAULT_UPSTREAM,
-                 bodies_dir: str | Path | None = None, progress: Callable[[str], None] | None = None) -> None:
+                 bodies_dir: str | Path | None = None, progress: Callable[[str], None] | None = None,
+                 opening_text: str | None = None) -> None:
         self.log_path = Path(log_path)
         self.host = host
         self.upstream = upstream.rstrip("/")
         self.bodies_dir = Path(bodies_dir) if bodies_dir else None
+        self.opening_text = opening_text
         self._port = port
         self._progress = progress
         self._lock = threading.Lock()  # guards the log, the sequence, and the count of requests in progress

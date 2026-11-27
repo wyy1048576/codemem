@@ -18,14 +18,18 @@ the search index by the memory of the place it runs in: all of the host's for a 
 a run. A large index that the build saved as the exact one would then be rebuilt as the compact one at the start
 of every run, and the agent's first searches would be answered from keywords only.
 
-The codemem program is <codemem checkout>/.venv/bin/codemem (or CMEVAL_CODEMEM_BIN). The runner mounts the
-checkout and the Python install of its environment into the container at their own paths.
+The codemem program is <codemem checkout>/.venv/bin/codemem (or CMEVAL_CODEMEM_BIN). The runner mounts only
+what the program reads at run time, each at its own path and read-only: the environment (<checkout>/.venv), the
+package source that the editable install of `uv sync` points to (<checkout>/src), and the Python install that the
+environment links to (codemem_mount_paths, codemem_python_root). The rest of the checkout stays out of the
+container: its eval/tasks/ files hold the real fixes and the hidden tests of the tasks.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -81,6 +85,82 @@ def codemem_python_root(program: Path) -> Path | None:
                             "with a Python that uv installed")
     checkout = Path(os.path.realpath(codemem_checkout(program)))
     return None if root.is_relative_to(checkout) else root
+
+
+# The second line of a script that uv or pip makes when the path of its Python holds a space.
+_SH_EXEC = re.compile(r"""^'''exec' '(.+)' "\$0" "\$@"$""")
+
+
+def _script_python(program: Path) -> str | None:
+    """The Python that a script of an environment starts: "#!<python>", or uv's form for a path with a space
+    ("#!/bin/sh", then "'''exec' '<python>' ..."). None for any other first lines."""
+    try:
+        lines = program.read_bytes()[:4096].decode("utf-8", "replace").splitlines()
+    except OSError:
+        return None
+    if not lines or not lines[0].startswith("#!") or not lines[0][2:].strip():
+        return None
+    if lines[0].strip() != "#!/bin/sh":
+        return lines[0][2:].split()[0]
+    match = _SH_EXEC.match(lines[1]) if len(lines) > 1 else None
+    return match.group(1) if match else None
+
+
+def _pth_paths(site: Path) -> list[tuple[Path, Path]]:
+    """The folders that the .pth files of site-packages add to sys.path, as (pth file, folder). Python skips
+    lines that start with "#" and runs lines that start with "import"; a relative path is relative to site."""
+    found = []
+    for pth in sorted(site.glob("*.pth")):
+        for line in pth.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or re.match(r"import[ \t]", line):
+                continue
+            found.append((pth, Path(line) if os.path.isabs(line) else site / line))
+    return found
+
+
+def codemem_mount_paths(program: Path) -> list[Path]:
+    """The folders of the checkout that the program reads at run time: its environment (the folder above bin/),
+    and the package source when the install is editable (<checkout>/src, named in a .pth file). The container
+    gets these and the Python install (codemem_python_root), and nothing else of the checkout.
+
+    The check fails when the layout is not this one: the script does not start the environment's Python, a .pth
+    file adds a folder outside the environment that is not <checkout>/src, the Python is in the checkout but
+    outside the environment, an editable finder module
+    (__editable__*) maps the package to paths that this check cannot read, or codemem is not installed."""
+    venv = program.parent.parent
+    src = codemem_checkout(program) / "src"
+    python = _script_python(program)
+    if python is None or not Path(python).is_relative_to(venv):
+        raise GenerateError(f"{program} does not start the Python of its environment {venv} (it starts "
+                            f"{python}); make the environment with `uv sync` in the codemem checkout")
+    sites = sorted(venv.glob("lib/python*/site-packages"))
+    if len(sites) != 1:
+        raise GenerateError(f"{venv} has {len(sites)} site-packages folders, expected 1")
+    site = sites[0]
+    finders = sorted(p.name for p in site.glob("__editable__*"))
+    if finders:
+        raise GenerateError(f"{site} has editable finder modules ({', '.join(finders)}); the runner cannot tell "
+                            "which folders they read. Make the environment with `uv sync`")
+    real_venv, real_src = Path(os.path.realpath(venv)), Path(os.path.realpath(src))
+    real_python = Path(os.path.realpath(python))
+    if real_python.is_relative_to(os.path.realpath(src.parent)) and not real_python.is_relative_to(real_venv):
+        raise GenerateError(f"the Python of {venv} is {real_python}: in the checkout, but outside the environment, "
+                            "so the container would not have it")
+    editable = None
+    for pth, folder in _pth_paths(site):
+        if not folder.exists():
+            continue  # Python skips it, and the container does not have it either
+        real = Path(os.path.realpath(folder))
+        if real == real_src:
+            editable = folder
+        elif not real.is_relative_to(real_venv):
+            raise GenerateError(f"{pth} adds {folder} to the path of codemem's Python. It is outside {venv} and "
+                                f"is not {src}, so the container would not have it")
+    if editable is None and not (site / "codemem").is_dir():
+        raise GenerateError(f"codemem is not installed in {venv}: no .pth file names {src}, and {site} has no "
+                            "codemem folder")
+    return [venv] + ([editable] if editable else [])
 
 
 def codemem_commit(checkout: Path) -> str | None:
@@ -147,7 +227,8 @@ def _summary(log: Path) -> str | None:
 
 def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None, force: bool = False) -> dict | None:
     """Build the task's index. Returns index.json, or None when it exists for the same base commit and the same
-    codemem commit (and force is off). A build always starts from an empty index folder."""
+    codemem commit (and force is off). A build always starts from an empty index folder, and deletes the blocks
+    of e2e_block beside the old index."""
     root = index_root(recipe, task)
     meta = read_index_meta(recipe, task)
     if (not force and meta and meta.get("base_commit") == task.base_commit and meta.get("codemem_commit") == commit
@@ -156,6 +237,8 @@ def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None,
     src, index, log = root / "src", root / "index", root / "index.log"
     ensure_worktree(task, src)
     (root / "index.json").unlink(missing_ok=True)
+    for block in root.glob("block-*.json"):  # blocks of e2e_block, made on the old index
+        block.unlink()
     if index.exists():
         shutil.rmtree(index)
     log.unlink(missing_ok=True)

@@ -724,6 +724,56 @@ def cmd_e2e_index(args) -> int:
     return 1 if failed else 0
 
 
+def cmd_e2e_block(args) -> int:
+    from . import e2e_block, e2e_run
+    from . import generate as gen
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    levels = list(dict.fromkeys(args.prompt_level or e2e_run.PROMPT_LEVELS))
+    try:
+        recipe = gen.load_recipe(args.recipe)
+        tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+        prompts = {}
+        for level in levels:
+            if level != e2e_run.PROMPT_LEVEL:
+                if not args.prompts:
+                    raise gen.GenerateError(f"the block at {level} needs --prompts FILE (or give --prompt-level L0)")
+                prompts[level] = e2e_run.load_prompts(args.prompts, level)
+        if args.sample:
+            planned = e2e_block.sample_ids(args.sample, recipe.repo)
+            tasks = [t for t in tasks if t.id in planned]
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"e2e block: {exc}", file=sys.stderr)
+        return 1
+    if args.id:
+        wanted = set(args.id)
+        tasks = [t for t in tasks if t.id in wanted]
+    ready = [t for t in tasks if gen.tests_path(recipe, t).exists()]
+    if len(ready) < len(tasks):
+        say(f"note: {len(tasks) - len(ready)} tasks have no tests.json (not valid or not generated); skipped")
+    jobs = []
+    for task in ready:
+        queries = {level: e2e_run.prompt_text(task, prompts.get(level)) for level in levels
+                   if level == e2e_run.PROMPT_LEVEL or task.id in prompts[level].texts}
+        if len(queries) < len(levels):
+            say(f"note: {task.id} has no {', '.join(lv for lv in levels if lv not in queries)} prompt in "
+                f"{args.prompts.name}; no block at that level")
+        if queries:
+            jobs.append((task, queries))
+    if not jobs:
+        print(f"e2e block: no task of {recipe.repo} in {args.tasks} to make a block for", file=sys.stderr)
+        return 1
+    try:
+        failed = e2e_block.block_tasks(recipe, jobs, force=args.force, progress=say)
+    except gen.GenerateError as exc:
+        print(f"e2e block: {exc}", file=sys.stderr)
+        return 1
+    blocks = sum(len(queries) for _, queries in jobs)
+    print(f"{recipe.name}: {blocks - failed} of {blocks} blocks ready beside the indexes in "
+          f"{e2e_block.index_root(recipe, jobs[0][0]).parent}")
+    return 1 if failed else 0
+
+
 def cmd_e2e_score(args) -> int:
     from .e2e_score import format_score, score
     from .e2e_screen import ScreenError, completion_set, load_facts
@@ -1148,6 +1198,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--id", action="append", help="only this task; can be given more than once")
     p.add_argument("--force", action="store_true", help="build again, also when index.json is up to date")
     p.set_defaults(func=cmd_e2e_index)
+    p = e2e_sub.add_parser(
+        "block", help="make the block of codemem results of each valid task and prompt level, for runs of the "
+                      "setups codemem and upfront",
+        description="One codemem search for each task and prompt level, on the task's index (from cmeval e2e "
+                    "index), with the level's prompt text as the query and 20 results. The block is saved beside "
+                    "the index as block-<level>.json, and a run of the setups codemem and upfront puts it at the top "
+                    "of its first message. A block that a run can use is skipped. Exit code 1 when a block failed or "
+                    "was made without the embedding model.")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--sample", type=Path,
+                   help="only the tasks of this repo that a run sample runs (from cmeval e2e sample: its rows with "
+                        "run true)")
+    p.add_argument("--prompt-level", action="append", choices=("L0", "L1", "L2"),
+                   help="a prompt level; can be given more than once (default L0, L1 and L2)")
+    p.add_argument("--prompts", type=Path,
+                   help="file of rewritten prompts, one JSON object per line: id, level, prompt (needed for L1 and "
+                        "L2: the file that the runs get)")
+    p.add_argument("--force", action="store_true", help="make the blocks again, also those that a run can use")
+    p.set_defaults(func=cmd_e2e_block)
     p = e2e_sub.add_parser("score", help="tables of an end-to-end run: completion, tokens, time, by setup")
     p.add_argument("run_id", help="run id (in CMEVAL_HOME/e2e/runs)")
     p.add_argument("--screen", type=Path, action="append",

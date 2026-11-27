@@ -4,15 +4,19 @@ One run (run_one) has these steps:
 
   1. check the preconditions: the task's image and tests.json, the login token file, the Claude Code binary,
      and an internal Docker network. For a codemem setup also the codemem program, the task's index (from
-     `cmeval e2e index`), the Hugging Face cache, and the GPU setting
+     `cmeval e2e index`), the Hugging Face cache, and the GPU setting. For a setup with a block (codemem,
+     upfront) also its block of codemem results (from `cmeval e2e block`; e2e_block.read_block)
   2. write the prompt, the MCP config and the container script (agent.sh) to the run's folder. For a codemem
      setup, copy the task's index to cmindex/ in the run's folder. The container gets it at /cmindex, and the
-     copy is deleted after the run
+     copy is deleted after the run. For a setup with a block, the prompt starts with the block
   3. start a recording proxy on the network's gateway, then the container. On the network the container
      reaches the proxy and nothing else. A thread follows the stream of events and stops the agent after
      the turn limit
   4. in the container, as root: remove files that would configure the agent, make a user that is not
-     root. For a codemem setup, start codemem's MCP server through the gate (codemem_gate.py) and wait until
+     root. For a codemem setup, make the mount proof as that user (proof_script): the codemem checkout in the
+     container holds only codemem's environment and source (no eval/ with the task files), and no mounted
+     path holds a line of the task's real fix or hidden tests. When it fails, the script stops there. Then
+     start codemem's MCP server through the gate (codemem_gate.py) and wait until
      its model and search index are in memory and a search has no note. Then start Claude Code as that user
      with the time limit; its codemem server is the gate's bridge to that warm server. After it stops, save
      its changes as a patch
@@ -26,9 +30,17 @@ the model was still loading, and codemem answered it from keywords only.
 A run is discarded when it hit a usage limit or failed the setup check. The setup check reads the init event
 of the stream (check_setup), and for a codemem setup also the gate's ready file and the first search_code
 result (codemem_checks): a warm-up that failed, or a first search answered from keywords only, fails it. A
-discarded run is not graded, and the next batch does it again. When the warm-up fails, Claude Code does not
-start, and the run ends in an error: three of them in a row stop the batch. A run that ended at the time or
-turn limit is graded like any other.
+discarded run is not graded, and the next batch does it again. A failed mount proof (proof_checks) also fails
+the setup check. When the mount proof or the warm-up fails, Claude Code does not start, and the run ends in an
+error: three of them in a row stop the batch. A run that ended at the time or turn limit is graded like any
+other.
+
+A setup with a block (e2e_block.py) is another setup plus one codemem search made for the agent before it
+starts, with the results at the top of the first message: codemem is tool plus the block, and upfront is grep
+plus the block (grep's container, MCP config and checks). The block is made before the batch, so its search is
+in no clock of the run. The proxy says of each model request whether its first user message begins with the
+block (proxy.opens_with). A run in which no model request did, or whose proxy log has no model request, gets
+a flag. A batch with such a setup does not start while the block of one of its tasks cannot be used.
 
 The login token goes to the container only through the environment of the docker client (docker run -e NAME
 with no value). It is never written to a file or put on a command line. Before anything is read from the
@@ -44,16 +56,26 @@ run.json has these fields:
   completed           the grader's verdict; null for a discarded run
   discard, discard_reason, flags
                       a discarded run is done again; a flag (for example "cross-check disagrees") asks a person to look
-  identity            prompt level, frame and hash, harness and its version, binary, image tag and id, split, cmeval
+  identity            prompt level, frame and hash, harness and its version, binary, seat (the name of the login
+                      token's file, never its text), image tag and id, split, cmeval
                       commit, machine, limits, start time (UTC), the task's gold files. codemem: null for a setup
                       without codemem; else the codemem commit, the program, the task's index.json, the steering
-                      level, and the bytes of the index copy before and after the run
+                      level, and the bytes of the index copy before and after the run. block: null for a setup
+                      without a block; else e2e_block.record_entry: its file and sha256, its result lines, the
+                      search's seconds and codemem commit, searches_made_for_agent (1), the ranks of the first
+                      result in a gold file and on a gold function, and the results (rank, path, line, name)
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
                       network, the removed configuration files, the files where the token was found and replaced,
-                      gpus (the container had the GPU). codemem setups only, else null: codemem_warm (the gate's
+                      gpus (the container had the GPU). codemem setups only, else null: codemem_mount_proof (ok,
+                      the checkout, the folders it should hold, the mounted paths that were searched, the number
+                      of phrases of patch and test_patch, the container's answers: script_says, checkout_eval,
+                      checkout_entries, grep_exit, other_errors, hits and grep_errors, and the seconds),
+                      codemem_warm (the gate's
                       ready file: ok, seconds, warmup_searches, the index_status answer, or the error) and
                       codemem_fallback_searches (e2e_steps.codemem_fallbacks: the search_code results with one
-                      of codemem's notes, with their turns; `cmeval e2e recount` computes it again)
+                      of codemem's notes, with their turns; `cmeval e2e recount` computes it again).
+                      block_in_first_message: for a setup with a block (else null), whether the first user message
+                      of a model request of the run began with the block; null when the log has no such request
   result_event        subtype, is_error, num_turns, duration_ms, duration_api_ms, total_cost_usd
   usage_limit         the evidence of a usage limit (429 answers and their reset headers, the result text), or null
   turn_limit          the turn at which the runner stopped the agent, and how, or null
@@ -64,9 +86,12 @@ run.json has these fields:
   proxy_errors        the errors of the proxy log
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
                       preparation step, codemem_warm_s (the wait for codemem, a part of prep_s; null without
-                      codemem), container_start_s, collect_s, container_s, grade_s
+                      codemem), container_start_s, collect_s, container_s, grade_s, host_load_start and
+                      host_load_end (the host's load averages right before and right after docker run; null
+                      where /proc/loadavg does not exist)
   steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
-                      command), and num_turns_result from the result event. `cmeval e2e recount` computes it again
+                      command), and num_turns_result from the result event. In a setup with a block, the block is
+                      one codemem search at turn 0. `cmeval e2e recount` computes it again
   outcome             completed, the grader's record, the patch's files and changed lines, status_lines, and
                       unexpected_paths (files of the patch that codemem could have written, such as .codemem*)
 """
@@ -93,14 +118,16 @@ from typing import Callable
 
 from . import codemem_gate
 from .e2e import grade, patch_files
-from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_python_root, hf_cache, \
-    index_root, index_state, read_index_meta
+from .e2e_block import codemem_program_commit, read_block, record_entry
+from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_mount_paths, \
+    codemem_python_root, hf_cache, index_root, index_state, read_index_meta
 from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
 from .files import write_json
 from .generate import NO_CORE_DUMPS, GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
 from .images import missing_image_hint
 from .paths import cmeval_home, e2e_dir
-from .proxy import AGENT_CLASSES, DEFAULT_UPSTREAM, TOKEN_CLASSES, RecordingProxy, cross_check, read_log, summarize
+from .proxy import AGENT_CLASSES, DEFAULT_UPSTREAM, MESSAGES_PATH, TOKEN_CLASSES, RecordingProxy, cross_check, \
+    read_log, summarize
 from .status import NullStatus
 from .tasks import Task, load_tasks
 
@@ -142,6 +169,16 @@ GATE_LOGS = (f"cp {GATE_DIR}/gate.log /out/codemem-gate.log 2>/dev/null; "
              f"cp {GATE_DIR}/server.log /out/codemem-server.log 2>/dev/null")
 # Files of the agent's patch that codemem could have written. `codemem mcp` should write none.
 UNEXPECTED_PATTERNS = (".codemem*", ".mcp.json")
+# The mount proof of a codemem setup (proof_script): the host writes lines of the task's real fix and hidden
+# tests to PROOF_PHRASES in the run's folder. agent.sh moves the file to PROOF_DIR, a folder that only root can
+# read, before anything runs as the agent's user, and deletes it after the search. The result is PROOF_FILE.
+PROOF_DIR = "/run/cmproof"
+PROOF_PHRASES = "cmproof.txt"
+PROOF_FILE = "mount-proof.txt"
+# Added lines of this length or longer, the longest PROOF_LINES of each patch. Shorter lines are often in other
+# code too (for example a library in codemem's environment), and a false match stops the run.
+PROOF_MIN_CHARS = 40
+PROOF_LINES = 3
 
 # Exit codes of a batch.
 EXIT_USAGE_LIMIT = 4
@@ -199,6 +236,8 @@ class Setup:
     checks: tuple[Callable[[dict], list[str]], ...] = ()  # more checks of the init event: failed checks
     # codemem's MCP server. Its config holds paths of the host, so codemem_mcp_config makes it for each run.
     codemem: bool = False
+    # The block of codemem results at the top of the first message (e2e_block.py), made before the run.
+    block: bool = False
 
     @property
     def built(self) -> bool:
@@ -226,7 +265,9 @@ def _codemem_loaded(init: dict) -> list[str]:
 SETUPS = {s.name: s for s in (
     Setup("grep", {"mcpServers": {}}, checks=(_no_mcp_tools,)),
     Setup("tool", None, ("codemem",), checks=(_codemem_loaded,), codemem=True),
-    Setup("upfront", None),
+    # tool and grep, each with the block of codemem results at the top of the first message
+    Setup("codemem", None, ("codemem",), checks=(_codemem_loaded,), codemem=True, block=True),
+    Setup("upfront", {"mcpServers": {}}, checks=(_no_mcp_tools,), block=True),
     Setup("placebo", None, ("codemem",)),
     Setup("tool-strong", None, ("codemem",)),
     Setup("grep-nosub", None),
@@ -282,13 +323,22 @@ def load_prompts(path: Path, level: str) -> PromptSet:
     return PromptSet(level=level, texts=texts, source=Path(path).name, sha256=hashlib.sha256(data).hexdigest())
 
 
-def make_prompt(task: Task, prompts: PromptSet | None = None) -> str:
-    """The task's text in frame v1: the issue as written (L0), or the rewrite of the prompt set's level."""
+def prompt_text(task: Task, prompts: PromptSet | None = None) -> str:
+    """The task's text at the prompt set's level: the issue as written (L0), or the rewrite. It goes into the
+    frame, and it is the query of the block's search (e2e_block.py)."""
     if prompts is None or prompts.level == PROMPT_LEVEL:
-        return FRAME_V1.format(query=task.query.strip())
+        return task.query.strip()
     if task.id not in prompts.texts:
         raise GenerateError(f"{task.id}: no {prompts.level} prompt in {prompts.source}")
-    return FRAME_V1.format(query=prompts.texts[task.id].strip())
+    return prompts.texts[task.id].strip()
+
+
+def make_prompt(task: Task, prompts: PromptSet | None = None, block: str | None = None) -> str:
+    """The task's text in frame v1: the issue as written (L0), or the rewrite of the prompt set's level. With the
+    text of a block (e2e_block.block_text, which ends in a newline): the block, one empty line, and then that
+    same prompt."""
+    prompt = FRAME_V1.format(query=prompt_text(task, prompts))
+    return prompt if block is None else block + "\n" + prompt
 
 
 # ---- preconditions
@@ -350,8 +400,9 @@ def ensure_network(name: str = NETWORK) -> str:
 
 
 def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> dict:
-    """Check what codemem needs in the container. Returns the program, its checkout and Python install, the
-    Hugging Face cache, the task's index folder and index.json, and the codemem commit."""
+    """Check what codemem needs in the container. Returns the program, its checkout, the folders of the checkout
+    that the container gets (e2e_index.codemem_mount_paths), the Python install, the Hugging Face cache, the
+    task's index folder and index.json, and the codemem commit."""
     hint = f"run cmeval e2e index {recipe.name} first"
     if not settings.gpus:
         raise GenerateError(f"a codemem setup needs the GPU in the container ({GPUS_ENV}=1): the index is tied to "
@@ -371,24 +422,30 @@ def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> 
         raise GenerateError(f"no Hugging Face cache at {hf} (codemem's embedding model is there); {hint}, "
                             "which loads the model")
     checkout = codemem_checkout(program)
-    return {"bin": program, "checkout": checkout, "python_root": python_root, "hf_cache": hf,
-            "index": index_root(recipe, task) / "index", "meta": read_index_meta(recipe, task),
-            "commit": codemem_commit(checkout)}
+    return {"bin": program, "checkout": checkout, "mounts": codemem_mount_paths(program),
+            "python_root": python_root, "hf_cache": hf, "index": index_root(recipe, task) / "index",
+            "meta": read_index_meta(recipe, task), "commit": codemem_commit(checkout)}
 
 
-def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setup | None = None) -> dict:
-    """Check what a run needs. Returns the image tag, the token file, the binary, the gateway, and for a codemem
-    setup what codemem_preconditions returns (else None)."""
+def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setup | None = None,
+                  prompts: PromptSet | None = None) -> dict:
+    """Check what a run needs. Returns the image tag, the token file, the binary, the gateway, for a codemem
+    setup what codemem_preconditions returns (else None), and for a setup with a block the block and its file
+    (e2e_block.read_block, for the prompt text of the run's level; else None)."""
     tag = task_tag(recipe, task)
     if not image_exists(tag):
         raise GenerateError(f"{task.id}: image {tag} does not exist; {missing_image_hint(recipe, task)}")
     if not tests_path(recipe, task).exists():
         raise GenerateError(f"{task.id}: no tests.json; validate the task with cmeval generate first")
     codemem = codemem_preconditions(recipe, task, settings) if setup and setup.codemem else None
+    block = None
+    if setup and setup.block:
+        block = read_block(recipe, task, prompts.level if prompts else PROMPT_LEVEL, prompt_text(task, prompts),
+                           codemem["commit"] if codemem else codemem_program_commit())
     path = token_file()
     check_token_file(path)
     return {"tag": tag, "token_file": path, "claude_bin": claude_bin(), "gateway": ensure_network(settings.network),
-            "codemem": codemem}
+            "codemem": codemem, "block": block}
 
 
 # ---- codemem in the container
@@ -440,9 +497,10 @@ def gated_mcp_config(codemem: dict, settings: RunSettings) -> dict:
 
 
 def codemem_mounts(codemem: dict, index_copy: Path) -> list[str]:
-    """The docker run arguments of a codemem setup. The checkout and the Python install keep their paths, so
-    that the program's links and its editable install work."""
-    mounts = [f"{codemem['checkout']}:{codemem['checkout']}:ro"]
+    """The docker run arguments of a codemem setup. Of the checkout only the environment and the package source
+    (codemem["mounts"]), never the checkout itself: its eval/ folder holds the real fixes. These folders and the
+    Python install keep their paths, so that the program's links and its editable install work."""
+    mounts = [f"{path}:{path}:ro" for path in codemem["mounts"]]
     if codemem["python_root"]:
         mounts.append(f"{codemem['python_root']}:{codemem['python_root']}:ro")
     mounts += [f"{codemem['hf_cache']}:{HF_MOUNT}:ro", f"{index_copy}:{INDEX_MOUNT}"]
@@ -517,9 +575,110 @@ def gate_script(python: str) -> str:
     )
 
 
-def agent_script(model: str, settings: RunSettings, gate_python: str | None = None) -> str:
+def mount_targets(volumes: list[str]) -> list[str]:
+    """The paths in the container of the "-v" arguments of docker run."""
+    return [volumes[i + 1].split(":")[1] for i, part in enumerate(volumes[:-1]) if part == "-v"]
+
+
+def proof_plan(codemem: dict, volumes: list[str]) -> dict:
+    """What the mount proof checks in the container: the checkout holds only the mounted folders (no eval/),
+    and no mounted path holds a line of the real fix or the hidden tests."""
+    checkout = Path(codemem["checkout"])
+    return {"checkout": str(checkout),
+            "expected_entries": sorted(Path(p).name for p in codemem["mounts"] if Path(p).parent == checkout),
+            "paths": mount_targets(volumes)}
+
+
+def proof_phrases(task: Task, avoid: str) -> dict[str, list[str]]:
+    """Lines that only the real fix (patch) and the hidden tests (test_patch) hold: the longest added lines of
+    each, at least PROOF_MIN_CHARS long, without the leading and trailing spaces. A line that the patch also
+    removes (a moved line) or that is in `avoid` (the files that the run's folder holds before the agent
+    starts, such as prompt.txt with the issue text) is not used."""
+    phrases = {}
+    for name, patch in (("patch", task.patch), ("test_patch", task.test_patch or "")):
+        lines = patch.replace("\r", "").splitlines()
+        removed = {line[1:].strip() for line in lines if line.startswith("-") and not line.startswith("--- ")}
+        added = {line[1:].strip() for line in lines if line.startswith("+") and not line.startswith("+++ ")}
+        found = [line for line in added - removed if len(line) >= PROOF_MIN_CHARS and line not in avoid]
+        phrases[name] = sorted(found, key=lambda line: (-len(line), line))[:PROOF_LINES]
+    return phrases
+
+
+def proof_script(plan: dict) -> str:
+    """The lines of agent.sh that prove, as the agent's user and before the agent starts, that the container
+    does not expose the answers: the codemem checkout holds only the mounted folders (so no eval/), and a
+    fixed-string search of every mounted path for the phrases of PROOF_PHRASES finds nothing. The phrases reach
+    grep on its standard input from a file that only root can read; they never pass through the shell. grep
+    skips binary files (-I). When the proof fails, the script stops before codemem and Claude Code start."""
+    checkout = shlex.quote(plan["checkout"])
+    expected = shlex.quote("".join(name + " " for name in plan["expected_entries"]))
+    paths = " ".join(shlex.quote(p) for p in plan["paths"])
+    return (
+        f"mkdir -p -m 700 {PROOF_DIR} && mv /out/{PROOF_PHRASES} {PROOF_DIR}/phrases.txt || exit 4\n"
+        f"if runuser -u agent -- test -e {checkout}/eval; then eval_state=present; else eval_state=absent; fi\n"
+        f"entries=$(runuser -u agent -- ls -A {checkout} | LC_ALL=C sort | tr '\\n' ' ')\n"
+        f"runuser -u agent -- grep -rIlF -f /dev/stdin -- {paths} < {PROOF_DIR}/phrases.txt > {PROOF_DIR}/hits "
+        f"2> {PROOF_DIR}/errors\n"
+        "rc=$?\n"
+        f"other=$(grep -vc 'Permission denied' {PROOF_DIR}/errors)\n"
+        f'if [ "$eval_state" = absent ] && [ "$entries" = {expected} ] && [ ! -s {PROOF_DIR}/hits ] && '
+        '{ [ "$rc" = 1 ] || { [ "$rc" = 2 ] && [ "$other" = 0 ]; }; }; then proof=ok; else proof=failed; fi\n'
+        f'{{ echo "proof $proof"; echo "checkout_eval $eval_state"; echo "checkout_entries $entries"; '
+        f'echo "grep_exit $rc"; echo "other_errors $other"; sed "s/^/hit /" {PROOF_DIR}/hits; '
+        f'sed "s/^/grep_error /" {PROOF_DIR}/errors | head -n 20; }} > /out/{PROOF_FILE}\n'
+        f"rm -rf {PROOF_DIR}\n"
+        "mark mount_proof\n"
+        '[ "$proof" = ok ] || exit 4\n'
+    )
+
+
+def read_proof(out: Path) -> dict | None:
+    """The result of the mount proof (PROOF_FILE), or None when the container did not write it."""
+    path = out / PROOF_FILE
+    if not path.exists():
+        return None
+    proof = {"script_says": None, "checkout_eval": None, "checkout_entries": None, "grep_exit": None,
+             "other_errors": None, "hits": [], "grep_errors": []}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        key, _, value = line.partition(" ")
+        if key in ("hit", "grep_error"):
+            proof[key + "s"].append(value)
+        elif key == "proof":
+            proof["script_says"] = value
+        elif key == "checkout_entries":
+            proof[key] = value.split()
+        elif key in ("grep_exit", "other_errors"):
+            proof[key] = int(value) if value.strip().isdigit() else None
+        elif key == "checkout_eval":
+            proof[key] = value
+    return proof
+
+
+def proof_checks(proof: dict) -> list[str]:
+    """The checks of the mount proof that fail. The host checks the container's answers again."""
+    if not proof.get("found"):
+        return [f"mount proof: no {PROOF_FILE}; the proof did not run"]
+    failed = []
+    if proof["checkout_eval"] != "absent":
+        failed.append(f"mount proof: {proof['checkout']}/eval is {proof['checkout_eval']} in the container")
+    if proof["checkout_entries"] != proof["expected_entries"]:
+        failed.append(f"mount proof: {proof['checkout']} holds {proof['checkout_entries']} in the container, "
+                      f"expected {proof['expected_entries']}")
+    if proof["hits"]:
+        failed.append(f"mount proof: a line of the real fix or the hidden tests is in {', '.join(proof['hits'][:5])}")
+    if not (proof["grep_exit"] == 1 or (proof["grep_exit"] == 2 and proof["other_errors"] == 0)):
+        first = proof["grep_errors"][0] if proof["grep_errors"] else "no message"
+        failed.append(f"mount proof: the search failed (exit {proof['grep_exit']}): {first}")
+    if not failed and proof["script_says"] != "ok":
+        failed.append(f"mount proof: the container script says {proof['script_says']}")
+    return failed
+
+
+def agent_script(model: str, settings: RunSettings, gate_python: str | None = None,
+                 proof: dict | None = None) -> str:
     """The shell script that runs in the task's container, as root. It reads and writes /out. With gate_python
-    (a codemem setup), it starts codemem through the gate and waits for it before the agent's clock starts."""
+    (a codemem setup), it starts codemem through the gate and waits for it before the agent's clock starts.
+    With proof (proof_plan, a codemem setup), it first makes the mount proof (proof_script)."""
     specs = " ".join(shlex.quote(p) for p in CONFIG_PATHSPECS)
     # MCP_TIMEOUT and MCP_TOOL_TIMEOUT are the same in every setup, so that the setups differ only in the server.
     env = ("env -u ANTHROPIC_API_KEY HOME=/home/agent CLAUDE_CONFIG_DIR=/run/claude-empty "
@@ -550,6 +709,7 @@ def agent_script(model: str, settings: RunSettings, gate_python: str | None = No
         "mark chown\n"
         "mkdir -p /run/claude-empty && chown agent /run/claude-empty\n"
         "cp /out/mcp.json /tmp/mcp.json && chmod 644 /tmp/mcp.json\n"
+        + (proof_script(proof) if proof else "")
         + (gate_script(gate_python) if gate_python else "") +
         "mark ready\n"
         # The run's time: from right before Claude Code starts to right after it ends.
@@ -619,6 +779,17 @@ def codemem_checks(warm: dict | None, fallbacks: dict) -> list[str]:
         failed.append(f"the first search_code result (turn {first['turn']}) came from keywords only "
                       f"({', '.join(first['notes'])})")
     return failed
+
+
+def block_opened(proxy_records: list[dict]) -> bool | None:
+    """Whether the block reached the model: whether the first user message of at least one model request of the
+    run began with it (opens_with_text of the /v1/messages requests in the proxy log). Every request of the
+    agent's own conversation begins with the same first message, so one is enough, and a request that Claude Code
+    makes for itself beside the conversation does not count against the run. None when the log has no such
+    request."""
+    seen = [r["opens_with_text"] is True for r in proxy_records
+            if r.get("path") == MESSAGES_PATH and "opens_with_text" in r]
+    return any(seen) if seen else None
 
 
 _USAGE_TEXT = re.compile(r"usage limit|limit reached|hit your limit|rate limit|resets? at", re.I)
@@ -735,6 +906,16 @@ def _cmeval_commit() -> str | None:
     return head.stdout.strip() + ("-dirty" if dirty.stdout.strip() else "")
 
 
+def host_load(path: Path = Path("/proc/loadavg")) -> list[float] | None:
+    """The host's load averages over 1, 5 and 15 minutes (/proc/loadavg). None where the file does not exist,
+    as on a Mac. Other work on the machine, such as an image build, shows here."""
+    try:
+        values = [float(v) for v in path.read_text(encoding="utf-8").split()[:3]]
+    except (OSError, ValueError):
+        return None
+    return values if len(values) == 3 else None
+
+
 def _machine() -> dict:
     return {"hostname": socket.gethostname(), "platform": platform.platform(), "arch": platform.machine(),
             "cpu_count": os.cpu_count()}
@@ -778,22 +959,33 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     """One run of Claude Code on one task. `out` is made again. Returns the record, also saved as run.json."""
     spec = get_setup(setup)
     check_model(model)
-    ready = preconditions(recipe, task, settings, spec)
+    ready = preconditions(recipe, task, settings, spec, prompts)
     codemem = ready["codemem"]
+    block, block_file = ready["block"] or (None, None)
     token = read_token(ready["token_file"])
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     out = out.resolve()
-    prompt = make_prompt(task, prompts)
+    prompt = make_prompt(task, prompts, block["text"] if block else None)
     (out / "prompt.txt").write_text(prompt, encoding="utf-8")
     mcp_config = gated_mcp_config(codemem, settings) if codemem else spec.mcp_config
     (out / "mcp.json").write_text(json.dumps(mcp_config) + "\n", encoding="utf-8")
     if codemem:
         (out / "cmgate.py").write_bytes(Path(codemem_gate.__file__).read_bytes())
         write_json(out / "cmgate.json", gate_config(codemem, settings))
-    (out / "agent.sh").write_text(agent_script(model, settings, codemem_python(codemem) if codemem else None),
+    index_copy = out / "cmindex"
+    volumes = ["-v", f"{ready['claude_bin']}:/usr/local/bin/claude:ro", "-v", f"{out}:/out",
+               *(codemem_mounts(codemem, index_copy) if codemem else [])]
+    plan = proof_plan(codemem, volumes) if codemem else None
+    (out / "agent.sh").write_text(agent_script(model, settings, codemem_python(codemem) if codemem else None, plan),
                                   encoding="utf-8")
+    if plan:
+        avoid = "".join(p.read_text(encoding="utf-8", errors="replace") for p in sorted(out.iterdir()) if p.is_file())
+        phrases = proof_phrases(task, avoid)
+        plan["phrases"] = {name: len(lines) for name, lines in phrases.items()}
+        (out / PROOF_PHRASES).write_text("".join(line + "\n" for lines in phrases.values() for line in lines),
+                                         encoding="utf-8")
     image_id = _run(["docker", "image", "inspect", "-f", "{{.Id}}", ready["tag"]]).stdout.strip() or None
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     name = f"cmeval-run-{uuid.uuid4().hex[:12]}"
@@ -809,26 +1001,26 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             turn_limit["how"] = "docker kill"
 
     host_start_ns, host_timeout, docker_exit = time.time_ns(), False, None
-    index_copy, index_bytes, index_removed = out / "cmindex", {}, None
+    index_bytes, index_removed, load = {}, None, {}
     t0 = time.monotonic()
     try:
         if codemem:
             copy_index(codemem["index"], index_copy)
             index_bytes["before"] = tree_bytes(index_copy)
         with RecordingProxy(out / "proxy.jsonl", host=gateway, port=0, upstream=settings.upstream,
-                            bodies_dir=out / "bodies" if keep_bodies() else None) as proxy:
+                            bodies_dir=out / "bodies" if keep_bodies() else None,
+                            opening_text=block["text"] if block else None) as proxy:
             cmd = ["docker", "run", "--rm", "--name", name, "--network", settings.network,
                    f"--cpus={settings.cpus}", f"--memory={settings.memory}", *NO_CORE_DUMPS,
                    *(["--device", GPU_DEVICE] if settings.gpus else []),
                    "-e", TOKEN_ENV, "-e", f"ANTHROPIC_BASE_URL=http://{gateway}:{proxy.port}",
-                   "-v", f"{ready['claude_bin']}:/usr/local/bin/claude:ro", "-v", f"{out}:/out",
-                   *(codemem_mounts(codemem, index_copy) if codemem else []),
-                   ready["tag"], "bash", "/out/agent.sh"]
+                   *volumes, ready["tag"], "bash", "/out/agent.sh"]
             stop = threading.Event()
             watcher = threading.Thread(target=_follow_stream, name="cmeval-turns", daemon=True,
                                        args=(out / "stream.jsonl", counter, settings.turn_limit, stop, stop_agent,
                                              settings.poll_s))
             watcher.start()
+            load["start"] = host_load()
             try:
                 # The token is only in the environment of the docker client, which hands it to the container.
                 docker_exit = _run(cmd, log=out / "docker.log", env={**os.environ, TOKEN_ENV: token},
@@ -838,10 +1030,12 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 host_timeout = True
                 _run(["docker", "rm", "-f", name])
             finally:
+                load["end"] = host_load()
                 stop.set()
                 watcher.join()
     finally:
         _run(["docker", "rm", "-f", name])
+        (out / PROOF_PHRASES).unlink(missing_ok=True)  # agent.sh moves it; this is for a container that failed
         if codemem:
             # Keep only the numbers: a copy is about 300 MB.
             index_bytes["after"] = tree_bytes(index_copy)
@@ -861,8 +1055,16 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     failed = check_setup(init, spec, model)
     warm = read_warm(out) if codemem else None
     fallbacks = codemem_fallbacks(stream["events"]) if codemem else None
+    proof = None
     if codemem:
-        failed += codemem_checks(warm, fallbacks)
+        found = read_proof(out)
+        proof = {**plan, "found": found is not None, **(found or {}),
+                 "seconds": read_prep(out)["steps_s"].get("mount_proof")}
+        proof_failed = proof_checks(proof)
+        proof = {"ok": not proof_failed, **proof}
+        failed += proof_failed
+        if not proof_failed:
+            failed += codemem_checks(warm, fallbacks)
     usage = (result or {}).get("modelUsage")
     cross = cross_check(summary, usage) if summary and usage else None
     tokens = token_block(summary, result)
@@ -889,6 +1091,11 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
         flags.append("cross-check disagrees")
     if summary and not summary["proxy_complete"] and end == "finished":
         flags.append("proxy log not complete")
+    opened = block_opened(records) if block else None
+    if block and opened is False:
+        flags.append("block not in the first message")
+    elif block and opened is None:
+        flags.append("block not checked: no model request in the proxy log")
 
     record = {
         "schema": SCHEMA,
@@ -912,6 +1119,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "harness": HARNESS,
             "harness_version": (init or {}).get("claude_code_version"),
             "claude_bin": str(ready["claude_bin"]),
+            "seat": Path(ready["token_file"]).name,
             "image": ready["tag"],
             "image_id": image_id,
             "split": task.split,
@@ -931,6 +1139,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 "index_bytes_after": index_bytes.get("after"),
                 "index_copy_removed": index_removed,
             } if codemem else None,
+            "block": record_entry(block, block_file, task) if block else None,
         },
         "integrity": {
             "setup_ok": not failed,
@@ -948,8 +1157,10 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "host_timeout": host_timeout,
             "docker_exit_code": docker_exit,
             "gpus": settings.gpus,
+            "codemem_mount_proof": proof,
             "codemem_warm": warm,
             "codemem_fallback_searches": fallbacks,
+            "block_in_first_message": opened,
         },
         "result_event": {k: (result or {}).get(k) for k in ("subtype", "is_error", "num_turns", "duration_ms",
                                                              "duration_api_ms", "total_cost_usd")},
@@ -972,8 +1183,11 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                           if "collected" in prep["marks_ns"] and "agent_end" in clock else None),
             "container_s": round(container_s, 1),
             "grade_s": grade_s,
+            "host_load_start": load.get("start"),
+            "host_load_end": load.get("end"),
         },
-        "steps": count_steps(stream["events"], task.gold.files),
+        "steps": count_steps(stream["events"], task.gold.files,
+                             block_paths=[r["path"] for r in block["results"]] if block else None),
         "outcome": {
             "completed": graded["completed"] if graded else None,
             "grade": graded,
@@ -1014,7 +1228,8 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
     """Compute `steps` of each run of a run id again from its stream.jsonl, with the rules of today, and write
     it into run.json. For a codemem setup also integrity.codemem_fallback_searches. Nothing else in the record
     changes: a run is not discarded after the fact. The gold files come from the record (identity), or
-    from the task file for records that do not have them. Returns the number of runs counted again."""
+    from the task file for records that do not have them; the block of a setup with a block from the record
+    (identity.block). Returns the number of runs counted again."""
     root = e2e_dir() / "runs" / run_id
     if not root.is_dir():
         raise FileNotFoundError(f"no run folder {root}")
@@ -1033,7 +1248,8 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
             continue
         old = record.get("steps") or {}
         events = parse_stream(path.parent / "stream.jsonl")["events"]
-        steps = count_steps(events, gold)
+        block = (record.get("identity") or {}).get("block")
+        steps = count_steps(events, gold, block_paths=[r["path"] for r in block["results"]] if block else None)
         steps["num_turns_result"] = old.get("num_turns_result", (record.get("result_event") or {}).get("num_turns"))
         record["steps"] = steps
         fallbacks, old_fallbacks = None, None
@@ -1057,12 +1273,14 @@ def recount(run_id: str, tasks_file: Path | None = None, progress: Callable[[str
 
 def plan_runs(tasks: list[Task], setups: list[str], reps: int) -> list[tuple[Task, str, int]]:
     """The order of a batch: all of repetition 1 before repetition 2 (plan section 3.3). Inside one task the
-    setups take turns, and the setup that goes first moves by one at each repetition (plan 4.5, rule 8)."""
+    setups take turns (plan 4.5, rule 8). The setup that goes first moves by one from task to task and from
+    repetition to repetition, so that no setup always goes first or last: a later run can find the image's files
+    in the host's page cache."""
     order = []
     for rep in range(1, reps + 1):
-        shift = (rep - 1) % len(setups)
-        turn = setups[shift:] + setups[:shift]
-        order += [(task, setup, rep) for task in tasks for setup in turn]
+        for i, task in enumerate(tasks):
+            shift = (rep - 1 + i) % len(setups)
+            order += [(task, setup, rep) for setup in setups[shift:] + setups[:shift]]
     return order
 
 
@@ -1106,12 +1324,32 @@ class BatchResult:
     records: list[dict] = field(default_factory=list)
 
 
+def check_blocks(recipe: Recipe, tasks: list[Task], setups: list[str], prompts: PromptSet | None = None) -> None:
+    """Refuse a batch with a setup that has a block while the block of one of its tasks cannot be used, before
+    the first run (e2e_block.read_block). Each run checks its own block again."""
+    if not any(SETUPS[name].block for name in setups if name in SETUPS):
+        return
+    level = prompts.level if prompts else PROMPT_LEVEL
+    commit = codemem_program_commit()
+    problems = []
+    for task in tasks:
+        try:
+            read_block(recipe, task, level, prompt_text(task, prompts), commit)
+        except GenerateError as exc:
+            problems.append(str(exc))
+    if problems:
+        raise GenerateError(f"{len(problems)} of {len(tasks)} tasks have no block that a run can use; the first: "
+                            f"{problems[0]}")
+
+
 def run_batch(recipe: Recipe, tasks: list[Task], *, run_id: str, setups: list[str], model: str, reps: int = 1,
               settings: RunSettings = RunSettings(), progress: Callable[[str], None] = lambda message: None,
               status=None, prompts: PromptSet | None = None) -> BatchResult:
     """The runs of a batch, one at a time, in the order of plan_runs. Stops at a usage limit (exit code 4)
-    and after three runs in a row that ended in an error (exit code 5)."""
+    and after three runs in a row that ended in an error (exit code 5). Does not start while a block that one
+    of its setups needs cannot be used (check_blocks)."""
     status = status or NullStatus()
+    check_blocks(recipe, tasks, setups, prompts)
     order = plan_runs(tasks, setups, reps)
     status.total(len(order), "runs")
     batch = BatchResult()

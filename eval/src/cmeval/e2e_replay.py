@@ -431,9 +431,10 @@ def _gold_from_entry(entry: dict) -> dict:
             "functions": [Span(f["path"], f["start"], f["end"], f.get("symbol")) for f in gold["functions"]]}
 
 
-def cli_search(program: Path, src: Path, index: Path, env: dict, args: dict, k: int, timeout: float,
-               signals: str | None = None) -> list[dict]:
-    """The result list of `codemem search --json` with the arguments of a search_code call."""
+def cli_search_json(program: Path, src: Path, index: Path, env: dict, args: dict, k: int, timeout: float,
+                    signals: str | None = None) -> dict:
+    """The answer of `codemem search --json` with the arguments of a search_code call: its results (path,
+    start_line, end_line, qualname, score, ...) and codemem's timings."""
     argv = [str(program), "search", "--repo", str(src), "--index-dir", str(index), "-k", str(k), "--json"]
     if signals:
         argv += ["--signals", signals]
@@ -448,7 +449,13 @@ def cli_search(program: Path, src: Path, index: Path, env: dict, args: dict, k: 
     proc = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=timeout)
     if proc.returncode != 0:
         raise ReplayError(f"codemem search ended with exit code {proc.returncode}: {proc.stderr.strip()[-500:]}")
-    data = json.loads(proc.stdout)
+    return json.loads(proc.stdout)
+
+
+def cli_search(program: Path, src: Path, index: Path, env: dict, args: dict, k: int, timeout: float,
+               signals: str | None = None) -> list[dict]:
+    """The result list of `codemem search --json` with the arguments of a search_code call."""
+    data = cli_search_json(program, src, index, env, args, k, timeout, signals)
     return [{"rank": i, "path": r["path"], "start": r["start_line"], "end": r["end_line"],
              "name": r.get("qualname"), "chunk_id": r.get("chunk_id")}
             for i, r in enumerate(data.get("results") or [], start=1)]
