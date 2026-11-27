@@ -191,6 +191,93 @@ def test_ruff_wrapper_writes_a_failure_without_results(ruff_wrapper):
     assert gen.parse_junit(junit) == {"cmeval::no-results": FAIL}
 
 
+def _ruff_reference_step(recipe) -> str:
+    # Docker joins a line that ends with a backslash with the next line.
+    return next(step for step in recipe.deps if "cmeval-ruff-keep-deps" in step).replace("\\\n", "")
+
+
+def test_ruff_dependency_layer_builds_a_reference_with_the_task_selection():
+    recipe = gen.load_recipe("ruff")
+    # The layer is keyed on the toolchain file only. It must not read a per-task value.
+    assert recipe.deps_files == ("rust-toolchain.toml",)
+    assert not any("{exclude_newer}" in step for step in recipe.deps)
+    step = _ruff_reference_step(recipe)
+    # The same cargo selection as the task build, so the third-party output has the same fingerprints.
+    assert "cargo nextest run --workspace --all-features --no-run && cmeval-ruff-keep-deps" in step
+    # The reference source is removed, and the shared output stays writable for the agent user.
+    assert "rm -rf /testbed" in step and "chmod a+rwX" in step
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.parametrize("channel, ref", [
+    ("1.98.0", "dde7a34cd02556a93f04deff46202a40dfa108e6"),
+    ("1.96", "c913987b442a8f531adab62df127b3c062588fa6"),
+    ("1.200.0", ""),
+])
+def test_ruff_dependency_layer_takes_the_reference_of_the_toolchain(tmp_path, channel, ref):
+    (tmp_path / "rust-toolchain.toml").write_text(f'[toolchain]\nchannel = "{channel}"\n')
+    # Only the part that chooses the reference: it stops before the network is used.
+    command = _ruff_reference_step(gen.load_recipe("ruff")).split("if [ -z")[0] + 'echo "ref=$ref"'
+    out = subprocess.run(["bash", "-c", command], cwd=tmp_path, capture_output=True, text=True, check=True).stdout
+    assert out.strip() == f"ref={ref}"
+
+
+@pytest.fixture
+def ruff_keep_deps(tmp_path):
+    """cmeval-ruff-keep-deps as the base image writes it, with a cargo that gives two workspace
+    packages and records the arguments of "cargo clean"."""
+    if not shutil.which("bash"):
+        pytest.skip("needs bash")
+    step = next(s for s in gen.load_recipe("ruff").base_setup if "cmeval-ruff-keep-deps" in s)
+    script = tmp_path / "cmeval-ruff-keep-deps"
+    command = step.replace("\\\n", "").replace("/usr/local/bin/cmeval-ruff-keep-deps", str(script))
+    subprocess.run(["bash", "-c", command], check=True)
+    meta = {"packages": [{"name": "ruff_db", "id": "path+file:///testbed/crates/ruff_db#0.0.18"},
+                         {"name": "ty", "id": "path+file:///testbed/crates/ty#0.0.1"}]}
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "cargo").write_text(
+        "#!/bin/bash\n"
+        f"if [ \"$1\" = metadata ]; then echo '{json.dumps(meta)}'; exit 0; fi\n"
+        'echo "$@" > "$CARGO_TARGET_DIR/../clean-args"\n'
+        # Like cargo clean -p: remove the fingerprint folders of the named packages.
+        'rm -rf "$CARGO_TARGET_DIR"/debug/.fingerprint/ruff_db-* "$CARGO_TARGET_DIR"/debug/.fingerprint/ty-*\n')
+    (bin_dir / "cargo").chmod(0o755)
+    target = tmp_path / "target"
+    for folder in ("debug/.fingerprint/ruff_db-0123456789abcdef", "debug/.fingerprint/ty-fedcba9876543210",
+                   "debug/.fingerprint/serde-00112233445566ff", "debug/incremental/ruff_db-0123456789abcdef"):
+        (target / folder).mkdir(parents=True)
+    (target / "debug/deps").mkdir()
+    (target / "debug/deps/libserde-00112233445566ff.rlib").write_text("x")
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CARGO_TARGET_DIR": str(target)}
+
+    def run():
+        return subprocess.run([str(script)], env=env, capture_output=True, text=True)
+
+    return target, run
+
+
+def test_ruff_keep_deps_removes_workspace_output_only(ruff_keep_deps):
+    target, run = ruff_keep_deps
+    proc = run()
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    args = (target.parent / "clean-args").read_text().split()
+    assert args == ["clean", "-p", "path+file:///testbed/crates/ruff_db#0.0.18",
+                    "-p", "path+file:///testbed/crates/ty#0.0.1"]
+    assert not (target / "debug/incremental").exists()
+    assert sorted(p.name for p in (target / "debug/.fingerprint").iterdir()) == ["serde-00112233445566ff"]
+    assert (target / "debug/deps/libserde-00112233445566ff.rlib").exists()
+
+
+def test_ruff_keep_deps_fails_when_workspace_output_is_left(ruff_keep_deps):
+    target, run = ruff_keep_deps
+    # A file that "cargo clean" did not remove.
+    (target / "debug/deps/libruff_db-0123456789abcdef.rlib").write_text("x")
+    proc = run()
+    assert proc.returncode == 1
+    assert "libruff_db-0123456789abcdef.rlib" in proc.stdout
+
+
 def test_load_recipe_vscode():
     recipe = gen.load_recipe("vscode")
     assert len(recipe.suites) == 3

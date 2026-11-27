@@ -7,6 +7,9 @@
 # one integration test binary. The build is always the whole workspace with all features, as in
 # the CI of the repo ("cargo insta test --all-features"). So a test run never builds the
 # dependencies again. It only builds the crates that a patch changed since the last build.
+#
+# The dependency layer holds the compiled third-party crates, shared by all tasks with the same
+# toolchain. The task's own layer holds the compiled workspace crates (see deps).
 
 repo = "astral-sh/ruff"
 # This image also has Rust 1.99.0. Each task installs the toolchain of its own rust-toolchain.toml.
@@ -192,12 +195,77 @@ base_setup = [
   'fi' \
   'exit $code' \
   > /usr/local/bin/cmeval-ruff-test && chmod +x /usr/local/bin/cmeval-ruff-test''',
+    # The script that keeps only the build output of third-party crates (see deps).
+    '''printf '%s\n' \
+  '#!/usr/bin/env python3' \
+  '# cmeval-ruff-keep-deps' \
+  '# Run in the root of a ruff checkout after a build. It removes the build output of every crate of' \
+  '# the workspace from CARGO_TARGET_DIR, so only the output of third-party crates stays. A later' \
+  '# build then compiles every workspace crate from its own source: cargo always compiles a crate' \
+  '# that has no fingerprint.' \
+  'import json, os, re, shutil, subprocess, sys' \
+  'target = os.environ["CARGO_TARGET_DIR"]' \
+  'meta = subprocess.run(["cargo", "metadata", "--no-deps", "--format-version", "1"],' \
+  '                      check=True, capture_output=True, text=True).stdout' \
+  'packages = json.loads(meta)["packages"]' \
+  'args = ["cargo", "clean"]' \
+  'for p in packages:' \
+  '    args += ["-p", p["id"]]' \
+  'subprocess.run(args, check=True)' \
+  '# Cargo compiles only workspace crates incrementally.' \
+  'shutil.rmtree(os.path.join(target, "debug", "incremental"), ignore_errors=True)' \
+  '# Check: no file or folder of a workspace crate is left, such as .fingerprint/<name>-<hash>.' \
+  'names = {p["name"] for p in packages} | {p["name"].replace("-", "_") for p in packages}' \
+  'pattern = re.compile("^(lib)?(" + "|".join(sorted(map(re.escape, names))) + ")-[0-9a-f]{16}([.].*)?$")' \
+  'left = [os.path.join(d, n) for d, dirs, files in os.walk(target) for n in dirs + files if pattern.match(n)]' \
+  'if left:' \
+  '    print("cmeval-ruff-keep-deps: build output of workspace crates is left:", *left[:20], sep="\n  ")' \
+  '    sys.exit(1)' \
+  'print("cmeval-ruff-keep-deps: removed the build output of", len(packages), "workspace crates")' \
+  > /usr/local/bin/cmeval-ruff-keep-deps && chmod +x /usr/local/bin/cmeval-ruff-keep-deps''',
 ]
 
-# The toolchain of the task, from its rust-toolchain.toml. Tasks with the same file share this layer.
-# rustfmt and clippy are for the agent, as on a developer's machine. No test uses them.
+# Tasks with the same rust-toolchain.toml share this layer. It holds no file of the task.
+# 1. The toolchain of the task. rustfmt and clippy are for the agent, as on a developer's machine.
+#    No test uses them.
+# 2. The build output of the third-party crates. The layer builds a fixed reference commit with
+#    the same toolchain and the same cargo selection as the task build, then removes the build
+#    output of every workspace crate (cmeval-ruff-keep-deps) and the source. The task build then
+#    compiles all workspace crates, and only those third-party crates that the reference does not
+#    have (another version in Cargo.lock, or other features). Cargo keys the output of a
+#    third-party crate by its version, source, features, profile and compiler, not by file times,
+#    so this reuse is sound. Workspace output is not kept: cargo decides by file times whether a
+#    workspace crate is up to date, and the source of a task has other times than the reference.
+#    It would not save much either: in 249 of the 260 candidate tasks, a low-level crate
+#    (ruff_text_size, ruff_python_ast, ruff_db and others) differs from the reference, so every
+#    test binary is built again.
+#    The reference for each toolchain is the commit, among those with this toolchain file, whose
+#    Cargo.lock is nearest to those of the candidate tasks (median: 21 of about 500 registry
+#    packages to build again). A toolchain without a reference, or a reference with another
+#    toolchain file, gives a layer without build output: the task build then compiles everything.
 deps_files = ["rust-toolchain.toml"]
-deps = ["rustup toolchain install && rustup component add rustfmt clippy && rustc --version"]
+deps = [
+    "rustup toolchain install && rustup component add rustfmt clippy && rustc --version",
+    '''t=$(sed -n 's/^channel *= *"\(.*\)".*$/\1/p' rust-toolchain.toml); \
+case "$t" in \
+  1.96) ref=c913987b442a8f531adab62df127b3c062588fa6 ;; \
+  1.96.1) ref=2f09ac88e475086a0ef60a811a5242c40c0704e3 ;; \
+  1.97.0) ref=7cb38ea371c5b6293b616fc512c32a4559a10200 ;; \
+  1.97.1) ref=3e628b8ef074b270d44a182a272e091117db4405 ;; \
+  1.98.0) ref=dde7a34cd02556a93f04deff46202a40dfa108e6 ;; \
+  1.99.0) ref=9ff6b0f0d27dcbac5a1e6447a336ad8562720f3c ;; \
+  *) ref= ;; \
+esac; \
+if [ -z "$ref" ]; then echo "cmeval: no reference commit for Rust $t: the task build compiles every crate"; exit 0; fi; \
+git init -q /testbed && cd /testbed && git fetch -q --depth 1 https://github.com/astral-sh/ruff "$ref" && git checkout -q FETCH_HEAD && \
+if ! cmp -s /deps/rust-toolchain.toml rust-toolchain.toml; then echo "cmeval: reference $ref has another rust-toolchain.toml: the task build compiles every crate"; cd / && rm -rf /testbed; exit 0; fi && \
+CARGO_NET_OFFLINE=false cargo fetch --locked && \
+cargo nextest run --workspace --all-features --no-run && \
+cmeval-ruff-keep-deps && \
+cd / && rm -rf /testbed && \
+find /opt/target /usr/local/cargo ! -perm -a+rw -exec chmod a+rwX {} + && \
+du -sh /opt/target /usr/local/cargo/registry''',
+]
 
 build = [
     # uv at the version that the CI of the commit uses (first "version:" in ci.yaml).
@@ -206,8 +274,10 @@ build = [
     # The agent runs as another user, so cargo must be able to write its lock files there. Each
     # step changes the mode only of files that need it: a chmod of a file of an older layer copies it.
     "CARGO_NET_OFFLINE=false cargo fetch --locked && find /usr/local/cargo ! -perm -a+rw -exec chmod a+rwX {} +",
-    # All test binaries of the workspace, offline. This clean build takes most of the build time.
-    "cargo nextest run --workspace --all-features --no-run && find /opt/target /usr/local/cargo ! -perm -a+rw -exec chmod a+rwX {} +",
+    # All test binaries of the workspace, offline. This build takes most of the build time: it
+    # compiles every workspace crate and the third-party crates that the dependency layer does not
+    # have. The sizes at the end go to the build log.
+    "cargo nextest run --workspace --all-features --no-run && find /opt/target /usr/local/cargo ! -perm -a+rw -exec chmod a+rwX {} + && (du -sh /opt/target/debug/deps /opt/target/debug/build /opt/target/debug/incremental /opt/target/debug/.fingerprint || true)",
     # The CI of the repo runs the ty markdown tests with external packages (MDTEST_EXTERNAL=1).
     # Such a test runs "uv sync --locked" with the lock file beside it. One run here, with the
     # network, puts the packages and Pythons in the uv folders of the image. Tests then use them
