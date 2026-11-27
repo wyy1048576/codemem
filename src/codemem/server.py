@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -58,9 +59,23 @@ def build_server(service: CodememService) -> MCPServer:
             return "The codemem index is not available yet." + (
                 f" Last error: {service.last_error}" if service.last_error else ""
             )
-        if memory.on:
-            memory.for_client(_client_of(ctx))
-        depth = memory.depth(k, query, path_prefix, kinds, tests) if memory.on else k
+        if not memory.on:
+            return _search_page(notice, query, k, path_prefix, kinds, tests, k, None)
+        # search_dedup (dedup.py). Calls in flight at once make their pages in the order they came in (a
+        # ticket); a failure in the memory never fails the search: it answers the plain page (D2, D3).
+        ticket = memory.ticket()
+        try:
+            depth = k
+            try:
+                memory.for_client(_client_of(ctx))
+                depth = memory.depth(k, query, path_prefix, kinds, tests)
+            except Exception:
+                log.exception("search_dedup: no depth; this search goes on without it")
+            return _search_page(notice, query, k, path_prefix, kinds, tests, depth, ticket)
+        finally:
+            memory.release(ticket)
+
+    def _search_page(notice, query, k, path_prefix, kinds, tests, depth, ticket) -> str:
         resp = service.search(
             query, k=depth, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
         )
@@ -72,10 +87,17 @@ def build_server(service: CodememService) -> MCPServer:
             notes.append(prompts.vectors_unavailable_notice(resp.models_error) if resp.models_error else prompts.models_loading_notice())
         # Appended here, not in format_results: the eval builds its hit text from format_results.
         notes.append(prompts.search_footer(steering))
-        if memory.on:  # one line for what this session was sent and is unchanged: dedup.py
+        body = None
+        if ticket is not None:  # one line for what this session was sent and is unchanged: dedup.py
             current = (fresh is None or fresh.complete) and not resp.models_loading
-            body = memory.page(resp, k, service.store, current=current, path_prefix=path_prefix, kinds=kinds, tests=tests)
-        else:
+            try:
+                with memory.in_order(ticket):
+                    body = memory.page(resp, k, service.store, current=current, path_prefix=path_prefix,
+                                       kinds=kinds, tests=tests)
+            except Exception:
+                log.exception("search_dedup: the page failed; the plain page is sent and nothing is recorded")
+                resp = replace(resp, results=resp.results[:k])
+        if body is None:
             body = format_results(resp)
         return notice + body + "".join(f"\n\n{n}" for n in notes if n)
 
@@ -89,10 +111,13 @@ def build_server(service: CodememService) -> MCPServer:
             # In a copy of another checkout's index, a function of this checkout may only be missing still.
             return f"{missing}\n\n{prompts.copy_notice()}" if service.copy_unchecked() else missing
         if memory.on:  # never shortened; only recorded, so a later search can name it in one line
-            memory.for_client(_client_of(ctx))
-            chunk = service.store.get_chunk(d["chunk_id"])
-            if chunk is not None:
-                memory.got_chunk(chunk.key, chunk.content_hash, whole=d["code"] == chunk.code)
+            try:
+                memory.for_client(_client_of(ctx))
+                chunk = service.store.get_chunk(d["chunk_id"])
+                if chunk is not None:
+                    memory.got_chunk(chunk.key, chunk.content_hash, whole=d["code"] == chunk.code)
+            except Exception:  # the answer does not depend on it (D2)
+                log.exception("search_dedup: get_chunk was not recorded")
         return (prompts.copy_notice() + "\n\n" if d.get("unchecked_copy") else "") + format_chunk(d)
 
     @server.tool(

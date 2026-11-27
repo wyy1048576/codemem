@@ -27,12 +27,23 @@ search, then relays Claude Code's handshake to the same process; the gate's sear
 `shorten` shows the same k results as `off`, repeats as one line. `refill` goes on down the ranking
 until the page has k full cards (or the ranking ends), so the slots a repeat took go to results the
 session has not seen. get_chunk is never shortened; it only records what it sent.
+
+Safe to fail and safe to call at once (review of 2026-11-27 14:10 UTC, D2 and D3):
+  - `page()` and `got_chunk()` record nothing until they are done, so one that fails halfway leaves the
+    memory as it was; the server then answers the plain page (server.py).
+  - The MCP library runs sync tools in worker threads, so two calls can be in flight at once. Every
+    method holds one lock, and a search takes a ticket when it is entered (`ticket()`): its page is
+    made only after every earlier ticket's (`in_order()`), so the first-sent call gets the cards and a
+    later one the short lines. A ticket is always given back (`release()`), also when its search fails.
 """
 
 from __future__ import annotations
 
 import hashlib
 import re
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from .render import card_label, format_card
@@ -41,6 +52,7 @@ from .store import Store
 
 MODES = ("off", "shorten", "refill")
 REFILL_DEPTH = 50  # refill asks the ranking for at most this many results beyond k
+TURN_WAIT = 30.0  # seconds a page waits for an earlier call still in flight; then it goes ahead
 
 
 @dataclass
@@ -73,41 +85,87 @@ class SessionMemory:
         self.calls = 0
         self.stats = {"searches": 0, "one_line": 0, "cards": 0, "changed": 0, "other_lines": 0, "refilled": 0}
         self._client: object = None
+        self._lock = threading.RLock()
+        self._turn = threading.Condition(self._lock)
+        self._tickets = 0
+        self._open: set[int] = set()  # tickets taken and not given back yet
 
     def for_client(self, client: object) -> None:
         """`client`: who is calling (server._client_of: the name and version of its `initialize`). A new
         client forgets everything an earlier one was sent."""
-        if client != self._client:
-            self._client = client
-            self.sent, self.queries, self.calls = {}, set(), 0
+        with self._lock:
+            if client != self._client:
+                self._client = client
+                self.sent, self.queries, self.calls = {}, set(), 0
 
     @property
     def on(self) -> bool:
         return self.mode != "off"
 
-    def _forget(self) -> None:
-        if self.forget_calls:
-            old = [key for key, s in self.sent.items() if self.calls - s.call >= self.forget_calls]
-            for key in old:
-                del self.sent[key]
+    # ------------------------------------------------------------ the order of calls in flight (D3)
+
+    def ticket(self) -> int:
+        """Taken when search_code is entered, before its search runs."""
+        with self._lock:
+            t = self._tickets
+            self._tickets += 1
+            self._open.add(t)
+            return t
+
+    def release(self, ticket: int) -> None:
+        """Given back when search_code ends, however it ends."""
+        with self._turn:
+            self._open.discard(ticket)
+            self._turn.notify_all()
+
+    @contextmanager
+    def in_order(self, ticket: int, timeout: float = TURN_WAIT) -> Iterator[None]:
+        """Hold the memory once every earlier ticket is given back (or after `timeout`)."""
+        with self._turn:
+            self._turn.wait_for(lambda: not any(t < ticket for t in self._open), timeout)
+            yield
+
+    # ------------------------------------------------------------ pages
+
+    def _kept(self, calls: int) -> dict[str, Sent]:
+        """What is still remembered at call number `calls`, as a new dict (self.sent is not touched)."""
+        if not self.forget_calls:
+            return dict(self.sent)
+        return {key: s for key, s in self.sent.items() if calls - s.call < self.forget_calls}
 
     def depth(self, k: int, query: str, path_prefix: str | None, kinds: list[str] | None, tests: str) -> int:
         """How many results to ask the ranking for."""
-        if self.mode != "refill" or _query_key(query, path_prefix, kinds, tests) in self.queries:
-            return k
-        return k + min(len(self.sent), REFILL_DEPTH)
+        with self._lock:
+            if self.mode != "refill" or _query_key(query, path_prefix, kinds, tests) in self.queries:
+                return k
+            return k + min(len(self.sent), REFILL_DEPTH)
 
     def page(self, resp: SearchResponse, k: int, store: Store, *, current: bool, path_prefix: str | None = None,
              kinds: list[str] | None = None, tests: str = "include") -> str:
-        """The text of one search_code page. `current`: the index was current for this search."""
-        self.calls += 1
-        self._forget()
-        self.stats["searches"] += 1
-        qkey = _query_key(resp.query, path_prefix, kinds, tests)
-        again = qkey in self.queries
-        self.queries.add(qkey)
-        if not resp.results:
-            return f"No results for {resp.query!r}."
+        """The text of one search_code page. `current`: the index was current for this search.
+        Nothing is recorded unless the text is built (D2)."""
+        with self._lock:
+            calls = self.calls + 1
+            sent = self._kept(calls)
+            qkey = _query_key(resp.query, path_prefix, kinds, tests)
+            stats = dict.fromkeys(self.stats, 0)
+            stats["searches"] = 1
+            records: dict[str, Sent] = {}
+            if not resp.results:
+                text = f"No results for {resp.query!r}."
+            else:
+                text = self._build(resp, k, store, sent, records, stats, calls,
+                                   current=current, again=qkey in self.queries)
+            # Built: from here on it counts as sent.
+            sent.update(records)
+            self.calls, self.sent = calls, sent
+            self.queries.add(qkey)
+            for name, n in stats.items():
+                self.stats[name] += n
+            return text
+
+    def _build(self, resp: SearchResponse, k: int, store: Store, sent: dict[str, Sent], records: dict[str, Sent],
+               stats: dict[str, int], calls: int, *, current: bool, again: bool) -> str:
         hashes = {cid: c.content_hash for cid, c in store.get_chunks([r.chunk_id for r in resp.results]).items()}
         out: list[str] = []
         full = repeats = 0
@@ -116,27 +174,27 @@ class SessionMemory:
                 break
             card = format_card(r, i)
             chash, now = _card_hash(card), hashes.get(r.chunk_id)
-            prev = self.sent.get(r.key)
+            prev = sent.get(r.key)
             unchanged = prev is not None and now is not None and prev.content_hash == now
             if unchanged and current and not again and (prev.how == "full" or prev.card_hash == chash):
                 out.append(self._one_line(r, i, prev))  # not a new send: its call stays as it was
                 repeats += 1
-                self.stats["one_line"] += 1
+                stats["one_line"] += 1
                 continue
             if prev is not None and not unchanged:
                 card.insert(1, "   (changed since shown earlier)")
-                self.stats["changed"] += 1
+                stats["changed"] += 1
             elif prev is not None and prev.how == "card" and prev.card_hash != chash:
                 card.insert(1, "   (shown earlier, other lines this time)")
-                self.stats["other_lines"] += 1
+                stats["other_lines"] += 1
             out.extend(card)
             full += 1
-            self.stats["cards"] += 1
+            stats["cards"] += 1
             if i > k:
-                self.stats["refilled"] += 1
+                stats["refilled"] += 1
             if now is not None:
                 keep_full = unchanged and prev.how == "full"
-                self.sent[r.key] = Sent(now, "" if keep_full else chash, "full" if keep_full else "card", self.calls)
+                records[r.key] = Sent(now, "" if keep_full else chash, "full" if keep_full else "card", calls)
         if repeats:
             out.append("")
             if self.mode == "refill" and full < k:
@@ -152,7 +210,9 @@ class SessionMemory:
 
     def got_chunk(self, key: str, content_hash: str, whole: bool) -> None:
         """get_chunk sent this chunk; `whole`: its full code (not a long class's outline)."""
-        self.calls += 1
-        self._forget()
-        if whole:
-            self.sent[key] = Sent(content_hash, "", "full", self.calls)
+        with self._lock:
+            calls = self.calls + 1
+            sent = self._kept(calls)
+            if whole:
+                sent[key] = Sent(content_hash, "", "full", calls)
+            self.calls, self.sent = calls, sent

@@ -280,3 +280,157 @@ def test_a_new_client_starts_with_nothing_sent(sample_repo, tmp_path):
         assert "shown earlier" in texts[2]  # within the agent's session it works
     finally:
         svc.close()
+
+
+# ---------------------------------------------------------------- D2: a failure never fails the tool (review of 14:10 UTC)
+
+
+def test_a_page_that_fails_halfway_records_nothing(monkeypatch):
+    import codemem.dedup as dedup
+
+    m = SessionMemory("shorten")
+    m.page(_resp([1, 2, 3]), 3, _Store(6), current=True)
+    before = (dict(m.sent), set(m.queries), m.calls, dict(m.stats))
+    real, seen = dedup.format_card, []
+
+    def fails_on_the_second(r, i, **kw):
+        seen.append(i)
+        if len(seen) == 2:
+            raise RuntimeError("boom")
+        return real(r, i, **kw)
+
+    monkeypatch.setattr(dedup, "format_card", fails_on_the_second)
+    with pytest.raises(RuntimeError):
+        m.page(_resp([4, 5, 6], query="other"), 3, _Store(6), current=True)
+    assert (dict(m.sent), set(m.queries), m.calls, dict(m.stats)) == before  # card 4 was built, not recorded
+    monkeypatch.setattr(dedup, "format_card", real)
+    assert _full_cards(m.page(_resp([4, 5, 6], query="other"), 3, _Store(6), current=True)) == [4, 5, 6]
+
+
+@pytest.mark.parametrize("mode", ["shorten", "refill"])
+def test_a_failing_memory_answers_the_plain_page(sample_repo, tmp_path, monkeypatch, mode):
+    off = _service(sample_repo, tmp_path, "off")
+    on = _service(sample_repo, tmp_path, mode)
+    try:
+        want = _calls(off, QUERIES)
+        real_page, pages = SessionMemory.page, []
+
+        def page(self, *a, **kw):  # the first page works, so refill asks for more than k after it
+            pages.append(1)
+            if len(pages) > 1:
+                raise RuntimeError("boom")
+            return real_page(self, *a, **kw)
+
+        def got_chunk(self, *a, **kw):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(SessionMemory, "page", page)
+        monkeypatch.setattr(SessionMemory, "got_chunk", got_chunk)
+        got = _calls(on, QUERIES)
+        assert got == want  # the plain page, k results, the same notes; get_chunk unchanged
+    finally:
+        off.close()
+        on.close()
+
+
+# ---------------------------------------------------------------- D3: calls in flight at once
+
+
+def test_threads_on_one_memory_raise_nothing():
+    import sys
+    import threading
+
+    m, errors = SessionMemory("refill", forget_calls=3), []
+
+    def work(seed):
+        try:
+            for n in range(400):
+                ids = [(seed * 7 + n + j) % 30 + 1 for j in range(5)]
+                m.depth(5, f"q{n % 4}", None, None, "include")
+                m.page(_resp(ids, query=f"q{n % 4}"), 5, _Store(30), current=True)
+                m.got_chunk(f"m.py::f{ids[0]}", f"h{ids[0]}", whole=True)
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+
+    old = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)
+    try:
+        threads = [threading.Thread(target=work, args=(s,)) for s in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    finally:
+        sys.setswitchinterval(old)
+    assert errors == []
+    assert m.stats["searches"] == 1600
+
+
+def test_the_first_call_in_gets_the_cards():
+    """Two searches in flight: the one that came in second finishes its search first, and waits."""
+    import threading
+
+    m, out = SessionMemory("shorten"), {}
+    first, second = m.ticket(), m.ticket()
+
+    def later():
+        with m.in_order(second):
+            out["second"] = m.page(_resp([1, 2, 3], query="b"), 3, _Store(3), current=True)
+        m.release(second)
+
+    t = threading.Thread(target=later)
+    t.start()
+    t.join(0.3)
+    assert t.is_alive() and "second" not in out  # waits for the earlier call
+    with m.in_order(first):
+        out["first"] = m.page(_resp([1, 2, 3], query="a"), 3, _Store(3), current=True)
+    m.release(first)
+    t.join(5)
+    assert _full_cards(out["first"]) == [1, 2, 3]
+    assert _one_lines(out["second"]) == [1, 2, 3]
+
+
+def test_a_call_that_fails_before_its_page_does_not_hold_up_the_next():
+    import threading
+
+    m, out = SessionMemory("shorten"), {}
+    first, second = m.ticket(), m.ticket()
+
+    def later():
+        with m.in_order(second):
+            out["second"] = m.page(_resp([1, 2]), 2, _Store(2), current=True)
+
+    t = threading.Thread(target=later)
+    t.start()
+    m.release(first)  # its search failed: no page
+    t.join(5)
+    assert not t.is_alive() and _full_cards(out["second"]) == [1, 2]
+
+
+def test_two_searches_sent_at_once_through_the_server(sample_repo, tmp_path):
+    """One of the two pages has the cards and the other the short lines; neither is an error."""
+    from mcp import Client
+
+    from codemem.server import build_server
+
+    svc = _service(sample_repo, tmp_path, "shorten")
+    try:
+        texts = {}
+
+        async def run():
+            async with Client(build_server(svc)) as client:
+                async def search(name, q):
+                    res = await client.call_tool("search_code", {"query": q, "k": 5})
+                    assert not res.is_error
+                    texts[name] = res.content[0].text
+
+                async with anyio.create_task_group() as tg:
+                    tg.start_soon(search, "a", "revoke session")
+                    tg.start_soon(search, "b", "revoke a session")
+
+        anyio.run(run)
+        short = [name for name, text in texts.items() if "shown earlier" in text]
+        assert len(short) == 1
+        assert _one_lines(texts[short[0]])  # the other page sent those results as cards
+    finally:
+        svc.close()
