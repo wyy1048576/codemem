@@ -733,6 +733,55 @@ one index.
 
 ---
 
+## 12. What comes next
+
+What this track plans or proposes after the runs, and what it has not checked yet. Each item says
+what, why, and what is known so far. The numbers are in
+[the results](../analysis/track-c-results.md), §2.6 for the Linux PC.
+
+- **Threads: codemem sets them, the user never does** (proposed). On a 16-core Linux PC a compact
+  search took 32 to 58 ms longer on all cores than on one, through numpy's BLAS threads. Three
+  parts: one search runs on one thread while a build keeps the cores; codemem limits its threads
+  to the CPUs a container allows; a guard script fails when all cores are slower than one. The
+  script and the candidate fixes are on `andre/compact-threads`,
+  `andre/compact-threads-fix-rotation` and `andre/compact-threads-fix-faiss`, waiting for a
+  measurement on Linux.
+- **The rotation in double precision** (proposed). A compact code depends, in its last bits, on
+  how numpy's BLAS rounds the rotation, and that differs by machine and by call size. Rotating in
+  float64 would remove the dependence. It changes how vectors are coded, and it is still not exact.
+- **Whether the compact index keeps its second code** (open; Andre decides). The 1-bit code is 120
+  of a vector's 628 bytes; with the 4-bit code alone a vector takes 508. On the M1, FAISS's own
+  search over the 4-bit codes was as fast and picked the same candidates for 150 of 150 questions,
+  with other jobs running. On the PC it took 1.8 to 6.2 times as long, at every size.
+- **Why ranking by 4-bit codes is slow on the PC's processor** (not started). On one thread that
+  step took 40 ms at 500,000 vectors there, against about 4 ms on the M1, and it is most of a
+  compact search on the PC.
+- **One codemem process per machine** (proposed, for a production release; §4.4, §4.6). It would
+  hold the embedding model and the open repos' search indexes for every caller, so that nobody
+  pays a start. The pieces for a shared model exist (`codemem serve-embeddings`, the idle unload).
+  With it, the exact index's saved copy can go: 261 MB of vLLM's 909 MB.
+- **Whether to index files that are not code** (open). Markdown files are not indexed: 327 `.md`
+  files on vLLM, beside 719 `.json` and 518 `.yaml` files also skipped as not code. Andre asked
+  about them.
+- **The eval's lock file follows codemem's** (after the runs). `eval/uv.lock` pins FAISS 1.15.1,
+  codemem's own 1.16.0. The runs use codemem's, and the two give the same results.
+- **Agents in several worktrees through one MCP server** (open, §7.5). A tool call does not say
+  which folder it came from, and a test with a real agent comes before any design.
+- **A check against the literature,** before the paper: whether track C's own findings are new
+  has not been checked ([the results](../analysis/track-c-results.md) §6).
+- **Checks not done yet:**
+  - a real index above vLLM's 144,729 vectors; beyond it only generated vectors were measured;
+  - the compact index in the eval's runs: they use the exact index, so an agent's results with
+    the compact one are known only search by search;
+  - the embedding assist with a real model or a hosted provider: only stand-in models so far;
+  - whether the real model gives a text the same vector, bit for bit, when it embeds it again;
+  - another model's vectors (§4.2, C-E2): every check used `jina-code-embeddings-0.5b`;
+  - native Windows: the Linux PC runs under WSL 2;
+  - the M1's times on a quiet machine: its search times were taken with no other job of ours
+    running, most of its other times were not.
+
+---
+
 ## Sources
 
 Items marked *(reported)* in this file were read by research passes on Nov 22, 2026. Re-read a

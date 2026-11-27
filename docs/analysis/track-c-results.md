@@ -37,6 +37,8 @@ of the machine's memory and uses the compact one only beyond that.
 
 ## 2. The search index
 
+The numbers of §2.1 to §2.5 are from the M1, those of §2.6 from a 16-core Linux PC.
+
 ### 2.1 How it works
 
 Today's index keeps every full vector in memory: 896 numbers at 2 bytes each, about 1.8 KB. A
@@ -59,7 +61,7 @@ one, and the final order is the exact index's order.
 **The codes are RaBitQ codes** (Gao and Long, SIGMOD 2024; several bits per number: Gao et al.,
 2025), made and compared by FAISS, Meta's vector search library. Before a vector is coded,
 codemem multiplies it by a rotation: a fixed table of random numbers, drawn once from a seed, so
-that the same vector gets the same code on every machine.
+that the same vector gets the same code on every machine, up to the rotation's rounding (§2.6).
 The 1-bit code keeps the sign of each rotated number. The 4-bit code keeps the sign and 3 more
 bits for the number's size: 16 levels. With each code FAISS stores a correction that says how
 well the code matches its own vector, and an estimate divides by it. Each extra bit about halves
@@ -84,7 +86,7 @@ takes the full estimate only where that leaves a chance. When the index was buil
 the FAISS version pinned now, FAISS's own search is as fast as our steps 1 and 2 and picked the
 same candidates in 150 of 150 questions. What the second code still gives is a fixed rule: the
 candidates depend only on the vectors held, never on their order. Whether that is worth 120 of
-the 628 bytes is open.
+the 628 bytes is open; §2.6 has the Linux PC's times.
 
 ### 2.2 Does it return the same results?
 
@@ -170,10 +172,10 @@ beyond. Vector search sits on the path of every request, so this is where it wou
 | 1 million | about 75 ms | about 45 ms | about 30 ms |
 | 5 million | about 370 ms | about 215 ms | about 150 ms |
 
-The rows beyond vLLM are worked out from the two costs above, not measured: a measurement up to
-2 million vectors is being run on a larger machine. A repo needs about ten times vLLM's 102,000
-functions and classes before a search saves 30 ms. At that size the exact index would also hold
-1.9 GB of memory, and that is the first reason to change index.
+The rows beyond vLLM are worked out from the two costs above, not measured on the M1; §2.6 has
+measurements up to 2 million vectors on a 16-core Linux PC. A repo needs about ten times vLLM's
+102,000 functions and classes before a search saves 30 ms. At that size the exact index would
+also hold 1.9 GB of memory, and that is the first reason to change index.
 
 ### 2.4 When each index is used
 
@@ -194,6 +196,90 @@ These are results too, and they shaped the design.
   when the index was built (§2.1).
 - **The first 512 numbers at full precision as a first step** was no better than the 1-bit code
   over all 896.
+
+### 2.6 On a second machine: a 16-core Linux PC
+
+The M1 cannot hold a million vectors beside its other work, and it is not Linux. So track A ran
+this section's checks on a second machine: a PC with a 16-core AMD Ryzen 9 3950X and 50.5 GB,
+running Linux on x86-64 under WSL 2, with FAISS 1.16.0 and numpy 2.4.6 on OpenBLAS 0.3.31. The
+numbers below are the PC's unless a line names the M1, and its times were taken while it was
+quiet. Keep the two machines' numbers apart: compare the two indexes on one machine at a time.
+
+**The same results, on real indexes.** The repo's check script (`scripts/check_search_indexes.py`)
+ran on the PC's index of pandas (41,932 code and 6,419 usage vectors, 352 questions) and of
+playwright (20,731 and 7,692, 209 questions), with the exact index as the reference. The compact
+index's default returned the same top 10 and top 50 for every question and both kinds of vector,
+and the whole search the same 10 results in the same order. `auto` chose the exact index for
+both: 2% of this machine's memory is 1,010 MB.
+
+**Memory and time as the index grows.** Generated vectors of 896 numbers around 2,000 centres, so
+that a query has neighbours, and the compact index's default settings. Each time is a median, for
+searches of 50 results. "All cores" is how codemem runs on Linux. "One core" sets
+`OMP_NUM_THREADS=1`, which on this machine limits numpy's BLAS as well as FAISS.
+
+| Vectors | Memory, exact / compact | A search on all 16 cores, exact / compact | On one core, exact / compact |
+|---|---|---|---|
+| 100,000 | 198 / 86 MB | 20.6 / 80.0 ms | 18.8 / 22.3 ms |
+| 200,000 | 399 / 155 MB | 39.3 / 76.5 ms | 38.5 / 25.8 ms |
+| 500,000 | 999 / 370 MB | 95.3 / 90.8 ms | 91.1 / 59.3 ms |
+| 1 million | 1,945 / 704 MB | 190.5 / 148.5 ms | 190.4 / 114.9 ms |
+| 2 million | 3,892 / 1,404 MB | 381.0 / 258.5 ms | not run |
+
+- **Memory:** the compact index holds 36 to 44% of what the exact one holds, on all cores and on
+  one.
+- **On one core** the compact search is the faster one from 200,000 vectors.
+- **On all cores** it is slower up to 200,000 vectors, level at 500,000 and faster from a
+  million. The exact search takes about the same time on all cores as on one; the compact search
+  takes 32 to 58 ms more. The cause is below.
+- **Under a filter** that keeps a tenth of the chunks, the exact search was the faster one at
+  every size, on all cores and on one.
+- **The 4-bit code alone,** searched by FAISS itself (§2.1), took 1.8 to 6.2 times as long as the
+  compact index's search with both codes, at every size, on all cores and on one.
+- **The same top 10** came back in every search at every size. On generated vectors that is only
+  a sanity check: the real indexes above are the evidence.
+
+**Why all cores are slower: numpy's BLAS threads.** A compact search first rotates the query, one
+row times the rotation, in numpy's BLAS; the exact search has no such step. A second script timed
+each step of a compact search with FAISS and numpy's BLAS each on one or on all 16 threads, at
+100,000 and 500,000 vectors (medians of 50 searches). Against both on one thread, a search took:
+
+- 2.0 and 2.2 ms more with FAISS on 16 threads and numpy's BLAS on one;
+- 1.2 and 26.1 ms more with numpy's BLAS on 16 threads and FAISS on one;
+- 51.1 and 27.8 ms more with both on 16 threads.
+
+So numpy's BLAS threads carry the cost. It does not sit in the rotation itself (at most 4.7 ms)
+but in the two FAISS steps after it: at 100,000 vectors, ranking by the 4-bit codes took 54.7 ms
+with both on 16 threads, against 16.4 ms with both on one. Why the FAISS steps slow down was not
+measured. Reading the candidates' rows took 2.6 to 3.1 ms in every setting, so the disk is not
+the cause, and every setting returned the same results. The M1 does not show the effect: with the
+rows in memory, a compact search took the same time on 8 threads as on one. A fix is proposed and
+not measured yet ([the plan](../plan/track-c-memory.md) §12).
+
+**Five tests failed on Linux, and why.** Before the fix below, codemem's whole suite ended on the
+PC with 5 failed and 724 passed. The five compare two compact indexes that hold the same vectors,
+one patched edit by edit and one built at once, byte for byte, or expect copies of one vector to
+tie exactly. The cause is the rotation. It is a float32 matrix product in numpy's BLAS, and
+OpenBLAS rounds a row differently by the size of the call and by the row's place in it, also on
+one thread. FAISS coded the same rotated rows to the same bytes however they were split into
+calls, on 1 thread or 16. So a vector's code is the same only up to the rotation's rounding. In an
+index of 6,000 generated vectors built both ways, the 1-bit codes kept every bit and differed only
+in the last bits of their corrections; the 4-bit codes changed 134 bits (478 with numpy's BLAS on
+all threads). The top 10 and its scores were the same for all 21 queries. The scores a search
+returns never depend on the codes: they are computed from the rows.
+
+**The fix is on `main`** (#65) and changes no behaviour. The three tests behind the five failures
+use a rotation that every BLAS computes exactly (a signed permutation), so they still check the
+bookkeeping and the cut through ties on any machine. The docs no longer promise equal bytes, and
+`scripts/diagnose_compact_store.py` shows on any machine which step of the coding depends on the
+call. On the PC the compact index's tests pass with the fix (94 of 94).
+
+**What these numbers do not show.**
+
+- A real index larger than pandas on the PC, or than vLLM's 144,729 vectors on either machine.
+  Beyond those, the vectors are generated.
+- Native Windows: the PC runs Linux under WSL 2.
+- The whole suite with the fix: on the PC only the compact index's tests ran with it.
+- A compact search on all cores with the thread fix in.
 
 ---
 
