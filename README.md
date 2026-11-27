@@ -115,6 +115,28 @@ The commands that use an index accept `--index-dir DIR`; the eval uses it for on
 
   Either hook works without the other. The PowerShell tool is not covered. The command
   takes about 0.2 s, and the second hook also runs after every Read.
+- **Claude Code, optional: the starting search.** `init --start-search` adds a third hook to
+  `.claude/settings.json`, on the user's prompt. On the first prompt of a session it makes the
+  search `codemem search -k 20` would make for that prompt, in the repository of the session, and
+  gives the agent the results as context for that prompt:
+
+  ```text
+  Possibly relevant code, from a search by meaning (it may be wrong):
+  auth/sessions.py:33  SessionManager.revoke_session
+  auth/tokens.py:12  TokenStore.revoke
+  ```
+
+  Later prompts of the session get nothing. The prompt goes to the agent as it would without the
+  hook when there is no index or its first build has not finished, when the search could not use
+  the embedding model (keywords only), when it finds nothing or fails, and after 50 s. The first
+  search loads the embedding model (about 9 s on a laptop), and the agent waits for it, so the
+  hook has a timeout of its own. It works with or without the two hooks above; both flags together
+  write all three. By hand:
+
+  ```json
+  {"hooks": {"UserPromptSubmit": [
+    {"hooks": [{"type": "command", "command": "codemem hook", "timeout": 60}]}]}}
+  ```
 
 The agent gets four tools: `search_code` (plain-language or identifier search), `get_chunk` (one
 result in full, with its callers and callees), `index_status` and `refresh_index`. Every search

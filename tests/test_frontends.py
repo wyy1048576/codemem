@@ -608,7 +608,7 @@ def _our_hooks(repo) -> dict:
     """event -> the (matcher, condition, command, timeout) of every codemem hook registered for it."""
     return {
         event: [
-            (group["matcher"], h.get("if"), h["command"], h.get("timeout"))
+            (group.get("matcher"), h.get("if"), h["command"], h.get("timeout"))
             for group in groups for h in group["hooks"] if h["command"].endswith("codemem hook")
         ]
         for event, groups in _settings(repo)["hooks"].items()
@@ -707,6 +707,55 @@ def test_init_hooks_refuse_settings_they_cannot_read(sample_repo, on_path):
         with pytest.raises(ValueError, match="fix or remove it first"):
             agents.plan(sample_repo, ["claude"], write_hooks=True)
         assert path.read_text() == text
+
+
+_START = {"UserPromptSubmit": [(None, None, "codemem hook", agents.START_SEARCH_TIMEOUT)]}
+
+
+def test_cli_init_start_search_writes_that_hook_only(sample_repo, tmp_path, fake_env, on_path, capsys):
+    rc = main(["init", str(sample_repo), "--yes", "--start-search", "--index-dir", str(tmp_path / "idx")])
+    assert rc == 0 and "starting search" in capsys.readouterr().out
+    assert _our_hooks(sample_repo) == _START and agents.START_SEARCH_TIMEOUT == 60
+    # Running again changes nothing, so there is nothing to write for the hooks.
+    before = (sample_repo / ".claude" / "settings.json").read_text()
+    assert [a.agent for a in agents.plan(sample_repo, ["claude"], start_search=True)] == ["claude"]
+    assert main(["init", str(sample_repo), "--yes", "--start-search", "--no-index"]) == 0
+    assert (sample_repo / ".claude" / "settings.json").read_text() == before
+
+
+def test_cli_init_both_flags_write_all_three(sample_repo, tmp_path, fake_env, on_path):
+    rc = main(["init", str(sample_repo), "--yes", "--write-hooks", "--start-search", "--index-dir", str(tmp_path / "i")])
+    assert rc == 0 and _our_hooks(sample_repo) == {**_expected_hooks(), **_START}
+    assert "hooks" not in [a.agent for a in agents.plan(sample_repo, ["claude"], write_hooks=True, start_search=True)]
+
+
+def test_init_each_flag_keeps_the_hooks_of_the_other(sample_repo, on_path):
+    agents.apply(agents.plan(sample_repo, ["claude"], write_hooks=True))
+    agents.apply(agents.plan(sample_repo, ["claude"], start_search=True))
+    assert _our_hooks(sample_repo) == {**_expected_hooks(), **_START}
+    agents.apply(agents.plan(sample_repo, ["claude"], write_hooks=True))
+    assert _our_hooks(sample_repo) == {**_expected_hooks(), **_START}
+
+
+def test_init_start_search_keeps_other_hooks_and_replaces_an_earlier_entry(sample_repo, on_path):
+    theirs = {"type": "command", "command": "echo checked"}
+    old = {"type": "command", "command": "/old/env/bin/python -m codemem hook", "timeout": 5}
+    path = sample_repo / ".claude" / "settings.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps({"model": "x", "hooks": {
+        "UserPromptSubmit": [{"hooks": [theirs]}, {"hooks": [old, theirs]}],
+        "Stop": [{"hooks": [theirs]}],
+    }}))
+    agents.apply(agents.plan(sample_repo, ["claude"], start_search=True))
+    data = _settings(sample_repo)
+    assert data["model"] == "x" and data["hooks"]["Stop"] == [{"hooks": [theirs]}]
+    # Theirs first, codemem's where its earlier entry stood, then what was left of that group.
+    assert data["hooks"]["UserPromptSubmit"] == [
+        {"hooks": [theirs]},
+        {"hooks": [{"type": "command", "command": "codemem hook", "timeout": agents.START_SEARCH_TIMEOUT}]},
+        {"hooks": [theirs]},
+    ]
+    assert "PreToolUse" not in data["hooks"]
 
 
 def test_hook_command_when_codemem_is_not_on_path(monkeypatch):

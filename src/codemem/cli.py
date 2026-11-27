@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from pathlib import Path
@@ -86,7 +87,8 @@ def cmd_init(args) -> int:
     config = load_config(repo)
     names = [a.strip() for a in args.agents.split(",") if a.strip()] if args.agents else []
     actions = agents.plan(
-        repo, names, write_agent_notes=not args.no_agent_notes, write_hooks=args.write_hooks, steering=config.steering
+        repo, names, write_agent_notes=not args.no_agent_notes, write_hooks=args.write_hooks,
+        start_search=args.start_search, steering=config.steering,
     )
     print(f"repo: {repo}")
     for a in actions:
@@ -268,9 +270,15 @@ def cmd_mcp(args) -> int:
 
 
 def cmd_hook(args) -> int:
-    from .hook import run
+    from . import hook
 
-    return run(sys.stdin, sys.stdout)
+    code = hook.run(sys.stdin, sys.stdout)
+    if hook.search_left_running():
+        # The starting search ran past its limit and gave nothing: end the process now, without
+        # waiting for it or tidying up after it.
+        sys.stdout.flush()
+        os._exit(code)
+    return code
 
 
 def cmd_serve_embeddings(args) -> int:
@@ -336,6 +344,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--write-hooks", action="store_true",
         help="Claude Code: add two hooks to .claude/settings.json that point the agent at search_code when it has no lead",
     )
+    sp.add_argument(
+        "--start-search", action="store_true",
+        help="Claude Code: add a hook to .claude/settings.json that searches codemem with the first prompt of a "
+        "session and gives the agent the 20 best results with it",
+    )
     sp.add_argument("--dry-run", action="store_true", help="show what would be written")
     sp.add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
     sp.set_defaults(func=cmd_init)
@@ -385,7 +398,8 @@ def build_parser() -> argparse.ArgumentParser:
     common(sub.add_parser("mcp", help="MCP server over stdio (what agents launch)")).set_defaults(func=cmd_mcp)
     sub.add_parser("languages", help="list supported languages and file extensions").set_defaults(func=cmd_languages)
     sub.add_parser(
-        "hook", help="Claude Code hooks: point the agent at search_code when it has no lead (see the README)"
+        "hook", help="Claude Code hooks: the starting search, and pointers to search_code when the agent has no lead "
+        "(see the README)"
     ).set_defaults(func=cmd_hook)
     return p
 
