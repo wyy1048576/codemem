@@ -106,7 +106,7 @@ PASS: auto and compact:bits=4,rescore=200 returned what the exact index returns,
 
 **What we read in the numbers.** These are only facts from the tables. The decisions are yours.
 
-- Run 3, all cores: the compact index uses 36 to 44% of the exact index's memory. Its search is slower than the exact search up to 500,000 vectors (80.0 against 20.6 ms at 100,000). It is faster from 1,000,000 vectors (148.5 against 190.5 ms; at 2,000,000, 258.5 against 381.0 ms). With a filter, the exact search is faster at every size.
+- Run 3, all cores: the compact index uses 36 to 44% of the exact index's memory. Its search is slower than the exact search up to 200,000 vectors (80.0 against 20.6 ms at 100,000). It is about equal at 500,000 (90.8 against 95.3 ms) and faster from 1,000,000 (148.5 against 190.5 ms; at 2,000,000, 258.5 against 381.0 ms). With a filter, the exact search is faster at every size.
 - Run 3, one core: the compact search is faster from 200,000 vectors (25.8 against 38.5 ms; at 1,000,000, 114.9 against 190.4 ms). With a filter, the exact search is faster at every size here too.
 - FAISS's own search over one code ("FAISS own") is slower than the exact and the compact search at every size, on both settings.
 - Run 4: on both repos every setting gives the same top 10 as the exact index. Only `compact:bits=1,rescore=500` misses one result in the top 50 on pandas (overlap 0.9999). At these sizes (pandas 41,932 code vectors, playwright 20,731) the compact search is 4 to 15 times slower than the exact search on the code vectors.
