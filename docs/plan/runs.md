@@ -175,6 +175,8 @@ three answer "did it reach the right place, and how fast", for the small models 
 
 **The search made for the agent counts as one codemem search of the run,** and its results count as
 seen before the first turn. A `codemem` run's count of searches is that one and the agent's own.
+The record keeps the list itself, so that it can be read off whether the list held a gold file and
+whether the agent's first move went to a file of the list (§11).
 
 ---
 
@@ -371,3 +373,28 @@ cannot be a task: there is no request to give the agent.
    end with fewer than 4: pandas has 19 candidates, trino 8. They run more medium tasks instead
    (§3).
 4. Each hard task gets its L1 and L2 prompts like any other.
+
+---
+
+## 11. Beside the runs: does a model ask for a search by itself?
+
+In a `codemem` run the first search is made for the agent. So these runs give codemem at its
+best, and they cannot show whether a model would have asked for a search. Three things show it.
+
+1. **What every `codemem` run records anyway** (§4): the agent's own searches after the list;
+   whether its first move goes to a file of the list; and, in tasks where the list holds no gold
+   file, what the agent does next: another search, or grep from what it remembers. No extra run.
+2. **The memory probe.** Each task's L2 request is given to each model with no repository and no
+   tools, and the model names the file it would change. It shows how much of a repo a model
+   places from memory: on the tasks that were ready on Nov 27, Sonnet named the right file first
+   in 15 of 17 pandas tasks and in 12 of 41 duckdb tasks. Track C runs it on the sample as soon
+   as the sample is committed. It uses no seat of the eval's machine.
+3. **A side sample with the tool alone** (`tool`, §1): Sonnet on its four repos and Opus on its
+   tasks, at L2, once. That is 56 and 36 runs, about 3 hours on three seats. It gives the plain
+   number: how often a model calls codemem when nothing is given to it. In our first sessions
+   Sonnet called it in 3 of 17 pandas tasks and Opus in 0 of 6.
+   - **Who and when:** whoever has seats free: track B, track C, or track A if its runs end
+     early. Before the presentation if that happens, otherwise in the days after it.
+   - **What it is used for:** the share of runs that call the tool, and what the model does
+     instead. Its tokens and times are compared with `grep` runs only where both were made on the
+     same machine.

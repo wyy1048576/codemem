@@ -344,7 +344,7 @@ The plan above, as a table. This is the proposal for what the paper's numbers co
 | **Today's codemem,** the simple version that exists now | medium tasks only | enough to show the step from today's version to the final one. The large tasks would be wasted on it |
 | **The model gap:** an open model, the 9B first, with and without codemem | the easy and medium tasks of the same sample | the second part of the study. At least one open model before the presentation. A small model is not expected to finish hard, spread-out tasks |
 | **The model gap, a probe** | about 10 hard tasks | to check that expectation instead of assuming it |
-| **Mechanism setups:** results up front, placebo, stronger wording (§4.1) | a medium subset | to explain the headline, not to be it |
+| **Mechanism setups:** the tool alone, the results alone, placebo, stronger wording (§4.1) | a medium subset; the tool alone first, for Sonnet and Opus ([runs.md](runs.md) §11) | to explain the headline, not to be it |
 
 **Many tasks are prepared, and a sample is run.** The generator prepares 30 to 40 validated tasks
 per repo. The full runs take a fixed sample of them: 20 per repo, spread over easy, medium and
