@@ -863,7 +863,7 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
     assert not (out / "cmindex").exists()
     assert record["identity"]["codemem"] == {
         "commit": None, "bin": str(checkout / ".venv" / "bin" / "codemem"), "index": meta, "steering": "default",
-        "index_bytes_before": 1500, "index_bytes_after": 1600, "index_copy_removed": True}
+        "search_dedup": "default", "index_bytes_before": 1500, "index_bytes_after": 1600, "index_copy_removed": True}
     assert json.loads((out / "mcp.json").read_text())["mcpServers"]["codemem"]["alwaysLoad"] is True
     assert record["integrity"]["gpus"] is True and record["outcome"]["unexpected_paths"] == []
     steps = record["steps"]
