@@ -1,0 +1,52 @@
+diff --git a/packages/playwright-core/src/server/highlightController.ts b/packages/playwright-core/src/server/highlightController.ts
+index 966d2f1..e19c7ea 100644
+--- a/packages/playwright-core/src/server/highlightController.ts
++++ b/packages/playwright-core/src/server/highlightController.ts
+@@ -59,9 +59,11 @@ export class HighlightController {
+   async hideHighlights() {
+     this._entries.clear();
+     await Promise.all(this._page.frames().map(frame => frame.raceAgainstEvaluationStallingEvents(async () => {
+-      const context = frame.existingContext('utility');
+-      const injectedScript = await context?.injectedScript();
+-      await injectedScript?.evaluate(injected => injected.hideHighlight());
++      for (const world of ['utility', 'main'] as const) {
++        const context = frame.existingContext(world);
++        const injectedScript = await context?.injectedScript();
++        await injectedScript?.evaluate(injected => injected.hideHighlight());
++      }
+     }).catch(() => {})));
+   }
+ 
+@@ -78,7 +80,7 @@ export class HighlightController {
+     if (this._page.isClosed())
+       return;
+ 
+-    const perFrame = new Map<Frame, { selector: ParsedSelector, cssStyle?: string }[]>();
++    const perFrame = new Map<Frame, { selector: ParsedSelector, cssStyle?: string, world: 'main' | 'utility' }[]>();
+     for (const entry of this._entries.values()) {
+       const results = await this._page.mainFrame().selectors.resolveFramesForSelector(entry.selector, { strict: false, anyFrame: entry.anyFrame }).catch(() => []);
+       for (const { frame, info } of results) {
+@@ -87,16 +89,19 @@ export class HighlightController {
+           list = [];
+           perFrame.set(frame, list);
+         }
+-        list.push({ selector: info.parsed, cssStyle: entry.style });
++        list.push({ selector: info.parsed, cssStyle: entry.style, world: info.world });
+       }
+     }
+ 
+     await Promise.all(this._page.frames().map(async frame => {
+       const highlights = perFrame.get(frame) || [];
+       await frame.raceAgainstEvaluationStallingEvents(async () => {
+-        const context = frame.existingContext('utility');
+-        const injectedScript = await context?.injectedScript();
+-        await injectedScript?.evaluate((injected, highlights) => injected.setHighlights(highlights), highlights);
++        for (const world of ['utility', 'main'] as const) {
++          const context = frame.existingContext(world);
++          const injectedScript = await context?.injectedScript();
++          const worldHighlights = highlights.filter(h => h.world === world).map(h => ({ selector: h.selector, cssStyle: h.cssStyle }));
++          await injectedScript?.evaluate((injected, highlights) => injected.setHighlights(highlights), worldHighlights);
++        }
+       }).catch(() => {});
+     }));
+ 

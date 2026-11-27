@@ -1,0 +1,36 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42260",
+ "fixed": {
+  "round": 1,
+  "explanation": "_collectDB opens a connection with indexedDB.open and never closes it. An open connection blocks later deleting or upgrading the database, so restoring storage hangs. The edits close the connection on the early-return path and after all reads finish.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0265,
+ "seconds": 21,
+ "diff_stat": "packages/injected/src/storageScript.ts | 5 ++++-\n 1 file changed, 4 insertions(+), 1 deletion(-)"
+}
+round 1: k=3 action=edit picked=['packages/injected/src/storageScript.ts:StorageScript._collectDB'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   6%|▌         | 17/290 [00:00<00:01, 157.28it/s]
+Loading weights:  19%|█▉        | 56/290 [00:00<00:00, 287.44it/s]
+Loading weights:  50%|████▉     | 144/290 [00:00<00:00, 536.90it/s]
+Loading weights:  68%|██████▊   | 198/290 [00:00<00:00, 522.06it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 682.50it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43071",
+ "exit": 0,
+ "seconds": 12,
+ "cost_usd": 0.024808200000000002,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 2944,
+  "cache_read_input_tokens": 26462,
+  "output_tokens": 1037,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 2944,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 325,
+    "cache_read_input_tokens": 7860,
+    "cache_creation_input_tokens": 476,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 476
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/tools/mcp/config.ts | 12 ++++++++++++\n 1 file changed, 12 insertions(+)",
+ "final": "Playwright MCP now uses the user name and password from the `--proxy-server` URL. I haven't built or run anything, so the change is untested.\n\nThe fix is in `packages/playwright-core/src/tools/mcp/config.ts`, where the proxy option is built. It parses the URL and percent-decodes the user name and password into `proxy.username` and `proxy.password`. It then removes the credentials from `proxy.server`, so the server value no longer contains them. That value is set on both `launchOptions.proxy` and `contextOptions.proxy`.\n\nIf the value isn't a parseable URL, it is passed through unchanged, as before.\n\nTwo limits:\n- Credentials in `PLAYWRIGHT_MCP_PROXY_SERVER` should also be picked up, because that variable feeds the same `proxyServer` option. I didn't check this.\n- `href` normalizes the URL, so a bare `http://host:3128` would gain a trailing `/`. That only happens when credentials were present.",
+ "stderr": ""
+}
+

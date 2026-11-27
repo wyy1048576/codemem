@@ -1,0 +1,32 @@
+diff --git a/packages/playwright/src/transform/esmLoaderSync.ts b/packages/playwright/src/transform/esmLoaderSync.ts
+index 9de1fc7..87d08f4 100644
+--- a/packages/playwright/src/transform/esmLoaderSync.ts
++++ b/packages/playwright/src/transform/esmLoaderSync.ts
+@@ -15,6 +15,7 @@
+  */
+ 
+ import fs from 'fs';
++import path from 'path';
+ import url from 'url';
+ 
+ import { currentFileDepsCollector } from './compilationCache';
+@@ -56,6 +57,8 @@ const kSupportedFormats = new Map([
+   [undefined, undefined]
+ ]);
+ 
++const kTransformedExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cjs', '.cts']);
++
+ export function load(moduleUrl: string, context: { format?: string, conditions?: string[] | Set<string> }, nextLoad: Function) {
+   // Bail out for wasm, json, etc.
+   if (!kSupportedFormats.has(context.format))
+@@ -74,6 +77,10 @@ export function load(moduleUrl: string, context: { format?: string, conditions?:
+   if (!shouldTransform(filename))
+     return nextLoad(moduleUrl, context);
+ 
++  // Bail for extensions we do not transform (e.g. .mdx), so that user-registered loaders can handle them.
++  if (!kTransformedExtensions.has(path.extname(filename)))
++    return nextLoad(moduleUrl, context);
++
+   // A file reached via `require` is loaded as CommonJS. Files reached via `import` keep real ESM semantics.
+   // This is a "bundler" behavior, where we go against Node.js semantics, to support extension-less esm imports, path mapping, etc.
+   const isRequire = !new Set(context.conditions).has('import');

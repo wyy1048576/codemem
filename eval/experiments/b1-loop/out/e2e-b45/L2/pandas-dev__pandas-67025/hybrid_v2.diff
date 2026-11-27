@@ -1,0 +1,43 @@
+diff --git a/pandas/core/arrays/arrow/array.py b/pandas/core/arrays/arrow/array.py
+index b413246..7e1123e 100644
+--- a/pandas/core/arrays/arrow/array.py
++++ b/pandas/core/arrays/arrow/array.py
+@@ -4178,18 +4178,24 @@ class ArrowExtensionArray(
+         self, pat: str | re.Pattern[str], flags: int = 0, expand: bool = True
+     ):
+         compiled = self._compile_re_fallback(pat, flags=flags)
+-        groups = compiled.groupindex.keys()
++        names = {v: k for k, v in compiled.groupindex.items()}
++        groups = [names.get(i + 1, i) for i in range(compiled.groups)]
+         if len(groups) == 0:
+-            raise ValueError(f"{pat=} must contain a symbolic group name.")
++            raise ValueError(f"{pat=} must contain a capture group.")
+ 
+-        if flags or isinstance(pat, re.Pattern):
++        if (
++            flags
++            or isinstance(pat, re.Pattern)
++            or len(compiled.groupindex) != compiled.groups
++        ):
+             # pc.extract_regex has no `ignore_case`, so unlike elsewhere not even
+             #  IGNORECASE can be honored by the kernel
+             matches = self._apply_elementwise(compiled.search)
+ 
+-            def extract_group(name: str):
++            def extract_group(label):
++                pos = groups.index(label) + 1
+                 chunks = [
+-                    [None if match is None else match.group(name) for match in chunk]
++                    [None if match is None else match.group(pos) for match in chunk]
+                     for chunk in matches
+                 ]
+                 return self._from_pyarrow_array(
+@@ -4197,7 +4203,7 @@ class ArrowExtensionArray(
+                 )
+ 
+             if not expand:
+-                return extract_group(next(iter(groups)))
++                return extract_group(groups[0])
+             return {col: extract_group(col) for col in groups}
+ 
+         result = pc.extract_regex(self._pa_array, pat)

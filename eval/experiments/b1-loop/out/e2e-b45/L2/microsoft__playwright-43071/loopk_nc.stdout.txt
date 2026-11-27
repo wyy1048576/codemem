@@ -1,0 +1,40 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43071",
+ "fixed": {
+  "round": 3,
+  "explanation": "configFromCLIOptions passes the proxy URL as server without extracting credentials. The fix parses the URL, moves percent-decoded username and password into the proxy fields, and strips them from the server string.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "ks": [
+  3,
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 3,
+  "loopk": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0557,
+ "seconds": 32,
+ "diff_stat": "packages/playwright-core/src/tools/mcp/config.ts | 11 +++++++++++\n 1 file changed, 11 insertions(+)"
+}
+round 1: k=3 action=search picked=[] 
+round 2: k=3 action=search picked=[] 
+round 3: k=3 action=edit picked=['packages/playwright-core/src/tools/mcp/config.ts:configFromCLIOptions'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  23%|██▎       | 67/290 [00:00<00:00, 561.37it/s]
+Loading weights:  47%|████▋     | 135/290 [00:00<00:00, 586.84it/s]
+Loading weights:  67%|██████▋   | 195/290 [00:00<00:00, 557.65it/s]
+Loading weights:  90%|████████▉ | 260/290 [00:00<00:00, 572.37it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 595.59it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

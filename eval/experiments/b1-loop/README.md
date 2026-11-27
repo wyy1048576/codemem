@@ -10,7 +10,9 @@ it costs about what the grep agent costs and edits a gold function in the same n
 algorithm, how to run it, how to grade the saved diffs with `cmeval e2e grade`, and why each choice was made.
 
 **Next: [`hybrid.md`](hybrid.md) (2026-11-26):** the hybrid (`e2e_hybrid.py`): at each step Sonnet picks grep or a
-codemem search (loop-k, k = 3, 5 or 10), reads its picks or edits. First result on 2 tasks only.
+codemem search (loop-k, k = 3, 5 or 10), reads its picks or edits. First result on 2 tasks only. On 35 contamination-free tasks (e2e-b45, 2026-11-27) it does not improve;
+`hybrid_v2` (`e2e_hybrid2.py`, one cached conversation, grep with code, `open`) costs 23-25% less but still edits
+fewer gold functions than grep (sections 3-4).
 
 **Earlier work: [`loop_vs_grep.md`](loop_vs_grep.md):** Track B's current focus (loop vs grep), the algorithms, the
 21-task results, the n = 10 / 25 / 50 sweep, the duckdb-25101 case study and the grep "memory" test.

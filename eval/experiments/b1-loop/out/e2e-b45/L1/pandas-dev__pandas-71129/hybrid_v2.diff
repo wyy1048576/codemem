@@ -1,0 +1,18 @@
+diff --git a/pandas/io/pytables.py b/pandas/io/pytables.py
+index b5c94b7..ba78083 100644
+--- a/pandas/io/pytables.py
++++ b/pandas/io/pytables.py
+@@ -3008,8 +3008,11 @@ class IndexCol:
+             if (
+                 new_metadata is not None
+                 and cur_metadata is not None
+-                and not array_equivalent(
+-                    new_metadata, cur_metadata, strict_nan=True, dtype_equal=True
++                and (
++                    new_metadata.dtype != cur_metadata.dtype
++                    or not array_equivalent(
++                        new_metadata, cur_metadata, strict_nan=True, dtype_equal=True
++                    )
+                 )
+             ):
+                 raise ValueError(

@@ -1,0 +1,65 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42433",
+ "fixed": {
+  "round": 1,
+  "explanation": "Step 2c/2d embedded-control handling only checks role === 'textbox', so inputs with role 'searchbox' fall through and contribute no value. Including 'searchbox' in the check makes the embedded value count, as it does for text inputs.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0335,
+ "seconds": 11,
+ "diff_stat": "packages/injected/src/roleUtils.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "In the accessible name computation (step 2E, embedded control), the check for an embedded textbox role only handles role 'textbox', so inputs with role 'searchbox' are skipped. Make it include 'searchbox' so the embedded control's value is added to the name.",
+    "symptom": "An input of type search embedded in aria-labelledby content or a label contributes no value to the computed accessible name, unlike a text input.",
+    "anchors": [
+     "aria-labelledby",
+     "searchbox",
+     "textbox",
+     "type search",
+     "accessible name"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     687,
+     1015
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     517,
+     536
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "Step 2c/2d embedded-control handling only checks role === 'textbox', so inputs with role 'searchbox' fall through and contribute no value. Including 'searchbox' in the check makes the embedded value count, as it does for text inputs.",
+   "picked": [
+    "packages/injected/src/roleUtils.ts:getTextAlternativeInternal"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

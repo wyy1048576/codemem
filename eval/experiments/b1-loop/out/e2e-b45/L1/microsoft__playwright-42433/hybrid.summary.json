@@ -1,0 +1,113 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42433",
+ "fixed": {
+  "step": 4,
+  "explanation": "The embedded control rule only checks role === 'textbox', so searchbox inputs are skipped. Treat searchbox like textbox.",
+  "edits": 1
+ },
+ "rounds": 4,
+ "tools": {
+  "grep": 3,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 4
+ },
+ "sonnet_calls": 5,
+ "cost_usd": 0.0706,
+ "seconds": 18,
+ "diff_stat": "packages/injected/src/roleUtils.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "role === 'textbox'",
+    "path": "packages/playwright-core/src",
+    "ignore_case": false
+   },
+   "matches": 0,
+   "grep_shown": [],
+   "picked_shown": [],
+   "action": "grep",
+   "analysis": "The name computation lives in roleUtils; the embedded control check likely uses 'textbox' differently. Search for it.",
+   "picked": []
+  },
+  {
+   "step": 2,
+   "tool": "grep",
+   "input": {
+    "pattern": "'textbox'",
+    "path": "packages/playwright-core/src",
+    "ignore_case": false
+   },
+   "matches": 19,
+   "grep_shown": [
+    "packages/playwright-core/src/tools/backend/form.ts:32",
+    "packages/playwright-core/src/tools/backend/form.ts:42",
+    "packages/playwright-core/src/tools/backend/verify.ts:116",
+    "packages/playwright-core/src/tools/backend/verify.ts:126",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/running-code.md:223",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/running-code.md:224",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:29",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:33",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:50",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:51",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:122",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:309",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:329",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/test-generation.md:332",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/video-recording.md:66",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/video-recording.md:67",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/video-recording.md:87",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/video-recording.md:88"
+   ],
+   "picked_shown": [],
+   "action": "grep",
+   "analysis": "The name computation in roleUtils likely checks the embedded control role with a string comparison, perhaps using double quotes or an array. Search roleUtils for textbox usage.",
+   "picked": []
+  },
+  {
+   "step": 3,
+   "tool": "grep",
+   "input": {
+    "pattern": "textbox",
+    "path": "packages/injected/src/roleUtils.ts",
+    "ignore_case": false
+   },
+   "matches": 8,
+   "grep_shown": [
+    "packages/injected/src/roleUtils.ts:131",
+    "packages/injected/src/roleUtils.ts:140",
+    "packages/injected/src/roleUtils.ts:174",
+    "packages/injected/src/roleUtils.ts:267",
+    "packages/injected/src/roleUtils.ts:615",
+    "packages/injected/src/roleUtils.ts:749",
+    "packages/injected/src/roleUtils.ts:1115",
+    "packages/injected/src/roleUtils.ts:1175"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "Line 749 in getTextAlternativeInternal checks role === 'textbox' for embedded control value; searchbox is excluded. I need to see the code to edit exactly.",
+   "picked": [
+    "packages/injected/src/roleUtils.ts:getTextAlternativeInternal"
+   ]
+  },
+  {
+   "step": 4,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 687-1015 (getTextAlternativeInternal)"
+   ],
+   "action": "edit",
+   "analysis": "The embedded control rule only checks role === 'textbox', so searchbox inputs are skipped. Treat searchbox like textbox.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

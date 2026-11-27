@@ -1,0 +1,13 @@
+diff --git a/pandas/_libs/groupby.pyx b/pandas/_libs/groupby.pyx
+index 8e606f0..38271ba 100644
+--- a/pandas/_libs/groupby.pyx
++++ b/pandas/_libs/groupby.pyx
+@@ -427,6 +427,8 @@ def group_cumsum(
+                 out[i, :] = 0
+                 continue
+             elif lab < 0:
++                for j in range(K):
++                    out[i, j] = na_val
+                 continue
+ 
+             for j in range(K):

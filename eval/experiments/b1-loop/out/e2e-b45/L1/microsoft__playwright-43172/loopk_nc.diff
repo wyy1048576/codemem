@@ -1,0 +1,60 @@
+diff --git a/packages/isomorphic/locatorParser.ts b/packages/isomorphic/locatorParser.ts
+index 5267207..3a4fdbb 100644
+--- a/packages/isomorphic/locatorParser.ts
++++ b/packages/isomorphic/locatorParser.ts
+@@ -163,6 +163,13 @@ abstract class LocatorParser {
+         parts.push(selectorPart('internal:control', 'enter-frame'));
+         inFrameLocator = false;
+       }
++      if (handler === withinParts) {
++        const chainPart = nestedParts('internal:chain')(call, this._testIdAttributeName)[0];
++        const outer = JSON.parse(stringifySelector({ parts: [chainPart] }).substring('internal:chain='.length));
++        const inner = stringifySelector({ parts: parts.splice(0, parts.length) });
++        parts.push(...parseSelector(outer).parts, selectorPart('internal:chain', JSON.stringify(inner)));
++        continue;
++      }
+       parts.push(...handler(call, this._testIdAttributeName));
+       if (handler === contentFrameParts || (handler === frameLocatorParts && call.args.length))
+         inFrameLocator = true;
+@@ -468,6 +475,14 @@ function textParts(toSelector: (text: string | RegExp, options: { exact?: boolea
+   };
+ }
+ 
++function withinParts(call: CallArguments): ParsedSelectorPart[] {
++  // Handled specially in parseLocator.
++  return [];
++}
++function getByRefParts(call: CallArguments): ParsedSelectorPart[] {
++  checkArguments(call, 1, []);
++  return [selectorPart('aria-ref', arg(call, 0, isString))];
++}
+ const andParts = nestedParts('internal:and');
+ const orParts = nestedParts('internal:or');
+ const firstParts = fixedNthParts('0');
+@@ -486,6 +501,8 @@ const kJavaScriptMethods = new Map<string, CallHandler>([
+   ['filter', filterParts],
+   ['and', andParts],
+   ['or', orParts],
++  ['within', withinParts],
++  ['getByRef', getByRefParts],
+   ['frameLocator', frameLocatorParts],
+   ['contentFrame', contentFrameParts],
+   ['first', firstParts],
+@@ -506,6 +523,8 @@ const kPythonMethods = new Map<string, CallHandler>([
+   ['filter', filterParts],
+   ['and_', andParts],
+   ['or_', orParts],
++  ['within', withinParts],
++  ['get_by_ref', getByRefParts],
+   ['frame_locator', frameLocatorParts],
+   ['content_frame', contentFrameParts],
+   ['first', firstParts],
+@@ -526,6 +545,8 @@ const kCSharpMethods = new Map<string, CallHandler>([
+   ['Filter', filterParts],
+   ['And', andParts],
+   ['Or', orParts],
++  ['Within', withinParts],
++  ['GetByRef', getByRefParts],
+   ['FrameLocator', frameLocatorParts],
+   ['ContentFrame', contentFrameParts],
+   ['First', firstParts],

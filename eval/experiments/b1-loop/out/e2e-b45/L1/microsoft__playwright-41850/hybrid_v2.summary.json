@@ -1,0 +1,62 @@
+{
+ "arm": "hybrid-v2",
+ "session_id": "8899b28d-0b51-4b7b-89bc-ab4b69168142",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "edits": 1,
+  "edit_steps": [
+   1
+  ]
+ },
+ "rounds": 1,
+ "tools": {
+  "grep": 1
+ },
+ "repeats": [],
+ "ks": [],
+ "sonnet_calls": 2,
+ "cost_usd": 0.021,
+ "first_call_cost_usd": 0.009711999999999998,
+ "tokens": {
+  "input_tokens": 2,
+  "cache_creation_input_tokens": 1484,
+  "cache_read_input_tokens": 2522,
+  "output_tokens": 509
+ },
+ "seconds": 5,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "\\['host'\\]|'host'",
+    "path": "packages/playwright-core/src/server/fetch.ts",
+    "ignore_case": false
+   },
+   "matches": 2,
+   "grep_shown": [
+    "packages/playwright-core/src/server/fetch.ts:479",
+    "packages/playwright-core/src/server/fetch.ts:480"
+   ],
+   "picked_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 474-485"
+   ],
+   "cut": false,
+   "call_cost": 0.01128,
+   "tokens": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1484,
+    "cache_read_input_tokens": 2522,
+    "output_tokens": 509
+   },
+   "action": "edit",
+   "analysis": "The redirect only checks lowercase 'host'. Fix: iterate header keys case-insensitively and update every Host header.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "edit_attempt": "applied",
+   "done": true
+  }
+ ]
+}

@@ -1,0 +1,113 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42780",
+ "fixed": {
+  "round": 2,
+  "explanation": "In innerAsLocators for internal:role, name and description each set options.exact from attr.caseSensitive and throw on mismatch. A regex value parses as case sensitive, so next to a non-exact string it counts as a conflict and the output falls back to the raw selector. The fix applies the exactness check and assignment only to string values. Regex values are ignored.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0556,
+ "seconds": 19,
+ "diff_stat": "packages/isomorphic/locatorGenerators.ts | 16 ++++++++++------\n 1 file changed, 10 insertions(+), 6 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The selector-to-locator-call conversion (asLocator / locator generator) for role selectors bails out when name and description have conflicting exact flags. A regular expression is parsed as case sensitive (exact), so next to a non-exact string it counts as a conflict. The check should ignore regex values when comparing exactness of name and description.",
+    "symptom": "A getByRole locator with a regex name and string description (or the reverse) prints as the raw internal role selector with [name=...][description=...] instead of the readable getByRole call.",
+    "anchors": [
+     "name",
+     "description",
+     "exact"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/roleSelectorEngine.ts",
+     145,
+     188
+    ],
+    [
+     "packages/isomorphic/locatorUtils.ts",
+     69,
+     90
+    ],
+    [
+     "packages/isomorphic/locatorParser.ts",
+     25,
+     101
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The shown code is the engine and selector builder, not the selector-to-locator converter. The exact-conflict check is likely in the locator generator that converts internal:role selectors to getByRole calls.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Locator generator code that handles internal:role selectors with nameExact and descriptionExact attributes and bails out when they differ.",
+    "symptom": "getByRole with regex name and string description prints as raw internal:role selector instead of getByRole call.",
+    "anchors": [
+     "nameExact",
+     "descriptionExact",
+     "internal:role",
+     "getByRole"
+    ],
+    "look_in": [
+     "packages/isomorphic/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     86,
+     271
+    ],
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     528,
+     603
+    ],
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     315,
+     384
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In innerAsLocators for internal:role, name and description each set options.exact from attr.caseSensitive and throw on mismatch. A regex value parses as case sensitive, so next to a non-exact string it counts as a conflict and the output falls back to the raw selector. The fix applies the exactness check and assignment only to string values. Regex values are ignored.",
+   "picked": [
+    "packages/isomorphic/locatorGenerators.ts:innerAsLocators"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

@@ -72,13 +72,22 @@ def run_arm(task, arm, out):
     copy = copy_dir(task)
     if arm == "grep":
         cmd, env = [PY, str(HERE / "e2e_run.py"), str(tasks_file), task["id"], "grep", str(copy), str(out)], os.environ.copy()
-    elif arm == "hybrid":  # e2e_hybrid.py: each step Sonnet picks grep or codemem search (loopk_nc, k 3/5/10)
+    elif arm == "hybrid_v2":  # e2e_hybrid2.py: grep / codemem / open in one cached conversation (plan A-G, 2026-11-27)
+        cmd = [PY, str(HERE / "e2e_hybrid2.py"), str(tasks_file), task["id"], str(copy), str(out)]
+        env = os.environ.copy() | {"LOOP_TAG": arm}
+    elif arm in ("hybrid", "hybrid_gc", "hybrid_done", "hybrid_v2a"):  # e2e_hybrid.py: each step Sonnet picks grep or codemem search (loopk_nc, k 3/5/10)
         cmd = [PY, str(HERE / "e2e_hybrid.py"), str(tasks_file), task["id"], str(copy), str(out)]
-        env = os.environ.copy() | {"LOOP_TAG": arm, "LLM_NO_PROMPT_CACHE": "1"}
+        # hybrid_gc: prompt cache on for the calls that read grep results, off for the rest
+        env = os.environ.copy() | {"LOOP_TAG": arm, "LLM_NO_PROMPT_CACHE": "1", "HYBRID_CACHE_GREP": "1" if arm == "hybrid_gc" else "0",
+                                   "HYBRID_DONE": "1" if arm in ("hybrid_done", "hybrid_v2a") else "0",
+                                   "HYBRID_V2": "1" if arm == "hybrid_v2a" else "0"}  # v2a: HYBRID_V2 in e2e_hybrid.py (rebuilt prompt, keep list)  # hybrid_done: stop only on done
     elif arm in ("loopks", "loopks_nc"):  # loop-k with separate judge and fix calls; _nc: no prompt caching
         cmd = [PY, str(HERE / "e2e_loop.py"), str(tasks_file), task["id"], str(copy), str(out)]
         env = os.environ.copy() | {"LOOP_TAG": arm, "LOOP_FULL": "1", "LOOP_CHOOSE_K": "1",
                                    "LLM_NO_PROMPT_CACHE": "1" if arm.endswith("_nc") else "0"}
+    elif arm in ("merged10nc", "merged10hop"):  # merged loop, 10 results per round, prompt cache off; hop: LOOP_HOP 5:3,10:2
+        cmd = [PY, str(HERE / "e2e_loopk.py"), str(tasks_file), task["id"], str(copy), str(out)]
+        env = os.environ.copy() | {"LOOP_TAG": arm, "LLM_NO_PROMPT_CACHE": "1", "LOOP_FIXED_K": "10"} |             ({"LOOP_HOP": "5:3,10:2"} if arm == "merged10hop" else {})
     elif arm in ("loopk", "loopk_nc") or arm.startswith("merged"):  # loopk_nc: no prompt caching; mergedN: N fixed
         cmd = [PY, str(HERE / "e2e_loopk.py"), str(tasks_file), task["id"], str(copy), str(out)]
         # e2e_loopk.py turns the prompt cache off by default; loopk and mergedN were run with it on

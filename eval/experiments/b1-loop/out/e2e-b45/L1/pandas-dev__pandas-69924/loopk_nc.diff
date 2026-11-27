@@ -1,0 +1,50 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 8542ef2..7a16090 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -232,7 +232,10 @@ class WrappedCythonOp:
+             )
+ 
+     def _get_cython_vals(
+-        self, values: np.ndarray, uses_mask: bool = False
++        self,
++        values: np.ndarray,
++        uses_mask: bool = False,
++        is_datetimelike: bool = False,
+     ) -> np.ndarray:
+         """
+         Cast numeric dtypes to float64 for functions that only support that.
+@@ -254,7 +257,10 @@ class WrappedCythonOp:
+ 
+         elif values.dtype.kind in "iu":
+             if how in ["var", "mean"] or (
+-                self.kind == "transform" and self.has_dropped_na and not uses_mask
++                self.kind == "transform"
++                and self.has_dropped_na
++                and not uses_mask
++                and not is_datetimelike
+             ):
+                 # has_dropped_na check need for test_null_group_str_transformer
+                 # result may still include NaN, so we have to cast
+@@ -449,10 +455,20 @@ class WrappedCythonOp:
+ 
+         out_shape = self._get_output_shape(ngroups, values)
+         func = self._get_cython_function(self.kind, self.how, values.dtype, is_numeric)
+-        values = self._get_cython_vals(values, uses_mask=mask is not None)
++        values = self._get_cython_vals(
++            values, uses_mask=mask is not None, is_datetimelike=is_datetimelike
++        )
+         out_dtype = self._get_out_dtype(values.dtype)
+ 
+         result = maybe_fill(np.empty(out_shape, dtype=out_dtype))
++        if (
++            is_datetimelike
++            and self.kind == "transform"
++            and self.how != "rank"
++            and result.dtype.kind == "i"
++        ):
++            # rows with dropped keys are never written by the kernel
++            result.fill(np.iinfo(np.int64).min)
+         if self.kind == "aggregate":
+             counts = np.zeros(ngroups, dtype=np.int64)
+             if self.how in [

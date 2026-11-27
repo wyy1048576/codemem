@@ -1,0 +1,38 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "step": 1,
+  "explanation": "filterCookies treats host-only cookies as domain cookies by prefixing '.', and uses a plain startsWith for paths. I changed it to do an exact host match for host-only cookies and an RFC 6265 path match. I also fixed pathMatches in cookieStore, which appended '/' to the request path, so a /foo/ cookie matched /foo.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0427,
+ "seconds": 30,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 13 ++++++++-----\n 2 files changed, 11 insertions(+), 10 deletions(-)"
+}
+step 1: codemem {"intent": "Cookie filtering by URL in the browser context cookie store: domain matching (host-only vs domain cookies) and path matching (prefix must align at a -> action=edit picked=['packages/playwright-core/src/server/network.ts:filterCookies', 'packages/playwright-core/src/server/cookieStore.ts:pathMatches'] applied
+
+parse errors in browser_patches/webkit/embedder/Playwright/win/WinMain.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  19%|█▉        | 55/290 [00:00<00:00, 522.95it/s]
+Loading weights:  42%|████▏     | 123/290 [00:00<00:00, 581.93it/s]
+Loading weights:  63%|██████▎   | 182/290 [00:00<00:00, 562.66it/s]
+Loading weights:  84%|████████▍ | 245/290 [00:00<00:00, 533.99it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 612.91it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

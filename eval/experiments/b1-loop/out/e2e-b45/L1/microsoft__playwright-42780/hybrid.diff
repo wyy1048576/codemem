@@ -1,0 +1,37 @@
+diff --git a/packages/isomorphic/locatorGenerators.ts b/packages/isomorphic/locatorGenerators.ts
+index 942c5d1..ea1b768 100644
+--- a/packages/isomorphic/locatorGenerators.ts
++++ b/packages/isomorphic/locatorGenerators.ts
+@@ -165,17 +165,22 @@ function innerAsLocators(factory: LocatorFactory, parsed: ParsedSelector, isFram
+     if (part.name === 'internal:role') {
+       const attrSelector = parseAttributeSelector(part.body as string, true);
+       const options: LocatorOptions = { attrs: [] };
++      let stringExact: boolean | undefined;
+       for (const attr of attrSelector.attributes) {
+-        if (attr.name === 'name') {
+-          if (options.exact !== undefined && options.exact !== attr.caseSensitive)
+-            throw new Error(`Conflicting exactness in internal:role selector: ${stringifySelector({ parts: [part] })}`);
+-          options.exact = attr.caseSensitive;
+-          options.name = attr.value;
+-        } else if (attr.name === 'description') {
+-          if (options.exact !== undefined && options.exact !== attr.caseSensitive)
+-            throw new Error(`Conflicting exactness in internal:role selector: ${stringifySelector({ parts: [part] })}`);
+-          options.exact = attr.caseSensitive;
+-          options.description = attr.value;
++        if (attr.name === 'name' || attr.name === 'description') {
++          const isString = typeof attr.value === 'string';
++          if (isString) {
++            if (stringExact !== undefined && stringExact !== attr.caseSensitive)
++              throw new Error(`Conflicting exactness in internal:role selector: ${stringifySelector({ parts: [part] })}`);
++            stringExact = attr.caseSensitive;
++            options.exact = attr.caseSensitive;
++          } else if (stringExact === undefined && options.exact === undefined) {
++            options.exact = attr.caseSensitive;
++          }
++          if (attr.name === 'name')
++            options.name = attr.value;
++          else
++            options.description = attr.value;
+         } else {
+           if (attr.name === 'level' && typeof attr.value === 'string')
+             attr.value = +attr.value;

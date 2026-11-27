@@ -1,0 +1,39 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42838",
+ "fixed": {
+  "round": 3,
+  "explanation": "The fake clock builds replacements for Date, Intl and performance in createApi, but it has no replacement for Temporal. I added a createTemporal helper that copies the native Temporal namespace and replaces only the Temporal.Now methods that read the clock. It builds each result from clock.now(). I also added Temporal to platformOriginals and createApi. I could not see the Builtins type or the install code, so I used casts. Install may need a matching change to cover Temporal.",
+  "edits": 4
+ },
+ "rounds": 3,
+ "ks": [
+  3,
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 3,
+  "loopk": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.078,
+ "seconds": 50,
+ "diff_stat": "packages/injected/src/clock.ts | 25 +++++++++++++++++++++++--\n 1 file changed, 23 insertions(+), 2 deletions(-)"
+}
+round 1: k=3 action=search picked=[] 
+round 2: k=3 action=search picked=[] 
+round 3: k=3 action=edit picked=['packages/injected/src/clock.ts:createApi', 'packages/injected/src/clock.ts:createIntl', 'packages/injected/src/clock.ts:platformOriginals'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  15%|█▌        | 44/290 [00:00<00:00, 406.54it/s]
+Loading weights:  32%|███▏      | 94/290 [00:00<00:00, 419.66it/s]
+Loading weights:  47%|████▋     | 136/290 [00:00<00:00, 207.23it/s]
+Loading weights:  67%|██████▋   | 195/290 [00:00<00:00, 295.56it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 380.89it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

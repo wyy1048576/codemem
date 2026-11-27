@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-41682",
+ "exit": 0,
+ "seconds": 18,
+ "cost_usd": 0.04072,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 6640,
+  "cache_read_input_tokens": 28540,
+  "output_tokens": 1129,
+  "output_tokens_details": {
+   "thinking_tokens": 185
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 6640,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 274,
+    "cache_read_input_tokens": 9792,
+    "cache_creation_input_tokens": 655,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 655
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/isomorphic/urlMatch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "final": "I changed `resolveGlobBase` in `packages/isomorphic/urlMatch.ts` so that only glob-special parts of a pattern get the opaque placeholder. I haven't built or run anything, and I didn't add tests.\n\nLiteral path segments, including the host and port, now go through URL resolution as they did in 1.50. That means `http://localhost:80/**` should resolve to `http://localhost/**`. A space in a literal part should become `%20`, and `m\u00fcnchen.de` should become its punycode form.\n\nA segment is replaced only if it contains `*`, `{`, `}` or a backslash. Before, every segment was replaced. For a segment containing `?`, the part before the `?` is now replaced only if it has one of those characters. The `?` part itself is still replaced, as before, so the earlier fix for question marks should be unaffected.",
+ "stderr": ""
+}
+

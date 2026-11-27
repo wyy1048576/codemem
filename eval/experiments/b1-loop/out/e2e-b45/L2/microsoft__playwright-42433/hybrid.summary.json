@@ -1,0 +1,96 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42433",
+ "fixed": {
+  "step": 3,
+  "explanation": "Embedded-control handling only checks role === 'textbox'. A search input has the role 'searchbox', so it falls through and adds nothing. Treating 'searchbox' like 'textbox' makes it contribute its value.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "tools": {
+  "grep": 2,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0545,
+ "seconds": 15,
+ "diff_stat": "packages/injected/src/roleUtils.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "embedded|'textbox'|\"textbox\"",
+    "path": "packages/playwright-core/src/server/injected/roleUtils.ts",
+    "ignore_case": false
+   },
+   "matches": 0,
+   "grep_shown": [],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.009658,
+   "action": "grep",
+   "analysis": "The path guess was wrong. Search the whole repo for the accessible name computation file.",
+   "picked": []
+  },
+  {
+   "step": 2,
+   "tool": "grep",
+   "input": {
+    "pattern": "embedded in (a )?label|embeddedInLabel|embeddedInTargetElement",
+    "path": "",
+    "ignore_case": true
+   },
+   "matches": 24,
+   "grep_shown": [
+    "packages/injected/src/roleUtils.ts:533",
+    "packages/injected/src/roleUtils.ts:677",
+    "packages/injected/src/roleUtils.ts:678",
+    "packages/injected/src/roleUtils.ts:680",
+    "packages/injected/src/roleUtils.ts:684",
+    "packages/injected/src/roleUtils.ts:693",
+    "packages/injected/src/roleUtils.ts:701",
+    "packages/injected/src/roleUtils.ts:704",
+    "tests/library/role-utils.spec.ts:449"
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.011024,
+   "action": "read",
+   "analysis": "The embedded-control handling lives in getTextAlternativeInternal in roleUtils.ts. I need to see how textbox is handled so searchbox can be added.",
+   "picked": [
+    "packages/injected/src/roleUtils.ts:getTextAlternativeInternal"
+   ]
+  },
+  {
+   "step": 3,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 687-1015 (getTextAlternativeInternal)"
+   ],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.024026000000000002,
+   "action": "edit",
+   "analysis": "Embedded-control handling only checks role === 'textbox'. A search input has the role 'searchbox', so it falls through and adds nothing. Treating 'searchbox' like 'textbox' makes it contribute its value.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

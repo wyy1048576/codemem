@@ -1,0 +1,61 @@
+{
+ "arm": "hybrid-v2",
+ "session_id": "b2fadbd0-a3ae-473c-8ff7-288909da3430",
+ "task": "microsoft__playwright-42204",
+ "fixed": {
+  "edits": 1,
+  "edit_steps": [
+   1
+  ]
+ },
+ "rounds": 1,
+ "tools": {
+  "grep": 1
+ },
+ "repeats": [],
+ "ks": [],
+ "sonnet_calls": 2,
+ "cost_usd": 0.0252,
+ "first_call_cost_usd": 0.010206,
+ "tokens": {
+  "input_tokens": 2,
+  "cache_creation_input_tokens": 1743,
+  "cache_read_input_tokens": 2522,
+  "output_tokens": 779
+ },
+ "seconds": 6,
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "--depth[= ]?1|fetch.*depth",
+    "path": "packages/playwright/src",
+    "ignore_case": false
+   },
+   "matches": 1,
+   "grep_shown": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts:157"
+   ],
+   "picked_shown": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts lines 152-162"
+   ],
+   "cut": false,
+   "call_cost": 0.01502,
+   "tokens": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1743,
+    "cache_read_input_tokens": 2522,
+    "output_tokens": 779
+   },
+   "action": "edit",
+   "analysis": "The fetch always uses --depth=1, which turns a complete clone into a shallow one. Only pass the depth limit when the repository is already shallow.",
+   "picked": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts:gitDiff"
+   ],
+   "edit_attempt": "applied",
+   "done": true
+  }
+ ]
+}

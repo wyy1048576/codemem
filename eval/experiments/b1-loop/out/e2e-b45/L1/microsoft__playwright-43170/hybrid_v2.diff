@@ -1,0 +1,24 @@
+diff --git a/packages/isomorphic/locatorParser.ts b/packages/isomorphic/locatorParser.ts
+index 4222f67..86261dc 100644
+--- a/packages/isomorphic/locatorParser.ts
++++ b/packages/isomorphic/locatorParser.ts
+@@ -606,6 +606,8 @@ function getByRoleParts(call: CallArguments): ParsedSelectorPart[] {
+       body += `[${name}=${escapeForAttributeSelector(option(call, name, isText)!, exact)}]`;
+     else if (name === 'level')
+       body += `[level=${option(call, name, isNumber)}]`;
++    else if (name === 'checked' || name === 'pressed')
++      body += `[${name}=${option(call, name, isBooleanOrMixed)}]`;
+     else if (name !== 'exact')
+       body += `[${name === 'includeHidden' ? 'include-hidden' : name}=${option(call, name, isBoolean)}]`;
+   }
+@@ -655,6 +657,10 @@ function isText(value: Value): value is string | RegExp {
+   return typeof value === 'string' || value instanceof RegExp;
+ }
+ 
++function isBooleanOrMixed(value: Value): value is boolean | 'mixed' {
++  return typeof value === 'boolean' || value === 'mixed';
++}
++
+ function isNumber(value: Value): value is number {
+   return typeof value === 'number';
+ }

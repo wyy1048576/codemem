@@ -1,0 +1,41 @@
+{
+ "arm": "hybrid-v2",
+ "session_id": "75563189-f9e7-41ff-bf5c-c4b74e9fc8c3",
+ "task": "microsoft__playwright-42433",
+ "fixed": {
+  "edits": 1,
+  "edit_steps": [
+   4
+  ]
+ },
+ "rounds": 4,
+ "tools": {
+  "grep": 3,
+  "open": 1
+ },
+ "repeats": [
+  {
+   "step": 2,
+   "pattern": "'textbox'|\"textbox\"",
+   "jaccard": 0.67,
+   "no_new_lines": false
+  }
+ ],
+ "ks": [],
+ "sonnet_calls": 5,
+ "cost_usd": 0.0634,
+ "first_call_cost_usd": 0.009784,
+ "tokens": {
+  "input_tokens": 16,
+  "cache_creation_input_tokens": 8240,
+  "cache_read_input_tokens": 26297,
+  "output_tokens": 1795
+ },
+ "seconds": 22,
+ "diff_stat": "packages/injected/src/roleUtils.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+}
+step 1: grep {"pattern": "embedded|'textbox'|\"textbox\"", "path": "packages/playwright-core/src/server/injected/roleUtils.ts", "ignore_case": false} -> grep $0.01319 cache read 6174 
+step 2: grep {"pattern": "'textbox'|\"textbox\"", "path": "", "ignore_case": false} -> grep $0.01513 cache read 4015 
+step 3: grep {"pattern": "textbox|embedded", "path": "packages/injected/src/roleUtils.ts", "ignore_case": false} -> open $0.01417 cache read 6817 
+step 4: open {"targets": [{"path": "packages/injected/src/roleUtils.ts", "lines": "736-775", "symbol": "", "result": ""}]} -> edit $0.01109 cache read 9291 applied
+

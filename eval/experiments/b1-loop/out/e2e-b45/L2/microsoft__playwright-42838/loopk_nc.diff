@@ -1,0 +1,33 @@
+diff --git a/packages/injected/src/clock.ts b/packages/injected/src/clock.ts
+index 69fe461..79fa49a 100644
+--- a/packages/injected/src/clock.ts
++++ b/packages/injected/src/clock.ts
+@@ -826,6 +826,28 @@ export function install(globalObject: WindowOrWorkerGlobalScope, config: Install
+     });
+   }
+ 
++  const Temporal = (globalObject as any).Temporal;
++  if (Temporal?.Now && toFake.includes('Date')) {
++    const now = Temporal.Now;
++    const saved: Record<string, any> = {};
++    const names = ['instant', 'plainDateTimeISO', 'zonedDateTimeISO', 'plainDateISO', 'plainTimeISO'];
++    for (const name of names)
++      saved[name] = now[name];
++    const zoned = (tz?: any) => Temporal.Instant.fromEpochMilliseconds(clock.now()).toZonedDateTimeISO(tz === undefined ? now.timeZoneId() : tz);
++    try {
++      now.instant = () => Temporal.Instant.fromEpochMilliseconds(clock.now());
++      now.zonedDateTimeISO = zoned;
++      now.plainDateTimeISO = (tz?: any) => zoned(tz).toPlainDateTime();
++      now.plainDateISO = (tz?: any) => zoned(tz).toPlainDate();
++      now.plainTimeISO = (tz?: any) => zoned(tz).toPlainTime();
++      clock.disposables.push(() => {
++        for (const name of names)
++          now[name] = saved[name];
++      });
++    } catch {
++    }
++  }
++
+   return { clock, api, originals };
+ }
+ 

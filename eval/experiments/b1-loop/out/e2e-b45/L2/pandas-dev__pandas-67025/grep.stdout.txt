@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-67025",
+ "exit": 0,
+ "seconds": 23,
+ "cost_usd": 0.0525985,
+ "turns": 7,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 6299,
+  "cache_read_input_tokens": 47485,
+  "output_tokens": 2263,
+  "output_tokens_details": {
+   "thinking_tokens": 186
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 6299,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 381,
+    "cache_read_input_tokens": 10379,
+    "cache_creation_input_tokens": 1312,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1312
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Read": 3,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/arrays/arrow/array.py | 26 +++++++++++++++-----------\n 1 file changed, 15 insertions(+), 11 deletions(-)",
+ "final": "I fixed `ArrowExtensionArray._str_extract` in `pandas/core/arrays/arrow/array.py` so unnamed regex groups work on Arrow-backed strings. I haven't run or tested anything, since I can't build here.\n\n**The problem:** the method only handled named groups. It raised `ValueError` when the pattern had none. It also built columns only from `groupindex`, so unnamed groups in a mixed pattern were dropped.\n\n**The fix:**\n- It now labels groups the way `_get_group_names` in `accessor.py` does: by name when named, by position (0, 1, \u2026) when unnamed.\n- It checks for zero capture groups with `compiled.groups`, and the error message now says \"capture group\" instead of \"symbolic group name\".\n- It still uses `pc.extract_regex` when every group is named. Arrow's kernel needs named groups, so patterns with any unnamed group now go through the Python `re` fallback, as they already did for flags or a precompiled pattern.\n- The fallback picks groups by position (`match.group(i + 1)`) instead of by name.\n- With `expand=False`, it returns the first group.\n\nI added no tests.",
+ "stderr": ""
+}
+

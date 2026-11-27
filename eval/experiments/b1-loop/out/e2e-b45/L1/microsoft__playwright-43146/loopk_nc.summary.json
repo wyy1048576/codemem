@@ -1,0 +1,64 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "Both expires and max-age write cookie.expires in order, so the last wins. Track maxAge separately and apply it after the loop so it takes precedence. Also require Max-Age to match /^-?\\d+$/ per RFC 6265 5.2.2, otherwise ignore it.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0287,
+ "seconds": 21,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 21 ++++++++++++---------\n 1 file changed, 12 insertions(+), 9 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The Set-Cookie parsing code in the API request context (parseCookie) handles the Max-Age and Expires attributes in order, both writing the same expires field so the last wins. It must make Max-Age take precedence regardless of order, and ignore Max-Age values that are not purely digits (optionally with a leading minus per RFC).",
+    "symptom": "A cookie with Max-Age followed by a past Expires is stored as expired and not sent, and a non-numeric Max-Age like \"10abc\" is parsed as a number instead of being ignored.",
+    "anchors": [
+     "Max-Age",
+     "Expires",
+     "Set-Cookie"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     211
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     56,
+     60
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "Both expires and max-age write cookie.expires in order, so the last wins. Track maxAge separately and apply it after the loop so it takes precedence. Also require Max-Age to match /^-?\\d+$/ per RFC 6265 5.2.2, otherwise ignore it.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

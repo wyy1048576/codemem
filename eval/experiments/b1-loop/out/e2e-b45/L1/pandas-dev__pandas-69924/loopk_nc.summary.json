@@ -1,0 +1,113 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-69924",
+ "fixed": {
+  "round": 2,
+  "explanation": "Datetimelike values are viewed as int64 and then _get_cython_vals casts them to float64 when has_dropped_na for transforms, destroying NaT and precision. Skip the cast for datetimelike and pre-fill the int64 result with iNaT so dropped rows become NaT.",
+  "edits": 3
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0667,
+ "seconds": 33,
+ "diff_stat": "pandas/core/groupby/ops.py | 22 +++++++++++++++++++---\n 1 file changed, 19 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "In the groupby cython transform wrapper (_cython_operation / _call_cython_op in WrappedCythonOp), values of datetime/timedelta are viewed as int64 and then cast to float64 when some group keys are dropped (ngroups/ids == -1) so that dropped rows can be filled with NaN. This cast must be skipped for datetime-like (and fill with iNaT instead), as is done for nullable integer masks.",
+    "symptom": "Groupby cumsum, cummin, cummax and rank on datetime/timedelta columns give wrong values and lose nanosecond precision when a group key is NaN and dropna=True.",
+    "anchors": [
+     "rank",
+     "NaN",
+     "timedelta",
+     "datetime"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/groupby/groupby.py",
+     1596,
+     1597
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     1484,
+     1529
+    ],
+    [
+     "pandas/core/groupby/generic.py",
+     798,
+     807
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The results shown are only wrappers that call _grouper._cython_operation. The actual cast to float64 is in WrappedCythonOp in pandas/core/groupby/ops.py (_call_cython_op / _cython_op_ndim_compat), which I need to see.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "WrappedCythonOp._call_cython_op in ops.py, where values are viewed as i8 for datetime-like and cast to float64 when ids contain -1 (comp_ids / ngroups, mask handling) for transform kinds like cumsum, cummax, rank.",
+    "symptom": "Groupby cumsum/cummin/cummax/rank on datetime/timedelta give wrong values when a group key is NaN.",
+    "anchors": [
+     "WrappedCythonOp",
+     "_cython_operation",
+     "rank"
+    ],
+    "look_in": [
+     "pandas/core/groupby/ops.py"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/groupby/ops.py",
+     126,
+     612
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     578,
+     612
+    ],
+    [
+     "pandas/core/groupby/ops.py",
+     185,
+     232
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "Datetimelike values are viewed as int64 and then _get_cython_vals casts them to float64 when has_dropped_na for transforms, destroying NaT and precision. Skip the cast for datetimelike and pre-fill the int64 result with iNaT so dropped rows become NaT.",
+   "picked": [
+    "pandas/core/groupby/ops.py:WrappedCythonOp"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

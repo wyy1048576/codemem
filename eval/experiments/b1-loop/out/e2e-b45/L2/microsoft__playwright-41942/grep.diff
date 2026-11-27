@@ -1,0 +1,49 @@
+diff --git a/packages/playwright-core/src/server/registry/index.ts b/packages/playwright-core/src/server/registry/index.ts
+index 2b6e014..d3587fb 100644
+--- a/packages/playwright-core/src/server/registry/index.ts
++++ b/packages/playwright-core/src/server/registry/index.ts
+@@ -495,7 +495,7 @@ const DOWNLOAD_PATHS: Record<string, DownloadPaths> = {
+   },
+ };
+ 
+-export const defaultCacheDirectory = (() => {
++export function defaultCacheDirectory(): string {
+   if (process.platform === 'linux')
+     return process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache');
+   if (process.platform === 'darwin')
+@@ -503,9 +503,11 @@ export const defaultCacheDirectory = (() => {
+   if (process.platform === 'win32')
+     return process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+   throw new Error('Unsupported platform: ' + process.platform);
+-})();
++}
+ 
+-export const defaultRegistryDirectory = path.join(defaultCacheDirectory, 'ms-playwright');
++export function defaultRegistryDirectory(): string {
++  return path.join(defaultCacheDirectory(), 'ms-playwright');
++}
+ 
+ export const registryDirectory = (() => {
+   let result: string;
+@@ -516,7 +518,7 @@ export const registryDirectory = (() => {
+   else if (envDefined)
+     result = envDefined;
+   else
+-    result = defaultRegistryDirectory;
++    result = defaultRegistryDirectory();
+ 
+   if (!path.isAbsolute(result)) {
+     // It is important to resolve to the absolute path:
+diff --git a/packages/playwright-core/src/tools/mcp/browserFactory.ts b/packages/playwright-core/src/tools/mcp/browserFactory.ts
+index 9f593c3..3ca6e78 100644
+--- a/packages/playwright-core/src/tools/mcp/browserFactory.ts
++++ b/packages/playwright-core/src/tools/mcp/browserFactory.ts
+@@ -195,7 +195,7 @@ async function createPersistentBrowser(config: FullConfig, clientInfo: ClientInf
+ }
+ 
+ async function createUserDataDir(config: FullConfig, clientInfo: ClientInfo) {
+-  const dir = process.env.PWMCP_PROFILES_DIR_FOR_TEST ?? path.join(defaultCacheDirectory, 'ms-playwright-mcp');
++  const dir = process.env.PWMCP_PROFILES_DIR_FOR_TEST ?? path.join(defaultCacheDirectory(),'ms-playwright-mcp');
+   const browserToken = config.browser.launchOptions?.channel ?? config.browser?.browserName;
+   // Hesitant putting hundreds of files into the user's workspace, so using it for hashing instead.
+   const rootPathToken = createHash(clientInfo.cwd);

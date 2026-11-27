@@ -1,0 +1,84 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42919",
+ "fixed": {
+  "step": 1,
+  "explanation": "Tracing._captureSnapshot awaits the snapshotter's page evaluation directly, so when the page's main thread is busy it never returns and the progress budget cannot cut it off. The edit wraps the wait in progress.race, as the coverage capture does. The snapshotter's own errors are still swallowed.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0406,
+ "seconds": 35,
+ "diff_stat": "packages/playwright-core/src/server/trace/recorder/tracing.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Tracing snapshotter captures DOM snapshot in before/after call hooks; the snapshot evaluation waits on the page without being tied to the progress/step budget, so it never times out. Wrap the snapshot capture in progress.race (as coverage capture does).",
+    "symptom": "With tracing snapshots enabled, calls on a page with a busy main thread hang forever and timeouts don't fire.",
+    "anchors": [
+     "snapshots",
+     "tracing",
+     "timeout",
+     "optional chaining"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/playwright-core/src/server/trace/recorder/snapshotter.ts",
+     106,
+     121
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     698,
+     714
+    ],
+    [
+     "packages/playwright-core/src/server/trace/recorder/tracing.ts",
+     508,
+     528
+    ],
+    [
+     "tests/library/tracing.spec.ts",
+     1,
+     192
+    ],
+    [
+     "tests/library/tracing.spec.ts",
+     594,
+     760
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "Tracing._captureSnapshot awaits the snapshotter's page evaluation directly, so when the page's main thread is busy it never returns and the progress budget cannot cut it off. The edit wraps the wait in progress.race, as the coverage capture does. The snapshotter's own errors are still swallowed.",
+   "picked": [
+    "packages/playwright-core/src/server/trace/recorder/tracing.ts:Tracing._captureSnapshot"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43488",
+ "fixed": {
+  "round": 3,
+  "explanation": "The dedicated worker session attach path never sends Emulation.setUserAgentOverride, so the worker keeps the default Accept-Language and navigator.languages. I added a call in the worker branch of _onAttachedToTarget. It sends the same override as _updateUserAgent when userAgent or locale is set. It uses _sendMayFail so a closed target doesn't break anything.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "ks": [
+  3,
+  3,
+  1
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 3,
+  "loopk": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0906,
+ "seconds": 28,
+ "diff_stat": "packages/playwright-core/src/server/chromium/crPage.ts | 8 ++++++++\n 1 file changed, 8 insertions(+)"
+}
+round 1: k=3 action=search picked=['packages/playwright-core/src/server/chromium/crPage.ts:FrameSession._updateUserAgent'] 
+round 2: k=3 action=search picked=['packages/playwright-core/src/server/chromium/crPage.ts:FrameSession'] 
+round 3: k=1 action=edit picked=['packages/playwright-core/src/server/chromium/crPage.ts:FrameSession._onAttachedToTarget'] applied
+
+parse errors in tests/library/locator-parser.spec.ts; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 27326.91it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  14%|█▍        | 41/290 [00:00<00:00, 309.82it/s]
+Loading weights:  26%|██▌       | 76/290 [00:00<00:00, 261.73it/s]
+Loading weights:  36%|███▌      | 103/290 [00:00<00:00, 219.28it/s]
+Loading weights:  44%|████▍     | 128/290 [00:00<00:00, 220.12it/s]
+Loading weights:  62%|██████▏   | 179/290 [00:00<00:00, 293.03it/s]
+Loading weights:  76%|███████▌  | 220/290 [00:00<00:00, 285.53it/s]
+Loading weights:  86%|████████▌ | 250/290 [00:00<00:00, 259.44it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 300.04it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,27 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 94c092a..637ec02 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -907,14 +907,20 @@ class BaseGrouper:
+             else:
+                 # Recode ids and reorder result_index with observed groups up front,
+                 # unobserved at the end
+-                ids, uniques = compress_group_index(ids, sort=False)
+                 ids = ensure_platform_int(ids)
++                null_mask = (ob_ids < 0) | (unob_ids < 0)
++                valid = ~null_mask if self.dropna else np.ones(len(ids), dtype=bool)
++                new_valid_ids, uniques = compress_group_index(ids[valid], sort=False)
++                new_ids = np.full(len(ids), -1, dtype=np.intp)
++                new_ids[valid] = new_valid_ids
++                ids = new_ids
++                uniques = ensure_platform_int(uniques)
+                 taker = np.concatenate(
+                     [uniques, np.delete(np.arange(len(result_index)), uniques)]
+                 )
+                 result_index = result_index.take(taker)
+ 
+-            if self.dropna:
++            if self.dropna and any(sorts):
+                 ids = np.where((ob_ids < 0) | (unob_ids < 0), -1, ids)
+ 
+         return result_index, ids

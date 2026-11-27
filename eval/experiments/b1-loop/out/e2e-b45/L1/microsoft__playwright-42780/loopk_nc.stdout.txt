@@ -1,0 +1,43 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42780",
+ "fixed": {
+  "round": 2,
+  "explanation": "In innerAsLocators for internal:role, name and description each set options.exact from attr.caseSensitive and throw on mismatch. A regex value parses as case sensitive, so next to a non-exact string it counts as a conflict and the output falls back to the raw selector. The fix applies the exactness check and assignment only to string values. Regex values are ignored.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0556,
+ "seconds": 19,
+ "diff_stat": "packages/isomorphic/locatorGenerators.ts | 16 ++++++++++------\n 1 file changed, 10 insertions(+), 6 deletions(-)"
+}
+round 1: k=3 action=search picked=[] 
+round 2: k=3 action=edit picked=['packages/isomorphic/locatorGenerators.ts:innerAsLocators'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   4%|▍         | 13/290 [00:00<00:02, 95.51it/s]
+Loading weights:  46%|████▌     | 134/290 [00:00<00:00, 658.79it/s]
+Loading weights:  72%|███████▏  | 208/290 [00:00<00:00, 490.48it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 661.29it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  17%|█▋        | 50/290 [00:00<00:00, 409.85it/s]
+Loading weights:  40%|████      | 117/290 [00:00<00:00, 494.84it/s]
+Loading weights:  58%|█████▊    | 167/290 [00:00<00:00, 369.48it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 674.45it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -13,7 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 BASE = HERE / "out" / os.environ.get("VAGUE_SET", "e2e-vague8")
 NL = chr(10)
-ARMS = ("grep", "full5", "full10", "full25", "full50", "loopk", "loopk_nc", "full10t", "merged10", "loopks", "loopks_nc", "hybrid")
+ARMS = ("grep", "full5", "full10", "full25", "full50", "loopk", "loopk_nc", "full10t", "merged10", "loopks", "loopks_nc", "hybrid", "hybrid_gc", "hybrid_done", "hybrid_v2a", "hybrid_v2", "merged10nc", "merged10hop")
 
 src = (HERE / "e2e_score.py").read_text(encoding="utf8")
 exec(src[src.index("def add_range"):src.index("import sys\nCOMMON")])  # add_range, rel, diff_lines, grep_seen, found
@@ -51,7 +51,9 @@ for level in ("L1", "L2"):
             rows.append({"level": level, "task": tid, "arm": arm, "cost": s.get("cost_usd") or 0, "turns": turns,
                          "seconds": s.get("seconds"), "gold": len(gold), "seen": sum(a for a, _ in hits),
                          "edited": sum(b for _, b in hits), "task_hit": any(b for _, b in hits),
-                         "changed": bool(s.get("diff_stat"))})
+                         "changed": bool(s.get("diff_stat")),
+                         # tool runs by kind: grep agent's tool calls by name, loop-k's codemem rounds, hybrid's steps
+                         "tools": s.get("tool_calls") if arm == "grep" else (s.get("tools") or {"codemem": s.get("rounds")})})
 
 (BASE / "score.json").write_text(json.dumps(rows, indent=1), encoding="utf8")
 for level in ("L1", "L2"):
@@ -61,4 +63,5 @@ for level in ("L1", "L2"):
         miss = sum(1 for r in rows if r["level"] == level and r["arm"] == arm and r.get("missing"))
         print(f"{arm:7} {len(rs):2} {sum(r['cost'] for r in rs):6.2f} {sum(r['turns'] or 0 for r in rs):4} "
               f"{sum(r['gold'] for r in rs):3} {sum(r['seen'] for r in rs):3} {sum(r['edited'] for r in rs):3} "
-              f"{sum(r['task_hit'] for r in rs):2} {sum(r['changed'] for r in rs):2}" + (f"  missing {miss}" if miss else ""))
+              f"{sum(r['task_hit'] for r in rs):2} {sum(r['changed'] for r in rs):2}" + (f"  missing {miss}" if miss else "")
+              + "  tools " + str(dict(sum((__import__("collections").Counter(r["tools"] or {}) for r in rs), __import__("collections").Counter()))))

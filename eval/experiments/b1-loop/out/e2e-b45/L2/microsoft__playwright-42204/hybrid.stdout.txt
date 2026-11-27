@@ -1,0 +1,27 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42204",
+ "fixed": {
+  "step": 2,
+  "explanation": "The fetch with --depth=1 converts a full clone into a shallow one. Fix: only pass --depth=1 when the repository is already shallow, checked via `git rev-parse --is-shallow-repository`.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0332,
+ "seconds": 12,
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)"
+}
+step 1: grep {"pattern": "fetch.*--depth|--depth", "path": "packages/playwright/src", "ignore_case": false} -> action=read picked=['packages/playwright/src/plugins/gitCommitInfoPlugin.ts:gitDiff'] 
+step 2: read {} -> action=edit picked=[] applied
+

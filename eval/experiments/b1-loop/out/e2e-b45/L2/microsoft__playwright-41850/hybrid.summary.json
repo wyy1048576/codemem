@@ -1,0 +1,58 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "step": 2,
+  "explanation": "The redirect code only checks the lowercase 'host' key, so a header named 'Host' keeps the old host after a redirect. The fix finds the host key case-insensitively and updates it to the new location's host.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0416,
+ "seconds": 13,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "redirect.*host|host.*redirect|headers\\[.host.\\]|'host'",
+    "path": "packages/playwright-core/src/server/fetch.ts",
+    "ignore_case": true
+   },
+   "matches": 2,
+   "grep_shown": [
+    "packages/playwright-core/src/server/fetch.ts:479",
+    "packages/playwright-core/src/server/fetch.ts:480"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "The redirect handling checks only the lowercase 'host' key in headers, so a header like 'Host' is not updated. I need to see the function to write an exact edit.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ]
+  },
+  {
+   "step": 2,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 320-639 (APIRequestContext._sendRequest)"
+   ],
+   "action": "edit",
+   "analysis": "The redirect code only checks the lowercase 'host' key, so a header named 'Host' keeps the old host after a redirect. The fix finds the host key case-insensitively and updates it to the new location's host.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

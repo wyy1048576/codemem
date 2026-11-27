@@ -1,0 +1,163 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "step": 2,
+  "explanation": "runDaemonForContext binds the browser each time it is called. A second context on the same browser calls bind again, and the browser is already bound, so it crashes. The fix remembers which browsers are already bound and skips them.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "tools": {
+  "codemem": 2
+ },
+ "ks": [
+  10,
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0854,
+ "seconds": 27,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 10,
+   "input": {
+    "intent": "Playwright CLI debug mode (debug a test via the command-line tool, e.g. 'playwright-cli' / 'cli debug' session) attaches to a single browser context; code that handles browser context creation or attachment crashes when a second context is created, such as by a worker-scoped fixture.",
+    "symptom": "Debugging a test through the Playwright CLI crashes when the test creates a second browser context.",
+    "anchors": [
+     "worker-scoped fixture",
+     "browser context"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     376,
+     390
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     118,
+     126
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     63,
+     65
+    ],
+    [
+     "packages/playwright-core/src/server/browser.ts",
+     105,
+     128
+    ],
+    [
+     "tests/playwright-test/playwright.reuse.browser.spec.ts",
+     1,
+     154
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     369,
+     374
+    ],
+    [
+     "packages/playwright-core/src/client/playwright.ts",
+     77,
+     79
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/browserDispatcher.ts",
+     62,
+     78
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     98,
+     419
+    ],
+    [
+     "tests/library/browsercontext-reuse.spec.ts",
+     30,
+     34
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "codemem",
+   "analysis": "Need to find the code that attaches the CLI to the debugged test's browser context; Context in tools backend takes a single context, but the attach logic is elsewhere.",
+   "picked": []
+  },
+  {
+   "step": 2,
+   "tool": "codemem",
+   "input": {
+    "query": "debug test attach CLI to browser context when context created, single context assumption",
+    "look_in": [
+     "packages/playwright-core/src/tools/",
+     "packages/playwright/src/"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright/src/mcp/test/browserBackend.ts",
+     120,
+     137
+    ],
+    [
+     "packages/playwright/src/worker/testInfo.ts",
+     506,
+     516
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     446,
+     501
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     574,
+     588
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     155,
+     157
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "runDaemonForContext binds the browser each time it is called. A second context on the same browser calls bind again, and the browser is already bound, so it crashes. The fix remembers which browsers are already bound and skips them.",
+   "picked": [
+    "packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

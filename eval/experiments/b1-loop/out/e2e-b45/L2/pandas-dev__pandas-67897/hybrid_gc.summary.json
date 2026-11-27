@@ -1,0 +1,90 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": true,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-67897",
+ "fixed": {
+  "step": 1,
+  "explanation": "IntervalArray.__arrow_array__ calls pyarrow.from_numpy_dtype on a DatetimeTZDtype, which raises TypeError. ArrowIntervalType also serializes the subtype as a string like \"timestamp[ns, tz=UTC]\", which type_for_alias can't parse on deserialize. The edits build a pyarrow timestamp type with the tz, and serialize and deserialize the unit and tz explicitly.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0391,
+ "seconds": 16,
+ "diff_stat": "pandas/core/arrays/arrow/extension_types.py | 8 +++++++-\n pandas/core/arrays/interval.py              | 9 ++++++++-\n 2 files changed, 15 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Interval extension array / ArrowIntervalType conversion to pyarrow: __arrow_array__ in IntervalArray and the ArrowIntervalType extension type, plus IntervalDtype.__from_arrow__ for restoring the dtype. Needs to handle tz-aware datetime subtype when building the pyarrow struct and restoring via parquet metadata.",
+    "symptom": "Converting an Interval array with timezone-aware datetime bounds to pyarrow raises an error and does not round-trip through parquet to the same IntervalDtype.",
+    "anchors": [
+     "pyarrow",
+     "parquet",
+     "timezone-aware"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     60,
+     109
+    ],
+    [
+     "pandas/core/arrays/interval.py",
+     1608,
+     1658
+    ],
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     108,
+     109
+    ],
+    [
+     "pandas/tests/io/test_parquet.py",
+     1060,
+     1066
+    ],
+    [
+     "pandas/tests/io/test_parquet.py",
+     145,
+     157
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.028595999999999996,
+   "action": "edit",
+   "analysis": "IntervalArray.__arrow_array__ calls pyarrow.from_numpy_dtype on a DatetimeTZDtype, which raises TypeError. ArrowIntervalType also serializes the subtype as a string like \"timestamp[ns, tz=UTC]\", which type_for_alias can't parse on deserialize. The edits build a pyarrow timestamp type with the tz, and serialize and deserialize the unit and tz explicitly.",
+   "picked": [
+    "pandas/core/arrays/interval.py:IntervalArray.__arrow_array__",
+    "pandas/core/arrays/arrow/extension_types.py:ArrowIntervalType"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+diff --git a/packages/injected/src/storageScript.ts b/packages/injected/src/storageScript.ts
+index efb3054..51443d2 100644
+--- a/packages/injected/src/storageScript.ts
++++ b/packages/injected/src/storageScript.ts
+@@ -62,14 +62,14 @@ export class StorageScript {
+     return ctor === Object;
+   }
+ 
+-  private _trySerialize(value: any): { trivial?: any, encoded?: any } {
++  private _trySerialize(value: any): { isTrivial: boolean, trivial?: any, encoded?: any } {
+     let trivial = true;
+     const encoded = serializeAsCallArgument(value, v => {
+       const isTrivial = (
+         this._isPlainObject(v)
+         || Array.isArray(v)
+         || typeof v === 'string'
+-        || typeof v === 'number'
++        || (typeof v === 'number' && Number.isFinite(v) && !Object.is(v, -0))
+         || typeof v === 'boolean'
+         || Object.is(v, null)
+       );
+@@ -80,8 +80,8 @@ export class StorageScript {
+       return { fallThrough: v };
+     }, { extendedSerialization: true });
+     if (trivial)
+-      return { trivial: value };
+-    return { encoded };
++      return { isTrivial: true, trivial: value };
++    return { isTrivial: false, encoded };
+   }
+ 
+   private async _collectDB(dbInfo: IDBDatabaseInfo) {
+@@ -104,16 +104,16 @@ export class StorageScript {
+           const record: IndexedDBDatabase['stores'][0]['records'][0] = {};
+ 
+           if (objectStore.keyPath === null) {
+-            const { encoded, trivial } = this._trySerialize(key);
+-            if (trivial)
++            const { encoded, trivial, isTrivial } = this._trySerialize(key);
++            if (isTrivial)
+               record.key = trivial;
+             else
+               record.keyEncoded = encoded;
+           }
+ 
+           const value = await this._idbRequestToPromise(objectStore.get(key));
+-          const { encoded, trivial } = this._trySerialize(value);
+-          if (trivial)
++          const { encoded, trivial, isTrivial } = this._trySerialize(value);
++          if (isTrivial)
+             record.value = trivial;
+           else
+             record.valueEncoded = encoded;
+@@ -215,8 +215,8 @@ export class StorageScript {
+         await Promise.all(store.records.map(async record => {
+           await this._idbRequestToPromise(
+               objectStore.add(
+-                  record.value ?? parseEvaluationResultValue(record.valueEncoded),
+-                  record.key ?? parseEvaluationResultValue(record.keyEncoded),
++                  record.value !== undefined ? record.value : parseEvaluationResultValue(record.valueEncoded),
++                  record.key !== undefined ? record.key : parseEvaluationResultValue(record.keyEncoded),
+               )
+           );
+         }));

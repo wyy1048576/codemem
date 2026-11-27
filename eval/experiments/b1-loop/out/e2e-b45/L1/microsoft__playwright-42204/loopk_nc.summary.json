@@ -1,0 +1,65 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42204",
+ "fixed": {
+  "round": 1,
+  "explanation": "gitDiff always passes --depth=1 when fetching the PR base commit. On a complete clone this turns the repository shallow. The fix checks `git rev-parse --is-shallow-repository` and adds --depth=1 only when the repo is already shallow. A full clone then fetches the base commit without cutting history.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0255,
+ "seconds": 13,
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 8 +++++++-\n 1 file changed, 7 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The git info plugin in the test runner, when capturing a diff on CI, runs a git fetch of the pull request base commit with --depth=1 into the user's repository. This must avoid making a full clone shallow, by omitting the depth option when the repo is not shallow or by fetching without modifying the repo.",
+    "symptom": "Collecting git diff info on CI runs `git fetch --depth=1` of the base commit, turning a complete clone into a shallow clone and corrupting history for later steps.",
+    "anchors": [
+     "git information",
+     "depth",
+     "fetch",
+     "base commit",
+     "shallow"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright/src/plugins/gitCommitInfoPlugin.ts",
+     153,
+     179
+    ],
+    [
+     "packages/playwright/src/runner/vcs.ts",
+     23,
+     50
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "gitDiff always passes --depth=1 when fetching the PR base commit. On a complete clone this turns the repository shallow. The fix checks `git rev-parse --is-shallow-repository` and adds --depth=1 only when the repo is already shallow. A full clone then fetches the base commit without cutting history.",
+   "picked": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts:gitDiff"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

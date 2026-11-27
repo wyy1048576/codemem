@@ -1,0 +1,34 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41942",
+ "fixed": {
+  "step": 9,
+  "explanation": "defaultCacheDirectory is evaluated at module load and throws for platforms other than linux/darwin/win32 (e.g. android on Termux), even when PLAYWRIGHT_BROWSERS_PATH is set. Falling back to ~/.cache instead of throwing lets the env override work.",
+  "edits": 1
+ },
+ "rounds": 9,
+ "tools": {
+  "grep": 6,
+  "read": 3
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 9
+ },
+ "sonnet_calls": 10,
+ "cost_usd": 0.2715,
+ "seconds": 63,
+ "diff_stat": "packages/playwright-core/src/server/registry/index.ts | 3 ++-\n 1 file changed, 2 insertions(+), 1 deletion(-)"
+}
+step 1: grep {"pattern": "PLAYWRIGHT_BROWSERS_PATH|not supported", "path": "packages/playwright-core/src/server", "ignore_case": false} -> action=read picked=['packages/playwright-core/src/server/registry/index.ts:Registry.constructor.executablePathOrDie'] 
+step 2: read {} -> action=grep picked=[] 
+step 3: grep {"pattern": "hostPlatform|PLAYWRIGHT_BROWSERS_PATH|registryDirectory", "path": "packages/playwright-core/src/server/registry/index.ts", "ignore_case": false} -> action=grep picked=[] 
+step 4: grep {"pattern": "isOfficiallySupportedPlatform", "path": "packages", "ignore_case": false} -> action=grep picked=[] 
+step 5: grep {"pattern": "hostPlatform|PLAYWRIGHT_BROWSERS_PATH", "path": "packages/utils/hostPlatform.ts", "ignore_case": false} -> action=read picked=['packages/utils/hostPlatform.ts:calculatePlatform'] 
+step 6: read {} -> action=grep picked=[] 
+step 7: grep {"pattern": "<unknown>|isOfficiallySupportedPlatform|PLAYWRIGHT_BROWSERS_PATH|PLAYWRIGHT_HOST_PLATFORM_OVERRIDE", "path": "packages/playwright-core/src/server/r -> action=grep picked=[] 
+step 8: grep {"pattern": "executablePathOrDie|PLAYWRIGHT_BROWSERS_PATH|registryDirectory|executablePath\\(", "path": "packages/playwright-core/src/server/registry/index.ts", -> action=read picked=['packages/playwright-core/src/server/registry/index.ts:<block>', 'packages/playwright-core/src/server/registry/index.ts:Registry.constructor'] 
+step 9: read {} -> action=edit picked=[] applied
+

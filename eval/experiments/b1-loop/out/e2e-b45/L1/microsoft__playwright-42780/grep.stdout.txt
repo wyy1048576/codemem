@@ -1,0 +1,56 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42780",
+ "exit": 0,
+ "seconds": 13,
+ "cost_usd": 0.0364358,
+ "turns": 5,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 5238,
+  "cache_read_input_tokens": 30978,
+  "output_tokens": 1237,
+  "output_tokens_details": {
+   "thinking_tokens": 58
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 5238,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 295,
+    "cache_read_input_tokens": 9924,
+    "cache_creation_input_tokens": 706,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 706
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Glob": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/isomorphic/locatorGenerators.ts | 21 +++++++++++----------\n 1 file changed, 11 insertions(+), 10 deletions(-)",
+ "final": "I fixed the conflicting-exactness check for role locators in `packages/isomorphic/locatorGenerators.ts`. I haven't built or run anything, so it's untested.\n\n**Cause:** the `internal:role` branch compared `caseSensitive` between the name and the description. A regular expression always parses as case sensitive. Next to a non-exact string, that counted as a conflict, so the generator threw and the raw selector was printed.\n\n**Change:** only string values now take part in the exactness check and set `options.exact`. A regular expression keeps its own flags and is ignored for exactness. Two strings that really disagree on exactness still throw.\n\nA regular expression name with a string description, or the reverse, should now print as the readable role locator call. That applies to the JavaScript, Python, Java and .NET generators, since they share this parsing code. The two-regex and two-string cases behave as before.\n\nI didn't add a test.",
+ "stderr": ""
+}
+

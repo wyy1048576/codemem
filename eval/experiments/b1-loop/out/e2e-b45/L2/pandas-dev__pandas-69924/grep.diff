@@ -1,0 +1,64 @@
+diff --git a/pandas/_libs/groupby.pyx b/pandas/_libs/groupby.pyx
+index 8e606f0..3cc9f1e 100644
+--- a/pandas/_libs/groupby.pyx
++++ b/pandas/_libs/groupby.pyx
+@@ -427,6 +427,8 @@ def group_cumsum(
+                 out[i, :] = 0
+                 continue
+             elif lab < 0:
++                # dropped NA group key; out was initialized as empty
++                out[i, :] = na_val
+                 continue
+ 
+             for j in range(K):
+@@ -2363,6 +2365,8 @@ cdef group_cummin_max(
+                 out[i, :] = 0
+                 continue
+             elif lab < 0:
++                # dropped NA group key; out was initialized as empty
++                out[i, :] = na_val
+                 continue
+             for j in range(K):
+ 
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 8542ef2..a76b5e3 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -232,7 +232,10 @@ class WrappedCythonOp:
+             )
+ 
+     def _get_cython_vals(
+-        self, values: np.ndarray, uses_mask: bool = False
++        self,
++        values: np.ndarray,
++        uses_mask: bool = False,
++        is_datetimelike: bool = False,
+     ) -> np.ndarray:
+         """
+         Cast numeric dtypes to float64 for functions that only support that.
+@@ -254,8 +257,13 @@ class WrappedCythonOp:
+ 
+         elif values.dtype.kind in "iu":
+             if how in ["var", "mean"] or (
+-                self.kind == "transform" and self.has_dropped_na and not uses_mask
++                self.kind == "transform"
++                and self.has_dropped_na
++                and not uses_mask
++                and not is_datetimelike
+             ):
++                # datetimelike i8 must stay int64: float64 would lose nanosecond
++                #  precision and turn NaT into an ordinary number
+                 # has_dropped_na check need for test_null_group_str_transformer
+                 # result may still include NaN, so we have to cast
+                 values = ensure_float64(values)
+@@ -449,7 +457,9 @@ class WrappedCythonOp:
+ 
+         out_shape = self._get_output_shape(ngroups, values)
+         func = self._get_cython_function(self.kind, self.how, values.dtype, is_numeric)
+-        values = self._get_cython_vals(values, uses_mask=mask is not None)
++        values = self._get_cython_vals(
++            values, uses_mask=mask is not None, is_datetimelike=is_datetimelike
++        )
+         out_dtype = self._get_out_dtype(values.dtype)
+ 
+         result = maybe_fill(np.empty(out_shape, dtype=out_dtype))

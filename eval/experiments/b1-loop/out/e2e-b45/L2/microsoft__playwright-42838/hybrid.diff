@@ -1,0 +1,29 @@
+diff --git a/packages/injected/src/clock.ts b/packages/injected/src/clock.ts
+index 69fe461..b1fbce7 100644
+--- a/packages/injected/src/clock.ts
++++ b/packages/injected/src/clock.ts
+@@ -826,6 +826,24 @@ export function install(globalObject: WindowOrWorkerGlobalScope, config: Install
+     });
+   }
+ 
++  const TemporalNow = (globalObject as any).Temporal?.Now;
++  const TemporalInstant = (globalObject as any).Temporal?.Instant;
++  if (TemporalNow && TemporalInstant && toFake.includes('Date')) {
++    const originalNow = { ...TemporalNow };
++    const originalTimeZoneId = originalNow.timeZoneId;
++    const fakeInstant = () => TemporalInstant.fromEpochMilliseconds(clock.now());
++    const fakeZoned = (tz?: any) => fakeInstant().toZonedDateTimeISO(tz ?? originalTimeZoneId.call(TemporalNow));
++    TemporalNow.instant = fakeInstant;
++    TemporalNow.zonedDateTimeISO = fakeZoned;
++    TemporalNow.plainDateTimeISO = (tz?: any) => fakeZoned(tz).toPlainDateTime();
++    TemporalNow.plainDateISO = (tz?: any) => fakeZoned(tz).toPlainDate();
++    TemporalNow.plainTimeISO = (tz?: any) => fakeZoned(tz).toPlainTime();
++    clock.disposables.push(() => {
++      for (const key of ['instant', 'zonedDateTimeISO', 'plainDateTimeISO', 'plainDateISO', 'plainTimeISO'])
++        TemporalNow[key] = originalNow[key];
++    });
++  }
++
+   return { clock, api, originals };
+ }
+ 

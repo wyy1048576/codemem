@@ -1,0 +1,39 @@
+{
+ "arm": "hybrid-v2",
+ "session_id": "bc76c429-624f-46d6-b4bd-56c9d6c38d90",
+ "task": "pandas-dev__pandas-67025",
+ "fixed": {
+  "edits": 3,
+  "edit_steps": [
+   1
+  ]
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "repeats": [],
+ "ks": [
+  5
+ ],
+ "sonnet_calls": 2,
+ "cost_usd": 0.0511,
+ "first_call_cost_usd": 0.009866,
+ "tokens": {
+  "input_tokens": 4,
+  "cache_creation_input_tokens": 5242,
+  "cache_read_input_tokens": 9128,
+  "output_tokens": 1936
+ },
+ "seconds": 21,
+ "diff_stat": "pandas/core/arrays/arrow/array.py | 18 ++++++++++++------\n 1 file changed, 12 insertions(+), 6 deletions(-)"
+}
+step 1: codemem {"intent": "The Arrow-backed string extension array's str.extract implementation (_str_extract) splits regex capture groups into columns. It must labe -> edit $0.04125 cache read 9128 applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  26%|██▌       | 76/290 [00:00<00:00, 665.93it/s]
+Loading weights:  49%|████▉     | 143/290 [00:00<00:00, 311.39it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 682.86it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

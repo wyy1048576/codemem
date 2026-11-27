@@ -1,0 +1,90 @@
+diff --git a/packages/injected/src/storageScript.ts b/packages/injected/src/storageScript.ts
+index aae4653..d5a72be 100644
+--- a/packages/injected/src/storageScript.ts
++++ b/packages/injected/src/storageScript.ts
+@@ -77,7 +77,7 @@ export class StorageScript {
+         trivial = false;
+ 
+       return { fallThrough: v };
+-    });
++    }, { collections: true });
+     if (trivial)
+       return { trivial: value };
+     return { encoded };
+diff --git a/packages/isomorphic/utilityScriptSerializers.ts b/packages/isomorphic/utilityScriptSerializers.ts
+index 7e5264e..7fabbcd 100644
+--- a/packages/isomorphic/utilityScriptSerializers.ts
++++ b/packages/isomorphic/utilityScriptSerializers.ts
+@@ -34,6 +34,8 @@ export type SerializedValue =
+     { a: SerializedValue[], id: number } |
+     { o: { k: string, v: SerializedValue }[], id: number } |
+     { ref: number } |
++    { map: [SerializedValue, SerializedValue][], id: number } |
++    { set: SerializedValue[], id: number } |
+     { h: number } |
+     { fn: string } |
+     { ta: { b: string, k: TypedArrayKind } } |
+@@ -44,6 +46,7 @@ type HandleOrValue = { h: number } | { fn: string } | { fallThrough: any };
+ type VisitorInfo = {
+   visited: Map<object, number>;
+   lastId: number;
++  collections?: boolean;
+ };
+ 
+ function isRegExp(obj: any): obj is RegExp {
+@@ -183,6 +186,20 @@ export function parseEvaluationResultValue(value: SerializedValue, handles: any[
+       }
+       return result;
+     }
++    if ('map' in value) {
++      const result = new Map<any, any>();
++      refs.set(value.id, result);
++      for (const [k, v] of value.map)
++        result.set(parseEvaluationResultValue(k, handles, refs), parseEvaluationResultValue(v, handles, refs));
++      return result;
++    }
++    if ('set' in value) {
++      const result = new Set<any>();
++      refs.set(value.id, result);
++      for (const v of value.set)
++        result.add(parseEvaluationResultValue(v, handles, refs));
++      return result;
++    }
+     if ('h' in value)
+       return handles[value.h];
+     if ('fn' in value) {
+@@ -198,8 +215,8 @@ export function parseEvaluationResultValue(value: SerializedValue, handles: any[
+   return value;
+ }
+ 
+-export function serializeAsCallArgument(value: any, handleSerializer: (value: any) => HandleOrValue): SerializedValue {
+-  return serialize(value, handleSerializer, { visited: new Map(), lastId: 0 });
++export function serializeAsCallArgument(value: any, handleSerializer: (value: any) => HandleOrValue, options?: { collections?: boolean }): SerializedValue {
++  return serialize(value, handleSerializer, { visited: new Map(), lastId: 0, collections: options?.collections });
+ }
+ 
+ function serialize(value: any, handleSerializer: (value: any) => HandleOrValue, visitorInfo: VisitorInfo): SerializedValue {
+@@ -275,6 +292,23 @@ function innerSerialize(value: any, handleSerializer: (value: any) => HandleOrVa
+   if (id)
+     return { ref: id };
+ 
++  if (visitorInfo.collections && (value instanceof Map || Object.prototype.toString.call(value) === '[object Map]')) {
++    const map: [SerializedValue, SerializedValue][] = [];
++    const id = ++visitorInfo.lastId;
++    visitorInfo.visited.set(value, id);
++    for (const [k, v] of Map.prototype.entries.call(value))
++      map.push([serialize(k, handleSerializer, visitorInfo), serialize(v, handleSerializer, visitorInfo)]);
++    return { map, id };
++  }
++  if (visitorInfo.collections && (value instanceof Set || Object.prototype.toString.call(value) === '[object Set]')) {
++    const set: SerializedValue[] = [];
++    const id = ++visitorInfo.lastId;
++    visitorInfo.visited.set(value, id);
++    for (const v of Set.prototype.values.call(value))
++      set.push(serialize(v, handleSerializer, visitorInfo));
++    return { set, id };
++  }
++
+   if (Array.isArray(value)) {
+     const a = [];
+     const id = ++visitorInfo.lastId;

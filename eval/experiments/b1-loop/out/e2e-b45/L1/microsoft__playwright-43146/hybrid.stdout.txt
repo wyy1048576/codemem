@@ -1,0 +1,27 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "step": 2,
+  "explanation": "Expires and Max-Age both write cookie.expires, so the last one wins. The fix tracks Max-Age separately and applies it after the loop, so it takes precedence. It also requires Max-Age values to match /^-?\\d+$/ and ignores anything else.",
+  "edits": 4
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0397,
+ "seconds": 14,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 9 ++++++---\n 1 file changed, 6 insertions(+), 3 deletions(-)"
+}
+step 1: grep {"pattern": "max-age", "path": "packages/playwright-core/src", "ignore_case": true} -> action=read picked=['packages/playwright-core/src/server/cookieStore.ts:parseRawCookie'] 
+step 2: read {} -> action=edit picked=[] applied
+

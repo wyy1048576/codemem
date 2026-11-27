@@ -1,0 +1,30 @@
+{
+ "arm": "hybrid-v2",
+ "session_id": "b2fadbd0-a3ae-473c-8ff7-288909da3430",
+ "task": "microsoft__playwright-42204",
+ "fixed": {
+  "edits": 1,
+  "edit_steps": [
+   1
+  ]
+ },
+ "rounds": 1,
+ "tools": {
+  "grep": 1
+ },
+ "repeats": [],
+ "ks": [],
+ "sonnet_calls": 2,
+ "cost_usd": 0.0252,
+ "first_call_cost_usd": 0.010206,
+ "tokens": {
+  "input_tokens": 2,
+  "cache_creation_input_tokens": 1743,
+  "cache_read_input_tokens": 2522,
+  "output_tokens": 779
+ },
+ "seconds": 6,
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)"
+}
+step 1: grep {"pattern": "--depth[= ]?1|fetch.*depth", "path": "packages/playwright/src", "ignore_case": false} -> edit $0.01502 cache read 2522 applied
+

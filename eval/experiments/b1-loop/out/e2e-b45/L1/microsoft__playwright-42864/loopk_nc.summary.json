@@ -1,0 +1,140 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42864",
+ "fixed": {
+  "round": 2,
+  "explanation": "HighlightController._resolve always evaluates setHighlights in the 'utility' world, even when the selector's engine must run in the main world (info.world). Custom engines that aren't content scripts therefore can't see page globals. The fix groups highlights by frame and by info.world, and calls setHighlights in each world's injected script. It sets an empty list in the other world, so stale highlights are cleared. hideHighlights now clears both worlds.",
+  "edits": 4
+ },
+ "rounds": 2,
+ "ks": [
+  5,
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0587,
+ "seconds": 34,
+ "diff_stat": ".../src/server/highlightController.ts              | 25 ++++++++++++----------\n 1 file changed, 14 insertions(+), 11 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Highlighting a locator evaluates the selector in the injected script, apparently in the utility world (isolated context) even for custom selector engines not registered with contentScript. The highlight path should resolve the selector in the same world as the engine was registered for (main world unless contentScript is true), like click does.",
+    "symptom": "locator.highlight() highlights nothing for a custom selector engine that reads page globals (not registered with contentScript), because the engine runs in an isolated world and sees globals undefined, while click works.",
+    "anchors": [
+     "highlight",
+     "custom selector engine"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/client/locator.ts",
+     160,
+     163
+    ],
+    [
+     "packages/playwright-core/src/client/locator.ts",
+     165,
+     169
+    ],
+    [
+     "packages/playwright-core/src/server/recorder.ts",
+     366,
+     379
+    ],
+    [
+     "packages/injected/src/injectedScript.ts",
+     92,
+     1743
+    ],
+    [
+     "tests/library/inspector/inspectorTest.ts",
+     181,
+     192
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    false,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The client only forwards the selector to frame._highlight. The server side (frame highlight / highlightController / addHighlight) likely evaluates the selector in the utility world, where non-contentScript engines can't see page globals. I need to find the server-side highlight implementation.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Server-side Frame.highlight implementation and highlightController addHighlight that evaluates setHighlights with a parsed selector in an injected script; check which execution context world (main or utility) is used.",
+    "symptom": "locator.highlight() highlights nothing for a custom selector engine reading page globals because the selector runs in the utility world.",
+    "anchors": [
+     "setHighlights",
+     "addHighlight",
+     "highlightController",
+     "_highlight",
+     "hideHighlight",
+     "ParsedSelector",
+     "_isUtilityWorld"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/server/"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/highlightController.ts",
+     40,
+     45
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/frameDispatcher.ts",
+     274,
+     276
+    ],
+    [
+     "packages/playwright-core/src/server/highlightController.ts",
+     30,
+     106
+    ],
+    [
+     "packages/playwright-core/src/server/highlightController.ts",
+     77,
+     105
+    ],
+    [
+     "packages/playwright-core/src/server/highlightController.ts",
+     59,
+     66
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "HighlightController._resolve always evaluates setHighlights in the 'utility' world, even when the selector's engine must run in the main world (info.world). Custom engines that aren't content scripts therefore can't see page globals. The fix groups highlights by frame and by info.world, and calls setHighlights in each world's injected script. It sets an empty list in the other world, so stale highlights are cleared. hideHighlights now clears both worlds.",
+   "picked": [
+    "packages/playwright-core/src/server/highlightController.ts:HighlightController"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

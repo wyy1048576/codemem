@@ -1,0 +1,24 @@
+diff --git a/packages/isomorphic/locatorParser.ts b/packages/isomorphic/locatorParser.ts
+index 4222f67..2042db8 100644
+--- a/packages/isomorphic/locatorParser.ts
++++ b/packages/isomorphic/locatorParser.ts
+@@ -597,6 +597,10 @@ function filterSelectorParts(call: CallArguments): ParsedSelectorPart[] {
+   return parts;
+ }
+ 
++function isBooleanOrMixed(value: any): value is boolean | 'mixed' {
++  return typeof value === 'boolean' || value === 'mixed';
++}
++
+ function getByRoleParts(call: CallArguments): ParsedSelectorPart[] {
+   checkArguments(call, 1, ['name', 'description', 'exact', 'checked', 'disabled', 'expanded', 'includeHidden', 'level', 'pressed', 'selected']);
+   const exact = !!option(call, 'exact', isBoolean);
+@@ -606,6 +610,8 @@ function getByRoleParts(call: CallArguments): ParsedSelectorPart[] {
+       body += `[${name}=${escapeForAttributeSelector(option(call, name, isText)!, exact)}]`;
+     else if (name === 'level')
+       body += `[level=${option(call, name, isNumber)}]`;
++    else if (name === 'checked' || name === 'pressed')
++      body += `[${name}=${option(call, name, isBooleanOrMixed)}]`;
+     else if (name !== 'exact')
+       body += `[${name === 'includeHidden' ? 'include-hidden' : name}=${option(call, name, isBoolean)}]`;
+   }

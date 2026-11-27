@@ -1,0 +1,92 @@
+{
+ "arm": "hybrid-v2",
+ "session_id": "64589418-84a0-47ee-91e5-3196690630e1",
+ "task": "microsoft__playwright-42260",
+ "fixed": {
+  "edits": 2,
+  "edit_steps": [
+   1
+  ]
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "repeats": [],
+ "ks": [
+  5
+ ],
+ "sonnet_calls": 2,
+ "cost_usd": 0.041,
+ "first_call_cost_usd": 0.010092,
+ "tokens": {
+  "input_tokens": 2,
+  "cache_creation_input_tokens": 5410,
+  "cache_read_input_tokens": 2522,
+  "output_tokens": 897
+ },
+ "seconds": 15,
+ "diff_stat": "packages/injected/src/storageScript.ts | 14 +++++++++++---\n 1 file changed, 11 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Code that collects IndexedDB databases for the browser context storageState (indexedDB: true) via a page-side script, opening databases and reading all records. It likely doesn't close the opened IDBDatabase connection, so a later restore (setStorageState/addInitScript that opens/deletes databases) blocks.",
+    "symptom": "Saving storage state with IndexedDB leaves database connections open, so restoring storage later hangs when a page is open.",
+    "anchors": [
+     "IndexedDB"
+    ]
+   },
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     149,
+     177
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     136,
+     147
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     72,
+     134
+    ],
+    [
+     "tests/library/browsercontext-storage-state.spec.ts",
+     415,
+     589
+    ],
+    [
+     "packages/playwright-core/src/client/browserContext.ts",
+     479,
+     486
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "call_cost": 0.03087,
+   "tokens": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 5410,
+    "cache_read_input_tokens": 2522,
+    "output_tokens": 897
+   },
+   "action": "edit",
+   "analysis": "_collectDB opens a DB and never closes it. Rename the existing body to _collectOpenDB(db, dbInfo), and have _collectDB open the DB and close it in a finally block.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._collectDB"
+   ],
+   "edit_attempt": "applied",
+   "done": true
+  }
+ ]
+}

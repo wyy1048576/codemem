@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-68278",
+ "exit": 0,
+ "seconds": 18,
+ "cost_usd": 0.0471478,
+ "turns": 9,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 6206,
+  "cache_read_input_tokens": 47898,
+  "output_tokens": 1751,
+  "output_tokens_details": {
+   "thinking_tokens": 315
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 6206,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 267,
+    "cache_read_input_tokens": 10692,
+    "cache_creation_input_tokens": 906,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 906
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 3,
+  "Read": 2,
+  "Edit": 3
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/window/ewm.py    | 4 +---\n pandas/core/window/online.py | 2 +-\n 2 files changed, 2 insertions(+), 4 deletions(-)",
+ "final": "I found and fixed the bug, but I haven't run anything, so it's untested.\n\n**Cause:** the online EWM mean looked up its time deltas by column number instead of row number. The deltas array was also sized by the number of columns instead of the number of rows. A single-column frame got an empty deltas array, so the decay exponent came out as 0. That makes every old weight 1, which is a plain cumulative mean.\n\n**Changes:**\n- `pandas/core/window/online.py`: the lookup `deltas[j - 1]` is now `deltas[i - 1]`, so it indexes by row.\n- `pandas/core/window/ewm.py`: in the online `mean`, `update_deltas` is now built after `np_array` exists, with length `len(np_array) - 1`. It was previously `shape[-1] - 1`.",
+ "stderr": ""
+}

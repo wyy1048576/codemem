@@ -43,6 +43,13 @@ TAG = os.environ.get("LOOP_TAG", "loopk")
 # LOOP_FIXED_K=n ("merged" loop): always n results per round, and the first query comes from the plain one-shot call,
 # as in e2e_loop.py, so it differs from that loop only in having one call per round (judge and fix merged).
 FIXED_K = int(os.environ["LOOP_FIXED_K"]) if os.environ.get("LOOP_FIXED_K") else None
+# LOOP_HOP="5:3,10:2": after each round's search, add call-graph neighbours (callers and callees, codemem's edges) of
+# the round's results: the 3 closest to the issue for each of results 1-5, the 2 closest for each of results 6-10.
+# Closest = cosine between the neighbour's code vector and the issue's query vector. Left out: results shown
+# before or in this round, and hubs (more than HOP_HUB callers). The neighbours are shown after the results, as
+# raw code, and can be picked or edited like them.
+HOP = [tuple(int(x) for x in band.split(":")) for band in os.environ.get("LOOP_HOP", "").split(",") if band]
+HOP_HUB = 50
 
 tasks_file, task_id, repo_arg, out_dir = sys.argv[1:5]
 task = next(t for t in (json.loads(x) for x in Path(tasks_file).read_text(encoding="utf8").split("\n") if x.strip())
@@ -120,6 +127,35 @@ def apply(edits: list[dict]) -> tuple[bool, str]:
     return True, ""
 
 
+
+
+def hop_cards(cards, seen_ids: set[int]) -> list:
+    """The one-hop additions for this round's results (see LOOP_HOP)."""
+    global _qvec
+    if _qvec is None:
+        from aug_retriever import _MemoEmbedder
+        _qvec = _MemoEmbedder(service.config.vectors["code"], service.config).embed_queries([task["query"]])[0]
+    conn, taken, out = store.conn, set(seen_ids) | {c.chunk_id for c in cards}, []
+    for rank, card in enumerate(cards, start=1):
+        quota = next((q for last, q in HOP if rank <= last), 0)
+        if not quota:
+            continue
+        nbrs = {r[0] for r in conn.execute("SELECT callee_id FROM edges WHERE caller_id = ?", (card.chunk_id,))}
+        nbrs |= {r[0] for r in conn.execute("SELECT caller_id FROM edges WHERE callee_id = ?", (card.chunk_id,))}
+        nbrs = [c for c in nbrs - taken
+                if conn.execute("SELECT COUNT(*) FROM edges WHERE callee_id = ?", (c,)).fetchone()[0] <= HOP_HUB]
+        if not nbrs:
+            continue
+        best = store.vector_search("code", _qvec, len(nbrs), sorted(nbrs))[:quota]
+        chunks = store.get_chunks([h.chunk_id for h in best])
+        for h in best:
+            if h.chunk_id in chunks and h.chunk_id not in taken:
+                taken.add(h.chunk_id)
+                out.append(make_card(chunks[h.chunk_id], h.score, service.config))
+    return out
+
+
+_qvec = None
 start = time.time()
 first_record = llm.extract("oneshot" if FIXED_K else "oneshot_k", llm.oneshot_input(task["repo"], task["query"]))
 cost = first_record.get("cost_usd") or 0.0
@@ -140,6 +176,10 @@ for round_no in range(1, MAX_ROUNDS + 1):
     calls["codemem_rounds"] += 1
     if not cards and not retry:
         break
+    if HOP and cards:
+        added = hop_cards(cards, seen)
+        history[-1]["hop_added"] = len(added)
+        cards = cards + added
     shown, whole = show_full(cards) if cards else ("[no new results this round: your last edit did not apply; the code is shown again under picked_earlier]", [])
     picked_code = code_for(picks)
     seen.update(c.chunk_id for c in cards)
@@ -177,7 +217,7 @@ for round_no in range(1, MAX_ROUNDS + 1):
 service.close()
 patch = subprocess.run(["git", "diff"], cwd=repo, capture_output=True, text=True, encoding="utf8").stdout
 (out / f"{TAG}.diff").write_text(patch, encoding="utf8")
-summary = {"arm": "codemem-loop-merged" if FIXED_K else "codemem-loop-k", "fixed_k": FIXED_K, "judge_sees": "raw code", "task": task_id, "fixed": fixed, "rounds": len(history),
+summary = {"arm": "codemem-loop-merged" if FIXED_K else "codemem-loop-k", "fixed_k": FIXED_K, "hop": os.environ.get("LOOP_HOP"), "judge_sees": "raw code", "task": task_id, "fixed": fixed, "rounds": len(history),
            "ks": [h["k"] for h in history if "shown" in h], "calls": dict(calls), "sonnet_calls": calls["oneshot"] + calls["loopk"],
            "cost_usd": round(cost, 4), "seconds": round(time.time() - start),
            "diff_stat": subprocess.run(["git", "diff", "--stat"], cwd=repo, capture_output=True, text=True).stdout.strip(),

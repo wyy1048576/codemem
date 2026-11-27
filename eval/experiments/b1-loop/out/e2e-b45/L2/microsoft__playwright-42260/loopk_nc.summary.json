@@ -1,0 +1,68 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42260",
+ "fixed": {
+  "round": 1,
+  "explanation": "_collectDB opens a connection with indexedDB.open and never closes it. An open connection blocks later deleting or upgrading the database, so restoring storage hangs. The edits close the connection on the early-return path and after all reads finish.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0265,
+ "seconds": 21,
+ "diff_stat": "packages/injected/src/storageScript.ts | 5 ++++-\n 1 file changed, 4 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that collects IndexedDB contents when saving browser context storageState (indexedDB: true) opens a database connection through the IndexedDB API and does not close it. The connection must be closed after reading, so later setting storage state (restoring/deleting/recreating databases) is not blocked.",
+    "symptom": "After storageState with IndexedDB is saved, the opened database connection stays open, so restoring that storage later hangs forever while a page is open.",
+    "anchors": [
+     "IndexedDB"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     149,
+     177
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     136,
+     147
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     72,
+     134
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "_collectDB opens a connection with indexedDB.open and never closes it. An open connection blocks later deleting or upgrading the database, so restoring storage hangs. The edits close the connection on the early-return path and after all reads finish.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._collectDB"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

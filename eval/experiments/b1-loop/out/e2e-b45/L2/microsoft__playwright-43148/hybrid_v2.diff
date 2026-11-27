@@ -1,0 +1,50 @@
+diff --git a/packages/playwright-core/src/server/cookieStore.ts b/packages/playwright-core/src/server/cookieStore.ts
+index 2d13ecb..9169ce2 100644
+--- a/packages/playwright-core/src/server/cookieStore.ts
++++ b/packages/playwright-core/src/server/cookieStore.ts
+@@ -226,12 +226,12 @@ export function domainMatches(value: string, domain: string): boolean {
+   return value.endsWith(domain);
+ }
+ 
+-function pathMatches(value: string, path: string): boolean {
++export function pathMatches(value: string, path: string): boolean {
+   if (value === path)
+     return true;
+-  if (!value.endsWith('/'))
+-    value = value + '/';
+-  if (!path.endsWith('/'))
+-    path = path + '/';
+-  return value.startsWith(path);
++  if (!value.startsWith(path))
++    return false;
++  if (path.endsWith('/'))
++    return true;
++  return value[path.length] === '/';
+ }
+diff --git a/packages/playwright-core/src/server/network.ts b/packages/playwright-core/src/server/network.ts
+index 7c7cad6..821b461 100644
+--- a/packages/playwright-core/src/server/network.ts
++++ b/packages/playwright-core/src/server/network.ts
+@@ -21,6 +21,7 @@ import { isProtocolError } from './protocolError';
+ import { BrowserContext } from './browserContext';
+ import { APIRequestContext } from './fetch';
+ import { SdkObject } from './instrumentation';
++import { domainMatches, pathMatches } from './cookieStore';
+ 
+ import type * as contexts from './browserContext';
+ import type * as frames from './frames';
+@@ -39,12 +40,9 @@ export function filterCookies(cookies: channels.NetworkCookie[], urls: string[])
+     if (!parsedURLs.length)
+       return true;
+     for (const parsedURL of parsedURLs) {
+-      let domain = c.domain;
+-      if (!domain.startsWith('.'))
+-        domain = '.' + domain;
+-      if (!('.' + parsedURL.hostname).endsWith(domain))
++      if (!domainMatches(parsedURL.hostname, c.domain))
+         continue;
+-      if (!parsedURL.pathname.startsWith(c.path))
++      if (!pathMatches(parsedURL.pathname, c.path))
+         continue;
+       if (parsedURL.protocol !== 'https:' && !isLocalHostname(parsedURL.hostname) && c.secure)
+         continue;

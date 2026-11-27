@@ -1,0 +1,28 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "step": 2,
+  "explanation": "In parseRawCookie, Expires and Max-Age both write cookie.expires in attribute order, so a later past Expires overrides an earlier Max-Age. Max-Age also uses parseInt, which accepts non-integer strings like \"10abc\". I track whether a valid Max-Age was seen, make Expires skip in that case, and validate Max-Age with /^-?\\d+$/.",
+  "edits": 3
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.039,
+ "seconds": 14,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)"
+}
+step 1: grep {"pattern": "max-age|maxAge", "path": "packages/playwright-core/src/server", "ignore_case": true} -> action=read picked=['packages/playwright-core/src/server/cookieStore.ts:parseRawCookie'] 
+step 2: read {} -> action=edit picked=[] applied
+

@@ -1,0 +1,71 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42204",
+ "fixed": {
+  "round": 1,
+  "explanation": "gitDiff fetches the PR base hash with --depth=1, which makes a full clone shallow. Dropping --depth=1 when the repo is complete fixes this. Simplest: check whether the repo is shallow and only pass --depth=1 in that case.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.024,
+ "seconds": 19,
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that captures git diff on CI pull requests runs git fetch with a depth option (e.g. --depth=1) to get the base commit, which makes a full clone shallow. It should avoid shallowing the repo, e.g. not use --depth or only deepen when already shallow.",
+    "symptom": "On CI pull request builds, the git diff capture runs a shallow fetch that converts a complete clone into a shallow clone.",
+    "anchors": [
+     "git diff",
+     "shallow",
+     "CI",
+     "pull request"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/plugins/gitCommitInfoPlugin.ts",
+     153,
+     179
+    ],
+    [
+     "packages/playwright/src/runner/vcs.ts",
+     23,
+     50
+    ],
+    [
+     "packages/playwright/src/runner/vcs.ts",
+     22,
+     58
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "gitDiff fetches the PR base hash with --depth=1, which makes a full clone shallow. Dropping --depth=1 when the repo is complete fixes this. Simplest: check whether the repo is shallow and only pass --depth=1 in that case.",
+   "picked": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts:gitDiff"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

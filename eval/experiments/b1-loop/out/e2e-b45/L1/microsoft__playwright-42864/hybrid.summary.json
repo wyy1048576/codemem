@@ -1,0 +1,170 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42864",
+ "fixed": {
+  "step": 6,
+  "explanation": "_resolve always evaluates highlights in the frame's utility world. Selectors using custom engines not registered as content scripts have info.world === 'main', so they must be queried in the main world. The fix groups highlights per frame and per world, and calls setHighlights in each world's injected script. It sends an empty list to the other world so stale highlights are cleared.",
+  "edits": 3
+ },
+ "rounds": 6,
+ "tools": {
+  "codemem": 1,
+  "read": 3,
+  "grep": 2
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 6
+ },
+ "sonnet_calls": 7,
+ "cost_usd": 0.0982,
+ "seconds": 61,
+ "diff_stat": ".../src/server/highlightController.ts                | 20 ++++++++++++--------\n 1 file changed, 12 insertions(+), 8 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Locator highlight evaluates the selector in the injected script; it likely uses the utility (isolated) world instead of the main world for custom selector engines not registered with contentScript. Code resolving the execution context for highlight/selector query should choose main world for non-content-script engines.",
+    "symptom": "Highlighting a locator using a custom selector engine that reads page globals highlights nothing because the engine runs in an isolated world, while click works.",
+    "anchors": [
+     "highlight"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/playwright-core/src/client/locator.ts",
+     160,
+     163
+    ],
+    [
+     "packages/playwright-core/src/client/locator.ts",
+     165,
+     169
+    ],
+    [
+     "packages/playwright-core/src/server/dom.ts",
+     881,
+     883
+    ],
+    [
+     "packages/playwright-core/src/server/highlightController.ts",
+     40,
+     45
+    ],
+    [
+     "packages/playwright-core/src/client/frame.ts",
+     359,
+     361
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "HighlightController resolves selectors in the page; need to see how it queries (_resolveNow) and which world it uses. Reading the file.",
+   "picked": [
+    "packages/playwright-core/src/server/highlightController.ts:HighlightController.addHighlight"
+   ]
+  },
+  {
+   "step": 2,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright-core/src/server/highlightController.ts lines 40-45 (HighlightController.addHighlight)"
+   ],
+   "action": "grep",
+   "analysis": "addHighlight calls _resolveNow, which I can't see. I need to find where it resolves the selector and which world it uses.",
+   "picked": []
+  },
+  {
+   "step": 3,
+   "tool": "grep",
+   "input": {
+    "pattern": "_resolveNow|utility|'main'",
+    "path": "packages/playwright-core/src/server/highlightController.ts",
+    "ignore_case": false
+   },
+   "matches": 6,
+   "grep_shown": [
+    "packages/playwright-core/src/server/highlightController.ts:44",
+    "packages/playwright-core/src/server/highlightController.ts:49",
+    "packages/playwright-core/src/server/highlightController.ts:62",
+    "packages/playwright-core/src/server/highlightController.ts:68",
+    "packages/playwright-core/src/server/highlightController.ts:97",
+    "packages/playwright-core/src/server/highlightController.ts:104"
+   ],
+   "picked_shown": [
+    "packages/playwright-core/src/server/highlightController.ts lines 40-45 (HighlightController.addHighlight)"
+   ],
+   "action": "read",
+   "analysis": "_resolve uses frame.existingContext('utility') at line 97, which is likely the cause. I need to see the full _resolve function to decide how to change the world used.",
+   "picked": [
+    "packages/playwright-core/src/server/highlightController.ts:HighlightController._resolveNow"
+   ]
+  },
+  {
+   "step": 4,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright-core/src/server/highlightController.ts lines 40-45 (HighlightController.addHighlight)",
+    "packages/playwright-core/src/server/highlightController.ts lines 68-75 (HighlightController._resolveNow)"
+   ],
+   "action": "grep",
+   "analysis": "_resolveNow only chains _resolve; the utility world is used inside _resolve (around line 97), which I haven't seen. I need to pick that function to read it.",
+   "picked": []
+  },
+  {
+   "step": 5,
+   "tool": "grep",
+   "input": {
+    "pattern": "existingContext|private async _resolve\\(|_resolve\\(",
+    "path": "packages/playwright-core/src/server/highlightController.ts",
+    "ignore_case": false
+   },
+   "matches": 4,
+   "grep_shown": [
+    "packages/playwright-core/src/server/highlightController.ts:62",
+    "packages/playwright-core/src/server/highlightController.ts:73",
+    "packages/playwright-core/src/server/highlightController.ts:77",
+    "packages/playwright-core/src/server/highlightController.ts:97"
+   ],
+   "picked_shown": [
+    "packages/playwright-core/src/server/highlightController.ts lines 40-45 (HighlightController.addHighlight)",
+    "packages/playwright-core/src/server/highlightController.ts lines 68-75 (HighlightController._resolveNow)"
+   ],
+   "action": "read",
+   "analysis": "The _resolve function at line 77 uses frame.existingContext('utility') at line 97, which runs selectors in the isolated world. I need to read the full function to change it.",
+   "picked": [
+    "packages/playwright-core/src/server/highlightController.ts:HighlightController._resolve"
+   ]
+  },
+  {
+   "step": 6,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright-core/src/server/highlightController.ts lines 40-45 (HighlightController.addHighlight)",
+    "packages/playwright-core/src/server/highlightController.ts lines 68-75 (HighlightController._resolveNow)",
+    "packages/playwright-core/src/server/highlightController.ts lines 77-105 (HighlightController._resolve)"
+   ],
+   "action": "edit",
+   "analysis": "_resolve always evaluates highlights in the frame's utility world. Selectors using custom engines not registered as content scripts have info.world === 'main', so they must be queried in the main world. The fix groups highlights per frame and per world, and calls setHighlights in each world's injected script. It sends an empty list to the other world so stale highlights are cleared.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

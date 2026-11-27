@@ -1,0 +1,48 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43170",
+ "fixed": {
+  "round": 2,
+  "explanation": "getByRoleParts parses every option other than name, description, level and exact with isBoolean, so 'mixed' for checked and pressed is rejected. The fix accepts a boolean or the string 'mixed' for those two options. The other options still accept only booleans.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  2,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0396,
+ "seconds": 24,
+ "diff_stat": "packages/isomorphic/locatorParser.ts | 2 ++\n 1 file changed, 2 insertions(+)"
+}
+round 1: k=2 action=search picked=[] 
+round 2: k=3 action=edit picked=['packages/isomorphic/locatorParser.ts:getByRoleParts'] applied
+
+parse errors in tests/library/locator-generator.spec.ts; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  16%|█▌        | 45/290 [00:00<00:00, 368.13it/s]
+Loading weights:  42%|████▏     | 121/290 [00:00<00:00, 500.69it/s]
+Loading weights:  59%|█████▉    | 171/290 [00:00<00:00, 464.47it/s]
+Loading weights:  77%|███████▋  | 224/290 [00:00<00:00, 456.38it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 499.72it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   8%|▊         | 23/290 [00:00<00:01, 229.92it/s]
+Loading weights:  16%|█▌        | 46/290 [00:00<00:01, 134.56it/s]
+Loading weights:  21%|██▏       | 62/290 [00:00<00:02, 98.03it/s] 
+Loading weights:  28%|██▊       | 81/290 [00:00<00:01, 119.36it/s]
+Loading weights:  44%|████▍     | 128/290 [00:00<00:00, 197.24it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 349.96it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

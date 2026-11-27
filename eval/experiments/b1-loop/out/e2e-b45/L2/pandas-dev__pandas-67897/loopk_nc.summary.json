@@ -1,0 +1,71 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-67897",
+ "fixed": {
+  "round": 1,
+  "explanation": "from_numpy_dtype can't handle DatetimeTZDtype subtypes, so conversion fails. Build a pyarrow timestamp type with tz for those. Deserialization used type_for_alias on the string, which fails for tz timestamps; take the subtype from the storage type instead.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0346,
+ "seconds": 33,
+ "diff_stat": "pandas/core/arrays/arrow/extension_types.py | 5 ++++-\n pandas/core/arrays/interval.py              | 6 +++++-\n 2 files changed, 9 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Arrow extension type for IntervalDtype (ArrowIntervalType) and IntervalArray __arrow_array__ / __from_arrow__ conversion; subtype conversion to pyarrow must handle timezone-aware datetime64 subtypes, and restoring from arrow must rebuild the same IntervalDtype with tz.",
+    "symptom": "Converting an interval array with tz-aware datetime bounds to pyarrow raises an error, and parquet round trip does not preserve the dtype.",
+    "anchors": [
+     "pyarrow",
+     "parquet",
+     "intervals",
+     "timezone-aware"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/arrays/interval.py",
+     1608,
+     1658
+    ],
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     60,
+     109
+    ],
+    [
+     "pandas/core/arrays/arrow/extension_types.py",
+     108,
+     109
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "from_numpy_dtype can't handle DatetimeTZDtype subtypes, so conversion fails. Build a pyarrow timestamp type with tz for those. Deserialization used type_for_alias on the string, which fails for tz timestamps; take the subtype from the storage type instead.",
+   "picked": [
+    "pandas/core/arrays/interval.py:IntervalArray.__arrow_array__",
+    "pandas/core/arrays/arrow/extension_types.py:ArrowIntervalType"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

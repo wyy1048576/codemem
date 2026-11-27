@@ -1,0 +1,38 @@
+diff --git a/pandas/core/arrays/arrow/extension_types.py b/pandas/core/arrays/arrow/extension_types.py
+index 7814a77..8a0abf7 100644
+--- a/pandas/core/arrays/arrow/extension_types.py
++++ b/pandas/core/arrays/arrow/extension_types.py
+@@ -85,7 +85,7 @@ class ArrowIntervalType(pyarrow.ExtensionType):
+     @classmethod
+     def __arrow_ext_deserialize__(cls, storage_type, serialized) -> ArrowIntervalType:
+         metadata = json.loads(serialized.decode())
+-        subtype = pyarrow.type_for_alias(metadata["subtype"])
++        subtype = storage_type.field("left").type
+         closed = metadata["closed"]
+         return ArrowIntervalType(subtype, closed)
+ 
+diff --git a/pandas/core/arrays/interval.py b/pandas/core/arrays/interval.py
+index fe8c7d9..f69d43b 100644
+--- a/pandas/core/arrays/interval.py
++++ b/pandas/core/arrays/interval.py
+@@ -1613,13 +1613,17 @@ class IntervalArray(IntervalMixin, ExtensionArray):
+ 
+         from pandas.core.arrays.arrow.extension_types import ArrowIntervalType
+ 
++        from pandas.core.arrays.arrow.array import to_pyarrow_type
++
+         try:
+-            subtype = pyarrow.from_numpy_dtype(self.dtype.subtype)
+-        except TypeError as err:
++            subtype = to_pyarrow_type(self.dtype.subtype)
++        except TypeError:
++            subtype = None
++        if subtype is None:
+             raise TypeError(
+                 f"Conversion to arrow with subtype '{self.dtype.subtype}' "
+                 "is not supported"
+-            ) from err
++            )
+         interval_type = ArrowIntervalType(subtype, self.closed)
+         storage_array = pyarrow.StructArray.from_arrays(
+             [

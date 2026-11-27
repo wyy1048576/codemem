@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43170",
+ "exit": 0,
+ "seconds": 12,
+ "cost_usd": 0.0322539,
+ "turns": 5,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 4791,
+  "cache_read_input_tokens": 28839,
+  "output_tokens": 1019,
+  "output_tokens_details": {
+   "thinking_tokens": 88
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 4791,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 253,
+    "cache_read_input_tokens": 9507,
+    "cache_creation_input_tokens": 676,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 676
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 2
+ },
+ "subtype": "success",
+ "diff_stat": "packages/isomorphic/locatorParser.ts | 6 ++++++\n 1 file changed, 6 insertions(+)",
+ "final": "I fixed the parser so `checked` and `pressed` accept `'mixed'` again. I haven't built or run anything, so the round trip is untested.\n\nThe change is in `getByRoleParts` in `packages/isomorphic/locatorParser.ts`. The `checked` and `pressed` options now go through a new `isBooleanOrMixed` check, which accepts a boolean or the string `'mixed'`. Every other role option (`disabled`, `expanded`, `selected` and so on) still accepts only booleans.\n\nI didn't check how the Java and C# forms of the value are parsed. The fix assumes the parser returns the plain string `'mixed'` for all four languages, as it does for JavaScript and Python. If Java or C# produce a different value, those two would still fail.",
+ "stderr": ""
+}

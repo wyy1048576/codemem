@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42864",
+ "exit": 0,
+ "seconds": 33,
+ "cost_usd": 0.1017127,
+ "turns": 13,
+ "usage": {
+  "input_tokens": 16,
+  "cache_creation_input_tokens": 13981,
+  "cache_read_input_tokens": 91067,
+  "output_tokens": 3665,
+  "output_tokens_details": {
+   "thinking_tokens": 349
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 13981,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 364,
+    "cache_read_input_tokens": 17349,
+    "cache_creation_input_tokens": 2024,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2024
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 6,
+  "Read": 3,
+  "Edit": 3
+ },
+ "subtype": "success",
+ "diff_stat": ".../src/server/highlightController.ts              | 45 +++++++++++++++-------\n 1 file changed, 31 insertions(+), 14 deletions(-)",
+ "final": "Highlighting now evaluates each selector in the world it needs, so a custom engine registered without `contentScript` can see the page's globals. I couldn't build or run anything, so this is untested.\n\n**Root cause:** `HighlightController` in `packages/playwright-core/src/server/highlightController.ts` always ran `setHighlights` in the utility (isolated) world. Clicking is different. It uses `info.world`, which is `'main'` for engines that aren't content scripts. During a highlight, the engine therefore couldn't see the page's globals.\n\n**Changes**, all in that file:\n- `_resolve()` now groups each frame's highlights by `info.world`. It calls `setHighlights` in the matching execution context for each world.\n- The empty lists are still sent to contexts that have no highlights, so old highlights get cleared.\n- If a browser has no separate utility world, `existingContext` returns the main context for both worlds. Highlights are merged per context, so one world can't overwrite the other.\n- `hideHighlights()` now hides highlights in both worlds, not just the utility one.\n\nI didn't add a regression test.",
+ "stderr": ""
+}
+

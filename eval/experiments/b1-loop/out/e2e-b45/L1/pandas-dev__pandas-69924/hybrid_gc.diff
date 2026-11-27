@@ -1,0 +1,29 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 8542ef2..eef6cb6 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -449,7 +449,9 @@ class WrappedCythonOp:
+ 
+         out_shape = self._get_output_shape(ngroups, values)
+         func = self._get_cython_function(self.kind, self.how, values.dtype, is_numeric)
+-        values = self._get_cython_vals(values, uses_mask=mask is not None)
++        values = self._get_cython_vals(
++            values, uses_mask=(mask is not None) or is_datetimelike
++        )
+         out_dtype = self._get_out_dtype(values.dtype)
+ 
+         result = maybe_fill(np.empty(out_shape, dtype=out_dtype))
+@@ -533,6 +535,13 @@ class WrappedCythonOp:
+                 mask=mask,
+                 **kwargs,
+             )
++            if is_datetimelike and self.has_dropped_na:
++                dropped = comp_ids < 0
++                if dropped.any():
++                    if result.dtype.kind == "f":
++                        result[dropped] = np.nan
++                    elif result.dtype.kind == "i":
++                        result[dropped] = iNaT
+ 
+         if self.kind == "aggregate" and self.how not in ["idxmin", "idxmax"]:
+             # i.e. counts is defined.  Locations where count<min_count

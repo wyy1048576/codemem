@@ -1,0 +1,15 @@
+diff --git a/packages/isomorphic/urlMatch.ts b/packages/isomorphic/urlMatch.ts
+index 30cd9a9..6ae3c00 100644
+--- a/packages/isomorphic/urlMatch.ts
++++ b/packages/isomorphic/urlMatch.ts
+@@ -239,6 +239,10 @@ function resolveGlobBase(baseURL: string | undefined, match: string): string {
+         // Preserve explicit schema as is as it may affect trailing slashes after domain.
+         return token;
+       }
++      // Tokens without glob symbols are safe to resolve and get normalized by URL
++      // (default ports, spaces, punycode hosts).
++      if (!/[*{}\[\]\\?]/.test(token))
++        return token;
+       const questionIndex = token.indexOf('?');
+       if (questionIndex === -1)
+         return mapToken(token, `$_${index}_$`);

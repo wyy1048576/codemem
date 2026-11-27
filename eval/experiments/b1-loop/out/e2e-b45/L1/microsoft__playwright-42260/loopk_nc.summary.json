@@ -1,0 +1,107 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42260",
+ "fixed": {
+  "round": 2,
+  "explanation": "_collectDB opens each IndexedDB database and never closes it, so the open connection blocks deleteDatabase during restore, which then hangs. The fix wraps the read in try/finally so db.close() always runs. The original body moves into a helper that takes the open db.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  1
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0493,
+ "seconds": 32,
+ "diff_stat": "packages/injected/src/storageScript.ts | 8 ++++++++\n 1 file changed, 8 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Chromium browser context storageState collection and restore with indexedDB: code that opens IndexedDB databases in the page (via injected script) to read all records, and does not close the connections; also the restore path (setStorageState) that deletes and recreates databases and hangs when an open connection blocks deletion. Needs to close db connections after reading, and handle blocked/versionchange events and timeouts on restore.",
+    "symptom": "Saving storageState with indexedDB leaves an open IndexedDB connection, so later deleteDatabase is blocked and restoring storage into the same context hangs without honoring timeout.",
+    "anchors": [
+     "IndexedDB",
+     "storage",
+     "restore",
+     "blocked",
+     "default timeout"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     149,
+     177
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     179,
+     209
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     675,
+     732
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Restore deletes DBs without waiting and is blocked by open connections. The collect side, which opens the DBs and leaves them open, is not yet visible. It is probably in StorageScript.collect in storageScript.ts.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript.restore"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "StorageScript collect method that opens each IndexedDB database and reads all records for storageState, and where it should close the db.",
+    "symptom": "Saving storageState with indexedDB leaves open IDB connections, blocking deleteDatabase and hanging restore.",
+    "anchors": [
+     "StorageScript",
+     "_restoreDB",
+     "_idbRequestToPromise",
+     "indexedDB.databases"
+    ],
+    "look_in": [
+     "packages/injected/src/storageScript.ts"
+    ]
+   },
+   "k": 1,
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     72,
+     134
+    ]
+   ],
+   "shown_whole": [
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/storageScript.ts lines 179-209 (StorageScript.restore)"
+   ],
+   "action": "edit",
+   "analysis": "_collectDB opens each IndexedDB database and never closes it, so the open connection blocks deleteDatabase during restore, which then hangs. The fix wraps the read in try/finally so db.close() always runs. The original body moves into a helper that takes the open db.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._collectDB"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

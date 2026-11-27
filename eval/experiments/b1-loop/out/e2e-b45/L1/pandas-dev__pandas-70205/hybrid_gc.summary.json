@@ -1,0 +1,89 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": true,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-70205",
+ "fixed": {
+  "step": 1,
+  "explanation": "When the sheet holds only the header rows, the parser returns an empty DataFrame with a flat columns Index, as read_csv does. _parse_sheet then calls set_names with two header names on that one-level Index. That raises \"Expected 1 name, got 2\". The fix applies the names only when the number of column levels equals the number of header names.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0775,
+ "seconds": 25,
+ "diff_stat": "pandas/io/excel/_base.py | 5 ++++-\n 1 file changed, 4 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Excel reader parsing with multi-row header (header=[0,1]) and index_col=0: the code that handles a MultiIndex column header with index_col in read_excel / TextParser (python parser), likely failing when the data has only the index column or empty rows, causing a length mismatch error on names (\"Expected 1 name, got 2\").",
+    "symptom": "read_excel with header=[0,1] and index_col=0 raises a ValueError (expected 1 name, got 2) while read_csv returns an empty DataFrame.",
+    "anchors": [
+     "header",
+     "openpyxl",
+     "sheet 0"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/io/excel/_base.py",
+     840,
+     992
+    ],
+    [
+     "pandas/tests/io/excel/test_readers.py",
+     1804,
+     1818
+    ],
+    [
+     "pandas/io/excel/_base.py",
+     166,
+     560
+    ],
+    [
+     "pandas/io/excel/_util.py",
+     271,
+     303
+    ],
+    [
+     "pandas/tests/io/excel/test_writers.py",
+     94,
+     108
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.06681200000000001,
+   "action": "edit",
+   "analysis": "When the sheet holds only the header rows, the parser returns an empty DataFrame with a flat columns Index, as read_csv does. _parse_sheet then calls set_names with two header names on that one-level Index. That raises \"Expected 1 name, got 2\". The fix applies the names only when the number of column levels equals the number of header names.",
+   "picked": [
+    "pandas/io/excel/_base.py:BaseExcelReader._parse_sheet"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

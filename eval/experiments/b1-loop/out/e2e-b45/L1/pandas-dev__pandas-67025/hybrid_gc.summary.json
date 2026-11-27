@@ -1,0 +1,89 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": true,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-67025",
+ "fixed": {
+  "step": 1,
+  "explanation": "_str_extract raises when there are no named groups and uses the pyarrow kernel for mixed patterns. The kernel rejects unnamed groups, and the flags path looked groups up by name only. The fix sends any pattern with an unnamed group to the Python regex fallback. The fallback extracts groups by position and labels them by name when there is one, otherwise by position.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0432,
+ "seconds": 28,
+ "diff_stat": "pandas/core/arrays/arrow/array.py | 22 ++++++++++++++--------\n 1 file changed, 14 insertions(+), 8 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "The _str_extract method of the Arrow-backed string extension array (ArrowExtensionArray / ArrowStringArrayMixin) handles str.extract with expand=True. It uses pyarrow extract_regex only when all groups are named, and otherwise falls back to the Python re path; it must also fall back for unnamed groups and label columns by position.",
+    "symptom": "Series.str.extract on a generic ArrowDtype(pa.string()) Series raises an error or returns all-missing columns when the pattern has unnamed capture groups, instead of labelling them by position.",
+    "anchors": [
+     "extract",
+     "named group",
+     "unnamed groups"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/strings/accessor.py",
+     3408,
+     3534
+    ],
+    [
+     "pandas/core/arrays/arrow/array.py",
+     4177,
+     4210
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     3536,
+     3612
+    ],
+    [
+     "pandas/tests/strings/test_extract.py",
+     104,
+     184
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     4899,
+     4921
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.031624,
+   "action": "edit",
+   "analysis": "_str_extract raises when there are no named groups and uses the pyarrow kernel for mixed patterns. The kernel rejects unnamed groups, and the flags path looked groups up by name only. The fix sends any pattern with an unnamed group to the Python regex fallback. The fallback extracts groups by position and labels them by name when there is one, otherwise by position.",
+   "picked": [
+    "pandas/core/arrays/arrow/array.py:ArrowExtensionArray._str_extract"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

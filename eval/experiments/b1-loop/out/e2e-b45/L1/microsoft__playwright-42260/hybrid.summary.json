@@ -1,0 +1,117 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42260",
+ "fixed": {
+  "step": 3,
+  "explanation": "_collectDB opens an IDBDatabase connection and never closes it, which blocks later deleteDatabase calls. I split it into a wrapper that opens the database and closes it in a finally block, and a helper that reads the data. I also made _restoreDB close its connection once its transaction has completed.",
+  "edits": 2
+ },
+ "rounds": 3,
+ "tools": {
+  "codemem": 1,
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0693,
+ "seconds": 50,
+ "diff_stat": "packages/injected/src/storageScript.ts | 20 ++++++++++++++++++++\n 1 file changed, 20 insertions(+)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Code that collects IndexedDB data for storageState (indexedDB: true) by opening databases in the page and reading all records, and code that restores IndexedDB on setStorageState/addInitScript. It must close opened IDBDatabase connections after reading, and restore must not hang on blocked deleteDatabase.",
+    "symptom": "Saving storageState with IndexedDB leaves open IDB connections that block deleteDatabase, causing restore of storage to hang forever.",
+    "anchors": [
+     "IndexedDB"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     149,
+     177
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     179,
+     209
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     619,
+     669
+    ],
+    [
+     "tests/library/browsercontext-storage-state.spec.ts",
+     415,
+     589
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     675,
+     732
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "grep",
+   "analysis": "The collect function in storageScript.ts opens databases but isn't visible yet. I need to find where it opens IDB connections so I can close them. Restore also needs to handle blocked deletes.",
+   "picked": []
+  },
+  {
+   "step": 2,
+   "tool": "grep",
+   "input": {
+    "pattern": "indexedDB\\.open|_collectDB|async collect|db\\.close",
+    "path": "packages/injected/src/storageScript.ts",
+    "ignore_case": false
+   },
+   "matches": 5,
+   "grep_shown": [
+    "packages/injected/src/storageScript.ts:72",
+    "packages/injected/src/storageScript.ts:78",
+    "packages/injected/src/storageScript.ts:136",
+    "packages/injected/src/storageScript.ts:142",
+    "packages/injected/src/storageScript.ts:150"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "_collectDB opens a connection and likely never closes it. _restoreDB needs to be seen too, to handle blocked deletes. I need the full source before editing.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._collectDB",
+    "packages/injected/src/storageScript.ts:StorageScript._restoreDB"
+   ]
+  },
+  {
+   "step": 3,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/storageScript.ts lines 72-134 (StorageScript._collectDB)",
+    "packages/injected/src/storageScript.ts lines 149-177 (StorageScript._restoreDB)"
+   ],
+   "action": "edit",
+   "analysis": "_collectDB opens an IDBDatabase connection and never closes it, which blocks later deleteDatabase calls. I split it into a wrapper that opens the database and closes it in a finally block, and a helper that reads the data. I also made _restoreDB close its connection once its transaction has completed.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

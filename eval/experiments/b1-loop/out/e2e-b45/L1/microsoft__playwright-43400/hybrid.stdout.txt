@@ -1,0 +1,28 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43400",
+ "fixed": {
+  "step": 4,
+  "explanation": "In InjectedScript.fill, the value read back from the input is compared with strict equality, except for range inputs. datetime-local inputs also re-serialize the value and drop zero seconds and zero fractions, so 12:00:00 becomes 12:00 and the comparison fails. The edit normalizes the expected value for datetime-local before comparing it, the same way the range case is handled.",
+  "edits": 1
+ },
+ "rounds": 4,
+ "tools": {
+  "grep": 4
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 4
+ },
+ "sonnet_calls": 5,
+ "cost_usd": 0.0646,
+ "seconds": 24,
+ "diff_stat": "packages/injected/src/injectedScript.ts | 3 ++-\n 1 file changed, 2 insertions(+), 1 deletion(-)"
+}
+step 1: grep {"pattern": "Malformed value", "path": "packages/playwright-core/src", "ignore_case": false} -> action=grep picked=[] 
+step 2: grep {"pattern": "Input value is invalid|not valid|'range'", "path": "packages/playwright-core/src", "ignore_case": false} -> action=grep picked=[] 
+step 3: grep {"pattern": "range", "path": "packages", "ignore_case": false} -> action=grep picked=[] 
+step 4: grep {"pattern": "range|datetime-local", "path": "packages/injected/src/injectedScript.ts", "ignore_case": false} -> action=edit picked=['packages/injected/src/injectedScript.ts:InjectedScript.fill'] applied
+

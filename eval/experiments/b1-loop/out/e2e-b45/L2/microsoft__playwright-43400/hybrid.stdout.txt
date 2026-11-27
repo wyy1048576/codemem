@@ -1,0 +1,31 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43400",
+ "fixed": {
+  "step": 5,
+  "explanation": "The browser normalizes datetime-local/time values with zero seconds (\"12:00:00\" becomes \"12:00\"), so the strict equality check in fill throws Malformed value. The fix compares values after stripping zero seconds and milliseconds for those types.",
+  "edits": 1
+ },
+ "rounds": 5,
+ "tools": {
+  "grep": 4,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 5
+ },
+ "sonnet_calls": 6,
+ "cost_usd": 0.0947,
+ "seconds": 31,
+ "diff_stat": "packages/injected/src/injectedScript.ts | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)"
+}
+step 1: grep {"pattern": "datetime-local", "path": "packages/playwright-core/src", "ignore_case": false} -> action=grep picked=[] 
+step 2: grep {"pattern": "datetime|Malformed value", "path": "packages/playwright-core/src", "ignore_case": true} -> action=grep picked=[] 
+step 3: grep {"pattern": "Malformed|'date'|\"date\"|time-local|kDateTypes", "path": "packages/playwright-core/src/server", "ignore_case": false} -> action=grep picked=[] 
+step 4: grep {"pattern": "Malformed value|datetime-local", "path": "packages", "ignore_case": false} -> action=read picked=['packages/injected/src/injectedScript.ts:InjectedScript.fill'] 
+step 5: read {} -> action=edit picked=[] applied
+

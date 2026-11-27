@@ -1,0 +1,45 @@
+diff --git a/pandas/core/arrays/arrow/extension_types.py b/pandas/core/arrays/arrow/extension_types.py
+index 7814a77..df22866 100644
+--- a/pandas/core/arrays/arrow/extension_types.py
++++ b/pandas/core/arrays/arrow/extension_types.py
+@@ -80,12 +80,18 @@ class ArrowIntervalType(pyarrow.ExtensionType):
+ 
+     def __arrow_ext_serialize__(self) -> bytes:
+         metadata = {"subtype": str(self.subtype), "closed": self.closed}
++        if pyarrow.types.is_timestamp(self.subtype) and self.subtype.tz is not None:
++            metadata["unit"] = self.subtype.unit
++            metadata["tz"] = self.subtype.tz
+         return json.dumps(metadata).encode()
+ 
+     @classmethod
+     def __arrow_ext_deserialize__(cls, storage_type, serialized) -> ArrowIntervalType:
+         metadata = json.loads(serialized.decode())
+-        subtype = pyarrow.type_for_alias(metadata["subtype"])
++        if "tz" in metadata:
++            subtype = pyarrow.timestamp(metadata["unit"], tz=metadata["tz"])
++        else:
++            subtype = pyarrow.type_for_alias(metadata["subtype"])
+         closed = metadata["closed"]
+         return ArrowIntervalType(subtype, closed)
+ 
+diff --git a/pandas/core/arrays/interval.py b/pandas/core/arrays/interval.py
+index fe8c7d9..a5eafb0 100644
+--- a/pandas/core/arrays/interval.py
++++ b/pandas/core/arrays/interval.py
+@@ -1613,8 +1613,15 @@ class IntervalArray(IntervalMixin, ExtensionArray):
+ 
+         from pandas.core.arrays.arrow.extension_types import ArrowIntervalType
+ 
++        from pandas.core.dtypes.dtypes import DatetimeTZDtype
++
+         try:
+-            subtype = pyarrow.from_numpy_dtype(self.dtype.subtype)
++            if isinstance(self.dtype.subtype, DatetimeTZDtype):
++                subtype = pyarrow.timestamp(
++                    self.dtype.subtype.unit, tz=str(self.dtype.subtype.tz)
++                )
++            else:
++                subtype = pyarrow.from_numpy_dtype(self.dtype.subtype)
+         except TypeError as err:
+             raise TypeError(
+                 f"Conversion to arrow with subtype '{self.dtype.subtype}' "

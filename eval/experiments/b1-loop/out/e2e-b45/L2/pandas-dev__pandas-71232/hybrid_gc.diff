@@ -1,0 +1,15 @@
+diff --git a/pandas/core/generic.py b/pandas/core/generic.py
+index 4988288..9cd389c 100644
+--- a/pandas/core/generic.py
++++ b/pandas/core/generic.py
+@@ -7223,7 +7223,9 @@ class NDFrame(PandasObject, indexing.IndexingMixin):
+             result = self.T._pad_or_backfill(
+                 method=method, limit=limit, limit_area=limit_area
+             ).T
+-
++            if inplace:
++                self._update_inplace(result)
++                return self
+             return result
+ 
+         new_mgr = self._mgr.pad_or_backfill(

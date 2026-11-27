@@ -1,0 +1,35 @@
+diff --git a/pandas/core/window/ewm.py b/pandas/core/window/ewm.py
+index b7f9f62..df39880 100644
+--- a/pandas/core/window/ewm.py
++++ b/pandas/core/window/ewm.py
+@@ -1166,9 +1166,6 @@ class OnlineExponentialMovingWindow(ExponentialMovingWindow):
+         is_frame = self._selected_obj.ndim == 2
+         if update_times is not None:
+             raise NotImplementedError("update_times is not implemented.")
+-        update_deltas = np.ones(
+-            max(self._selected_obj.shape[-1] - 1, 0), dtype=np.float64
+-        )
+         if update is not None:
+             if self._mean.last_ewm is None:
+                 raise ValueError(
+@@ -1191,6 +1188,7 @@ class OnlineExponentialMovingWindow(ExponentialMovingWindow):
+             else:
+                 result_kwargs["name"] = self._selected_obj.name
+             np_array = self._selected_obj.astype(np.float64).to_numpy()
++        update_deltas = np.ones(max(len(np_array) - 1, 0), dtype=np.float64)
+         ewma_func = generate_online_numba_ewma_func(
+             **get_jit_arguments(self.engine_kwargs)
+         )
+diff --git a/pandas/core/window/online.py b/pandas/core/window/online.py
+index 30dcc0f..5d08fe7 100644
+--- a/pandas/core/window/online.py
++++ b/pandas/core/window/online.py
+@@ -68,7 +68,7 @@ def generate_online_numba_ewma_func(
+                     if is_observations[j] or not ignore_na:
+                         # note that len(deltas) = len(vals) - 1 and deltas[i] is to be
+                         # used in conjunction with vals[i+1]
+-                        old_wt[j] *= old_wt_factor ** deltas[j - 1]
++                        old_wt[j] *= old_wt_factor ** deltas[i - 1]
+                         if is_observations[j]:
+                             # avoid numerical errors on constant series
+                             if weighted_avg[j] != cur[j]:

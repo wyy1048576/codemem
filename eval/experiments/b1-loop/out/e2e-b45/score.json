@@ -1,0 +1,10886 @@
+[
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "grep",
+  "cost": 0.04072,
+  "turns": 4,
+  "seconds": 18,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopk_nc",
+  "cost": 0.0304,
+  "turns": 1,
+  "seconds": 21,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid",
+  "cost": 0.0413,
+  "turns": 2,
+  "seconds": 16,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_v2",
+  "cost": 0.0399,
+  "turns": 2,
+  "seconds": 10,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41682",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "grep",
+  "cost": 0.027109300000000003,
+  "turns": 4,
+  "seconds": 9,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopk_nc",
+  "cost": 0.0454,
+  "turns": 2,
+  "seconds": 25,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid",
+  "cost": 0.0427,
+  "turns": 2,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_v2",
+  "cost": 0.021,
+  "turns": 1,
+  "seconds": 5,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41850",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "grep",
+  "cost": 0.0623094,
+  "turns": 12,
+  "seconds": 27,
+  "gold": 4,
+  "seen": 0,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 4,
+   "Read": 2,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopk_nc",
+  "cost": 0.0612,
+  "turns": 3,
+  "seconds": 25,
+  "gold": 4,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid",
+  "cost": 0.0602,
+  "turns": 3,
+  "seconds": 21,
+  "gold": 4,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_v2",
+  "cost": 0.0909,
+  "turns": 3,
+  "seconds": 26,
+  "gold": 4,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41942",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "grep",
+  "cost": 0.1548351,
+  "turns": 14,
+  "seconds": 50,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "Grep": 5,
+   "Read": 7,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk_nc",
+  "cost": 0.2879,
+  "turns": 8,
+  "seconds": 104,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 8
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid",
+  "cost": 0.1495,
+  "turns": 3,
+  "seconds": 41,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_v2",
+  "cost": 0.1557,
+  "turns": 3,
+  "seconds": 42,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "grep",
+  "cost": 0.0842469,
+  "turns": 13,
+  "seconds": 24,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 5,
+   "Read": 5,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopk_nc",
+  "cost": 0.1162,
+  "turns": 4,
+  "seconds": 39,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 4
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid",
+  "cost": 0.1195,
+  "turns": 5,
+  "seconds": 58,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_v2",
+  "cost": 0.1026,
+  "turns": 5,
+  "seconds": 42,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42042",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "grep",
+  "cost": 0.026668400000000002,
+  "turns": 4,
+  "seconds": 11,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopk_nc",
+  "cost": 0.0255,
+  "turns": 1,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid",
+  "cost": 0.0369,
+  "turns": 2,
+  "seconds": 14,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_v2",
+  "cost": 0.0252,
+  "turns": 1,
+  "seconds": 6,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42204",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "grep",
+  "cost": 0.06516730000000001,
+  "turns": 9,
+  "seconds": 28,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 4,
+   "Read": 1,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopk_nc",
+  "cost": 0.0493,
+  "turns": 2,
+  "seconds": 32,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid",
+  "cost": 0.0693,
+  "turns": 3,
+  "seconds": 50,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_v2",
+  "cost": 0.0714,
+  "turns": 2,
+  "seconds": 25,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42260",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "grep",
+  "cost": 0.0214061,
+  "turns": 4,
+  "seconds": 10,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopk_nc",
+  "cost": 0.0335,
+  "turns": 1,
+  "seconds": 11,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid",
+  "cost": 0.0706,
+  "turns": 4,
+  "seconds": 18,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_v2",
+  "cost": 0.0581,
+  "turns": 3,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42433",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "grep",
+  "cost": 0.0452792,
+  "turns": 6,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopk_nc",
+  "cost": 0.0753,
+  "turns": 3,
+  "seconds": 47,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid",
+  "cost": 0.0976,
+  "turns": 5,
+  "seconds": 53,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_v2",
+  "cost": 0.0603,
+  "turns": 2,
+  "seconds": 20,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42503",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "grep",
+  "cost": 0.12474769999999999,
+  "turns": 14,
+  "seconds": 36,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 6,
+   "Read": 2,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopk_nc",
+  "cost": 0.1662,
+  "turns": 4,
+  "seconds": 46,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 4
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid",
+  "cost": 0.2229,
+  "turns": 9,
+  "seconds": 67,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 4,
+   "read": 4
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_v2",
+  "cost": 0.1483,
+  "turns": 4,
+  "seconds": 47,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1,
+   "review": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42707",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "grep",
+  "cost": 0.0364358,
+  "turns": 5,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Glob": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopk_nc",
+  "cost": 0.0556,
+  "turns": 2,
+  "seconds": 19,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid",
+  "cost": 0.1062,
+  "turns": 3,
+  "seconds": 32,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_v2",
+  "cost": 0.0955,
+  "turns": 4,
+  "seconds": 32,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42780",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "grep",
+  "cost": 0.08015900000000001,
+  "turns": 15,
+  "seconds": 28,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 6,
+   "Read": 5,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk_nc",
+  "cost": 0.051,
+  "turns": 2,
+  "seconds": 32,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid",
+  "cost": 0.0616,
+  "turns": 3,
+  "seconds": 28,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_v2",
+  "cost": 0.1048,
+  "turns": 5,
+  "seconds": 42,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "open": 1,
+   "review": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "grep",
+  "cost": 0.134625,
+  "turns": 21,
+  "seconds": 45,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 10,
+   "Read": 3,
+   "Edit": 7
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopk_nc",
+  "cost": 0.078,
+  "turns": 3,
+  "seconds": 50,
+  "gold": 4,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid",
+  "cost": 0.1472,
+  "turns": 6,
+  "seconds": 53,
+  "gold": 4,
+  "seen": 3,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_v2",
+  "cost": 0.0576,
+  "turns": 2,
+  "seconds": 28,
+  "gold": 4,
+  "seen": 2,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42838",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "grep",
+  "cost": 0.1017127,
+  "turns": 13,
+  "seconds": 33,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 6,
+   "Read": 3,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopk_nc",
+  "cost": 0.0587,
+  "turns": 2,
+  "seconds": 34,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid",
+  "cost": 0.0982,
+  "turns": 6,
+  "seconds": 61,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "read": 3,
+   "grep": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_v2",
+  "cost": 0.0836,
+  "turns": 3,
+  "seconds": 42,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "open": 1,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42864",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "grep",
+  "cost": 0.035190000000000006,
+  "turns": 6,
+  "seconds": 13,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 2,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopk_nc",
+  "cost": 0.0247,
+  "turns": 1,
+  "seconds": 29,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid",
+  "cost": 0.0406,
+  "turns": 1,
+  "seconds": 35,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_v2",
+  "cost": 0.0543,
+  "turns": 1,
+  "seconds": 13,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-42919",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "grep",
+  "cost": 0.0346004,
+  "turns": 5,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 2,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopk_nc",
+  "cost": 0.0247,
+  "turns": 1,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid",
+  "cost": 0.0284,
+  "turns": 1,
+  "seconds": 19,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_v2",
+  "cost": 0.0334,
+  "turns": 1,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43012",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "grep",
+  "cost": 0.025083099999999997,
+  "turns": 4,
+  "seconds": 12,
+  "gold": 4,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopk_nc",
+  "cost": 0.0713,
+  "turns": 4,
+  "seconds": 27,
+  "gold": 4,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 4
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid",
+  "cost": 0.0544,
+  "turns": 3,
+  "seconds": 17,
+  "gold": 4,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_v2",
+  "cost": 0.0517,
+  "turns": 2,
+  "seconds": 8,
+  "gold": 4,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43071",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "grep",
+  "cost": 0.033590800000000004,
+  "turns": 6,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopk_nc",
+  "cost": 0.0287,
+  "turns": 1,
+  "seconds": 21,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid",
+  "cost": 0.0397,
+  "turns": 2,
+  "seconds": 14,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_v2",
+  "cost": 0.0379,
+  "turns": 2,
+  "seconds": 10,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43146",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "grep",
+  "cost": 0.0525723,
+  "turns": 9,
+  "seconds": 19,
+  "gold": 5,
+  "seen": 4,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 3,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopk_nc",
+  "cost": 0.0458,
+  "turns": 2,
+  "seconds": 19,
+  "gold": 5,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid",
+  "cost": 0.0634,
+  "turns": 3,
+  "seconds": 38,
+  "gold": 5,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_v2",
+  "cost": 0.0645,
+  "turns": 3,
+  "seconds": 29,
+  "gold": 5,
+  "seen": 4,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43148",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "grep",
+  "cost": 0.0322539,
+  "turns": 5,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopk_nc",
+  "cost": 0.0396,
+  "turns": 2,
+  "seconds": 24,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid",
+  "cost": 0.0962,
+  "turns": 5,
+  "seconds": 29,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_v2",
+  "cost": 0.0527,
+  "turns": 2,
+  "seconds": 14,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43170",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "grep",
+  "cost": 0.1250265,
+  "turns": 17,
+  "seconds": 34,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 7,
+   "Read": 4,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopk_nc",
+  "cost": 0.1314,
+  "turns": 5,
+  "seconds": 71,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 5
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid",
+  "cost": 0.3931,
+  "turns": 15,
+  "seconds": 108,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false,
+  "tools": {
+   "codemem": 1,
+   "grep": 12,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_v2",
+  "cost": 0.1282,
+  "turns": 4,
+  "seconds": 36,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "open": 2,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43172",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "grep",
+  "cost": 0.052910200000000004,
+  "turns": 4,
+  "seconds": 18,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk_nc",
+  "cost": 0.034,
+  "turns": 1,
+  "seconds": 31,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid",
+  "cost": 0.0307,
+  "turns": 1,
+  "seconds": 22,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_v2",
+  "cost": 0.0464,
+  "turns": 2,
+  "seconds": 20,
+  "gold": 2,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "grep",
+  "cost": 0.052168,
+  "turns": 9,
+  "seconds": 18,
+  "gold": 3,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 3,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopk_nc",
+  "cost": 0.0297,
+  "turns": 1,
+  "seconds": 16,
+  "gold": 3,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid",
+  "cost": 0.0782,
+  "turns": 3,
+  "seconds": 40,
+  "gold": 3,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_v2",
+  "cost": 0.0396,
+  "turns": 1,
+  "seconds": 15,
+  "gold": 3,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43305",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "grep",
+  "cost": 0.0271237,
+  "turns": 4,
+  "seconds": 14,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopk_nc",
+  "cost": 0.0339,
+  "turns": 1,
+  "seconds": 19,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid",
+  "cost": 0.0646,
+  "turns": 4,
+  "seconds": 24,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 4
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_v2",
+  "cost": 0.0371,
+  "turns": 2,
+  "seconds": 9,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43400",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "grep",
+  "cost": 0.0653429,
+  "turns": 7,
+  "seconds": 23,
+  "gold": 3,
+  "seen": 3,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopk_nc",
+  "cost": 0.0534,
+  "turns": 2,
+  "seconds": 27,
+  "gold": 3,
+  "seen": 3,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid",
+  "cost": 0.0852,
+  "turns": 4,
+  "seconds": 56,
+  "gold": 3,
+  "seen": 3,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_v2",
+  "cost": 0.0956,
+  "turns": 4,
+  "seconds": 44,
+  "gold": 3,
+  "seen": 2,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "retry": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43429",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "grep",
+  "cost": 0.0502006,
+  "turns": 7,
+  "seconds": 16,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 3,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopk_nc",
+  "cost": 0.0906,
+  "turns": 3,
+  "seconds": 28,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid",
+  "cost": 0.0685,
+  "turns": 4,
+  "seconds": 22,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_v2",
+  "cost": 0.0684,
+  "turns": 3,
+  "seconds": 19,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "microsoft__playwright-43488",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "grep",
+  "cost": 0.04345739999999999,
+  "turns": 4,
+  "seconds": 16,
+  "gold": 5,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopk_nc",
+  "cost": 0.036,
+  "turns": 1,
+  "seconds": 18,
+  "gold": 5,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid",
+  "cost": 0.0432,
+  "turns": 1,
+  "seconds": 32,
+  "gold": 5,
+  "seen": 4,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_gc",
+  "cost": 0.0432,
+  "turns": 1,
+  "seconds": 28,
+  "gold": 5,
+  "seen": 4,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_v2",
+  "cost": 0.0644,
+  "turns": 1,
+  "seconds": 23,
+  "gold": 5,
+  "seen": 4,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "grep",
+  "cost": 0.058596699999999995,
+  "turns": 12,
+  "seconds": 20,
+  "gold": 4,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 3,
+   "Read": 3,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk_nc",
+  "cost": 0.0351,
+  "turns": 1,
+  "seconds": 31,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid",
+  "cost": 0.0479,
+  "turns": 2,
+  "seconds": 18,
+  "gold": 4,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_gc",
+  "cost": 0.0578,
+  "turns": 2,
+  "seconds": 14,
+  "gold": 4,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_v2",
+  "cost": 0.0408,
+  "turns": 1,
+  "seconds": 9,
+  "gold": 4,
+  "seen": 1,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "grep",
+  "cost": 0.0780694,
+  "turns": 10,
+  "seconds": 25,
+  "gold": 3,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 4,
+   "Read": 4,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopk_nc",
+  "cost": 0.0969,
+  "turns": 3,
+  "seconds": 36,
+  "gold": 3,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid",
+  "cost": 0.0999,
+  "turns": 3,
+  "seconds": 48,
+  "gold": 3,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_gc",
+  "cost": 0.0987,
+  "turns": 3,
+  "seconds": 44,
+  "gold": 3,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_v2",
+  "cost": 0.0922,
+  "turns": 3,
+  "seconds": 38,
+  "gold": 3,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "grep",
+  "cost": 0.0351132,
+  "turns": 9,
+  "seconds": 19,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopk_nc",
+  "cost": 0.0232,
+  "turns": 1,
+  "seconds": 18,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid",
+  "cost": 0.0353,
+  "turns": 2,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_gc",
+  "cost": 0.0369,
+  "turns": 2,
+  "seconds": 10,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_v2",
+  "cost": 0.0242,
+  "turns": 1,
+  "seconds": 5,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "grep",
+  "cost": 0.0402198,
+  "turns": 7,
+  "seconds": 14,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 2,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopk_nc",
+  "cost": 0.0549,
+  "turns": 2,
+  "seconds": 30,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid",
+  "cost": 0.0908,
+  "turns": 4,
+  "seconds": 28,
+  "gold": 2,
+  "seen": 1,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_gc",
+  "cost": 0.1053,
+  "turns": 4,
+  "seconds": 21,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_v2",
+  "cost": 0.0511,
+  "turns": 2,
+  "seconds": 9,
+  "gold": 2,
+  "seen": 1,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "grep",
+  "cost": 0.13964880000000002,
+  "turns": 20,
+  "seconds": 36,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 6,
+   "Read": 8,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopk_nc",
+  "cost": 0.0667,
+  "turns": 2,
+  "seconds": 33,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid",
+  "cost": 0.1664,
+  "turns": 6,
+  "seconds": 75,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_gc",
+  "cost": 0.1761,
+  "turns": 6,
+  "seconds": 69,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "read": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_v2",
+  "cost": 0.0988,
+  "turns": 3,
+  "seconds": 39,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "grep",
+  "cost": 0.0315947,
+  "turns": 4,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopk_nc",
+  "cost": 0.0966,
+  "turns": 1,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid",
+  "cost": 0.0775,
+  "turns": 1,
+  "seconds": 25,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_gc",
+  "cost": 0.0775,
+  "turns": 1,
+  "seconds": 25,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_v2",
+  "cost": 0.062,
+  "turns": 1,
+  "seconds": 18,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "grep",
+  "cost": 0.0335228,
+  "turns": 5,
+  "seconds": 11,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 2,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk_nc",
+  "cost": 0.055,
+  "turns": 2,
+  "seconds": 36,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid",
+  "cost": 0.0733,
+  "turns": 4,
+  "seconds": 27,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_gc",
+  "cost": 0.0628,
+  "turns": 4,
+  "seconds": 19,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_v2",
+  "cost": 0.0429,
+  "turns": 1,
+  "seconds": 6,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "grep",
+  "cost": 0.026368500000000003,
+  "turns": 5,
+  "seconds": 10,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopk_nc",
+  "cost": 0.039,
+  "turns": 2,
+  "seconds": 43,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid",
+  "cost": 0.0344,
+  "turns": 2,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_gc",
+  "cost": 0.0342,
+  "turns": 2,
+  "seconds": 8,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_v2",
+  "cost": 0.0409,
+  "turns": 2,
+  "seconds": 11,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L1",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "grep",
+  "cost": 0.047628699999999996,
+  "turns": 4,
+  "seconds": 23,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopk_nc",
+  "cost": 0.0441,
+  "turns": 2,
+  "seconds": 45,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid",
+  "cost": 0.0766,
+  "turns": 3,
+  "seconds": 46,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "hybrid_v2",
+  "cost": 0.0796,
+  "turns": 4,
+  "seconds": 40,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "open": 2,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41682",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "grep",
+  "cost": 0.028221800000000002,
+  "turns": 5,
+  "seconds": 11,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopk_nc",
+  "cost": 0.0426,
+  "turns": 2,
+  "seconds": 22,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid",
+  "cost": 0.0416,
+  "turns": 2,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "hybrid_v2",
+  "cost": 0.0207,
+  "turns": 1,
+  "seconds": 5,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41850",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "grep",
+  "cost": 0.0558383,
+  "turns": 9,
+  "seconds": 22,
+  "gold": 4,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 3,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopk_nc",
+  "cost": 0.0625,
+  "turns": 3,
+  "seconds": 32,
+  "gold": 4,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid",
+  "cost": 0.2715,
+  "turns": 9,
+  "seconds": 63,
+  "gold": 4,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "grep": 6,
+   "read": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "hybrid_v2",
+  "cost": 0.1403,
+  "turns": 7,
+  "seconds": 49,
+  "gold": 4,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "grep": 5,
+   "open": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41942",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "grep",
+  "cost": 0.25696050000000004,
+  "turns": 18,
+  "seconds": 73,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 6,
+   "Read": 10,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopk_nc",
+  "cost": 0.2092,
+  "turns": 11,
+  "seconds": 74,
+  "gold": 1,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false,
+  "tools": {
+   "codemem": 11
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid",
+  "cost": 0.6954,
+  "turns": 15,
+  "seconds": 116,
+  "gold": 1,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false,
+  "tools": {
+   "codemem": 1,
+   "grep": 8,
+   "read": 6
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "hybrid_v2",
+  "cost": 0.36,
+  "turns": 15,
+  "seconds": 145,
+  "gold": 1,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false,
+  "tools": {
+   "codemem": 2,
+   "grep": 7,
+   "open": 6
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-41988",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "grep",
+  "cost": 0.1067352,
+  "turns": 16,
+  "seconds": 24,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 5,
+   "Read": 8,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopk_nc",
+  "cost": 0.1251,
+  "turns": 4,
+  "seconds": 34,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 4
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid",
+  "cost": 0.2319,
+  "turns": 7,
+  "seconds": 51,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "read": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "hybrid_v2",
+  "cost": 0.1371,
+  "turns": 4,
+  "seconds": 36,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42042",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "grep",
+  "cost": 0.023853100000000002,
+  "turns": 4,
+  "seconds": 14,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopk_nc",
+  "cost": 0.024,
+  "turns": 1,
+  "seconds": 19,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid",
+  "cost": 0.0332,
+  "turns": 2,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "hybrid_v2",
+  "cost": 0.0351,
+  "turns": 2,
+  "seconds": 11,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "retry": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42204",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "grep",
+  "cost": 0.0497562,
+  "turns": 8,
+  "seconds": 19,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 3,
+   "Read": 1,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopk_nc",
+  "cost": 0.0265,
+  "turns": 1,
+  "seconds": 21,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid",
+  "cost": 0.0356,
+  "turns": 1,
+  "seconds": 41,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "hybrid_v2",
+  "cost": 0.041,
+  "turns": 1,
+  "seconds": 15,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42260",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "grep",
+  "cost": 0.0317182,
+  "turns": 6,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Glob": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopk_nc",
+  "cost": 0.0324,
+  "turns": 1,
+  "seconds": 26,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid",
+  "cost": 0.0545,
+  "turns": 3,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "hybrid_v2",
+  "cost": 0.0634,
+  "turns": 4,
+  "seconds": 22,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42433",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "grep",
+  "cost": 0.0933196,
+  "turns": 11,
+  "seconds": 30,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 7,
+   "Read": 1,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopk_nc",
+  "cost": 0.1301,
+  "turns": 5,
+  "seconds": 46,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 5
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid",
+  "cost": 0.0854,
+  "turns": 2,
+  "seconds": 27,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "hybrid_v2",
+  "cost": 0.1349,
+  "turns": 5,
+  "seconds": 36,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2,
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42503",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "grep",
+  "cost": 0.12156969999999999,
+  "turns": 14,
+  "seconds": 39,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 5,
+   "Read": 2,
+   "Edit": 6
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopk_nc",
+  "cost": 0.1089,
+  "turns": 4,
+  "seconds": 67,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 4
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid",
+  "cost": 0.2263,
+  "turns": 10,
+  "seconds": 83,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2,
+   "grep": 4,
+   "read": 4
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "hybrid_v2",
+  "cost": 0.1152,
+  "turns": 3,
+  "seconds": 36,
+  "gold": 4,
+  "seen": 4,
+  "edited": 4,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42707",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "grep",
+  "cost": 0.0335023,
+  "turns": 5,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopk_nc",
+  "cost": 0.0498,
+  "turns": 2,
+  "seconds": 27,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid",
+  "cost": 0.041,
+  "turns": 1,
+  "seconds": 38,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "hybrid_v2",
+  "cost": 0.0503,
+  "turns": 1,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42780",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "grep",
+  "cost": 0.0526182,
+  "turns": 9,
+  "seconds": 17,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 5,
+   "Read": 1,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopk_nc",
+  "cost": 0.0589,
+  "turns": 2,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid",
+  "cost": 0.0805,
+  "turns": 5,
+  "seconds": 44,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "hybrid_v2",
+  "cost": 0.0792,
+  "turns": 4,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1,
+   "review": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42792",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "grep",
+  "cost": 0.0435614,
+  "turns": 7,
+  "seconds": 17,
+  "gold": 4,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Glob": 1,
+   "Read": 1,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopk_nc",
+  "cost": 0.1029,
+  "turns": 5,
+  "seconds": 49,
+  "gold": 4,
+  "seen": 3,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 5
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid",
+  "cost": 0.1608,
+  "turns": 9,
+  "seconds": 64,
+  "gold": 4,
+  "seen": 3,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 5,
+   "read": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "hybrid_v2",
+  "cost": 0.0679,
+  "turns": 3,
+  "seconds": 30,
+  "gold": 4,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "retry": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42838",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "grep",
+  "cost": 0.10202930000000002,
+  "turns": 15,
+  "seconds": 38,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 6,
+   "Read": 4,
+   "Edit": 4
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopk_nc",
+  "cost": 0.0746,
+  "turns": 3,
+  "seconds": 42,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid",
+  "cost": 0.1099,
+  "turns": 6,
+  "seconds": 48,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2,
+   "grep": 2,
+   "read": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "hybrid_v2",
+  "cost": 0.1265,
+  "turns": 4,
+  "seconds": 40,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42864",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "grep",
+  "cost": 0.0208226,
+  "turns": 4,
+  "seconds": 10,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopk_nc",
+  "cost": 0.0578,
+  "turns": 2,
+  "seconds": 26,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid",
+  "cost": 0.0622,
+  "turns": 3,
+  "seconds": 25,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "hybrid_v2",
+  "cost": 0.0778,
+  "turns": 3,
+  "seconds": 23,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-42919",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "grep",
+  "cost": 0.0343168,
+  "turns": 6,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 2,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopk_nc",
+  "cost": 0.0248,
+  "turns": 1,
+  "seconds": 23,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid",
+  "cost": 0.0282,
+  "turns": 1,
+  "seconds": 26,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "hybrid_v2",
+  "cost": 0.0313,
+  "turns": 1,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43012",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "grep",
+  "cost": 0.024808200000000002,
+  "turns": 4,
+  "seconds": 12,
+  "gold": 4,
+  "seen": 0,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopk_nc",
+  "cost": 0.0557,
+  "turns": 3,
+  "seconds": 32,
+  "gold": 4,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid",
+  "cost": 0.052,
+  "turns": 3,
+  "seconds": 16,
+  "gold": 4,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "hybrid_v2",
+  "cost": 0.1031,
+  "turns": 4,
+  "seconds": 17,
+  "gold": 4,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 3,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43071",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "grep",
+  "cost": 0.0327379,
+  "turns": 6,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopk_nc",
+  "cost": 0.0288,
+  "turns": 1,
+  "seconds": 20,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid",
+  "cost": 0.039,
+  "turns": 2,
+  "seconds": 14,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "hybrid_v2",
+  "cost": 0.0626,
+  "turns": 2,
+  "seconds": 22,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43146",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "grep",
+  "cost": 0.0457915,
+  "turns": 9,
+  "seconds": 21,
+  "gold": 5,
+  "seen": 4,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 3,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopk_nc",
+  "cost": 0.0391,
+  "turns": 2,
+  "seconds": 25,
+  "gold": 5,
+  "seen": 3,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid",
+  "cost": 0.0427,
+  "turns": 1,
+  "seconds": 30,
+  "gold": 5,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "hybrid_v2",
+  "cost": 0.0716,
+  "turns": 3,
+  "seconds": 32,
+  "gold": 5,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "review": 1,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43148",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "grep",
+  "cost": 0.0401036,
+  "turns": 8,
+  "seconds": 17,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 4,
+   "Read": 1,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopk_nc",
+  "cost": 0.0507,
+  "turns": 2,
+  "seconds": 34,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid",
+  "cost": 0.088,
+  "turns": 4,
+  "seconds": 37,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "hybrid_v2",
+  "cost": 0.0883,
+  "turns": 4,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43170",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "grep",
+  "cost": 0.14975080000000002,
+  "turns": 17,
+  "seconds": 44,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 7,
+   "Read": 3,
+   "Edit": 6
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopk_nc",
+  "cost": 0.3619,
+  "turns": 9,
+  "seconds": 84,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 9
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid",
+  "cost": 0.3489,
+  "turns": 12,
+  "seconds": 92,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2,
+   "read": 4,
+   "grep": 6
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "hybrid_v2",
+  "cost": 0.2008,
+  "turns": 6,
+  "seconds": 54,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "open": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43172",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "grep",
+  "cost": 0.1139427,
+  "turns": 12,
+  "seconds": 43,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "Grep": 4,
+   "Read": 6,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopk_nc",
+  "cost": 0.1763,
+  "turns": 8,
+  "seconds": 72,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 8
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid",
+  "cost": 0.094,
+  "turns": 5,
+  "seconds": 47,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "read": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "hybrid_v2",
+  "cost": 0.1418,
+  "turns": 8,
+  "seconds": 54,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "open": 4
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43174",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "grep",
+  "cost": 0.0631708,
+  "turns": 11,
+  "seconds": 18,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 3,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopk_nc",
+  "cost": 0.0283,
+  "turns": 1,
+  "seconds": 26,
+  "gold": 3,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid",
+  "cost": 0.0342,
+  "turns": 1,
+  "seconds": 27,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "hybrid_v2",
+  "cost": 0.0565,
+  "turns": 2,
+  "seconds": 23,
+  "gold": 3,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43305",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "grep",
+  "cost": 0.028176600000000003,
+  "turns": 5,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopk_nc",
+  "cost": 0.0437,
+  "turns": 2,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid",
+  "cost": 0.0947,
+  "turns": 5,
+  "seconds": 31,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 4,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "hybrid_v2",
+  "cost": 0.0548,
+  "turns": 3,
+  "seconds": 20,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 2,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43400",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "grep",
+  "cost": 0.0628301,
+  "turns": 8,
+  "seconds": 21,
+  "gold": 3,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 3,
+   "Glob": 1,
+   "Read": 1,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopk_nc",
+  "cost": 0.0487,
+  "turns": 2,
+  "seconds": 35,
+  "gold": 3,
+  "seen": 3,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid",
+  "cost": 0.0371,
+  "turns": 1,
+  "seconds": 30,
+  "gold": 3,
+  "seen": 3,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "hybrid_v2",
+  "cost": 0.0386,
+  "turns": 1,
+  "seconds": 18,
+  "gold": 3,
+  "seen": 3,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43429",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "grep",
+  "cost": 0.0562276,
+  "turns": 9,
+  "seconds": 20,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 4,
+   "Read": 3,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopk_nc",
+  "cost": 0.0603,
+  "turns": 2,
+  "seconds": 33,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid",
+  "cost": 0.0858,
+  "turns": 4,
+  "seconds": 39,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 2,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_gc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "hybrid_v2",
+  "cost": 0.0557,
+  "turns": 2,
+  "seconds": 21,
+  "gold": 2,
+  "seen": 2,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "microsoft__playwright-43488",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "grep",
+  "cost": 0.0525985,
+  "turns": 7,
+  "seconds": 23,
+  "gold": 5,
+  "seen": 4,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 3,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopk_nc",
+  "cost": 0.0335,
+  "turns": 1,
+  "seconds": 39,
+  "gold": 5,
+  "seen": 5,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid",
+  "cost": 0.0334,
+  "turns": 1,
+  "seconds": 40,
+  "gold": 5,
+  "seen": 5,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_gc",
+  "cost": 0.0334,
+  "turns": 1,
+  "seconds": 15,
+  "gold": 5,
+  "seen": 5,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "hybrid_v2",
+  "cost": 0.0511,
+  "turns": 1,
+  "seconds": 21,
+  "gold": 5,
+  "seen": 5,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67025",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "grep",
+  "cost": 0.0802889,
+  "turns": 14,
+  "seconds": 28,
+  "gold": 4,
+  "seen": 4,
+  "edited": 3,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 5,
+   "Read": 4,
+   "Edit": 4
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopk_nc",
+  "cost": 0.0346,
+  "turns": 1,
+  "seconds": 33,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid",
+  "cost": 0.0391,
+  "turns": 1,
+  "seconds": 26,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_gc",
+  "cost": 0.0391,
+  "turns": 1,
+  "seconds": 16,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_done",
+  "cost": 0.083,
+  "turns": 3,
+  "seconds": 36,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "review": 1,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_v2a",
+  "cost": 0.0532,
+  "turns": 1,
+  "seconds": 21,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "hybrid_v2",
+  "cost": 0.0481,
+  "turns": 1,
+  "seconds": 19,
+  "gold": 4,
+  "seen": 3,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-67897",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "grep",
+  "cost": 0.0512942,
+  "turns": 4,
+  "seconds": 19,
+  "gold": 3,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopk_nc",
+  "cost": 0.1067,
+  "turns": 3,
+  "seconds": 60,
+  "gold": 3,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid",
+  "cost": 0.5579,
+  "turns": 7,
+  "seconds": 193,
+  "gold": 3,
+  "seen": 2,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "read": 3,
+   "grep": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_gc",
+  "cost": 0.2672,
+  "turns": 4,
+  "seconds": 62,
+  "gold": 3,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "read": 2,
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "hybrid_v2",
+  "cost": 0.0867,
+  "turns": 2,
+  "seconds": 26,
+  "gold": 3,
+  "seen": 0,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68090",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "grep",
+  "cost": 0.030283200000000003,
+  "turns": 8,
+  "seconds": 15,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 4
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopk_nc",
+  "cost": 0.0248,
+  "turns": 1,
+  "seconds": 25,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid",
+  "cost": 0.0339,
+  "turns": 2,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_gc",
+  "cost": 0.033,
+  "turns": 2,
+  "seconds": 9,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "hybrid_v2",
+  "cost": 0.023,
+  "turns": 1,
+  "seconds": 5,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68195",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "grep",
+  "cost": 0.0471478,
+  "turns": 9,
+  "seconds": 18,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 3,
+   "Read": 2,
+   "Edit": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopk_nc",
+  "cost": 0.0333,
+  "turns": 1,
+  "seconds": 21,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid",
+  "cost": 0.0358,
+  "turns": 1,
+  "seconds": 20,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_gc",
+  "cost": 0.0358,
+  "turns": 1,
+  "seconds": 16,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "hybrid_v2",
+  "cost": 0.0904,
+  "turns": 3,
+  "seconds": 34,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-68278",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "grep",
+  "cost": 0.17915550000000002,
+  "turns": 20,
+  "seconds": 43,
+  "gold": 2,
+  "seen": 2,
+  "edited": 2,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 7,
+   "Read": 7,
+   "Edit": 5
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopk_nc",
+  "cost": 0.2059,
+  "turns": 11,
+  "seconds": 67,
+  "gold": 2,
+  "seen": 2,
+  "edited": 0,
+  "task_hit": false,
+  "changed": false,
+  "tools": {
+   "codemem": 11
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid",
+  "cost": 0.2113,
+  "turns": 7,
+  "seconds": 63,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "read": 3
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_gc",
+  "cost": 0.0883,
+  "turns": 3,
+  "seconds": 28,
+  "gold": 2,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "hybrid_v2",
+  "cost": 0.2133,
+  "turns": 9,
+  "seconds": 81,
+  "gold": 2,
+  "seen": 1,
+  "edited": 0,
+  "task_hit": false,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 3,
+   "open": 4,
+   "review": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-69924",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "grep",
+  "cost": 0.0528708,
+  "turns": 8,
+  "seconds": 20,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 3,
+   "Read": 2,
+   "Edit": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopk_nc",
+  "cost": 0.0569,
+  "turns": 2,
+  "seconds": 35,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid",
+  "cost": 0.0446,
+  "turns": 1,
+  "seconds": 24,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_gc",
+  "cost": 0.0446,
+  "turns": 1,
+  "seconds": 8,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "hybrid_v2",
+  "cost": 0.1194,
+  "turns": 2,
+  "seconds": 37,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-70205",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "grep",
+  "cost": 0.027085500000000002,
+  "turns": 5,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 2,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopk_nc",
+  "cost": 0.0686,
+  "turns": 2,
+  "seconds": 35,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid",
+  "cost": 0.0326,
+  "turns": 2,
+  "seconds": 14,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_gc",
+  "cost": 0.0341,
+  "turns": 2,
+  "seconds": 10,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "hybrid_v2",
+  "cost": 0.0352,
+  "turns": 2,
+  "seconds": 13,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71129",
+  "arm": "merged10hop",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "grep",
+  "cost": 0.0211531,
+  "turns": 4,
+  "seconds": 12,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "Grep": 1,
+   "Read": 1,
+   "Edit": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full5",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full25",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full50",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopk",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopk_nc",
+  "cost": 0.0437,
+  "turns": 2,
+  "seconds": 41,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 2
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "full10t",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "merged10",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopks",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "loopks_nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid",
+  "cost": 0.0699,
+  "turns": 3,
+  "seconds": 50,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_gc",
+  "cost": 0.0679,
+  "turns": 3,
+  "seconds": 18,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "read": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_done",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_v2a",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "hybrid_v2",
+  "cost": 0.0635,
+  "turns": 3,
+  "seconds": 34,
+  "gold": 1,
+  "seen": 1,
+  "edited": 1,
+  "task_hit": true,
+  "changed": true,
+  "tools": {
+   "codemem": 1,
+   "grep": 1,
+   "open": 1
+  }
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "merged10nc",
+  "missing": true
+ },
+ {
+  "level": "L2",
+  "task": "pandas-dev__pandas-71232",
+  "arm": "merged10hop",
+  "missing": true
+ }
+]

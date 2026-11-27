@@ -1,0 +1,35 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68278",
+ "fixed": {
+  "step": 1,
+  "explanation": "In online_ewma, the decay exponent is deltas[j - 1], which indexes by column j rather than by row i. The deltas array is per row, so for a single column the wrong element is used, or it is out of range. The decay is lost and the result is a plain cumulative mean. The fix is to index with the row, deltas[i - 1].",
+  "edits": 1
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0358,
+ "seconds": 20,
+ "diff_stat": "pandas/core/window/online.py | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+}
+step 1: codemem {"intent": "Online/incremental exponentially weighted moving mean (EWM online, ExponentialMovingWindow.online, EWMMeanState) update path that, for single-column -> action=edit picked=['pandas/core/window/online.py:generate_online_numba_ewma_func'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  13%|█▎        | 39/290 [00:00<00:00, 374.41it/s]
+Loading weights:  29%|██▉       | 85/290 [00:00<00:00, 386.42it/s]
+Loading weights:  46%|████▌     | 133/290 [00:00<00:00, 425.00it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 719.98it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

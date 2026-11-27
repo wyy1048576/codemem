@@ -1,0 +1,19 @@
+diff --git a/packages/injected/src/storageScript.ts b/packages/injected/src/storageScript.ts
+index 2583b2c..7a85c0a 100644
+--- a/packages/injected/src/storageScript.ts
++++ b/packages/injected/src/storageScript.ts
+@@ -76,6 +76,14 @@ export class StorageScript {
+       throw new Error('Database version is unset');
+ 
+     const db = await this._idbRequestToPromise(indexedDB.open(dbInfo.name));
++    try {
++      return await this._collectOpenDB(db, { name: dbInfo.name, version: dbInfo.version });
++    } finally {
++      db.close();
++    }
++  }
++
++  private async _collectOpenDB(db: IDBDatabase, dbInfo: { name: string, version: number }) {
+     if (db.objectStoreNames.length === 0)
+       return { name: dbInfo.name, version: dbInfo.version, stores: [] };
+ 

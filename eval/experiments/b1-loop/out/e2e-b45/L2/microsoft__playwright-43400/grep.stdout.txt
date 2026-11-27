@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43400",
+ "exit": 0,
+ "seconds": 15,
+ "cost_usd": 0.028176600000000003,
+ "turns": 5,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 3312,
+  "cache_read_input_tokens": 26926,
+  "output_tokens": 1222,
+  "output_tokens_details": {
+   "thinking_tokens": 121
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 3312,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 431,
+    "cache_read_input_tokens": 8197,
+    "cache_creation_input_tokens": 507,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 507
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/injected/src/injectedScript.ts | 11 ++++++++++-\n 1 file changed, 10 insertions(+), 1 deletion(-)",
+ "final": "Filling a `datetime-local` input with seconds, like `2026-10-14T12:00:00`, should no longer throw \"Malformed value\". I haven't built or run anything, so this is untested.\n\n**Cause:** `fill` in `packages/injected/src/injectedScript.ts` sets `input.value`. It then requires the value read back to equal exactly what was passed in. For `datetime-local` and `time`, the browser shortens zero seconds, so `12:00:00` reads back as `12:00`. The strict comparison failed even though the browser had accepted the value.\n\n**Fix:** For `time` and `datetime-local`, both the requested value and the value read back now drop a trailing `:00` or `:00.000` before the comparison. An empty read-back still counts as rejected, so genuinely invalid strings still throw \"Malformed value\". Values with non-zero seconds, like `12:00:30`, are compared as they were before.\n\nI didn't add a test.",
+ "stderr": ""
+}
+

@@ -1,0 +1,26 @@
+diff --git a/packages/playwright-core/src/tools/cli-client/program.ts b/packages/playwright-core/src/tools/cli-client/program.ts
+index 4f3a0cc..6a087c4 100644
+--- a/packages/playwright-core/src/tools/cli-client/program.ts
++++ b/packages/playwright-core/src/tools/cli-client/program.ts
+@@ -295,6 +295,8 @@ async function runInSession(entry: SessionFile, clientInfo: ClientInfo, args: Mi
+     delete args[globalOption];
+   const session = new Session(entry);
+   const result = await session.run(clientInfo, args, { raw, json: output.json });
++  if (result.isError)
++    process.exitCode = 1;
+   return result.text;
+ }
+ 
+diff --git a/packages/playwright-core/src/tools/cli-client/session.ts b/packages/playwright-core/src/tools/cli-client/session.ts
+index bbcf54c..2db6a10 100644
+--- a/packages/playwright-core/src/tools/cli-client/session.ts
++++ b/packages/playwright-core/src/tools/cli-client/session.ts
+@@ -42,7 +42,7 @@ export class Session {
+     return compareSemver(clientInfo.version, this.config.version) >= 0;
+   }
+ 
+-  async run(clientInfo: ClientInfo, args: MinimistArgs, options?: { raw?: boolean, json?: boolean }): Promise<{ text: string }> {
++  async run(clientInfo: ClientInfo, args: MinimistArgs, options?: { raw?: boolean, json?: boolean }): Promise<{ text: string, isError?: boolean }> {
+     if (!this.isCompatible(clientInfo))
+       throw new Error(`Client is v${clientInfo.version}, session '${this.name}' is v${this.config.version}. Run\n\n  playwright-cli${this.name !== 'default' ? ` -s=${this.name}` : ''} open\n\nto restart the browser session.`);
+ 

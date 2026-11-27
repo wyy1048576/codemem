@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-41850",
+ "exit": 0,
+ "seconds": 9,
+ "cost_usd": 0.027109300000000003,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 4565,
+  "cache_read_input_tokens": 25433,
+  "output_tokens": 629,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 4565,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 136,
+    "cache_read_input_tokens": 8084,
+    "cache_creation_input_tokens": 288,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 288
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "final": "On redirect, Playwright now updates the Host header whatever the casing of its name. I haven't built or run anything, so the change is untested.\n\nThe old check in `packages/playwright-core/src/server/fetch.ts` (around line 479) only matched a lowercase `host` key. I replaced it with a loop over the header names that compares them case-insensitively and sets each match to the redirect target's host.\n\nI didn't add a test.",
+ "stderr": ""
+}
+

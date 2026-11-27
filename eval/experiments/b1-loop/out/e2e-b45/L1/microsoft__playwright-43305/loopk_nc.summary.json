@@ -1,0 +1,72 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43305",
+ "fixed": {
+  "round": 1,
+  "explanation": "The sync load hook runs before async loaders registered by users. For files with extensions Playwright doesn't transform (e.g. .mdx), it still reads and transforms them, causing a syntax error. I add an early extension check that calls nextLoad before reading the file, letting other loaders handle it.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0297,
+ "seconds": 16,
+ "diff_stat": "packages/playwright/src/transform/esmLoaderSync.ts | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Playwright's Node module loader hook (registered via synchronous module.registerHooks) has a load hook that reads and transforms files. It should call nextLoad immediately for file extensions Playwright doesn't transform (e.g. .mdx), before reading or transforming the file, so other registered loaders can handle them.",
+    "symptom": "With a custom async Node.js loader (MDX) registered in config, Playwright's synchronous load hook parses the .mdx file as JavaScript and fails with a syntax error, so no tests are collected.",
+    "anchors": [
+     "load hook",
+     "Node.js loader",
+     "synchronous module hooks",
+     "MDX",
+     "external"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/transform/esmLoaderSync.ts",
+     59,
+     93
+    ],
+    [
+     "packages/playwright/src/transform/esmLoader.ts",
+     64,
+     100
+    ],
+    [
+     "packages/playwright/src/transform/transform.ts",
+     273,
+     314
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "The sync load hook runs before async loaders registered by users. For files with extensions Playwright doesn't transform (e.g. .mdx), it still reads and transforms them, causing a syntax error. I add an early extension check that calls nextLoad before reading the file, letting other loaders handle it.",
+   "picked": [
+    "packages/playwright/src/transform/esmLoaderSync.ts:load"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

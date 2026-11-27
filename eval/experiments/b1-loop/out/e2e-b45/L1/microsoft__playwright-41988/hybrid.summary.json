@@ -1,0 +1,131 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41988",
+ "fixed": {
+  "step": 3,
+  "explanation": "`removeRedundantNames` clears a wrapper span's ref on enter, because the span is not a leaf generic yet. Later `inlineTextIntoGeneric` turns it into a text-only generic, and `removeNameRepeatingChild` removes it because its text equals the parent's name. The button's name is then dropped as redundant, since all of its contributors look represented, so both the name and the text are lost. The fix re-marks a removed node's ref as pending, so the ancestor keeps its name. I couldn't see `isLeafGeneric`, so this is inferred from the distiller code and untested.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "tools": {
+  "codemem": 1,
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.1495,
+ "seconds": 41,
+ "diff_stat": "packages/injected/src/ariaSnapshotDistiller.ts | 6 +++++-\n 1 file changed, 5 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "The AI/ariaSnapshot generator computes accessible names of elements while building the YAML snapshot. Name computation (getElementAccessibleName / name from content) apparently loses text when a child span contains an aria-hidden element next to a text span, likely due to caching or hidden-subtree handling in role utils.",
+    "symptom": "The snapshot lists a button with no name even though its content text \"Add New Item\" yields a name when located by role.",
+    "anchors": [
+     "aria-hidden",
+     "focusable",
+     "tabindex",
+     "snapshot",
+     "button"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     668,
+     991
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     411,
+     584
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     220,
+     409
+    ],
+    [
+     "tests/library/role-utils.spec.ts",
+     407,
+     597
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     85,
+     220
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "grep",
+   "analysis": "The name is probably dropped by distillAriaSnapshot as redundant, so I need to read that function.",
+   "picked": []
+  },
+  {
+   "step": 2,
+   "tool": "grep",
+   "input": {
+    "pattern": "distillAriaSnapshot|nameFromContentRefs",
+    "path": "packages/injected/src",
+    "ignore_case": false
+   },
+   "matches": 13,
+   "grep_shown": [
+    "packages/injected/src/ariaSnapshot.ts:21",
+    "packages/injected/src/ariaSnapshot.ts:27",
+    "packages/injected/src/ariaSnapshot.ts:93",
+    "packages/injected/src/ariaSnapshot.ts:142",
+    "packages/injected/src/ariaSnapshot.ts:145",
+    "packages/injected/src/ariaSnapshot.ts:161",
+    "packages/injected/src/ariaSnapshot.ts:218",
+    "packages/injected/src/ariaSnapshotDistiller.ts:50",
+    "packages/injected/src/ariaSnapshotDistiller.ts:173",
+    "packages/injected/src/ariaSnapshotDistiller.ts:182",
+    "packages/injected/src/ariaSnapshotDistiller.ts:183",
+    "packages/injected/src/ariaSnapshotDistiller.ts:185",
+    "packages/injected/src/ariaSnapshotDistiller.ts:188"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "The distiller uses nameFromContentRefs and pendingContentRefs to drop names considered redundant. I need to read the distiller and the visit function in ariaSnapshot.ts to find where the name is lost.",
+   "picked": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:<block>",
+    "packages/injected/src/ariaSnapshotDistiller.ts:distillAriaSnapshot",
+    "packages/injected/src/ariaSnapshot.ts:generateAriaTree.visit"
+   ]
+  },
+  {
+   "step": 3,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 50-52 (distillAriaSnapshot)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)"
+   ],
+   "action": "edit",
+   "analysis": "`removeRedundantNames` clears a wrapper span's ref on enter, because the span is not a leaf generic yet. Later `inlineTextIntoGeneric` turns it into a text-only generic, and `removeNameRepeatingChild` removes it because its text equals the parent's name. The button's name is then dropped as redundant, since all of its contributors look represented, so both the name and the text are lost. The fix re-marks a removed node's ref as pending, so the ancestor keeps its name. I couldn't see `isLeafGeneric`, so this is inferred from the distiller code and untested.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

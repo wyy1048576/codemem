@@ -1,0 +1,105 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42780",
+ "fixed": {
+  "round": 2,
+  "explanation": "In the internal:role branch, name and description both set options.exact from attr.caseSensitive and throw on a mismatch. A regex value has no meaningful exactness, so mixing a regex with an exact string makes the check throw. The caller then falls back to the raw selector. The fix applies the exactness check and assignment only to string values.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0498,
+ "seconds": 27,
+ "diff_stat": "packages/isomorphic/locatorGenerators.ts | 20 ++++++++++----------\n 1 file changed, 10 insertions(+), 10 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that converts an internal selector string (internal:role=...) into a readable locator expression (getByRole with name and description options) fails to handle regex vs string values for name and description, falling back to the raw selector. Likely the selector-to-locator generator/parser for role engine attributes.",
+    "symptom": "Role locators with a regex name and string description (or reverse) are printed as raw internal selectors instead of getByRole(...) locator text.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/isomorphic/locatorUtils.ts",
+     69,
+     90
+    ],
+    [
+     "packages/isomorphic/locatorParser.ts",
+     25,
+     101
+    ],
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     41,
+     52
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The selector-to-locator conversion happens in locatorGenerators.ts (innerAsLocators), which handles internal:role. getByRoleSelector shows name and description are escaped as strings or regexes, so the role handling probably mishandles mixed regex/string types and throws, which falls back to the raw selector. I need to see that role branch.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Code in the locator generator that handles 'role' engine selectors, parsing attrs name and description with regex vs string (exact) and producing getByRole options for each language.",
+    "symptom": "Role locators with a regex name and string description (or reverse) print as raw internal selector.",
+    "anchors": [
+     "asLocatorDescription",
+     "innerAsLocators",
+     "internal:role",
+     "getByRole",
+     "description"
+    ],
+    "look_in": [
+     "packages/isomorphic/locatorGenerators.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     86,
+     271
+    ],
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     528,
+     603
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In the internal:role branch, name and description both set options.exact from attr.caseSensitive and throw on a mismatch. A regex value has no meaningful exactness, so mixing a regex with an exact string makes the check throw. The caller then falls back to the raw selector. The fix applies the exactness check and assignment only to string values.",
+   "picked": [
+    "packages/isomorphic/locatorGenerators.ts:innerAsLocators"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

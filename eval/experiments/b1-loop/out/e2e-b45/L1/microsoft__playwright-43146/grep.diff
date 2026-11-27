@@ -1,0 +1,34 @@
+diff --git a/packages/playwright-core/src/server/cookieStore.ts b/packages/playwright-core/src/server/cookieStore.ts
+index 5d54b60..0cd1eff 100644
+--- a/packages/playwright-core/src/server/cookieStore.ts
++++ b/packages/playwright-core/src/server/cookieStore.ts
+@@ -153,13 +153,15 @@ export function parseRawCookie(header: string): RawCookie | null {
+     name,
+     value,
+   };
++  let hasMaxAge = false;
+   for (let i = 1; i < pairs.length; i++) {
+     const [name, value] = pairs[i];
+     switch (name.toLowerCase()) {
+       case 'expires':
+         const expiresMs = (+new Date(value));
+         // https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.1
+-        if (isFinite(expiresMs)) {
++        // Max-Age takes precedence over Expires regardless of attribute order.
++        if (isFinite(expiresMs) && !hasMaxAge) {
+           if (expiresMs <= 0)
+             cookie.expires = 0;
+           else
+@@ -167,8 +169,11 @@ export function parseRawCookie(header: string): RawCookie | null {
+         }
+         break;
+       case 'max-age':
+-        const maxAgeSec = parseInt(value, 10);
++        // https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.2
++        // Ignore the attribute unless the value is an optional '-' followed by digits only.
++        const maxAgeSec = /^-?\d+$/.test(value) ? parseInt(value, 10) : NaN;
+         if (isFinite(maxAgeSec)) {
++          hasMaxAge = true;
+           // From https://datatracker.ietf.org/doc/html/rfc6265#section-5.2.2
+           // If delta-seconds is less than or equal to zero (0), let expiry-time
+           // be the earliest representable date and time.

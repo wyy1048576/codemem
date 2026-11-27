@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42042",
+ "exit": 0,
+ "seconds": 24,
+ "cost_usd": 0.0842469,
+ "turns": 13,
+ "usage": {
+  "input_tokens": 18,
+  "cache_creation_input_tokens": 12861,
+  "cache_read_input_tokens": 108469,
+  "output_tokens": 2192,
+  "output_tokens_details": {
+   "thinking_tokens": 139
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 12861,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 307,
+    "cache_read_input_tokens": 17659,
+    "cache_creation_input_tokens": 594,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 594
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 5,
+  "Read": 5,
+  "Edit": 2
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/tools/cli-client/program.ts | 2 ++\n packages/playwright-core/src/tools/cli-client/session.ts | 2 +-\n 2 files changed, 3 insertions(+), 1 deletion(-)",
+ "final": "Those exits are only for `--version` and help, so they don't affect the fix. I didn't see an unconditional `process.exit(0)` after a tool run, but I only read part of the file.\n\nThe CLI now exits with status 1 when the final tool response is marked as an error. This applies to text and `--json` output. I haven't built or run it, so it's untested.\n\nThe daemon already returned `{ isError, text }` for each command. The client dropped `isError` and kept only `text`. I made two changes:\n- **`session.ts`**: `Session.run`'s return type now includes `isError?: boolean`.\n- **`program.ts`**: `runInSession` sets `process.exitCode = 1` when `result.isError` is true. It uses `exitCode` instead of calling `process.exit`, so the error output is flushed before the process exits.\n\nThis also covers the tool calls that `open` and `attach` make internally, such as the initial `goto`, because they go through the same function.",
+ "stderr": ""
+}
+

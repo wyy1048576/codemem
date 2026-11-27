@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42707",
+ "exit": 0,
+ "seconds": 39,
+ "cost_usd": 0.12156969999999999,
+ "turns": 14,
+ "usage": {
+  "input_tokens": 16,
+  "cache_creation_input_tokens": 17390,
+  "cache_read_input_tokens": 102477,
+  "output_tokens": 4173,
+  "output_tokens_details": {
+   "thinking_tokens": 802
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 17390,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 424,
+    "cache_read_input_tokens": 20069,
+    "cache_creation_input_tokens": 2713,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2713
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 5,
+  "Read": 2,
+  "Edit": 6
+ },
+ "subtype": "success",
+ "diff_stat": "packages/injected/src/storageScript.ts          |  2 +-\n packages/isomorphic/utilityScriptSerializers.ts | 58 +++++++++++++++++++++++--\n 2 files changed, 56 insertions(+), 4 deletions(-)",
+ "final": "IndexedDB values that are a `Map` or `Set` (including ones nested inside other values) should now keep their contents through save and restore. I couldn't build or run anything, so this is untested.\n\n**Cause:** the shared serializer in `packages/isomorphic/utilityScriptSerializers.ts` has no case for `Map` or `Set`. It treated them as plain objects with no own keys, so they were saved as `{}`.\n\n**Fix:**\n- **Serializer:** `serializeAsCallArgument` takes a new opt-in `{ mapsAndSets: true }` option. When it's set, it writes a `Map` as `{ m: [[k, v], \u2026], id }` and a `Set` as `{ se: [\u2026], id }`. `parseEvaluationResultValue` reads both back into a real `Map` or `Set`. The `m` and `se` variants are added to the `SerializedValue` type.\n- **Storage script:** `packages/injected/src/storageScript.ts` passes the option when it serializes IndexedDB keys and values.\n- **Evaluation results:** page evaluation results are unchanged because the option is off by default and only the storage script turns it on. The protocol field `valueEncoded` is `tAny`, so I didn't touch the protocol or validator.\n\nI didn't add a test.",
+ "stderr": ""
+}

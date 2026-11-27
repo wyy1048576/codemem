@@ -1,0 +1,69 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43174",
+ "fixed": {
+  "round": 1,
+  "explanation": "gracefullyClose treats any reentrant call as a second SIGINT and force-kills the process. On stdin end, both the transport close and the exit handler reach it, so the second call kills the browser right after the graceful close starts. The edit makes a repeated call wait for the first graceful close. closeOrKill in browserType.ts still force-kills if the close times out.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.034,
+ "seconds": 31,
+ "diff_stat": "packages/utils/processLauncher.ts | 26 +++++++++++++-------------\n 1 file changed, 13 insertions(+), 13 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Browser process graceful close logic: calling gracefullyClose a second time while one is in progress falls through to kill the browser process immediately. Also the MCP stdio server shutdown handler on stdin end, which closes the transport and separately triggers closing all browsers (gracefullyCloseAll).",
+    "symptom": "On stdin close, the MCP server runs two shutdown paths; the second graceful close finds one in progress and force-kills the browser (taskkill) 1 ms later, losing persistent profile data.",
+    "anchors": [
+     "taskkill",
+     "close tool",
+     "localStorage"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/browserType.ts",
+     245,
+     257
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/chromium.ts",
+     245,
+     249
+    ],
+    [
+     "packages/utils/processLauncher.ts",
+     210,
+     226
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "gracefullyClose treats any reentrant call as a second SIGINT and force-kills the process. On stdin end, both the transport close and the exit handler reach it, so the second call kills the browser right after the graceful close starts. The edit makes a repeated call wait for the first graceful close. closeOrKill in browserType.ts still force-kills if the close times out.",
+   "picked": [
+    "packages/utils/processLauncher.ts:launchProcess.gracefullyClose"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

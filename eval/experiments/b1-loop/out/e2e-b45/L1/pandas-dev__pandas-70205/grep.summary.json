@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-70205",
+ "exit": 0,
+ "seconds": 12,
+ "cost_usd": 0.0315947,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 4989,
+  "cache_read_input_tokens": 29627,
+  "output_tokens": 866,
+  "output_tokens_details": {
+   "thinking_tokens": 134
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 4989,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 213,
+    "cache_read_input_tokens": 9904,
+    "cache_creation_input_tokens": 477,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 477
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/io/excel/_base.py | 6 +++++-\n 1 file changed, 5 insertions(+), 1 deletion(-)",
+ "final": "I fixed the error in `pandas/io/excel/_base.py`. I haven't run anything, so the fix is untested.\n\nI couldn't see the issue's actual workbook, so the cause is my reading of the code. When a two-row header and `index_col` leave no data rows, the parser appears to return plain, single-level columns. `_parse_sheet` then tried to apply two header names to those columns. That is what raised the \"one name expected, two given\" error.\n\nThe change applies the header names only when the columns have as many levels as there are names. In the empty case the names are skipped, and the Excel read should return an empty DataFrame like the CSV read does.\n\nI didn't add a test.",
+ "stderr": ""
+}

@@ -1,0 +1,76 @@
+diff --git a/packages/injected/src/storageScript.ts b/packages/injected/src/storageScript.ts
+index aae4653..8c7be31 100644
+--- a/packages/injected/src/storageScript.ts
++++ b/packages/injected/src/storageScript.ts
+@@ -77,7 +77,7 @@ export class StorageScript {
+         trivial = false;
+ 
+       return { fallThrough: v };
+-    });
++    }, { structuredClone: true });
+     if (trivial)
+       return { trivial: value };
+     return { encoded };
+diff --git a/packages/isomorphic/utilityScriptSerializers.ts b/packages/isomorphic/utilityScriptSerializers.ts
+index 7e5264e..eb37748 100644
+--- a/packages/isomorphic/utilityScriptSerializers.ts
++++ b/packages/isomorphic/utilityScriptSerializers.ts
+@@ -183,6 +183,20 @@ export function parseEvaluationResultValue(value: SerializedValue, handles: any[
+       }
+       return result;
+     }
++    if ('m' in (value as any)) {
++      const result = new Map<any, any>();
++      refs.set((value as any).id, result);
++      for (const [k, v] of (value as any).m)
++        result.set(parseEvaluationResultValue(k, handles, refs), parseEvaluationResultValue(v, handles, refs));
++      return result;
++    }
++    if ('s' in (value as any)) {
++      const result = new Set<any>();
++      refs.set((value as any).id, result);
++      for (const v of (value as any).s)
++        result.add(parseEvaluationResultValue(v, handles, refs));
++      return result;
++    }
+     if ('h' in value)
+       return handles[value.h];
+     if ('fn' in value) {
+@@ -198,8 +212,8 @@ export function parseEvaluationResultValue(value: SerializedValue, handles: any[
+   return value;
+ }
+ 
+-export function serializeAsCallArgument(value: any, handleSerializer: (value: any) => HandleOrValue): SerializedValue {
+-  return serialize(value, handleSerializer, { visited: new Map(), lastId: 0 });
++export function serializeAsCallArgument(value: any, handleSerializer: (value: any) => HandleOrValue, options?: { structuredClone?: boolean }): SerializedValue {
++  return serialize(value, handleSerializer, { visited: new Map(), lastId: 0, structuredClone: !!options?.structuredClone } as any);
+ }
+ 
+ function serialize(value: any, handleSerializer: (value: any) => HandleOrValue, visitorInfo: VisitorInfo): SerializedValue {
+@@ -275,6 +289,26 @@ function innerSerialize(value: any, handleSerializer: (value: any) => HandleOrVa
+   if (id)
+     return { ref: id };
+ 
++  if ((visitorInfo as any).structuredClone && value && typeof value === 'object') {
++    const tag = Object.prototype.toString.call(value);
++    if (tag === '[object Map]') {
++      const m: any[] = [];
++      const mapId = ++visitorInfo.lastId;
++      visitorInfo.visited.set(value, mapId);
++      for (const [k, v] of (value as Map<any, any>).entries())
++        m.push([serialize(k, handleSerializer, visitorInfo), serialize(v, handleSerializer, visitorInfo)]);
++      return { m, id: mapId } as any;
++    }
++    if (tag === '[object Set]') {
++      const s: any[] = [];
++      const setId = ++visitorInfo.lastId;
++      visitorInfo.visited.set(value, setId);
++      for (const v of (value as Set<any>).values())
++        s.push(serialize(v, handleSerializer, visitorInfo));
++      return { s, id: setId } as any;
++    }
++  }
++
+   if (Array.isArray(value)) {
+     const a = [];
+     const id = ++visitorInfo.lastId;

@@ -1,0 +1,49 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43071",
+ "fixed": {
+  "round": 4,
+  "explanation": "configFromCLIOptions passes the proxy URL as the server field only, so the user and password are lost. The fix parses the URL, decodes the credentials into username and password, and removes them from the server address.",
+  "edits": 1
+ },
+ "rounds": 4,
+ "ks": [
+  3,
+  3,
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 4,
+  "loopk": 4
+ },
+ "sonnet_calls": 5,
+ "cost_usd": 0.0713,
+ "seconds": 27,
+ "diff_stat": "packages/playwright-core/src/tools/mcp/config.ts | 12 ++++++++++++\n 1 file changed, 12 insertions(+)"
+}
+round 1: k=3 action=search picked=[] 
+round 2: k=3 action=search picked=[] 
+round 3: k=3 action=search picked=[] 
+round 4: k=3 action=edit picked=['packages/playwright-core/src/tools/mcp/config.ts:configFromCLIOptions'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  13%|█▎        | 37/290 [00:00<00:00, 369.51it/s]
+Loading weights:  31%|███       | 90/290 [00:00<00:00, 427.54it/s]
+Loading weights:  46%|████▌     | 133/290 [00:00<00:00, 426.92it/s]
+Loading weights:  67%|██████▋   | 195/290 [00:00<00:00, 497.23it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 669.21it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  15%|█▍        | 43/290 [00:00<00:00, 406.55it/s]
+Loading weights:  32%|███▏      | 94/290 [00:00<00:00, 428.84it/s]
+Loading weights:  47%|████▋     | 137/290 [00:00<00:00, 321.86it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 654.17it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

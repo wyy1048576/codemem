@@ -1,0 +1,118 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 2,
+  "explanation": "Suite already has a _locks field that is serialized and cloned, but _configure ignores a lock option. I added a lock option (string or string[]) to _configure that pushes the names onto suite._locks. I didn't update the public type definitions because I haven't seen them.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0589,
+ "seconds": 31,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 11 ++++++++++-\n 1 file changed, 10 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "test.describe.configure implementation accepts options mode, retries, timeout; add a new lock option (string or string[]) that is stored on the describe's FileSuite/Suite and applied to the group's tests. Update the type definitions and the validation in the test type.",
+    "symptom": "test.describe.configure does not accept a lock option for declaring one or more lock names for the enclosing test group.",
+    "anchors": [
+     "configure",
+     "mode",
+     "timeout"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/runner/testGroups.ts",
+     28,
+     142
+    ],
+    [
+     "tests/playwright-test/test-locks.spec.ts",
+     39,
+     45
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     192,
+     215
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "_configure in testType.ts handles mode, retries, timeout but not lock. Tests have a _locks field, which is read when groups are built. I need to see how _locks is defined on TestCase/Suite and how test details' lock is applied so I can add a suite-level lock.",
+   "picked": [
+    "packages/playwright/src/common/testType.ts:TestTypeImpl._configure"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Suite and TestCase classes with _locks field, and where the lock option from test details is assigned to test._locks.",
+    "symptom": "test.describe.configure does not accept a lock option.",
+    "anchors": [
+     "_locks",
+     "_configure",
+     "lock",
+     "_timeout",
+     "_retries"
+    ],
+    "look_in": [
+     "packages/playwright/src/common/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/common/test.ts",
+     44,
+     266
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     34,
+     316
+    ],
+    [
+     "packages/playwright/src/common/test.ts",
+     268,
+     410
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/playwright/src/common/testType.ts lines 192-215 (TestTypeImpl._configure)"
+   ],
+   "action": "edit",
+   "analysis": "Suite already has a _locks field that is serialized and cloned, but _configure ignores a lock option. I added a lock option (string or string[]) to _configure that pushes the names onto suite._locks. I didn't update the public type definitions because I haven't seen them.",
+   "picked": [
+    "packages/playwright/src/common/testType.ts:TestTypeImpl"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

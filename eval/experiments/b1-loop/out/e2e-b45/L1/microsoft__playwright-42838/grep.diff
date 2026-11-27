@@ -1,0 +1,102 @@
+diff --git a/eslint.config.mjs b/eslint.config.mjs
+index d679710..0f1dfe1 100644
+--- a/eslint.config.mjs
++++ b/eslint.config.mjs
+@@ -238,6 +238,7 @@ const noWebGlobalsRuleList = [
+   { name: "cancelIdleCallback", message: "Use InjectedScript.utils.builtins.cancelIdleCallback instead" },
+   { name: "Date", message: "Use InjectedScript.utils.builtins.Date instead" },
+   { name: "Intl", message: "Use InjectedScript.utils.builtins.Intl instead" },
++  { name: "Temporal", message: "Use InjectedScript.utils.builtins.Temporal instead" },
+   { name: "performance", message: "Use InjectedScript.utils.builtins.performance instead" },
+ ];
+ 
+diff --git a/packages/injected/src/clock.ts b/packages/injected/src/clock.ts
+index 69fe461..d220a73 100644
+--- a/packages/injected/src/clock.ts
++++ b/packages/injected/src/clock.ts
+@@ -578,6 +578,39 @@ function createIntl(clock: ClockController, NativeIntl: Builtins['Intl']): Built
+   return ClockIntl;
+ }
+ 
++/**
++ * Mirror Temporal on our fake implementation. Only Temporal.Now
++ * reads the clock, so it is the only part we replace.
++ */
++function createTemporal(clock: ClockController, NativeTemporal: any): any {
++  const ClockTemporal: any = {};
++  for (const key of Reflect.ownKeys(NativeTemporal)) {
++    const descriptor = Object.getOwnPropertyDescriptor(NativeTemporal, key)!;
++    Object.defineProperty(ClockTemporal, key, descriptor);
++  }
++
++  const NativeNow = NativeTemporal.Now;
++  const instant = () => new NativeTemporal.Instant(BigInt(Math.floor(clock.now())) * BigInt(1000000));
++  const zoned = (timeZone?: any) => instant().toZonedDateTimeISO(timeZone === undefined ? NativeNow.timeZoneId() : timeZone);
++  const ClockNow: any = {};
++  for (const key of Reflect.ownKeys(NativeNow)) {
++    const descriptor = Object.getOwnPropertyDescriptor(NativeNow, key)!;
++    Object.defineProperty(ClockNow, key, descriptor);
++  }
++  const define = (name: string, value: any) => Object.defineProperty(ClockNow, name, { value, writable: true, configurable: true, enumerable: false });
++  define('instant', () => instant());
++  define('zonedDateTimeISO', (timeZone?: any) => zoned(timeZone));
++  define('zonedDateTime', (calendar: any, timeZone?: any) => zoned(timeZone).withCalendar(calendar));
++  define('plainDateTimeISO', (timeZone?: any) => zoned(timeZone).toPlainDateTime());
++  define('plainDateTime', (calendar: any, timeZone?: any) => zoned(timeZone).toPlainDateTime().withCalendar(calendar));
++  define('plainDateISO', (timeZone?: any) => zoned(timeZone).toPlainDate());
++  define('plainDate', (calendar: any, timeZone?: any) => zoned(timeZone).toPlainDate().withCalendar(calendar));
++  define('plainTimeISO', (timeZone?: any) => zoned(timeZone).toPlainTime());
++
++  Object.defineProperty(ClockTemporal, 'Now', { value: ClockNow, writable: true, configurable: true, enumerable: false });
++  return ClockTemporal;
++}
++
+ function compareTimers(a: Timer, b: Timer) {
+   // Sort first by absolute timing
+   if (a.callAt < b.callAt)
+@@ -622,6 +655,7 @@ function platformOriginals(globalObject: WindowOrWorkerGlobalScope): { raw: Buil
+     Date: (globalObject as any).Date,
+     performance: globalObject.performance,
+     Intl: (globalObject as any).Intl,
++    Temporal: (globalObject as any).Temporal,
+     AbortSignal: (globalObject as any).AbortSignal,
+   };
+   const bound = { ...raw };
+@@ -697,6 +731,7 @@ function createApi(clock: ClockController, originals: Builtins, browserName?: st
+         return clock.clearTimer(timerId, TimerType.IdleCallback);
+     },
+     Intl: originals.Intl ? createIntl(clock, originals.Intl) : (undefined as unknown as Builtins['Intl']),
++    Temporal: originals.Temporal ? createTemporal(clock, originals.Temporal) : undefined,
+     Date: createDate(clock, originals.Date),
+     performance: originals.performance ? fakePerformance(clock, originals.performance) : (undefined as unknown as Builtins['performance']),
+     AbortSignal: originals.AbortSignal ? fakeAbortSignal(clock, originals.AbortSignal, browserName) : (undefined as unknown as Builtins['AbortSignal']),
+@@ -804,6 +839,9 @@ export function install(globalObject: WindowOrWorkerGlobalScope, config: Install
+       (globalObject as any).Date = mirrorDateProperties(api.Date, (globalObject as any).Date);
+     } else if (method === 'Intl') {
+       (globalObject as any).Intl = api[method]!;
++    } else if (method === 'Temporal') {
++      if (api.Temporal)
++        (globalObject as any).Temporal = api.Temporal;
+     } else if (method === 'AbortSignal') {
+       (globalObject as any).AbortSignal = api[method]!;
+     } else if (method === 'performance') {
+diff --git a/packages/injected/src/utilityScript.ts b/packages/injected/src/utilityScript.ts
+index e4cfe21..2724c04 100644
+--- a/packages/injected/src/utilityScript.ts
++++ b/packages/injected/src/utilityScript.ts
+@@ -29,6 +29,7 @@ export type Builtins = {
+   performance: Window['performance'],
+   Intl: typeof window['Intl'],
+   Date: typeof window['Date'],
++  Temporal: any,
+   AbortSignal: typeof window['AbortSignal'],
+ };
+ 
+@@ -56,6 +57,7 @@ export class UtilityScript {
+         performance: global.performance,
+         Intl: global.Intl,
+         Date: global.Date,
++        Temporal: (global as any).Temporal,
+         AbortSignal: global.AbortSignal,
+       } satisfies Builtins;
+     }

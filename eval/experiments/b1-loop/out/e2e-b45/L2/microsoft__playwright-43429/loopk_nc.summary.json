@@ -1,0 +1,108 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43429",
+ "fixed": {
+  "round": 2,
+  "explanation": "Collection used truthiness on the trivial value, which drops 0, false, '', null. _trySerialize treats every number as trivial, so Infinity, NaN and -0 are saved as plain JSON (null). Fix: only finite non -0 numbers are trivial, collect checks 'trivial' in result, and restore checks key presence instead of using ??.",
+  "edits": 4
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  1
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0487,
+ "seconds": 35,
+ "diff_stat": "packages/injected/src/storageScript.ts | 22 +++++++++++-----------\n 1 file changed, 11 insertions(+), 11 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that serializes IndexedDB databases into storage state (and restores them) must use exact checks (undefined/null) rather than truthiness for keys and values, and must serialize special values like Infinity, NaN, -0 and undefined losslessly, e.g. via the serializedValue/structured serialization helpers, rather than plain JSON.",
+    "symptom": "IndexedDB entries with falsy keys/values (0, false, '', null) are dropped when saving storage state, and Infinity is saved as null.",
+    "anchors": [
+     "IndexedDB",
+     "storage state",
+     "Infinity"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     614,
+     614
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     196,
+     227
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     87,
+     153
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "_collectDB uses `if (trivial)` so falsy keys/values (0, false, '', null) are dropped, and _restoreDB uses `??`. The _trySerialize helper decides what is trivial and likely lets Infinity through as JSON (becoming null). I need to see _trySerialize before editing.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._restoreDB",
+    "packages/injected/src/storageScript.ts:StorageScript._collectDB"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "StorageScript._trySerialize helper that returns encoded and trivial values for IndexedDB records.",
+    "symptom": "IndexedDB falsy keys/values are dropped and Infinity is saved as null in storage state.",
+    "anchors": [
+     "_trySerialize",
+     "trivial",
+     "encoded",
+     "keyEncoded",
+     "valueEncoded",
+     "parseEvaluationResultValue"
+    ],
+    "look_in": [
+     "packages/injected/src/storageScript.ts"
+    ]
+   },
+   "k": 1,
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     65,
+     85
+    ]
+   ],
+   "shown_whole": [
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/storageScript.ts lines 196-227 (StorageScript._restoreDB)",
+    "packages/injected/src/storageScript.ts lines 87-153 (StorageScript._collectDB)"
+   ],
+   "action": "edit",
+   "analysis": "Collection used truthiness on the trivial value, which drops 0, false, '', null. _trySerialize treats every number as trivial, so Infinity, NaN and -0 are saved as plain JSON (null). Fix: only finite non -0 numbers are trivial, collect checks 'trivial' in result, and restore checks key presence instead of using ??.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

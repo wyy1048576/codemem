@@ -1,0 +1,69 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-67025",
+ "fixed": {
+  "round": 1,
+  "explanation": "ArrowExtensionArray._str_extract requires all groups to be named and relies on the pyarrow kernel. I changed it to build labels (name, or 0-based position for unnamed groups). It now takes the element-wise Python regex fallback whenever any group is unnamed, or when flags or a compiled pattern are used. It extracts groups by index.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.036,
+ "seconds": 18,
+ "diff_stat": "pandas/core/arrays/arrow/array.py | 20 ++++++++++++--------\n 1 file changed, 12 insertions(+), 8 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The str.extract implementation for the generic ArrowDtype string array (ArrowExtensionArray._str_extract) only uses the pyarrow extract_regex kernel and requires all groups to be named. It should fall back to the element-by-element Python re path when any capture group is unnamed (or flags/compiled pattern), labelling unnamed groups by position and named groups by name, mixed.",
+    "symptom": "Series.str.extract on ArrowDtype(pa.string()) raises errors with no or partially named groups, or returns an all-missing column for the unnamed group when flags are used, unlike other dtypes.",
+    "anchors": [
+     "extract",
+     "named group",
+     "unnamed groups"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/strings/accessor.py",
+     3408,
+     3534
+    ],
+    [
+     "pandas/core/arrays/arrow/array.py",
+     4177,
+     4210
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     3536,
+     3612
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "ArrowExtensionArray._str_extract requires all groups to be named and relies on the pyarrow kernel. I changed it to build labels (name, or 0-based position for unnamed groups). It now takes the element-wise Python regex fallback whenever any group is unnamed, or when flags or a compiled pattern are used. It extracts groups by index.",
+   "picked": [
+    "pandas/core/arrays/arrow/array.py:ArrowExtensionArray._str_extract"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}
