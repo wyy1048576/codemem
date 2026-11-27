@@ -1111,3 +1111,58 @@ def test_the_service_follows_the_compact_settings_in_the_config_file(sample_repo
         assert svc.config.compact.rescore == 64 and svc.store._type_index("code").store is second
     finally:
         svc.close()
+
+
+# Runs in a child process that never imports torch: several OpenMP threads are safe there on macOS.
+ONE_THREAD = """
+import contextlib, json, sys, threading
+import faiss
+import numpy as np
+import codemem.store as store_module
+from codemem.store import CompactVectorStore, for_index
+
+vecs = for_index(np.random.default_rng(0).standard_normal((20000, 64)), 64)
+queries = for_index(np.random.default_rng(1).standard_normal((40, 64)), 64)
+allowed = list(range(1, 20001, 7))
+index = CompactVectorStore(64, bits=4, rescore=50)
+index.upsert(list(range(1, 20001)), vecs)
+index.bind(lambda ids: (np.asarray(ids, dtype=np.int64), vecs[np.asarray(ids, dtype=np.int64) - 1]))
+faiss.omp_set_num_threads(4)
+inside = set()
+scan = index._scan
+def watched(*args):
+    inside.add(faiss.omp_get_max_threads())
+    return scan(*args)
+index._scan = watched
+
+def searches():
+    return [index.search(q, 10) for q in queries] + [index.search(q, 10, allowed) for q in queries]
+
+writer = {}
+def write():  # another thread with its own count adds vectors meanwhile
+    faiss.omp_set_num_threads(3)
+    other = CompactVectorStore(64, bits=4)
+    other.upsert(list(range(1, 20001)), vecs)
+    writer["threads"] = faiss.omp_get_max_threads()
+thread = threading.Thread(target=write)
+thread.start()
+limited = searches()
+thread.join()
+seen_limited, inside = sorted(inside), set()
+store_module._faiss_on_one_thread = contextlib.nullcontext  # as before the limit
+print(json.dumps({"same": limited == searches(), "inside_with_limit": seen_limited, "inside_without": sorted(inside),
+                  "after": faiss.omp_get_max_threads(), "writer": writer["threads"], "torch": "torch" in sys.modules}))
+"""
+
+
+def test_a_search_runs_faiss_on_one_thread_and_returns_what_several_returned():
+    import subprocess
+    import sys
+
+    proc = subprocess.run([sys.executable, "-c", ONE_THREAD], capture_output=True, text=True, timeout=300)
+    assert proc.returncode == 0, proc.stderr[-3000:]
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["same"], "the same ids and scores with FAISS on one thread as on four"
+    assert out["inside_with_limit"] == [1] and out["inside_without"] == [4]
+    assert out["after"] == 4 and out["writer"] == 3  # this thread's count back; another thread's untouched
+    assert out["torch"] is False

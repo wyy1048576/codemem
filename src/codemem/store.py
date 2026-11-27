@@ -375,6 +375,26 @@ def _rabitq(dim: int, bits: int) -> Any:
     return index
 
 
+@contextmanager
+def _faiss_on_one_thread() -> Iterator[None]:
+    """FAISS on one OpenMP thread in the calling thread while the block runs, and on as many as
+    before after it. A search asks FAISS about one query at a time, and FAISS still opens a
+    parallel region for it: the team's threads are woken and waited for while one of them works.
+    The count is the calling thread's own (OpenMP keeps it per thread: a thread that sets it
+    changes no other thread's, and a new thread starts from the process's default), so a writer
+    adding vectors on another thread keeps all of its threads, and this one gets its count back
+    for an add that comes after."""
+    threads = faiss.omp_get_max_threads()
+    if threads == 1:
+        yield
+        return
+    faiss.omp_set_num_threads(1)
+    try:
+        yield
+    finally:
+        faiss.omp_set_num_threads(threads)
+
+
 class CompactVectorStore(VectorStore):
     """Codes of each vector in memory, exact scores from the stored vectors
     (docs/architecture.md §5). It is built as CompactVectorStore(index_dim, **options), the
@@ -572,15 +592,16 @@ class CompactVectorStore(VectorStore):
         last of them. Which they are depends on the codes held, never on their order."""
         self._in_step()
         x = self._coded(q)
-        if self._fine is None:
-            return self._scan(x, size, allowed)
-        qualifying = len(self._ids) if allowed is None else int(np.count_nonzero(allowed))
-        ranked = max(_RANKED, _RANKED_PER_CANDIDATE * size, qualifying // _RANKED_ONE_IN)
-        ranked_again = np.zeros(len(self._ids), dtype=bool)
-        ranked_again[self._scan(x, ranked, allowed)] = True
-        selector, bitmap = self._selector(ranked_again)  # `bitmap` is what the selector reads
-        params = faiss.RaBitQSearchParameters(qb=_QUERY_BITS, centered=False, sel=selector)
-        _, estimates, positions = self._fine.range_search(x, _NO_THRESHOLD, params=params)
+        with _faiss_on_one_thread():  # one query: no team of threads to wake and wait for
+            if self._fine is None:
+                return self._scan(x, size, allowed)
+            qualifying = len(self._ids) if allowed is None else int(np.count_nonzero(allowed))
+            ranked = max(_RANKED, _RANKED_PER_CANDIDATE * size, qualifying // _RANKED_ONE_IN)
+            ranked_again = np.zeros(len(self._ids), dtype=bool)
+            ranked_again[self._scan(x, ranked, allowed)] = True
+            selector, bitmap = self._selector(ranked_again)  # `bitmap` is what the selector reads
+            params = faiss.RaBitQSearchParameters(qb=_QUERY_BITS, centered=False, sel=selector)
+            _, estimates, positions = self._fine.range_search(x, _NO_THRESHOLD, params=params)
         if len(positions) <= size:
             return positions
         cut = np.partition(estimates, len(estimates) - size)[len(estimates) - size]  # the size-th best
