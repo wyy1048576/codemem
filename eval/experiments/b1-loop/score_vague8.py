@@ -13,7 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 BASE = HERE / "out" / os.environ.get("VAGUE_SET", "e2e-vague8")
 NL = chr(10)
-ARMS = ("grep", "full5", "full10", "full25", "full50", "loopk", "loopk_nc", "full10t", "merged10", "loopks", "loopks_nc")
+ARMS = ("grep", "full5", "full10", "full25", "full50", "loopk", "loopk_nc", "full10t", "merged10", "loopks", "loopks_nc", "hybrid")
 
 src = (HERE / "e2e_score.py").read_text(encoding="utf8")
 exec(src[src.index("def add_range"):src.index("import sys\nCOMMON")])  # add_range, rel, diff_lines, grep_seen, found

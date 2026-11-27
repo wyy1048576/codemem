@@ -1,0 +1,85 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "picks",
+    "analysis",
+    "edits",
+    "query",
+    "look_in",
+    "next_k",
+    "grep_pattern",
+    "grep_path",
+    "grep_ignore_case"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "edit",
+        "read",
+        "codemem",
+        "grep"
+      ]
+    },
+    "picks": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "analysis": {
+      "type": "string"
+    },
+    "edits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "old",
+          "new"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "old": {
+            "type": "string"
+          },
+          "new": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "query": {
+      "type": "string"
+    },
+    "look_in": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_k": {
+      "type": "integer",
+      "enum": [
+        3,
+        5,
+        10
+      ]
+    },
+    "grep_pattern": {
+      "type": "string"
+    },
+    "grep_path": {
+      "type": "string"
+    },
+    "grep_ignore_case": {
+      "type": "boolean"
+    }
+  }
+}

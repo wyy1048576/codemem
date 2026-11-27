@@ -9,6 +9,9 @@ results to read (k = 1 to 10), one call per round judges and edits, and the prom
 it costs about what the grep agent costs and edits a gold function in the same number of tasks. Its write-up has the
 algorithm, how to run it, how to grade the saved diffs with `cmeval e2e grade`, and why each choice was made.
 
+**Next: [`hybrid.md`](hybrid.md) (2026-11-26):** the hybrid (`e2e_hybrid.py`): at each step Sonnet picks grep or a
+codemem search (loop-k, k = 3, 5 or 10), reads its picks or edits. First result on 2 tasks only.
+
 **Earlier work: [`loop_vs_grep.md`](loop_vs_grep.md):** Track B's current focus (loop vs grep), the algorithms, the
 21-task results, the n = 10 / 25 / 50 sweep, the duckdb-25101 case study and the grep "memory" test.
 

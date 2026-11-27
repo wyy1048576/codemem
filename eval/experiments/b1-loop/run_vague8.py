@@ -4,7 +4,7 @@ fair pilot tasks (L1 / L2 of eval/tasks/vague-pilot18-v2.jsonl on main); VAGUE_S
 Arms: grep; fullN (e2e_loop.py, judge sees N results as raw code, separate fix call; fullNt: test results condensed);
 loopk / loopk_nc (e2e_loopk.py: Sonnet picks k, one call per round; prompt cache on / off; loopk_nc is the chosen
 loop); loopks / loopks_nc (e2e_loop.py with Sonnet picking k but separate judge and fix calls); mergedN (e2e_loopk.py
-with k fixed at N).
+with k fixed at N); hybrid (e2e_hybrid.py: grep or codemem search, Sonnet's choice each step).
 
 Tasks: out/e2e-vague8/tasks-<LEVEL>.jsonl (the fresh task with `query` replaced by the vague prompt; the issue as
 written is kept in `query_L0`). Outputs: out/e2e-vague8/<LEVEL>/<task_id>/<arm>.*. Each task gets a fresh copy of
@@ -72,6 +72,9 @@ def run_arm(task, arm, out):
     copy = copy_dir(task)
     if arm == "grep":
         cmd, env = [PY, str(HERE / "e2e_run.py"), str(tasks_file), task["id"], "grep", str(copy), str(out)], os.environ.copy()
+    elif arm == "hybrid":  # e2e_hybrid.py: each step Sonnet picks grep or codemem search (loopk_nc, k 3/5/10)
+        cmd = [PY, str(HERE / "e2e_hybrid.py"), str(tasks_file), task["id"], str(copy), str(out)]
+        env = os.environ.copy() | {"LOOP_TAG": arm, "LLM_NO_PROMPT_CACHE": "1"}
     elif arm in ("loopks", "loopks_nc"):  # loop-k with separate judge and fix calls; _nc: no prompt caching
         cmd = [PY, str(HERE / "e2e_loop.py"), str(tasks_file), task["id"], str(copy), str(out)]
         env = os.environ.copy() | {"LOOP_TAG": arm, "LOOP_FULL": "1", "LOOP_CHOOSE_K": "1",
