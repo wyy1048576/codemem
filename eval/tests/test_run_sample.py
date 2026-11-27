@@ -7,8 +7,8 @@ import pytest
 from cmeval import e2e_screen
 from cmeval.cli import main
 from cmeval.generate import difficulty, tier
-from cmeval.run_sample import EASY_PATTERN, SampleError, run_counts, run_sample
-from cmeval.tasks import Fix, save_tasks
+from cmeval.run_sample import EASY_PATTERN, SampleError, format_table, run_counts, run_sample
+from cmeval.tasks import Fix, Issue, save_tasks
 
 
 def _patch(files: int, lines: int) -> str:
@@ -28,9 +28,11 @@ SIZES = {"easy": _patch(1, 5), "medium": _patch(1, 30), "hard": _patch(3, 10), "
 def make(make_task):
     """A task of a repo, with a fix of one size: easy and medium (easy tier), hard (medium tier), large (hard
     tier)."""
-    def build(repo: str, n: int, size: str, split: str = "test"):
+    def build(repo: str, n: int, size: str, split: str = "test", issue: int | None = None):
+        number = 1000 + n if issue is None else issue
         return make_task(id=f"{repo.replace('/', '__')}-{n}", repo=repo, split=split, patch=SIZES[size],
-                         fix=Fix(pr_number=n), query=f"issue {n}")
+                         fix=Fix(pr_number=n), query=f"issue {number}",
+                         issue=Issue(number=number, url=f"https://github.com/{repo}/issues/{number}"))
     return build
 
 
@@ -104,7 +106,8 @@ def test_the_rows_and_the_meta_file(tmp_path, make):
     inputs = _inputs(tmp_path, tasks, large)
     run_sample(tmp_path / "s.jsonl", seed="s1", command="cmeval e2e sample", **inputs)
     rows = _rows(tmp_path / "s.jsonl")
-    assert list(rows[0]) == ["repo", "id", "tier", "label", "split", "number", "run", "has_prompts"]
+    assert list(rows[0]) == ["repo", "id", "tier", "label", "split", "number", "run", "has_prompts", "duplicate_of"]
+    assert all(r["duplicate_of"] is None for r in rows)
     assert len(rows) == 20 and len({r["id"] for r in rows}) == 20
     for name, n in (("easy", 10), ("medium", 5), ("hard", 5)):
         assert [r["number"] for r in rows if r["tier"] == name] == list(range(1, n + 1))
@@ -230,5 +233,60 @@ def test_the_command(tmp_path, make, capsys):
     assert main(argv) == 0
     out = capsys.readouterr().out
     assert "acme/a" in out and "run tasks without L1 and L2: 0" in out and "20 tasks" in out
+    assert "not run, another task of the same issue: 0" in out
     assert main(argv[:3] + ["s2"] + argv[4:]) == 1
     assert "holds another sample" in capsys.readouterr().err
+
+
+def test_one_task_per_issue_the_tier_takes_the_next_task(tmp_path, make):
+    """25 is the only test task of the medium tier, so it comes first. With the issue of 20 it is not run, and the
+    first spare takes its place."""
+    large = [make("acme/a", 30 + i, "large") for i in range(4)]
+    dev = [make("acme/a", 20 + i, "hard", "dev") for i in range(5)]
+    (tmp_path / "a").mkdir()
+    alone = run_sample(tmp_path / "a.jsonl", seed="s1", **_inputs(tmp_path / "a", [*dev, make("acme/a", 25, "hard")], large))
+    before = [r for r in _rows(tmp_path / "a.jsonl") if r["tier"] == "medium"]
+    assert before[0]["id"] == "acme__a-25" and before[0]["run"]
+    (tmp_path / "b").mkdir()
+    result = run_sample(tmp_path / "b.jsonl", seed="s1",
+                        **_inputs(tmp_path / "b", [*dev, make("acme/a", 25, "hard", issue=1020)], large))
+    rows = [r for r in _rows(tmp_path / "b.jsonl") if r["tier"] == "medium"]
+    assert rows[-1] == {**before[0], "number": None, "run": False, "duplicate_of": "acme__a-20"}
+    # The others keep their order and move up one number; the first spare is run now.
+    assert [r["id"] for r in rows[:-1]] == [r["id"] for r in before[1:]]
+    assert [r["number"] for r in rows[:-1]] == [1, 2, 3, 4, 5]
+    assert [r["run"] for r in rows[:-1]] == [True] * 4 + [False]
+    assert not before[4]["run"] and rows[3]["id"] == before[4]["id"] and rows[3]["run"]
+    counts = result.samples[0].counts()
+    assert counts["tiers"]["medium"]["fair"] == 5 and counts["duplicates"] == {"acme__a-25": "acme__a-20"}
+    meta = json.loads((tmp_path / "b.meta.json").read_text())
+    assert meta["duplicates"] == {"acme/a": {"acme__a-25": "acme__a-20"}} and "one task per issue" in meta["issue_rule"]
+    assert "not run, another task of the same issue: 1 (acme__a-25 -> acme__a-20)" in format_table(result.samples)
+    assert alone.samples[0].counts()["duplicates"] == {}
+
+
+def test_a_dropped_hard_task_lets_medium_fill_up(tmp_path, make):
+    """Two hard tasks of one issue: the hard tier runs 1, so the medium tier runs 7."""
+    tasks = [make("acme/a", 20 + i, "hard") for i in range(9)]
+    large = [make("acme/a", 40, "large", issue=7), make("acme/a", 41, "large", issue=7)]
+    result = run_sample(tmp_path / "s.jsonl", seed="s1", **_inputs(tmp_path, tasks, large))
+    rows = _rows(tmp_path / "s.jsonl")
+    assert [(r["id"], r["number"], r["run"], r["duplicate_of"]) for r in rows if r["tier"] == "hard"] == \
+        [("acme__a-40", 1, True, None), ("acme__a-41", None, False, "acme__a-40")]
+    assert sum(r["run"] for r in rows if r["tier"] == "medium") == 7
+    assert any("the target is 7" in n for n in result.samples[0].notes)
+
+
+def test_what_identifies_an_issue(tmp_path, make, make_task):
+    """The issue URL comes first, then the issue text. The same text in two repos is not a duplicate."""
+    def no_issue(repo, n):
+        return make_task(id=f"{repo.replace('/', '__')}-{n}", repo=repo, patch=SIZES["easy"], fix=Fix(pr_number=n),
+                         query="  the same text\n", issue=Issue())
+    same_url = make("acme/a", 12, "easy", issue=5)
+    tasks = [make("acme/a", 11, "easy", issue=5), same_url, no_issue("acme/a", 13), no_issue("acme/a", 14),
+             no_issue("other/b", 15)]
+    tasks[0].query = "another text of issue 5"
+    run_sample(tmp_path / "s.jsonl", seed="s1", **_inputs(tmp_path, tasks))
+    dupes = {r["id"]: r["duplicate_of"] for r in _rows(tmp_path / "s.jsonl")}
+    assert dupes == {"acme__a-11": None, "acme__a-12": "acme__a-11", "acme__a-13": None,
+                     "acme__a-14": "acme__a-13", "other__b-15": None}
