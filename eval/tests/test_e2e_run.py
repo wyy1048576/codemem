@@ -504,6 +504,7 @@ def test_run_one_locally(make_task, tmp_path, monkeypatch):
     assert record["integrity"]["codemem_mount_proof"] is None
     assert record["run_id"] == "r1" and record["rep"] == 1 and record["identity"]["harness_version"] == "2.1.332"
     assert record["identity"]["prompt_frame"] == "v1" and record["identity"]["image_id"] == "sha256:abc"
+    assert record["identity"]["seat"] == "claude-token"  # the name of the token file, not its text
     integrity = record["integrity"]
     assert integrity["setup_ok"] and integrity["proxy_complete"] and integrity["cross_check"]["agree"]
     assert sorted(integrity["removed_config_files"]) == ["CLAUDE.md", "sub/.claude/settings.json", "sub/AGENTS.md"]

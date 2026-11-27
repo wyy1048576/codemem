@@ -56,7 +56,8 @@ run.json has these fields:
   completed           the grader's verdict; null for a discarded run
   discard, discard_reason, flags
                       a discarded run is done again; a flag (for example "cross-check disagrees") asks a person to look
-  identity            prompt level, frame and hash, harness and its version, binary, image tag and id, split, cmeval
+  identity            prompt level, frame and hash, harness and its version, binary, seat (the name of the login
+                      token's file, never its text), image tag and id, split, cmeval
                       commit, machine, limits, start time (UTC), the task's gold files. codemem: null for a setup
                       without codemem; else the codemem commit, the program, the task's index.json, the steering
                       level, and the bytes of the index copy before and after the run. block: null for a setup
@@ -1118,6 +1119,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "harness": HARNESS,
             "harness_version": (init or {}).get("claude_code_version"),
             "claude_bin": str(ready["claude_bin"]),
+            "seat": Path(ready["token_file"]).name,
             "image": ready["tag"],
             "image_id": image_id,
             "split": task.split,
