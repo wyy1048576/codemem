@@ -1,125 +1,125 @@
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27689", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26747", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26716", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27700", "tier": "easy", "label": "medium", "split": "dev", "number": 4, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26631", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26955", "tier": "easy", "label": "medium", "split": "dev", "number": 6, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27030", "tier": "easy", "label": "easy", "split": "test", "number": 7, "run": false, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27455", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26812", "tier": "easy", "label": "easy", "split": "test", "number": 9, "run": false, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26655", "tier": "easy", "label": "easy", "split": "dev", "number": 10, "run": false, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27053", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27000", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26628", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24011", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-26057", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23618", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-25125", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24819", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23873", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24531", "tier": "easy", "label": "medium", "split": "test", "number": 7, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24901", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23569", "tier": "easy", "label": "medium", "split": "test", "number": 9, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24760", "tier": "easy", "label": "medium", "split": "test", "number": 10, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23684", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24384", "tier": "easy", "label": "medium", "split": "test", "number": 12, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-27210", "tier": "easy", "label": "medium", "split": "test", "number": 13, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24701", "tier": "easy", "label": "easy", "split": "test", "number": 14, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23747", "tier": "easy", "label": "medium", "split": "test", "number": 15, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23782", "tier": "easy", "label": "medium", "split": "test", "number": 16, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24668", "tier": "easy", "label": "easy", "split": "test", "number": 17, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24318", "tier": "easy", "label": "medium", "split": "test", "number": 18, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24669", "tier": "easy", "label": "medium", "split": "test", "number": 19, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24508", "tier": "easy", "label": "easy", "split": "test", "number": 20, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23876", "tier": "easy", "label": "medium", "split": "dev", "number": 21, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24101", "tier": "easy", "label": "medium", "split": "dev", "number": 22, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24497", "tier": "easy", "label": "easy", "split": "test", "number": 23, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-27560", "tier": "easy", "label": "easy", "split": "test", "number": 24, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24478", "tier": "easy", "label": "easy", "split": "test", "number": 25, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24558", "tier": "easy", "label": "easy", "split": "test", "number": 26, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24486", "tier": "easy", "label": "easy", "split": "test", "number": 27, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24784", "tier": "easy", "label": "easy", "split": "test", "number": 28, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24548", "tier": "easy", "label": "easy", "split": "dev", "number": 29, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24382", "tier": "easy", "label": "easy", "split": "dev", "number": 30, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24015", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23931", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24168", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-25942", "tier": "medium", "label": "hard", "split": "test", "number": 4, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24228", "tier": "medium", "label": "hard", "split": "test", "number": 5, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23624", "tier": "medium", "label": "hard", "split": "test", "number": 6, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24044", "tier": "medium", "label": "hard", "split": "test", "number": 7, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-27246", "tier": "medium", "label": "hard", "split": "test", "number": 8, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23881", "tier": "medium", "label": "hard", "split": "test", "number": 9, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23920", "tier": "medium", "label": "hard", "split": "test", "number": 10, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24105", "tier": "medium", "label": "hard", "split": "test", "number": 11, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24805", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23634", "tier": "hard", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24150", "tier": "hard", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23923", "tier": "hard", "label": "hard", "split": "dev", "number": 4, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140607", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140926", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142138", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142215", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141618", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142340", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142950", "tier": "easy", "label": "medium", "split": "dev", "number": 7, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142213", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141211", "tier": "easy", "label": "easy", "split": "test", "number": 9, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141937", "tier": "easy", "label": "easy", "split": "test", "number": 10, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142527", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142493", "tier": "easy", "label": "easy", "split": "test", "number": 12, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140586", "tier": "easy", "label": "easy", "split": "test", "number": 13, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140318", "tier": "easy", "label": "easy", "split": "test", "number": 14, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142828", "tier": "easy", "label": "easy", "split": "dev", "number": 15, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140421", "tier": "easy", "label": "easy", "split": "dev", "number": 16, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140183", "tier": "easy", "label": "easy", "split": "dev", "number": 17, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140406", "tier": "easy", "label": "easy", "split": "dev", "number": 18, "run": false, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141057", "tier": "medium", "label": "hard", "split": "dev", "number": 1, "run": true, "has_prompts": true}
-{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140916", "tier": "medium", "label": "hard", "split": "dev", "number": 2, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42204", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43316", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42780", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42503", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43012", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43174", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42707", "tier": "easy", "label": "medium", "split": "test", "number": 7, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43170", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43172", "tier": "easy", "label": "medium", "split": "test", "number": 9, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42042", "tier": "easy", "label": "medium", "split": "test", "number": 10, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-41988", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42864", "tier": "easy", "label": "medium", "split": "test", "number": 12, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43146", "tier": "easy", "label": "medium", "split": "dev", "number": 13, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43429", "tier": "easy", "label": "easy", "split": "test", "number": 14, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-41913", "tier": "easy", "label": "easy", "split": "test", "number": 15, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-41682", "tier": "easy", "label": "easy", "split": "test", "number": 16, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-41850", "tier": "easy", "label": "easy", "split": "test", "number": 17, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43400", "tier": "easy", "label": "easy", "split": "dev", "number": 18, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42433", "tier": "easy", "label": "easy", "split": "dev", "number": 19, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43488", "tier": "easy", "label": "easy", "split": "dev", "number": 20, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42260", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-41942", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42792", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42838", "tier": "medium", "label": "hard", "split": "test", "number": 4, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43071", "tier": "medium", "label": "hard", "split": "test", "number": 5, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-42919", "tier": "medium", "label": "hard", "split": "test", "number": 6, "run": true, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43148", "tier": "medium", "label": "hard", "split": "test", "number": 7, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43305", "tier": "medium", "label": "hard", "split": "dev", "number": 8, "run": false, "has_prompts": true}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43482", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": false}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43342", "tier": "hard", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68278", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68945", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-69924", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-67025", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-71232", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-69779", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-66352", "tier": "easy", "label": "medium", "split": "dev", "number": 7, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70205", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-69015", "tier": "easy", "label": "easy", "split": "test", "number": 9, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70828", "tier": "easy", "label": "easy", "split": "test", "number": 10, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68195", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-71248", "tier": "easy", "label": "easy", "split": "test", "number": 12, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-71129", "tier": "easy", "label": "easy", "split": "test", "number": 13, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70966", "tier": "easy", "label": "easy", "split": "dev", "number": 14, "run": false, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68090", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-67897", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
-{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70734", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27689", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26747", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26716", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27700", "tier": "easy", "label": "medium", "split": "dev", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26631", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26955", "tier": "easy", "label": "medium", "split": "dev", "number": 6, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27030", "tier": "easy", "label": "easy", "split": "test", "number": 7, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27455", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26812", "tier": "easy", "label": "easy", "split": "test", "number": 9, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26655", "tier": "easy", "label": "easy", "split": "dev", "number": 10, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27053", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-27000", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "astral-sh/ruff", "id": "astral-sh__ruff-26628", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24011", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-26057", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23618", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-25125", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24819", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23873", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24531", "tier": "easy", "label": "medium", "split": "test", "number": 7, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24901", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23569", "tier": "easy", "label": "medium", "split": "test", "number": 9, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24760", "tier": "easy", "label": "medium", "split": "test", "number": 10, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23684", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24384", "tier": "easy", "label": "medium", "split": "test", "number": 12, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-27210", "tier": "easy", "label": "medium", "split": "test", "number": 13, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24701", "tier": "easy", "label": "easy", "split": "test", "number": 14, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23747", "tier": "easy", "label": "medium", "split": "test", "number": 15, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23782", "tier": "easy", "label": "medium", "split": "test", "number": 16, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24668", "tier": "easy", "label": "easy", "split": "test", "number": 17, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24318", "tier": "easy", "label": "medium", "split": "test", "number": 18, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24669", "tier": "easy", "label": "medium", "split": "test", "number": 19, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24508", "tier": "easy", "label": "easy", "split": "test", "number": 20, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23876", "tier": "easy", "label": "medium", "split": "dev", "number": 21, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24101", "tier": "easy", "label": "medium", "split": "dev", "number": 22, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24497", "tier": "easy", "label": "easy", "split": "test", "number": 23, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-27560", "tier": "easy", "label": "easy", "split": "test", "number": 24, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24478", "tier": "easy", "label": "easy", "split": "test", "number": 25, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24558", "tier": "easy", "label": "easy", "split": "test", "number": 26, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24486", "tier": "easy", "label": "easy", "split": "test", "number": 27, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24784", "tier": "easy", "label": "easy", "split": "test", "number": 28, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24548", "tier": "easy", "label": "easy", "split": "dev", "number": 29, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24382", "tier": "easy", "label": "easy", "split": "dev", "number": 30, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24015", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23931", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24168", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-25942", "tier": "medium", "label": "hard", "split": "test", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24228", "tier": "medium", "label": "hard", "split": "test", "number": 5, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23624", "tier": "medium", "label": "hard", "split": "test", "number": 6, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24044", "tier": "medium", "label": "hard", "split": "test", "number": 7, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-27246", "tier": "medium", "label": "hard", "split": "test", "number": 8, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23881", "tier": "medium", "label": "hard", "split": "test", "number": 9, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23920", "tier": "medium", "label": "hard", "split": "test", "number": 10, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24105", "tier": "medium", "label": "hard", "split": "test", "number": 11, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24805", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23634", "tier": "hard", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24150", "tier": "hard", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23923", "tier": "hard", "label": "hard", "split": "dev", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140607", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140926", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142138", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142215", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141618", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142340", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142950", "tier": "easy", "label": "medium", "split": "dev", "number": 7, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142213", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141211", "tier": "easy", "label": "easy", "split": "test", "number": 9, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141937", "tier": "easy", "label": "easy", "split": "test", "number": 10, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142527", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142493", "tier": "easy", "label": "easy", "split": "test", "number": 12, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140586", "tier": "easy", "label": "easy", "split": "test", "number": 13, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140318", "tier": "easy", "label": "easy", "split": "test", "number": 14, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142828", "tier": "easy", "label": "easy", "split": "dev", "number": 15, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140421", "tier": "easy", "label": "easy", "split": "dev", "number": 16, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140183", "tier": "easy", "label": "easy", "split": "dev", "number": 17, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140406", "tier": "easy", "label": "easy", "split": "dev", "number": 18, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-141057", "tier": "medium", "label": "hard", "split": "dev", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140916", "tier": "medium", "label": "hard", "split": "dev", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42204", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43316", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42780", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42503", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43012", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43174", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42707", "tier": "easy", "label": "medium", "split": "test", "number": 7, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43170", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43172", "tier": "easy", "label": "medium", "split": "test", "number": 9, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42042", "tier": "easy", "label": "medium", "split": "test", "number": 10, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-41988", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42864", "tier": "easy", "label": "medium", "split": "test", "number": 12, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43146", "tier": "easy", "label": "medium", "split": "dev", "number": 13, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43429", "tier": "easy", "label": "easy", "split": "test", "number": 14, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-41913", "tier": "easy", "label": "easy", "split": "test", "number": 15, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-41682", "tier": "easy", "label": "easy", "split": "test", "number": 16, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-41850", "tier": "easy", "label": "easy", "split": "test", "number": 17, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43400", "tier": "easy", "label": "easy", "split": "dev", "number": 18, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42433", "tier": "easy", "label": "easy", "split": "dev", "number": 19, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43488", "tier": "easy", "label": "easy", "split": "dev", "number": 20, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42260", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-41942", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42792", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42838", "tier": "medium", "label": "hard", "split": "test", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43071", "tier": "medium", "label": "hard", "split": "test", "number": 5, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-42919", "tier": "medium", "label": "hard", "split": "test", "number": 6, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43148", "tier": "medium", "label": "hard", "split": "test", "number": 7, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43305", "tier": "medium", "label": "hard", "split": "dev", "number": 8, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43342", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43482", "tier": "hard", "label": "hard", "split": "test", "number": null, "run": false, "has_prompts": false, "duplicate_of": "microsoft__playwright-43342"}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68278", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68945", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-69924", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-67025", "tier": "easy", "label": "medium", "split": "test", "number": 4, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-71232", "tier": "easy", "label": "easy", "split": "test", "number": 5, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-69779", "tier": "easy", "label": "medium", "split": "test", "number": 6, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-66352", "tier": "easy", "label": "medium", "split": "dev", "number": 7, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70205", "tier": "easy", "label": "easy", "split": "test", "number": 8, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-69015", "tier": "easy", "label": "easy", "split": "test", "number": 9, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70828", "tier": "easy", "label": "easy", "split": "test", "number": 10, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68195", "tier": "easy", "label": "easy", "split": "test", "number": 11, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-71248", "tier": "easy", "label": "easy", "split": "test", "number": 12, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-71129", "tier": "easy", "label": "easy", "split": "test", "number": 13, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70966", "tier": "easy", "label": "easy", "split": "dev", "number": 14, "run": false, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68090", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-67897", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-70734", "tier": "medium", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}

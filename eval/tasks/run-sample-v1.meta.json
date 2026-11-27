@@ -10,6 +10,12 @@
   },
   "medium_and_hard": 8,
   "fair_rule": "status fair in e2e_screen.completion_set; reads with another content hash (with facts) are stale",
+  "issue_rule": "one task per issue in each repo: the fair tasks with the same issue (issue URL, else issue number, else the issue text) keep the lowest pull request number; the others are not drawn",
+  "duplicates": {
+    "microsoft/playwright": {
+      "microsoft__playwright-43482": "microsoft__playwright-43342"
+    }
+  },
   "stale_reads": 0,
   "inputs": {
     "task_files": [
@@ -178,6 +184,7 @@
         }
       },
       "run_without_prompts": [],
+      "duplicates": {},
       "notes": [
         "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
         "medium tier: 3 fair tasks, fewer than the target of 8; all of them are run",
@@ -222,6 +229,7 @@
         }
       },
       "run_without_prompts": [],
+      "duplicates": {},
       "notes": []
     },
     "kubernetes/kubernetes": {
@@ -260,6 +268,7 @@
         }
       },
       "run_without_prompts": [],
+      "duplicates": {},
       "notes": [
         "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
         "medium tier: 2 fair tasks, fewer than the target of 8; all of them are run",
@@ -282,9 +291,9 @@
         },
         "medium": {
           "fair": 8,
-          "target": 6,
-          "run": 6,
-          "spare": 2,
+          "target": 7,
+          "run": 7,
+          "spare": 1,
           "test": 7,
           "dev": 1,
           "labels": {
@@ -292,23 +301,24 @@
           }
         },
         "hard": {
-          "fair": 2,
+          "fair": 1,
           "target": 4,
-          "run": 2,
+          "run": 1,
           "spare": 0,
-          "test": 2,
+          "test": 1,
           "dev": 0,
           "labels": {
-            "hard": 2
+            "hard": 1
           }
         }
       },
-      "run_without_prompts": [
-        "microsoft__playwright-43482"
-      ],
+      "run_without_prompts": [],
+      "duplicates": {
+        "microsoft__playwright-43482": "microsoft__playwright-43342"
+      },
       "notes": [
-        "medium tier: the target is 6, because the hard tier runs 2 (medium and hard together are 8)",
-        "hard tier: 2 fair tasks, fewer than the target of 4; all of them are run"
+        "medium tier: the target is 7, because the hard tier runs 1 (medium and hard together are 8)",
+        "hard tier: 1 fair tasks, fewer than the target of 4; all of them are run"
       ]
     },
     "pandas-dev/pandas": {
@@ -347,6 +357,7 @@
         }
       },
       "run_without_prompts": [],
+      "duplicates": {},
       "notes": [
         "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
         "medium tier: 3 fair tasks, fewer than the target of 8; all of them are run",
@@ -358,8 +369,8 @@
   "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --screen tasks/screen/hard-duckdb.jsonl --screen tasks/screen/hard-playwright.jsonl --force",
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "6ad841e127eafa8c96b23bb237e05910c9507b01",
+    "sha": "5b12a485fc039f12a5b33ad3488967a3ef54613f",
     "dirty": false
   },
-  "created": "2026-11-27T18:29:18+00:00"
+  "created": "2026-11-27T19:05:59+00:00"
 }
