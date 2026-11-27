@@ -1,6 +1,6 @@
 # Track A: the evaluation pipeline
 
-**Status:** a plan, written Nov 22, 2026. Nothing here is built yet. The shared context is in
+**Status:** a plan, written Nov 22, 2026. Built since: see the work log. The shared context is in
 [overview.md](overview.md). The eval that exists today is described in
 [eval/README.md](../../eval/README.md).
 

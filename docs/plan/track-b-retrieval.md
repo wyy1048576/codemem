@@ -1,6 +1,6 @@
 # Track B: retrieval design
 
-**Status:** a plan, written Nov 22, 2026. Nothing here is built yet. The shared context is in
+**Status:** a plan, written Nov 22, 2026. Built since: see the work log. The shared context is in
 [overview.md](overview.md). How retrieval works today is in [architecture.md](../architecture.md)
 §3 and §6.
 
@@ -448,7 +448,7 @@ moves to the front.
 
 | By | Packages | What it gives |
 |---|---|---|
-| **Nov 25, evening:** the freeze | B1, B2, B8, B4, and B3 for Python, TypeScript, Go, Rust, C and C++, in that order | the layered retrieval we present, in every language of the main runs: stemming and exact lookup, the integration that ships with its adoption numbers, the query path with relation lines on cards, typed edges. Each piece is in only if it has passed its gate on the retrieval eval by then |
+| **Nov 27, 16:30 Pacific:** the freeze | B1, B2, B8, B4, and B3 for Python, TypeScript, Go, Rust, C and C++, in that order | the layered retrieval we present, in every language of the main runs: stemming and exact lookup, the integration that ships with its adoption numbers, the query path with relation lines on cards, typed edges. Each piece is in only if it has passed its gate on the retrieval eval by then |
 | **Nov 30** | B7 on the test split, once; the merging experiments; anything that missed the freeze and has passed its gate since | the retrieval table, layer by layer, for the presentation. Nothing in this track is planned for later than this, except Java in B3, which is a bonus |
 
 The aim is to leave nothing open after December 1. What is still open then is finished in the week

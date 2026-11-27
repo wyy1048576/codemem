@@ -1,6 +1,6 @@
 # codemem, the next phase: overall plan
 
-**Status:** a plan, written Nov 22, 2026. Nothing in this folder is built yet. How codemem works
+**Status:** a plan, written Nov 22, 2026. Built since: see the work log. How codemem works
 today is in [architecture.md](../architecture.md).
 
 **In one sentence.** codemem becomes the system under test for one question: *when does an index
