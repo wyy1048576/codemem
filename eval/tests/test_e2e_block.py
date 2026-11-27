@@ -350,8 +350,12 @@ def test_block_opened():
     lines = [{"seq": 3, "path": "/v1/messages", "opens_with_text": False},
              {"seq": 2, "path": "/v1/messages", "opens_with_text": True},
              {"seq": 1, "path": "/v1/messages/count_tokens", "opens_with_text": False}]
-    assert e2e_run.block_opened(lines) is True  # the first /v1/messages request
+    assert e2e_run.block_opened(lines) is True  # one /v1/messages request began with the block
     assert e2e_run.block_opened(lines[:1]) is False
+    # a request that Claude Code makes for itself before the conversation does not count against the run
+    side_first = [{"seq": 1, "path": "/v1/messages", "opens_with_text": False},
+                  {"seq": 2, "path": "/v1/messages", "opens_with_text": True}]
+    assert e2e_run.block_opened(side_first) is True
 
 
 def test_run_one_codemem_locally(make_task, tmp_path, monkeypatch):

@@ -35,7 +35,7 @@ A setup with a block (e2e_block.py) is another setup plus one codemem search mad
 starts, with the results at the top of the first message: codemem is tool plus the block, and upfront is grep
 plus the block (grep's container, MCP config and checks). The block is made before the batch, so its search is
 in no clock of the run. The proxy says of each model request whether its first user message begins with the
-block (proxy.opens_with). A run whose first model request did not, or whose proxy log has no model request, gets
+block (proxy.opens_with). A run in which no model request did, or whose proxy log has no model request, gets
 a flag. A batch with such a setup does not start while the block of one of its tasks cannot be used.
 
 The login token goes to the container only through the environment of the docker client (docker run -e NAME
@@ -66,7 +66,7 @@ run.json has these fields:
                       codemem_fallback_searches (e2e_steps.codemem_fallbacks: the search_code results with one
                       of codemem's notes, with their turns; `cmeval e2e recount` computes it again).
                       block_in_first_message: for a setup with a block (else null), whether the first user message
-                      of the run's first model request began with the block; null when the log has no such request
+                      of a model request of the run began with the block; null when the log has no such request
   result_event        subtype, is_error, num_turns, duration_ms, duration_api_ms, total_cost_usd
   usage_limit         the evidence of a usage limit (429 answers and their reset headers, the result text), or null
   turn_limit          the turn at which the runner stopped the agent, and how, or null
@@ -656,11 +656,14 @@ def codemem_checks(warm: dict | None, fallbacks: dict) -> list[str]:
 
 
 def block_opened(proxy_records: list[dict]) -> bool | None:
-    """Whether the first user message of the run's first model request began with the block: opens_with_text of
-    the first /v1/messages request in the proxy log. None when the log has no such request."""
-    first = min((r for r in proxy_records if r.get("path") == MESSAGES_PATH and "opens_with_text" in r),
-                key=lambda r: r.get("seq", 0), default=None)
-    return None if first is None else first["opens_with_text"] is True
+    """Whether the block reached the model: whether the first user message of at least one model request of the
+    run began with it (opens_with_text of the /v1/messages requests in the proxy log). Every request of the
+    agent's own conversation begins with the same first message, so one is enough, and a request that Claude Code
+    makes for itself beside the conversation does not count against the run. None when the log has no such
+    request."""
+    seen = [r["opens_with_text"] is True for r in proxy_records
+            if r.get("path") == MESSAGES_PATH and "opens_with_text" in r]
+    return any(seen) if seen else None
 
 
 _USAGE_TEXT = re.compile(r"usage limit|limit reached|hit your limit|rate limit|resets? at", re.I)
