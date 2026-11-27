@@ -44,7 +44,7 @@ task is run at all three levels.
 best results of one codemem search on the prompt, one line each (`path:line`, two spaces, the
 name), under the line "Possibly relevant code, from a search by meaning (it may be wrong):"; and
 the codemem tool is there for further searches. That first search is made for the agent because
-it costs little, about 1,800 characters in the first message, and because not every model asks
+it costs little, about 1,400 characters in the first message, and because not every model asks
 for a search by itself (§4). The comparison is `grep` against `codemem`, at all three levels.
 
 The two parts of `codemem` can also be run alone, to see which part does the work: `tool` (the
