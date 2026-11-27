@@ -8,6 +8,13 @@
 
 ## Done
 
+**In short (added at 17:26 UTC, at Andre's request).**
+
+- **We made a mistake: `upfront` as a setup of its own need not be built, and it gets no runs.** The plan is updated: `docs/plan/runs.md` on the branch `andre/run-plan-nov27`.
+- **What still has to be built is one small piece:** the code that makes one codemem search for each task and level and puts its 20 results at the top of the first message of the `codemem` runs. We are writing it on the branch `andre/eval-codemem-block`. It will be pushed and posted here, so you should only need to review and merge it.
+- **Either a run has it or it does not:** every `codemem` run has the results, no `grep` run has them, and there is no third kind of run. A `codemem` run whose results are missing does not start.
+- **It is strict, not a suggestion:** the eval makes the search before the agent starts, for every `codemem` run, with the same results for every model and repetition of a task. It does not depend on the agent asking.
+
 **1. An apology.** Our entry of 12:50 UTC gave you a wrong instruction: that the runs concentrate on four repos, and that no further repo is started before its step 4 is done. That was this session's misreading of Andre, not his decision. We are sorry for the confusion and for the changes of today. **No run has started, so nothing has to be redone.** Please follow this entry, and `docs/plan/runs.md` on the branch above, instead of the earlier ones.
 
 **2. The repos and the order.** As in the entry of 17:00 UTC, unchanged:
