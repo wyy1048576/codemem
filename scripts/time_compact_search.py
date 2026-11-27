@@ -54,7 +54,11 @@ threads are safe in it, on macOS too). "All" is every CPU this process may use (
      own loop (np.einsum) instead of the BLAS; a batch of rows (a build) keeps the BLAS
   i  as a, with 50 other queries, each asked for the first time and timed then: their rows come
      from the disk unless the operating system keeps the whole index file in memory. Tests reads
-     from the disk, not threads. Its hits are not compared with the others' (other queries)
+     from the disk, not threads
+  j  as d, with 50 more other queries asked for the first time: reads from the disk on one
+     thread, to set against i (the hits of i and j are not compared with the others': other queries)
+  k  as a, run again after all the others: a thread setting slows both a and k; a page pushed out
+     of memory during one child slows that child only
 
 How a pool is set: numpy's BLAS by OPENBLAS_NUM_THREADS, MKL_NUM_THREADS and
 VECLIB_MAXIMUM_THREADS (OpenBLAS, MKL, Apple's Accelerate) in the child's environment, so before
@@ -72,22 +76,27 @@ AFTER THE TABLES: what each configuration adds to a search against d; whether ev
 configuration returned the same hits (ids and scores) for each query, with a fingerprint per size
 to compare with another run; the time to build the compact index from the rows on all cores (a)
 and on one (d), at the smallest size (--build-sizes), so that a fix that slows builds shows; and a
-closing block in plain words: the step that carries the overhead, the configurations where it
-disappears, so which fix applies; and how long the run took.
+closing block in plain words, with a verdict of three: threads (which pool, shown by which
+configurations, and which fix applies), the disk (the read step is slow only when the rows were
+not asked before, whatever the thread count), or neither on this machine; and how long the run
+took. bench_search_scale.py times each query the first time it is asked, so its "search ms"
+includes reads from the disk wherever the index file is not all in memory: read its numbers
+against the disk line as well.
+
 
 THE INDEXES are built as scripts/bench_search_scale.py builds them (the same synthetic vectors: 896
 numbers, around 2,000 centres, 1.25 vectors per chunk), and the compact search index (4 bits,
 rescore 200) is saved once. About 2.5 GB of disk per million vectors, in --work, which should be
 on a local disk (under WSL: not under /mnt/c). About 2.5 minutes on an 8-core M1 at the default
-sizes, so about 4 on 16 cores (the run is mostly one thread's work), a third of it building the
-indexes; a run that reuses them (--keep-indexes) saves that third.
+sizes; the PC's searches were about 3 times slower than the M1's, so about 5 there (the run is
+mostly one thread's work), a quarter of it building the indexes, which --keep-indexes saves.
 
 TO COMPARE TWO BRANCHES (main, and a fix in src/), run the script on each with the same flags,
 the first with --keep-indexes so that the second reuses the indexes. On the fix branch,
 configuration a is the fix as it would ship; its fingerprints must equal main's. Later commits
 may add configurations.
 
-Options: --sizes (default 100000,500000), --configs (default abcdefghi), --threads (what "all"
+Options: --sizes (default 100000,500000), --configs (default abcdefghijk), --threads (what "all"
 means; default every CPU), --queries (default 50), --build-sizes (default the smallest size;
 "none" skips it), --keep-indexes. It needs numpy, faiss and codemem only.
 """
@@ -122,6 +131,8 @@ WAIT_VARS = ("OMP_WAIT_POLICY", "GOMP_SPINCOUNT", "KMP_BLOCKTIME", "OPENBLAS_THR
 STEPS = ("rotate", "coarse", "fine", "read", "score", "other", "search")
 NAMES = {"rotate": "the rotation", "coarse": "the coarse scan", "fine": "the fine ranking", "read": "reading the rows",
          "score": "the exact scores", "other": "the store around the index"}
+SLOWER_SHARE = 0.15  # more than this share slower counts: run to run, a median of 50 searches moves a few percent
+SLOWER_MS = 2.0  # and more than this many ms: at small sizes a few percent is a fraction of a millisecond
 FORMAT = 1  # of the indexes in --work: an index built by another version of this script is built again
 # key: (FAISS threads, BLAS threads, waiting threads made passive, fix tried, what it is, what it tests)
 CONFIGS = {
@@ -139,7 +150,11 @@ CONFIGS = {
           "fix (i) without editing the store"),
     "i": ("all", "all", None, None, "as a, 50 other queries asked for the first time",
           "reads from the disk instead of the page cache"),
+    "j": (1, 1, None, None, "as d, 50 more other queries asked for the first time", "reads from the disk on one thread"),
+    "k": ("all", "all", None, None, "as a, run again after all the others", "whether a's numbers repeat"),
 }
+COLD = {"i": 11, "j": 17}  # the seeds of the queries asked for the first time
+SAME_QUERIES = "abcdefghk"  # the configurations that ask the same queries: their hits must be equal
 FIXES = {"ii": "(ii) the compact search's FAISS calls on one OpenMP thread",
          "i": "(i) the query row rotated without the BLAS"}
 
@@ -359,8 +374,8 @@ def cmd_time(args: argparse.Namespace) -> None:
     if args.try_fix:
         _try(ti.store, args.try_fix, faiss)
     if args.cold:  # other queries, asked for the first time when they are timed; 10 more warm the threads up
-        queries = synthetic(args.queries, 11).astype(np.float32)
-        warm_up = synthetic(WARM_UP, 13).astype(np.float32)
+        queries = synthetic(args.queries, args.cold).astype(np.float32)
+        warm_up = synthetic(WARM_UP, args.cold + 1).astype(np.float32)
     else:  # each query asked once before it is timed: the rows it reads are in the page cache
         queries = warm_up = synthetic(args.queries, 7).astype(np.float32)
     for q in warm_up:
@@ -487,7 +502,8 @@ def _same_results(results: dict, sizes: list[int], keys: list[str], field: str) 
 
 
 def _closing(results: dict, sizes: list[int], n_all: int) -> list[str]:
-    """The closing block, in plain words."""
+    """The closing block, in plain words: threads (which pool, by which configurations, which fix),
+    the disk (a first read of rows), or neither."""
     def have(key: str) -> bool:
         return all((n, key) in results for n in sizes)
 
@@ -497,92 +513,118 @@ def _closing(results: dict, sizes: list[int], n_all: int) -> list[str]:
     def med(key: str, n: int, step: str = "search") -> float:
         return results[(n, key)]["ms"][step]["p50"]
 
-    def extra(key: str, n: int, step: str = "search") -> float:
-        return med(key, n, step) - med("d", n, step)
+    def extra(key: str, n: int, step: str = "search", base: str = "d") -> float:
+        return med(key, n, step) - med(base, n, step)
 
-    def at(key: str) -> str:
-        return " and ".join(f"{extra(key, n):+.1f} ms at {n:,}" for n in sizes)
+    def at(key: str, base: str = "d") -> str:
+        return " and ".join(f"{extra(key, n, base=base):+.1f} ms at {n:,}" for n in sizes)
 
-    fault = {n: extra("a", n) for n in sizes}
-    lines = []
+    def slower(key: str, n: int, base: str = "d") -> bool:
+        x = extra(key, n, base=base)
+        return x > SLOWER_MS and x > SLOWER_SHARE * med(base, n)
+
+    def steps_of(key: str, base: str = "d") -> tuple[str, str | None]:
+        grown = sorted(((float(np.mean([extra(key, n, s, base) for n in sizes])), s) for s in STEPS[:-1]), reverse=True)
+        big = max(1.0, 0.1 * float(np.mean([extra(key, n, base=base) for n in sizes])))
+        named = [f"{NAMES[s]} ({g:+.1f} ms)" for g, s in grown if g > big][:3]
+        return (", ".join(named) if named else "no one step (it is spread over all of them)"), (grown[0][1] if named else None)
+
+    lines: list[str] = []
+    exact = (" and ".join(f"{extra('a', n, 'exact'):+.1f} ms" for n in sizes)
+             if all("exact" in results[(n, k)]["ms"] for n in sizes for k in "ad") else "not run")
+    slow_a = [n for n in sizes if slower("a", n)]
+    slow_k = [n for n in sizes if have("k") and slower("k", n)]
+    again = f" and again after all the others (k) {at('k')}" if have("k") else ""
+    threads, unsettled = "", ""
+    if not slow_a and not slow_k:
+        lines.append(f"THREADS: no. On all {n_all} cores (a) a compact search takes {at('a')} vectors against one core "
+                     f"each (d){again}; the exact search {exact}.")
+    elif have("k") and slow_a != slow_k:
+        one_off = "a" if len(slow_a) > len(slow_k) else "k"
+        where, _ = steps_of(one_off)
+        lines.append(f"THREADS: not shown. Of the two runs on all {n_all} cores only {one_off} was slower than one core "
+                     f"each (d): a {at('a')}, k {at('k')}, in {where}. A thread setting slows both; a change of one run "
+                     "is what a page pushed out of memory during it does. Run the script again to be sure.")
+        unsettled = f"only one of two runs on all cores ({one_off}) was slower than one core: run the script again"
+    else:
+        where, top = steps_of("a")
+        lines.append(f"THREADS: yes. On all {n_all} cores (a) a compact search takes {at('a')} vectors more than on one "
+                     f"core each (d){again}; the exact search {exact}.")
+        lines.append(f"  It sits in {where}, against d, as a mean over the sizes."
+                     + (f" {NAMES[top].capitalize()} runs no thread of its own: it waits, for cores that other threads "
+                        "hold or for the disk (the DISK line tells which)." if top in ("read", "score", "other") else ""))
+        fault = {n: extra("a", n) for n in sizes}
+        verdicts: dict[str, str] = {}
+        for key in "bcefgh":
+            if not have(key):
+                continue
+            if all(extra(key, n) <= max(SLOWER_MS, 0.25 * fault[n]) for n in sizes):
+                verdicts[key] = "gone"
+            elif all(extra(key, n) <= 0.75 * fault[n] for n in sizes):
+                verdicts[key] = "partly"
+            else:
+                verdicts[key] = "stays"
+
+        def listed(kind: str) -> str:
+            return "; ".join(f"{k}, {CONFIGS[k][4]} ({at(k)})" for k, v in verdicts.items() if v == kind) or "none"
+
+        lines.append(f"  It disappears in: {listed('gone')}.")
+        lines.append(f"  It shrinks to between a quarter and three quarters in: {listed('partly')}.")
+        lines.append(f"  It stays in: {listed('stays')}.")
+        gone = {k for k, v in verdicts.items() if v == "gone"}
+        if "c" in gone and "b" not in gone:
+            cause, detail, fix = "FAISS's OpenMP threads", "a parallel region for each FAISS call of one query", "ii"
+        elif "b" in gone and "c" not in gone:
+            cause, detail, fix = "numpy's BLAS threads", "the rotation's product", "i"
+        elif "b" in gone and "c" in gone:
+            cause, detail, fix = "the two pools together", "either one on 1 thread removes it", None
+        else:
+            cause, detail, fix = "neither pool's thread count alone", "see e and f: threads that spin", None
+        notes = [f"{CONFIGS[k][4][6:]} removes it as well: {who}'s threads spin and hold cores"
+                 for k, who in (("e", "FAISS"), ("f", "OpenBLAS")) if k in gone]
+        tried = {"g": "ii", "h": "i"}
+        if fix is None:
+            fix = next((tried[k] for k in "gh" if verdicts.get(k) == "gone"), None)
+        lines.append(f"  So it comes from {cause} ({detail})." + (f" {'; '.join(notes)}." if notes else ""))
+        measured = [f"fix {FIXES[tried[k]]} leaves {at(k)} ({k}: {verdicts[k]})" for k in "gh" if k in verdicts]
+        if measured:
+            lines.append(f"  Measured here: {'; '.join(measured)}.")
+        passive = [f"making {CONFIGS[k][4][6:]} ({k}, a setting of the whole process)" for k in "ef" if k in gone]
+        instead = "neither candidate removes it; " + (" or ".join(passive) + " does" if passive else "look at e and f")
+        lines.append(f"  The fix that applies: {FIXES[fix] if fix else instead}"
+                     + (". It must also leave the hits the same and the build time as it was (both above)." if fix else "."))
+        threads = f"threads: {cause}, in {where}; " + (f"fix {FIXES[fix]} applies" if fix else instead)
     disk = ""
     if have("i"):
-        cold = {n: med("i", n) - med("a", n) for n in sizes}
-        cold_read = " and ".join(f"{med('i', n, 'read') - med('a', n, 'read'):+.1f} ms" for n in sizes)
-        disk = (f"Reads from the disk: 50 queries asked for the first time (i) take "
-                + " and ".join(f"{cold[n]:+.1f} ms at {n:,}" for n in sizes) + f" against a ({cold_read} in reading "
-                f"the rows): " + ("the index file was not all in memory, so a first search of each query paid reads "
-                "from the disk, whatever the threads." if any(cold[n] > max(2.0, 0.15 * med("a", n)) for n in sizes)
-                else "the operating system keeps the index file in memory here."))
-    exact = " and ".join(f"{extra('a', n, 'exact'):+.1f} ms" for n in sizes) if all("exact" in results[(n, k)]["ms"]
-                                                                                  for n in sizes for k in "ad") else "not run"
-    if not any(fault[n] > max(2.0, 0.15 * med("d", n)) for n in sizes):
-        lines.append(f"1. No overhead here: on all {n_all} cores (a) a compact search takes {at('a')} vectors against one core "
-                     f"each (d); the exact search {exact}. Nothing to fix on this machine, and the other configurations "
-                     "then say nothing either way.")
-        if disk:
-            lines.append("2. " + disk)
-        lines.append("=> On this machine neither pool makes a compact search slower.")
-        return lines
-    grown = sorted(((float(np.mean([extra("a", n, s) for n in sizes])), s) for s in STEPS[:-1]), reverse=True)
-    big = max(1.0, 0.1 * float(np.mean(list(fault.values()))))
-    steps = [f"{NAMES[s]} ({g:+.1f} ms)" for g, s in grown if g > big][:3]
-    where = ", ".join(steps) if steps else "no one step (it is spread over all of them)"
-    lines.append(f"1. The fault: on all {n_all} cores (a) a compact search takes {at('a')} vectors more than on one core each "
-                 f"(d); the exact search {exact}.")
-    quiet = [s for g, s in grown[:1] if g > big and s in ("read", "score", "other")]
-    lines.append(f"2. It sits in {where}, against d, as a mean over the sizes."
-                 + (f" {NAMES[quiet[0]].capitalize()} runs no thread of its own: it waits, for cores that other "
-                    "threads hold or for the disk (configuration i tells which)." if quiet else ""))
-    verdicts: dict[str, str] = {}
-    for key in "bcefgh":  # i is not a thread setting: it has a line of its own below
-        if not have(key):
-            continue
-        if all(extra(key, n) <= max(2.0, 0.25 * fault[n]) for n in sizes):
-            verdicts[key] = "gone"
-        elif all(extra(key, n) <= 0.75 * fault[n] for n in sizes):
-            verdicts[key] = "partly"
+        # against the faster of the two warm runs on all cores, so that a one-off slow run of a hides nothing
+        warm = {n: min(("a", "k") if have("k") else ("a",), key=lambda key: med(key, n)) for n in sizes}
+        cold_all = {n: med("i", n) - med(warm[n], n) for n in sizes}
+        cold = [n for n in sizes if (cold_all[n] > SLOWER_MS and cold_all[n] > SLOWER_SHARE * med(warm[n], n))
+                or (have("j") and slower("j", n, base="d"))]
+        one = f", and on one thread (j against d) {at('j')}" if have("j") else ""
+        on_all = " and ".join(f"{cold_all[n]:+.1f} ms at {n:,}" for n in sizes)
+        read = " and ".join(f"{med('i', n, 'read') - med(warm[n], n, 'read'):+.1f} ms" for n in sizes)
+        if cold:
+            lines.append(f"DISK: yes. Queries asked for the first time take, on all cores (i against a), {on_all}{one}; "
+                         f"in reading the rows {read} (i). The index file is not all in memory here, so a first search of "
+                         "a query reads rows from the disk, whatever the thread count. bench_search_scale.py times each "
+                         "query the first time it is asked, so its \"search ms\" includes these reads on such a machine: "
+                         "read its numbers (last night's too) against this line.")
+            disk = "reads from the disk: a query's first search reads its rows from the disk, whatever the threads"
         else:
-            verdicts[key] = "stays"
-
-    def listed(kind: str) -> str:
-        keys = [k for k, v in verdicts.items() if v == kind]
-        return "; ".join(f"{k}, {CONFIGS[k][4]} ({at(k)})" for k in keys) or "none"
-
-    lines.append(f"3. It disappears in: {listed('gone')}.")
-    lines.append(f"   It shrinks to between a quarter and three quarters in: {listed('partly')}.")
-    lines.append(f"   It stays in: {listed('stays')}.")
-    gone = {k for k, v in verdicts.items() if v == "gone"}
-    if "c" in gone and "b" not in gone:
-        cause, detail, fix = "FAISS's OpenMP threads", "a parallel region for each FAISS call of one query", "ii"
-    elif "b" in gone and "c" not in gone:
-        cause, detail, fix = "numpy's BLAS threads", "the rotation's product", "i"
-    elif "b" in gone and "c" in gone:
-        cause, detail, fix = "the two pools together", "either one on 1 thread removes it", None
+            lines.append(f"DISK: no. Queries asked for the first time take, on all cores (i against a), {on_all}{one}: "
+                         "the operating system keeps the index file in memory here.")
+    if unsettled:
+        lines.append(f"=> Not settled on this machine: {unsettled}" + (f"; and {disk}." if disk else "."))
+    elif threads and disk:
+        lines.append(f"=> On this machine both: {threads}; and {disk}.")
+    elif threads:
+        lines.append(f"=> On this machine the overhead comes from {threads}.")
+    elif disk:
+        lines.append(f"=> On this machine the overhead is {disk}; not threads.")
     else:
-        cause, detail, fix = "neither pool's thread count alone", "see e and f: threads that spin", None
-    notes = []
-    if "e" in gone:
-        notes.append("OpenMP's waiting threads made passive remove it as well: FAISS's threads spin and hold cores")
-    if "f" in gone:
-        notes.append("OpenBLAS's waiting threads made passive remove it as well: OpenBLAS's threads spin and hold cores")
-    tried = {"g": "ii", "h": "i"}
-    measured = [f"fix {FIXES[tried[k]]} leaves {at(k)} (configuration {k}: {verdicts[k]})" for k in "gh" if k in verdicts]
-    if fix is None:
-        works = [tried[k] for k in "gh" if verdicts.get(k) == "gone"]
-        if works:
-            fix = works[0]
-    lines.append(f"4. So the overhead comes from {cause} ({detail})." + (f" {'; '.join(notes)}." if notes else ""))
-    if measured:
-        lines.append(f"   Measured here: {'; '.join(measured)}.")
-    passive = [f"making {CONFIGS[k][4][6:]} (configuration {k}, a setting of the whole process)" for k in "ef" if k in gone]
-    instead = ("neither candidate removes it; " + (" or ".join(passive) + " does" if passive else "look at e and f"))
-    lines.append(f"5. The fix that applies: {FIXES[fix] if fix else instead}"
-                 + (". It must also leave the results the same and the build time as it was (both above)." if fix else "."))
-    if disk:
-        lines.append("6. " + disk)
-    lines.append(f"=> On this machine the overhead comes from {cause}, in {where}; "
-                 + (f"fix {FIXES[fix]} applies." if fix else f"{instead}."))
+        lines.append("=> Neither shows on this machine: a compact search on all cores is as fast as on one"
+                     + (", and a first search of a query reads nothing from the disk." if have("i") else "."))
     return lines
 
 
@@ -639,8 +681,8 @@ def run(args: argparse.Namespace) -> None:
             argv: list[object] = ["time", "--index", index, "--faiss", given["OMP_NUM_THREADS"], "--queries", args.queries]
             if key in "ad":
                 argv.append("--exact")
-            if key == "i":
-                argv.append("--cold")
+            if key in COLD:
+                argv += ["--cold", COLD[key]]
             if key in "ad" and n in build_sizes:
                 argv.append("--build")
             if CONFIGS[key][3]:
@@ -695,7 +737,7 @@ def run(args: argparse.Namespace) -> None:
             cells.append(f"{r['ms']['search']['p50'] - base['search']['p50']:+.1f}{ex}")
         print(f"{n:>9,} " + " ".join(f"{c:>15}" for c in cells))
     print("\nsame results (ids and scores of every hit, query by query), compact index:")
-    for line in _same_results(results, sizes, [k for k in keys if k != "i"], "hits"):
+    for line in _same_results(results, sizes, [k for k in keys if k in SAME_QUERIES], "hits"):
         print("  " + line)
     print("same results, exact index (a, d):")
     for line in _same_results(results, sizes, keys, "exact_hits"):
@@ -719,7 +761,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--work", help="a folder with free disk for the indexes (about 2.5 GB per million vectors)")
     p.add_argument("--sizes", default="100000,500000")
-    p.add_argument("--configs", default="abcdefghi", help="which configurations to run (letters, see above)")
+    p.add_argument("--configs", default="abcdefghijk", help="which configurations to run (letters, see above)")
     p.add_argument("--threads", type=int, default=0, help="what 'all' means (default: every CPU this process may use)")
     p.add_argument("--queries", type=int, default=50)
     p.add_argument("--build-sizes", default="", help="sizes at which a and d time a build from the rows (default: the smallest)")
@@ -733,7 +775,7 @@ def main() -> None:
         s.add_argument("--queries", type=int, default=50)
         s.add_argument("--exact", action="store_true")
         s.add_argument("--build", action="store_true")
-        s.add_argument("--cold", action="store_true")
+        s.add_argument("--cold", type=int, default=0, help="the seed of queries asked for the first time")
         s.add_argument("--try-fix", default="")
         s.set_defaults(fn=fn)
     args = p.parse_args()
