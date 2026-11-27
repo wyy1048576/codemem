@@ -115,12 +115,11 @@ short needs that many more in medium (§3).
 
 **What this size can show.** The unit of every comparison is the task: `grep` against `codemem`
 on the same task, at one prompt level, with one model. For Haiku the six repos that are run fully
-(§5) give 84
-tasks, so 84 pairs at each level, and kubernetes and trino add 28. Sonnet runs four repos: 56
-pairs. The numbers below are planning numbers, under the assumptions of
-[track A](track-a-evals.md) §13: 75 pairs show a difference of 15% in tokens or time, and 150 pairs
-a difference of 10 points in tasks solved. With fewer pairs the difference has to be larger, by
-the square root of how many fewer.
+(§5) give 84 tasks, so 84 pairs at each level, and kubernetes and trino add 28. Sonnet runs four
+repos: 56 pairs. The numbers below are planning numbers, under the assumptions of
+[track A](track-a-evals.md) §13: 75 pairs show a difference of 15% in tokens or time, and 150
+pairs a difference of 10 points in tasks solved. With fewer pairs the difference has to be
+larger, by the square root of how many fewer.
 
 | Comparison | Pairs | What it can show |
 |---|---|---|
@@ -151,8 +150,8 @@ Every model runs a part of the same sample, so that models are compared on the s
 
 - **Haiku carries the comparison.** It is the cheapest of the three, and it places the fewest
   tasks from memory: 7 of 41 duckdb tasks, against Sonnet's 12 and Opus's 22. So it is run on
-  every repo, three times. Sonnet and Opus are run on a part, to see what codemem still gives a
-  model that knows more of the code. Sonnet's repetitions 2 and 3 are a bonus (§7).
+  every repo, and three times on the first six. Sonnet and Opus are run on a part, to see what
+  codemem still gives a model that knows more of the code. Sonnet's repetitions 2 and 3 are a bonus (§7).
 - **Sonnet runs four of the repos:** pandas, duckdb, playwright and kubernetes. A model of its
   size places many tasks from memory, so its runs go where that differs most. In a probe with no
   repository and no tools, Sonnet named the right file first in 15 of 17 pandas tasks, 13 of 20
@@ -220,7 +219,8 @@ locked codemem, and that codemem's results reach the agent.
 
 **What runs.** On pandas and on playwright, which Haiku and Sonnet both run (§5):
 numbers 1 and 2 of easy and number 1 of medium, at L0 and at L2, in `grep` and `codemem`, with
-Haiku and with Sonnet, once. That is 24 runs for each model, 48 in all, under two hours on three seats.
+Haiku and with Sonnet, once. That is 24 runs for each model, 48 in all, under two hours on three
+seats.
 
 **It passes when:**
 
