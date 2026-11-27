@@ -112,16 +112,20 @@ short needs that many more in medium (§3).
 **What this size can show.** The unit of every comparison is the task: `grep` against each
 codemem setup on the same task, at one prompt level, with one model. `tool` is paired with `grep`
 at L0, L1 and L2, `upfront` at L1 and L2. The four repos that are run fully (§5) give 56 tasks, so
-56 pairs at each level, and kubernetes adds 14. The numbers below are planning numbers for six
-repos, 84 pairs, under the assumptions of [track A](track-a-evals.md) §13. With 56 or 70 pairs, a
-difference has to be somewhat larger to show.
+56 pairs at each level, and kubernetes adds 14. The numbers below are planning numbers, under the
+assumptions of [track A](track-a-evals.md) §13: 75 pairs show a difference of 15% in tokens or
+time, and 150 pairs a difference of 10 points in tasks solved. With fewer pairs the difference has
+to be larger, by the square root of how many fewer.
 
-| Comparison | Pairs | What it can show |
-|---|---|---|
-| all tasks, at one prompt level | 84 | a difference of about 14% in tokens or time; in tasks solved, only a difference of 13 points or more |
-| the easy tier | 36 | a difference of about 22% |
-| the medium or the hard tier | 24 | large differences only, about 27% |
-| one repo | 14 | a direction, not a result |
+| Comparison | Pairs in the four repos | What it can show | With kubernetes |
+|---|---|---|---|
+| all tasks, at one prompt level | 56 | a difference of about 17% in tokens or time; in tasks solved, only a difference of 16 points or more | 70 pairs: about 16%, and 15 points |
+| the easy tier | 24 | a difference of about 27% | 30 pairs: about 24% |
+| the medium or the hard tier | 16 | large differences only, about 32% | 20 pairs: about 29% |
+| one repo | 14 | a direction, not a result | |
+
+Opus runs 6 tasks of each repo (§4), 24 pairs in the four repos: it can show large differences
+only.
 
 Tier and prompt level are two separate dimensions, and the sample covers both: every task of
 every tier is run at L0, L1 and L2.
@@ -244,8 +248,8 @@ track C the index, before any more seats are spent.
   for the steps that have passed, and is in step from then on.
 - A repo that is not ready when its turn comes is passed over and taken up when it is.
 - A batch that is cut short leaves a complete table with fewer repetitions, never a table with
-  holes. The `grep` run and the `tool` run of a task go turn about in the same batch, so that
-  their times can be compared.
+  holes. The setups of a task go turn about in the same batch, and which of them goes first
+  changes from task to task, so that their times can be compared.
 
 ---
 
@@ -260,10 +264,11 @@ track C the index, before any more seats are spent.
 | step 5: kubernetes, once | 224 | 6 to 9 hours |
 | step 6: repetitions 2 and 3 of Sonnet | 896 | 25 to 35 hours |
 | step 7: the repos run if time is left | not counted | |
-| the open models, on the rented GPU | 468 for each model | about 8 hours for each model, if a run takes as long as a Claude run and six run at once |
+| the open models, on the rented GPU | 312 for each model, on the four repos that are run fully | about 5 hours for each model, if a run takes as long as a Claude run and six run at once |
 
-**What fits.** The runs start on Nov 27 at 17:00 Pacific (Nov 28, 01:00 UTC), and the results are
-frozen on Nov 30 at 23:59 Pacific (Dec 1, 07:59 UTC): 79 hours. Steps 1 to 4 take 53 to 74 of
+**What fits.** codemem is locked on Nov 27 at 16:30 Pacific. The runs start at 17:00 Pacific
+(Nov 28, 01:00 UTC), and the results are frozen on Nov 30 at 23:59 Pacific (Dec 1, 07:59 UTC):
+79 hours. Steps 1 to 4 take 53 to 74 of
 them without a pause, which leaves 5 to 26 hours for steps 5 to 7.
 
 - **The 5 to 7 minutes are an assumption.** The pilot measured 4.3 to 5.5 minutes for Haiku at
@@ -288,7 +293,7 @@ them without a pause, which leaves 5 to 26 hours for steps 5 to 7.
 5. **Build the `upfront` setup** (§1): `grep` with a block of codemem's results at the top of the
    first message, made once for each task and level with the task's index and the locked codemem,
    so that every model and repetition gets the same block. The block's layout and the checks of
-   each run are in the work-log entry of Nov 27, 12:45 UTC.
+   each run are in the work-log entries of Nov 27, 12:45 and 15:13 UTC.
 6. **Run the check run** (§6) with Haiku and with Sonnet, and post its five points and the first
    numbers of both models. Go on only when it has passed.
 7. **Then run in the order of §7.**
