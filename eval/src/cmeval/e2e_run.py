@@ -13,7 +13,10 @@ One run (run_one) has these steps:
      reaches the proxy and nothing else. A thread follows the stream of events and stops the agent after
      the turn limit
   4. in the container, as root: remove files that would configure the agent, make a user that is not
-     root. For a codemem setup, start codemem's MCP server through the gate (codemem_gate.py) and wait until
+     root. For a codemem setup, make the mount proof as that user (proof_script): the codemem checkout in the
+     container holds only codemem's environment and source (no eval/ with the task files), and no mounted
+     path holds a line of the task's real fix or hidden tests. When it fails, the script stops there. Then
+     start codemem's MCP server through the gate (codemem_gate.py) and wait until
      its model and search index are in memory and a search has no note. Then start Claude Code as that user
      with the time limit; its codemem server is the gate's bridge to that warm server. After it stops, save
      its changes as a patch
@@ -27,9 +30,10 @@ the model was still loading, and codemem answered it from keywords only.
 A run is discarded when it hit a usage limit or failed the setup check. The setup check reads the init event
 of the stream (check_setup), and for a codemem setup also the gate's ready file and the first search_code
 result (codemem_checks): a warm-up that failed, or a first search answered from keywords only, fails it. A
-discarded run is not graded, and the next batch does it again. When the warm-up fails, Claude Code does not
-start, and the run ends in an error: three of them in a row stop the batch. A run that ended at the time or
-turn limit is graded like any other.
+discarded run is not graded, and the next batch does it again. A failed mount proof (proof_checks) also fails
+the setup check. When the mount proof or the warm-up fails, Claude Code does not start, and the run ends in an
+error: three of them in a row stop the batch. A run that ended at the time or turn limit is graded like any
+other.
 
 A setup with a block (e2e_block.py) is another setup plus one codemem search made for the agent before it
 starts, with the results at the top of the first message: codemem is tool plus the block, and upfront is grep
@@ -61,7 +65,11 @@ run.json has these fields:
                       result in a gold file and on a gold function, and the results (rank, path, line, name)
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
                       network, the removed configuration files, the files where the token was found and replaced,
-                      gpus (the container had the GPU). codemem setups only, else null: codemem_warm (the gate's
+                      gpus (the container had the GPU). codemem setups only, else null: codemem_mount_proof (ok,
+                      the checkout, the folders it should hold, the mounted paths that were searched, the number
+                      of phrases of patch and test_patch, the container's answers: script_says, checkout_eval,
+                      checkout_entries, grep_exit, other_errors, hits and grep_errors, and the seconds),
+                      codemem_warm (the gate's
                       ready file: ok, seconds, warmup_searches, the index_status answer, or the error) and
                       codemem_fallback_searches (e2e_steps.codemem_fallbacks: the search_code results with one
                       of codemem's notes, with their turns; `cmeval e2e recount` computes it again).
@@ -108,8 +116,8 @@ from typing import Callable
 from . import codemem_gate
 from .e2e import grade, patch_files
 from .e2e_block import read_block, record_entry
-from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_python_root, hf_cache, \
-    index_root, index_state, read_index_meta
+from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_mount_paths, \
+    codemem_python_root, hf_cache, index_root, index_state, read_index_meta
 from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
 from .files import write_json
 from .generate import NO_CORE_DUMPS, GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
@@ -158,6 +166,16 @@ GATE_LOGS = (f"cp {GATE_DIR}/gate.log /out/codemem-gate.log 2>/dev/null; "
              f"cp {GATE_DIR}/server.log /out/codemem-server.log 2>/dev/null")
 # Files of the agent's patch that codemem could have written. `codemem mcp` should write none.
 UNEXPECTED_PATTERNS = (".codemem*", ".mcp.json")
+# The mount proof of a codemem setup (proof_script): the host writes lines of the task's real fix and hidden
+# tests to PROOF_PHRASES in the run's folder. agent.sh moves the file to PROOF_DIR, a folder that only root can
+# read, before anything runs as the agent's user, and deletes it after the search. The result is PROOF_FILE.
+PROOF_DIR = "/run/cmproof"
+PROOF_PHRASES = "cmproof.txt"
+PROOF_FILE = "mount-proof.txt"
+# Added lines of this length or longer, the longest PROOF_LINES of each patch. Shorter lines are often in other
+# code too (for example a library in codemem's environment), and a false match stops the run.
+PROOF_MIN_CHARS = 40
+PROOF_LINES = 3
 
 # Exit codes of a batch.
 EXIT_USAGE_LIMIT = 4
@@ -379,8 +397,9 @@ def ensure_network(name: str = NETWORK) -> str:
 
 
 def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> dict:
-    """Check what codemem needs in the container. Returns the program, its checkout and Python install, the
-    Hugging Face cache, the task's index folder and index.json, and the codemem commit."""
+    """Check what codemem needs in the container. Returns the program, its checkout, the folders of the checkout
+    that the container gets (e2e_index.codemem_mount_paths), the Python install, the Hugging Face cache, the
+    task's index folder and index.json, and the codemem commit."""
     hint = f"run cmeval e2e index {recipe.name} first"
     if not settings.gpus:
         raise GenerateError(f"a codemem setup needs the GPU in the container ({GPUS_ENV}=1): the index is tied to "
@@ -400,9 +419,9 @@ def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> 
         raise GenerateError(f"no Hugging Face cache at {hf} (codemem's embedding model is there); {hint}, "
                             "which loads the model")
     checkout = codemem_checkout(program)
-    return {"bin": program, "checkout": checkout, "python_root": python_root, "hf_cache": hf,
-            "index": index_root(recipe, task) / "index", "meta": read_index_meta(recipe, task),
-            "commit": codemem_commit(checkout)}
+    return {"bin": program, "checkout": checkout, "mounts": codemem_mount_paths(program),
+            "python_root": python_root, "hf_cache": hf, "index": index_root(recipe, task) / "index",
+            "meta": read_index_meta(recipe, task), "commit": codemem_commit(checkout)}
 
 
 def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setup | None = None,
@@ -474,9 +493,10 @@ def gated_mcp_config(codemem: dict, settings: RunSettings) -> dict:
 
 
 def codemem_mounts(codemem: dict, index_copy: Path) -> list[str]:
-    """The docker run arguments of a codemem setup. The checkout and the Python install keep their paths, so
-    that the program's links and its editable install work."""
-    mounts = [f"{codemem['checkout']}:{codemem['checkout']}:ro"]
+    """The docker run arguments of a codemem setup. Of the checkout only the environment and the package source
+    (codemem["mounts"]), never the checkout itself: its eval/ folder holds the real fixes. These folders and the
+    Python install keep their paths, so that the program's links and its editable install work."""
+    mounts = [f"{path}:{path}:ro" for path in codemem["mounts"]]
     if codemem["python_root"]:
         mounts.append(f"{codemem['python_root']}:{codemem['python_root']}:ro")
     mounts += [f"{codemem['hf_cache']}:{HF_MOUNT}:ro", f"{index_copy}:{INDEX_MOUNT}"]
@@ -551,9 +571,110 @@ def gate_script(python: str) -> str:
     )
 
 
-def agent_script(model: str, settings: RunSettings, gate_python: str | None = None) -> str:
+def mount_targets(volumes: list[str]) -> list[str]:
+    """The paths in the container of the "-v" arguments of docker run."""
+    return [volumes[i + 1].split(":")[1] for i, part in enumerate(volumes[:-1]) if part == "-v"]
+
+
+def proof_plan(codemem: dict, volumes: list[str]) -> dict:
+    """What the mount proof checks in the container: the checkout holds only the mounted folders (no eval/),
+    and no mounted path holds a line of the real fix or the hidden tests."""
+    checkout = Path(codemem["checkout"])
+    return {"checkout": str(checkout),
+            "expected_entries": sorted(Path(p).name for p in codemem["mounts"] if Path(p).parent == checkout),
+            "paths": mount_targets(volumes)}
+
+
+def proof_phrases(task: Task, avoid: str) -> dict[str, list[str]]:
+    """Lines that only the real fix (patch) and the hidden tests (test_patch) hold: the longest added lines of
+    each, at least PROOF_MIN_CHARS long, without the leading and trailing spaces. A line that the patch also
+    removes (a moved line) or that is in `avoid` (the files that the run's folder holds before the agent
+    starts, such as prompt.txt with the issue text) is not used."""
+    phrases = {}
+    for name, patch in (("patch", task.patch), ("test_patch", task.test_patch or "")):
+        lines = patch.replace("\r", "").splitlines()
+        removed = {line[1:].strip() for line in lines if line.startswith("-") and not line.startswith("--- ")}
+        added = {line[1:].strip() for line in lines if line.startswith("+") and not line.startswith("+++ ")}
+        found = [line for line in added - removed if len(line) >= PROOF_MIN_CHARS and line not in avoid]
+        phrases[name] = sorted(found, key=lambda line: (-len(line), line))[:PROOF_LINES]
+    return phrases
+
+
+def proof_script(plan: dict) -> str:
+    """The lines of agent.sh that prove, as the agent's user and before the agent starts, that the container
+    does not expose the answers: the codemem checkout holds only the mounted folders (so no eval/), and a
+    fixed-string search of every mounted path for the phrases of PROOF_PHRASES finds nothing. The phrases reach
+    grep on its standard input from a file that only root can read; they never pass through the shell. grep
+    skips binary files (-I). When the proof fails, the script stops before codemem and Claude Code start."""
+    checkout = shlex.quote(plan["checkout"])
+    expected = shlex.quote("".join(name + " " for name in plan["expected_entries"]))
+    paths = " ".join(shlex.quote(p) for p in plan["paths"])
+    return (
+        f"mkdir -p -m 700 {PROOF_DIR} && mv /out/{PROOF_PHRASES} {PROOF_DIR}/phrases.txt || exit 4\n"
+        f"if runuser -u agent -- test -e {checkout}/eval; then eval_state=present; else eval_state=absent; fi\n"
+        f"entries=$(runuser -u agent -- ls -A {checkout} | LC_ALL=C sort | tr '\\n' ' ')\n"
+        f"runuser -u agent -- grep -rIlF -f /dev/stdin -- {paths} < {PROOF_DIR}/phrases.txt > {PROOF_DIR}/hits "
+        f"2> {PROOF_DIR}/errors\n"
+        "rc=$?\n"
+        f"other=$(grep -vc 'Permission denied' {PROOF_DIR}/errors)\n"
+        f'if [ "$eval_state" = absent ] && [ "$entries" = {expected} ] && [ ! -s {PROOF_DIR}/hits ] && '
+        '{ [ "$rc" = 1 ] || { [ "$rc" = 2 ] && [ "$other" = 0 ]; }; }; then proof=ok; else proof=failed; fi\n'
+        f'{{ echo "proof $proof"; echo "checkout_eval $eval_state"; echo "checkout_entries $entries"; '
+        f'echo "grep_exit $rc"; echo "other_errors $other"; sed "s/^/hit /" {PROOF_DIR}/hits; '
+        f'sed "s/^/grep_error /" {PROOF_DIR}/errors | head -n 20; }} > /out/{PROOF_FILE}\n'
+        f"rm -rf {PROOF_DIR}\n"
+        "mark mount_proof\n"
+        '[ "$proof" = ok ] || exit 4\n'
+    )
+
+
+def read_proof(out: Path) -> dict | None:
+    """The result of the mount proof (PROOF_FILE), or None when the container did not write it."""
+    path = out / PROOF_FILE
+    if not path.exists():
+        return None
+    proof = {"script_says": None, "checkout_eval": None, "checkout_entries": None, "grep_exit": None,
+             "other_errors": None, "hits": [], "grep_errors": []}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        key, _, value = line.partition(" ")
+        if key in ("hit", "grep_error"):
+            proof[key + "s"].append(value)
+        elif key == "proof":
+            proof["script_says"] = value
+        elif key == "checkout_entries":
+            proof[key] = value.split()
+        elif key in ("grep_exit", "other_errors"):
+            proof[key] = int(value) if value.strip().isdigit() else None
+        elif key == "checkout_eval":
+            proof[key] = value
+    return proof
+
+
+def proof_checks(proof: dict) -> list[str]:
+    """The checks of the mount proof that fail. The host checks the container's answers again."""
+    if not proof.get("found"):
+        return [f"mount proof: no {PROOF_FILE}; the proof did not run"]
+    failed = []
+    if proof["checkout_eval"] != "absent":
+        failed.append(f"mount proof: {proof['checkout']}/eval is {proof['checkout_eval']} in the container")
+    if proof["checkout_entries"] != proof["expected_entries"]:
+        failed.append(f"mount proof: {proof['checkout']} holds {proof['checkout_entries']} in the container, "
+                      f"expected {proof['expected_entries']}")
+    if proof["hits"]:
+        failed.append(f"mount proof: a line of the real fix or the hidden tests is in {', '.join(proof['hits'][:5])}")
+    if not (proof["grep_exit"] == 1 or (proof["grep_exit"] == 2 and proof["other_errors"] == 0)):
+        first = proof["grep_errors"][0] if proof["grep_errors"] else "no message"
+        failed.append(f"mount proof: the search failed (exit {proof['grep_exit']}): {first}")
+    if not failed and proof["script_says"] != "ok":
+        failed.append(f"mount proof: the container script says {proof['script_says']}")
+    return failed
+
+
+def agent_script(model: str, settings: RunSettings, gate_python: str | None = None,
+                 proof: dict | None = None) -> str:
     """The shell script that runs in the task's container, as root. It reads and writes /out. With gate_python
-    (a codemem setup), it starts codemem through the gate and waits for it before the agent's clock starts."""
+    (a codemem setup), it starts codemem through the gate and waits for it before the agent's clock starts.
+    With proof (proof_plan, a codemem setup), it first makes the mount proof (proof_script)."""
     specs = " ".join(shlex.quote(p) for p in CONFIG_PATHSPECS)
     # MCP_TIMEOUT and MCP_TOOL_TIMEOUT are the same in every setup, so that the setups differ only in the server.
     env = ("env -u ANTHROPIC_API_KEY HOME=/home/agent CLAUDE_CONFIG_DIR=/run/claude-empty "
@@ -584,6 +705,7 @@ def agent_script(model: str, settings: RunSettings, gate_python: str | None = No
         "mark chown\n"
         "mkdir -p /run/claude-empty && chown agent /run/claude-empty\n"
         "cp /out/mcp.json /tmp/mcp.json && chmod 644 /tmp/mcp.json\n"
+        + (proof_script(proof) if proof else "")
         + (gate_script(gate_python) if gate_python else "") +
         "mark ready\n"
         # The run's time: from right before Claude Code starts to right after it ends.
@@ -838,8 +960,18 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     if codemem:
         (out / "cmgate.py").write_bytes(Path(codemem_gate.__file__).read_bytes())
         write_json(out / "cmgate.json", gate_config(codemem, settings))
-    (out / "agent.sh").write_text(agent_script(model, settings, codemem_python(codemem) if codemem else None),
+    index_copy = out / "cmindex"
+    volumes = ["-v", f"{ready['claude_bin']}:/usr/local/bin/claude:ro", "-v", f"{out}:/out",
+               *(codemem_mounts(codemem, index_copy) if codemem else [])]
+    plan = proof_plan(codemem, volumes) if codemem else None
+    (out / "agent.sh").write_text(agent_script(model, settings, codemem_python(codemem) if codemem else None, plan),
                                   encoding="utf-8")
+    if plan:
+        avoid = "".join(p.read_text(encoding="utf-8", errors="replace") for p in sorted(out.iterdir()) if p.is_file())
+        phrases = proof_phrases(task, avoid)
+        plan["phrases"] = {name: len(lines) for name, lines in phrases.items()}
+        (out / PROOF_PHRASES).write_text("".join(line + "\n" for lines in phrases.values() for line in lines),
+                                         encoding="utf-8")
     image_id = _run(["docker", "image", "inspect", "-f", "{{.Id}}", ready["tag"]]).stdout.strip() or None
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     name = f"cmeval-run-{uuid.uuid4().hex[:12]}"
@@ -855,7 +987,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             turn_limit["how"] = "docker kill"
 
     host_start_ns, host_timeout, docker_exit = time.time_ns(), False, None
-    index_copy, index_bytes, index_removed = out / "cmindex", {}, None
+    index_bytes, index_removed = {}, None
     t0 = time.monotonic()
     try:
         if codemem:
@@ -868,9 +1000,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                    f"--cpus={settings.cpus}", f"--memory={settings.memory}", *NO_CORE_DUMPS,
                    *(["--device", GPU_DEVICE] if settings.gpus else []),
                    "-e", TOKEN_ENV, "-e", f"ANTHROPIC_BASE_URL=http://{gateway}:{proxy.port}",
-                   "-v", f"{ready['claude_bin']}:/usr/local/bin/claude:ro", "-v", f"{out}:/out",
-                   *(codemem_mounts(codemem, index_copy) if codemem else []),
-                   ready["tag"], "bash", "/out/agent.sh"]
+                   *volumes, ready["tag"], "bash", "/out/agent.sh"]
             stop = threading.Event()
             watcher = threading.Thread(target=_follow_stream, name="cmeval-turns", daemon=True,
                                        args=(out / "stream.jsonl", counter, settings.turn_limit, stop, stop_agent,
@@ -889,6 +1019,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 watcher.join()
     finally:
         _run(["docker", "rm", "-f", name])
+        (out / PROOF_PHRASES).unlink(missing_ok=True)  # agent.sh moves it; this is for a container that failed
         if codemem:
             # Keep only the numbers: a copy is about 300 MB.
             index_bytes["after"] = tree_bytes(index_copy)
@@ -908,8 +1039,16 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     failed = check_setup(init, spec, model)
     warm = read_warm(out) if codemem else None
     fallbacks = codemem_fallbacks(stream["events"]) if codemem else None
+    proof = None
     if codemem:
-        failed += codemem_checks(warm, fallbacks)
+        found = read_proof(out)
+        proof = {**plan, "found": found is not None, **(found or {}),
+                 "seconds": read_prep(out)["steps_s"].get("mount_proof")}
+        proof_failed = proof_checks(proof)
+        proof = {"ok": not proof_failed, **proof}
+        failed += proof_failed
+        if not proof_failed:
+            failed += codemem_checks(warm, fallbacks)
     usage = (result or {}).get("modelUsage")
     cross = cross_check(summary, usage) if summary and usage else None
     tokens = token_block(summary, result)
@@ -1001,6 +1140,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
             "host_timeout": host_timeout,
             "docker_exit_code": docker_exit,
             "gpus": settings.gpus,
+            "codemem_mount_proof": proof,
             "codemem_warm": warm,
             "codemem_fallback_searches": fallbacks,
             "block_in_first_message": opened,
