@@ -10,22 +10,72 @@ base_setup = [
     "a=$(dpkg --print-architecture); curl -fsSL https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_1.13.0_linux_$a.tar.gz | tar xz -C /usr/local/bin gotestsum && gotestsum --version",
     # ripgrep, at a fixed version: Claude Code searches through the shell and expects `rg`, as on a developer's machine.
     "a=$(uname -m); case $a in x86_64) t=x86_64-unknown-linux-musl;; aarch64) t=aarch64-unknown-linux-gnu;; esac; curl -fsSL https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-$t.tar.gz | tar xz -C /tmp && install /tmp/ripgrep-15.2.0-$t/rg /usr/local/bin/rg && rm -rf /tmp/ripgrep-15.2.0-$t && rg --version",
+    # The warm-up of the build cache, the same in deps and build. Run in the root of a checkout. It
+    # compiles every non-test package that a unit test of the repo can import (e2e and integration
+    # tests left out). A package that does not build does not stop it: the tests show it.
+    '''printf '%s\n' \
+  '#!/bin/bash' \
+  '# cmeval-k8s-warm: fills GOCACHE for the checkout in the current folder.' \
+  'set -e' \
+  'go list -e -f "{{.ImportPath}}" $(go list -m -f "{{.Path}}/...") | grep -vE "^k8s.io/kubernetes/test/(e2e|e2e_node|e2e_kubeadm|e2e_dra|integration)(/|$)|/test/integration(/|$)" > /tmp/roots.txt' \
+  'go list -e -deps -test -f "{{if and (not .ForTest) (not .Standard) (ne .Name \"main\") .GoFiles}}{{.ImportPath}}{{end}}" $(cat /tmp/roots.txt) | sort -u > /tmp/warm.txt' \
+  'wc -l < /tmp/warm.txt' \
+  'xargs go build < /tmp/warm.txt || echo "some packages did not build"' \
+  'rm /tmp/roots.txt /tmp/warm.txt' \
+  > /usr/local/bin/cmeval-k8s-warm && chmod +x /usr/local/bin/cmeval-k8s-warm''',
 ]
 
-# The Go version of the task's commit. The repo pins it in .go-version, and it changes in the
-# window (1.26.4 to 1.27.3). Tasks with the same version share this layer.
+# Tasks with the same Go version share this layer. It holds no file of the task.
+# 1. The task's own Go version in /usr/local/go. The repo pins it in .go-version, and it changes
+#    in the window (1.26.4 to 1.27.3).
+# 2. A build cache, filled at a fixed reference commit with this Go version (cmeval-k8s-warm in
+#    /testbed, the same folder as the task: the folder is part of Go's cache key). Then the
+#    reference source is removed. Go keys each cache entry by the content of its inputs (source
+#    files, flags, compiler, and the compiled packages that it imports), so an entry of the
+#    reference is used for a task only where the inputs are the same. The task build fills in the
+#    rest. The reference is an older commit than every candidate task of its Go version, so the
+#    image holds no compiled code of a later commit. The entries get a modification time in the
+#    year 2100: Go then never sets the time of an entry when it uses it (it does so for an entry
+#    older than one hour, and on overlayfs that copies the whole file into the upper layer), and
+#    never trims an entry (it removes entries unused for 5 days).
+#    A Go version without a reference gives a layer without build cache: the task build then
+#    compiles every package, as before.
 deps_files = [".go-version"]
 deps = [
     "v=$(cat .go-version) && a=$(dpkg --print-architecture) && rm -rf /usr/local/go && curl -fsSL https://go.dev/dl/go$v.linux-$a.tar.gz | tar xz -C /usr/local && go version | grep -F \"go$v \"",
+    '''v=$(cat .go-version); \
+case "$v" in \
+  1.26.4) ref=1ef08364a754caec0b6706ff61e08cfb39fd53e6 ;; \
+  1.26.5) ref=4a9aa48fb356822f4907730cb47a445405ebf2dc ;; \
+  1.26.6) ref=ec1e215c6c40fc5f771032d2b4ea670bd0214f5a ;; \
+  1.27.1) ref=0ba07e0866bb1e3d67464b2d3e01f6bde6fe9963 ;; \
+  1.27.2) ref=057137c2889719e820138c820886c5621edcb2b1 ;; \
+  1.27.3) ref=b91fd789fe3f61d022a9ad0fff37979283b99b2f ;; \
+  *) ref= ;; \
+esac; \
+if [ -z "$ref" ]; then echo "cmeval: no reference commit for Go $v: the task build fills the whole build cache"; exit 0; fi; \
+git init -q /testbed && cd /testbed && git fetch -q --depth 1 https://github.com/kubernetes/kubernetes "$ref" && git checkout -q FETCH_HEAD && \
+if ! cmp -s /deps/.go-version .go-version; then echo "cmeval: reference $ref has another Go version: no shared build cache"; cd / && rm -rf /testbed; exit 0; fi && \
+cmeval-k8s-warm && \
+cd / && rm -rf /testbed && \
+find /opt/gocache -type f -exec touch -d 2100-01-01T00:00:00Z {} + && \
+chmod -R a+rwX /opt/gocache && \
+du -sh /opt/gocache''',
 ]
 
 # The repo vendors all modules of its Go workspace (go.work and vendor/modules.txt), so no
-# module download is necessary. This step fills the build cache: every non-test package that a
-# unit test of the repo can import (e2e and integration tests left out). Then the first test
-# run of a package compiles only the package itself and links. The step does not stop the image
-# when a package does not build: the tests show it.
+# module download is necessary. This step fills the build cache for the task's commit
+# (cmeval-k8s-warm). With the shared cache of the dependency layer, it compiles only the packages
+# whose inputs differ from the reference. Then the first test run of a package compiles only the
+# package itself and links. The new entries get the time in 2100 too, and the agent user can
+# write the cache. Each find changes only the new files: a change of a file of the lower layer
+# copies it.
 build = [
-    "go list -e -f '{{.ImportPath}}' $(go list -m -f '{{.Path}}/...') | grep -vE '^k8s.io/kubernetes/test/(e2e|e2e_node|e2e_kubeadm|e2e_dra|integration)(/|$)|/test/integration(/|$)' > /tmp/roots.txt && go list -e -deps -test -f '{{if and (not .ForTest) (not .Standard) (ne .Name \"main\") .GoFiles}}{{.ImportPath}}{{end}}' $(cat /tmp/roots.txt) | sort -u > /tmp/warm.txt && wc -l < /tmp/warm.txt && (xargs go build < /tmp/warm.txt || echo 'some packages did not build') && rm /tmp/roots.txt /tmp/warm.txt && du -sh $GOCACHE",
+    '''cmeval-k8s-warm && \
+find /opt/gocache -type f ! -newermt 2099-01-01 -printf '%s\n' | awk '{s+=$1} END {printf "%.2f GB of new build cache entries\n", s/1e9}' && \
+find /opt/gocache -type f ! -newermt 2099-01-01 -exec touch -d 2100-01-01T00:00:00Z {} + && \
+find /opt/gocache ! -perm -a+rw -exec chmod a+rwX {} + && \
+du -sh /opt/gocache''',
 ]
 
 # Go compiles changed packages when the tests start, so no step is necessary after a patch.
