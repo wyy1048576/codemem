@@ -1,0 +1,24 @@
+{
+ "name": "vague-ruff1-v3",
+ "created": "2026-11-27",
+ "tasks": 13,
+ "rows": 26,
+ "levels": [
+  "L1",
+  "L2"
+ ],
+ "task_files": [
+  "tasks/e2e/ruff.jsonl"
+ ],
+ "task_choice": "every ruff task that the screen of tasks/screen/ruff1.jsonl calls fair (two reads, a third read for four tasks): 13 of 25 valid tasks",
+ "rules": "tasks/vague-rules-v3.md",
+ "rules_sha256": "8c3396a4eacfeee714112ca420224189708f8109aad0827e05cba426779c3011",
+ "writer": "two claude-opus-5-5 sessions on 2026-11-27, each with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions of its batch",
+ "with_done_when": [],
+ "checks": {
+  "leak": "each writer searched its texts for the names it removed and for the changed names of the real fix. Then one claude-fable-5-2 session reviewed all 13 tasks against the issue, the real fix, the hidden tests and the screen notes: 8 ok, 5 corrected (an added fact in 26716 L2 and 26955 L1; a step of the checker named in 26747 L1; a file name in words in 27000 L2; a stub's protocol name split into words, and a place in the code, in 27455 L1). Its corrected texts are used. It allowed TypeIs (26716) and pydantic-settings (26628) as names a user writes",
+  "solvable": "not done (plan section 9, check 2)",
+  "human": "not done (plan section 9, check 3)"
+ },
+ "sha256": "7222a25c2f92bd5dcd161664733a52e730b97fe5ebbb650daab452578d8ca29d"
+}
