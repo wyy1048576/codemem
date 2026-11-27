@@ -98,6 +98,10 @@
       {
         "path": "tasks/screen/ruff1.jsonl",
         "sha256": "c6ef2831fac330b317433920b5e3ac16ff83d67f3e80cdad81b1abc2695567aa"
+      },
+      {
+        "path": "tasks/screen/hard-pandas.jsonl",
+        "sha256": "98993514aad5765e13439fb3c405422d5673f92f968ee95d7cc351cebf83ada9"
       }
     ],
     "facts": [
@@ -114,6 +118,10 @@
       {
         "path": "tasks/vague-b7-v3.jsonl",
         "sha256": "1797ae6317aedfa9d96078e5b3bcd7fb844233cc073b18cb53ddc20d74857736"
+      },
+      {
+        "path": "tasks/vague-ruff1-v3.jsonl",
+        "sha256": "7222a25c2f92bd5dcd161664733a52e730b97fe5ebbb650daab452578d8ca29d"
       }
     ]
   },
@@ -153,17 +161,7 @@
           "labels": {}
         }
       },
-      "run_without_prompts": [
-        "astral-sh__ruff-27689",
-        "astral-sh__ruff-26747",
-        "astral-sh__ruff-26716",
-        "astral-sh__ruff-27700",
-        "astral-sh__ruff-26631",
-        "astral-sh__ruff-26955",
-        "astral-sh__ruff-27053",
-        "astral-sh__ruff-27000",
-        "astral-sh__ruff-26628"
-      ],
+      "run_without_prompts": [],
       "notes": [
         "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
         "medium tier: 3 fair tasks, fewer than the target of 8; all of them are run",
@@ -338,11 +336,11 @@
     }
   },
   "rows": 119,
-  "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl",
+  "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --force",
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "5e617e8d44ed78cfc81b64b660a1a8e92724b155",
+    "sha": "661658b1ce234a866f16233d043ddd123b10f194",
     "dirty": false
   },
-  "created": "2026-11-27T10:38:41+00:00"
+  "created": "2026-11-27T11:05:37+00:00"
 }
