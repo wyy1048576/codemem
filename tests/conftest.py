@@ -43,7 +43,7 @@ def isolated_home(tmp_path, monkeypatch):
     """Never touch the real ~/.codemem from tests."""
     home = tmp_path / "codemem_home"
     monkeypatch.setenv("CODEMEM_HOME", str(home))
-    for var in ("CODEMEM_MODEL", "CODEMEM_DEVICE", "CODEMEM_STEERING", "CODEMEM_VECTOR_BACKEND"):
+    for var in ("CODEMEM_MODEL", "CODEMEM_DEVICE", "CODEMEM_STEERING", "CODEMEM_VECTOR_BACKEND", "CODEMEM_SEARCH_DEDUP"):
         monkeypatch.delenv(var, raising=False)
     return home
 

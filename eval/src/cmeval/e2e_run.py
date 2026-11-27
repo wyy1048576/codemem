@@ -47,7 +47,7 @@ run.json has these fields:
   identity            prompt level, frame and hash, harness and its version, binary, image tag and id, split, cmeval
                       commit, machine, limits, start time (UTC), the task's gold files. codemem: null for a setup
                       without codemem; else the codemem commit, the program, the task's index.json, the steering
-                      level, and the bytes of the index copy before and after the run
+                      level, search_dedup, and the bytes of the index copy before and after the run
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
                       network, the removed configuration files, the files where the token was found and replaced,
                       gpus (the container had the GPU). codemem setups only, else null: codemem_warm (the gate's
@@ -117,6 +117,9 @@ GPUS_ENV = "CMEVAL_E2E_GPUS"
 # How hard codemem's tool texts push the agent to codemem: none, light or strong. Not set = codemem's default.
 STEERING_ENV = "CMEVAL_CODEMEM_STEERING"
 STEERING_LEVELS = ("none", "light", "strong")
+# codemem's search_dedup for a batch (results a session was sent, unchanged, come back short); unset: codemem's default, off.
+SEARCH_DEDUP_ENV = "CMEVAL_CODEMEM_SEARCH_DEDUP"
+SEARCH_DEDUP_MODES = ("off", "shorten", "refill")
 # For diagnostic batches only. Runs made with either of them are not comparable with other runs.
 # Extra arguments for claude, for example "--thinking-display summarized" to get the thinking text in the stream.
 DIAG_ARGS_ENV = "CMEVAL_E2E_DIAG_ARGS"
@@ -409,6 +412,10 @@ def codemem_mcp_config(codemem: dict, settings: RunSettings) -> dict:
         if steering not in STEERING_LEVELS:
             raise GenerateError(f"{STEERING_ENV} must be one of {', '.join(STEERING_LEVELS)}, not {steering!r}")
         env["CODEMEM_STEERING"] = steering
+    if dedup := os.environ.get(SEARCH_DEDUP_ENV):
+        if dedup not in SEARCH_DEDUP_MODES:
+            raise GenerateError(f"{SEARCH_DEDUP_ENV} must be one of {', '.join(SEARCH_DEDUP_MODES)}, not {dedup!r}")
+        env["CODEMEM_SEARCH_DEDUP"] = dedup
     return {"mcpServers": {"codemem": {"command": str(codemem["bin"]),
                                        "args": ["mcp", "/testbed", "--index-dir", INDEX_MOUNT],
                                        "env": env, "alwaysLoad": True}}}
@@ -927,6 +934,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 "bin": str(codemem["bin"]),
                 "index": codemem["meta"],
                 "steering": mcp_config["mcpServers"]["codemem"]["env"].get("CODEMEM_STEERING", "default"),
+                "search_dedup": mcp_config["mcpServers"]["codemem"]["env"].get("CODEMEM_SEARCH_DEDUP", "default"),
                 "index_bytes_before": index_bytes.get("before"),
                 "index_bytes_after": index_bytes.get("after"),
                 "index_copy_removed": index_removed,
