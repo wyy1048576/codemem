@@ -102,6 +102,14 @@
       {
         "path": "tasks/screen/hard-pandas.jsonl",
         "sha256": "98993514aad5765e13439fb3c405422d5673f92f968ee95d7cc351cebf83ada9"
+      },
+      {
+        "path": "tasks/screen/hard-duckdb.jsonl",
+        "sha256": "e2b92bda63c0cf097d1f22f480a43e4a7e1f085ddb3141377ea89f46b94afbe7"
+      },
+      {
+        "path": "tasks/screen/hard-playwright.jsonl",
+        "sha256": "0eb72ff6e35ee7cd4dd8c400329fd41a0ced08393a9b3fca5f452be305052433"
       }
     ],
     "facts": [
@@ -184,9 +192,9 @@
         },
         "medium": {
           "fair": 11,
-          "target": 8,
-          "run": 8,
-          "spare": 3,
+          "target": 4,
+          "run": 4,
+          "spare": 7,
           "test": 11,
           "dev": 0,
           "labels": {
@@ -194,20 +202,24 @@
           }
         },
         "hard": {
-          "fair": 0,
+          "fair": 4,
           "target": 4,
-          "run": 0,
+          "run": 4,
           "spare": 0,
-          "test": 0,
-          "dev": 0,
-          "labels": {}
+          "test": 3,
+          "dev": 1,
+          "labels": {
+            "hard": 4
+          }
         }
       },
-      "run_without_prompts": [],
-      "notes": [
-        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
-        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
-      ]
+      "run_without_prompts": [
+        "duckdb__duckdb-24805",
+        "duckdb__duckdb-23634",
+        "duckdb__duckdb-24150",
+        "duckdb__duckdb-23923"
+      ],
+      "notes": []
     },
     "kubernetes/kubernetes": {
       "tiers": {
@@ -335,12 +347,12 @@
       ]
     }
   },
-  "rows": 119,
-  "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --force",
+  "rows": 123,
+  "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --screen tasks/screen/hard-duckdb.jsonl --screen tasks/screen/hard-playwright.jsonl --force",
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "661658b1ce234a866f16233d043ddd123b10f194",
+    "sha": "e36865c9d90d5431b13de30b300d652d1069039e",
     "dirty": false
   },
-  "created": "2026-11-27T11:05:37+00:00"
+  "created": "2026-11-27T11:56:49+00:00"
 }
