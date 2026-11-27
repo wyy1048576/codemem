@@ -421,12 +421,92 @@ def _rebuild(gen, recipe, tasks, jobs: int, say) -> int:
     say(f"{recipe.repo}: images of {len(tasks)} tasks built again where they are missing, {jobs} at a time")
     records = gen.rebuild(recipe, tasks, jobs=jobs, progress=say)
     count = {status: [r for r in records if r["status"] == status]
-             for status in ("built", "exists", "skipped", "refused", "failed")}
+             for status in ("built", "exists", "archived", "skipped", "refused", "failed")}
     minutes = sum(r["build_s"] for r in count["built"]) / 60
+    archived = f"{len(count['archived'])} in the image archive (not built; use cmeval images load), " \
+        if count["archived"] else ""
     print(f"{recipe.repo}: {len(count['built'])} built ({minutes:.1f} min of builds), {len(count['exists'])} exist, "
-          f"{len(count['skipped'])} skipped (no valid record), {len(count['refused'])} refused, "
+          f"{archived}{len(count['skipped'])} skipped (no valid record), {len(count['refused'])} refused, "
           f"{len(count['failed'])} failed. Check the built images with cmeval e2e grader-check")
     return 3 if count["refused"] or count["failed"] else 0
+
+
+def _image_tasks(gen, args):
+    """The recipe, and the tasks of its repo in the task file (only the --id ones when given)."""
+    recipe = gen.load_recipe(args.recipe)
+    tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
+    if args.id:
+        wanted = set(args.id)
+        missing = wanted - {t.id for t in tasks}
+        if missing:
+            raise TaskError([f"no task {i} of {recipe.repo} in {args.tasks}" for i in sorted(missing)])
+        tasks = [t for t in tasks if t.id in wanted]
+    return recipe, tasks
+
+
+def cmd_images_save(args) -> int:
+    from . import generate as gen
+    from . import images
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        root = images.archive_root(args.dir)
+        recipe, tasks = _image_tasks(gen, args)
+        say(f"{recipe.repo}: images of {len(tasks)} tasks to {root / recipe.name}"
+            + (", removed from Docker after the save" if args.remove else ""))
+        records = images.save(recipe, tasks, root, remove=args.remove, progress=say)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"images save: {exc}", file=sys.stderr)
+        return 1
+    count = Counter(r["status"] for r in records)
+    size = sum(r["file_bytes"] or 0 for r in records if r["status"] == "saved")
+    seconds = sum(r["save_s"] or 0 for r in records if r["status"] == "saved")
+    print(f"{recipe.name}: {count['saved']} saved ({size / 1e9:.1f} GB in {seconds / 60:.1f} min), "
+          f"{count['archived']} archived already, {sum(r['removed'] for r in records)} removed from Docker "
+          f"({count['removed']} of them not valid), {count['skipped']} skipped, {count['refused']} refused, "
+          f"{count['failed']} failed")
+    return 3 if count["refused"] or count["failed"] else 0
+
+
+def cmd_images_load(args) -> int:
+    from . import generate as gen
+    from . import images
+
+    say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
+    try:
+        root = images.archive_root(args.dir)
+        recipe, tasks = _image_tasks(gen, args)
+        say(f"{recipe.repo}: images of {len(tasks)} tasks from {root / recipe.name} where they are missing")
+        records = images.load(recipe, tasks, root, progress=say)
+    except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
+        print(f"images load: {exc}", file=sys.stderr)
+        return 1
+    count = Counter(r["status"] for r in records)
+    seconds = sum((r["hash_s"] or 0) + (r["load_s"] or 0) for r in records if r["status"] == "loaded")
+    print(f"{recipe.name}: {count['loaded']} loaded ({seconds / 60:.1f} min), {count['exists']} in Docker already, "
+          f"{count['skipped']} not in the archive, {count['refused']} refused, {count['failed']} failed")
+    # A task named with --id that is not in the archive is a failure too: the run needs its image.
+    if count["refused"] or count["failed"] or (args.id and count["skipped"]):
+        return 3
+    return 0
+
+
+def cmd_images_list(args) -> int:
+    from . import generate as gen
+    from . import images
+
+    try:
+        root = images.archive_root(args.dir)
+    except gen.GenerateError as exc:
+        print(f"images list: {exc}", file=sys.stderr)
+        return 1
+    rows = images.listing(root, args.recipe)
+    if not rows:
+        print(f"{root}: no archived image" + (f" of {args.recipe}" if args.recipe else ""))
+        return 0
+    for line in images.format_listing(rows, tasks=not args.summary):
+        print(line)
+    return 0
 
 
 def cmd_resplit(args) -> int:
@@ -959,9 +1039,34 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rebuild", action="store_true",
                    help="build the image again for each valid task whose image is missing, and do not validate again "
                         "(the saved test lists stay; check them with cmeval e2e grader-check). Refuses a task whose "
-                        "saved record has another fingerprint. --repeats is not used")
+                        "saved record has another fingerprint. A task whose image is in the image archive is not "
+                        "built: load it with cmeval images load. --repeats is not used")
     p.add_argument("--list", action="store_true", help="only print the ids of the chosen tasks; build nothing")
     p.set_defaults(func=cmd_generate)
+
+    p = sub.add_parser("images", help="the image archive: save validated task images to one file each, load them back")
+    images_sub = p.add_subparsers(dest="images_command", required=True)
+    archive_help = "the archive folder (default: the variable CMEVAL_IMAGE_ARCHIVE; one of them is needed)"
+    p = images_sub.add_parser("save", help="save the image of each valid task to the archive (docker save, zstd)")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--dir", type=Path, help=archive_help)
+    p.add_argument("--remove", action="store_true",
+                   help="remove each image from Docker when its file is complete and checked; also remove the image "
+                        "of a task whose validation is not valid (it is not archived)")
+    p.set_defaults(func=cmd_images_save)
+    p = images_sub.add_parser("load", help="load the archived image of each task whose image is not in Docker")
+    p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
+    p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the repo's tasks")
+    p.add_argument("--id", action="append", help="only this task; can be given more than once")
+    p.add_argument("--dir", type=Path, help=archive_help)
+    p.set_defaults(func=cmd_images_load)
+    p = images_sub.add_parser("list", help="what the archive holds, and which of its images are in Docker now")
+    p.add_argument("recipe", nargs="?", help="only this recipe")
+    p.add_argument("--dir", type=Path, help=archive_help)
+    p.add_argument("--summary", action="store_true", help="one line for each recipe, no task lines")
+    p.set_defaults(func=cmd_images_list)
 
     p = sub.add_parser("resplit", help="split each task's change again, with the test paths of the repo's recipe")
     p.add_argument("recipe", help="a recipe name in eval/envs (for example duckdb), or a path to a .toml file")
@@ -987,8 +1092,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "a git diff against the task's base commit, with the default a/ and b/ prefixes (git diff, not "
                     "git diff --no-prefix), as UTF-8 text. Files that the hidden test change touches are dropped from "
                     "it before it is applied, as for an agent's change. The task needs a valid saved validation "
-                    "(tests.json from cmeval generate) and its image; build a removed image again with cmeval "
-                    "generate RECIPE --tasks FILE --id TASK --rebuild. Exit code 0 when every change completed its "
+                    "(tests.json from cmeval generate) and its image; load an archived image with cmeval images "
+                    "load RECIPE --tasks FILE --id TASK, or build a removed image again with cmeval generate RECIPE "
+                    "--tasks FILE --id TASK --rebuild. Exit code 0 when every change completed its "
                     "task, 3 when one did not, 1 for an error.")
     p.add_argument("recipe", help="a recipe name in eval/envs (for example pandas), or a path to a .toml file")
     p.add_argument("--tasks", type=Path, required=True, help="the task file that holds the tasks")

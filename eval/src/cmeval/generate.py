@@ -46,7 +46,9 @@ used. Docker is called through its command line. Output is kept under CMEVAL_HOM
 Each image that a task gets is added to the task's image-builds.json: its id, creation time, size,
 fingerprint, and the digest of the recipe's base image. A task image can be removed after its
 validation and built again later (rebuild_task) without a new validation. The saved test lists
-are then checked on the new image, test by test, by `cmeval e2e grader-check`.
+are then checked on the new image, test by test, by `cmeval e2e grader-check`. The image archive
+(images.py) avoids the rebuild: the validated image is saved to one file, removed, and loaded back
+for a run. A validation record whose image is in the archive is used again, and its image is not built.
 """
 
 from __future__ import annotations
@@ -89,6 +91,13 @@ FAIL, PASS, SKIP = "fail", "pass", "skip"
 TIMEOUT_CODES = (124, 137)
 BUILD_TIMEOUT_MIN = 60  # the limit for one docker build
 FINGERPRINT_LABEL = "cmeval.fingerprint"
+# Every container that the package starts gets this limit, so that a process that crashes leaves no
+# core dump. On WSL 2, core_pattern is a pipe to a crash handler that writes the dump to the Windows
+# drive (three dumps of 47 GB each on 2026-11-26). The kernel skips a piped dump only when the limit
+# is exactly 1; with 0 it still pipes the dump. With a file pattern, 1 byte is less than one page, so
+# no core file is written either. It is not part of a fingerprint: it does not change an image or a
+# test result, only the dump of a process that dies.
+NO_CORE_DUMPS = ("--ulimit", "core=1:1")
 # Change this number when the validation script or the rules of judge() change, so old records are not used.
 VALIDATION_VERSION = 1
 
@@ -392,8 +401,8 @@ def run_in_container(tag: str, work: Path, *, prefix: str, limit: float, cpus: i
     does not stop when its client is killed). Returns False when the limit passed."""
     name = f"{prefix}-{uuid.uuid4().hex[:12]}"
     try:
-        _run(["docker", "run", "--rm", "--name", name, "--network", "none", f"--cpus={cpus}", "-v", f"{work}:/work",
-              tag, "bash", "/work/run.sh"], log=work / "docker.log", timeout=limit)
+        _run(["docker", "run", "--rm", "--name", name, "--network", "none", f"--cpus={cpus}", *NO_CORE_DUMPS,
+              "-v", f"{work}:/work", tag, "bash", "/work/run.sh"], log=work / "docker.log", timeout=limit)
     except subprocess.TimeoutExpired:
         _run(["docker", "rm", "-f", name])
         return False
@@ -610,11 +619,25 @@ def read_builds(recipe: Recipe, task: Task) -> list[dict]:
     return [{"step": "validate", "event": "found", "source": "image.json", **_inspect_facts(data)}]
 
 
+def add_history(recipe: Recipe, task: Task, entry: dict) -> None:
+    """Append one entry to the task's image history."""
+    builds = read_builds(recipe, task)
+    builds.append(entry)
+    path = builds_path(recipe, task)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(builds, indent=2) + "\n", encoding="utf-8")
+
+
+def now_utc() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
 def record_image(recipe: Recipe, task: Task, tag: str, *, step: str, event: str,
-                 build_s: float | None = None) -> dict | None:
+                 build_s: float | None = None, extra: dict | None = None) -> dict | None:
     """Add the image that has the tag now to the task's history, and return its entry. `step` is
-    what used the image: validate, reuse (a saved validation was used again), or rebuild. `event`
-    is built or found. A found image that is the last entry already adds nothing. None when the
+    what used the image: validate, reuse (a saved validation was used again), rebuild, archive or
+    load (images.py). `event` is built or found, or saved or loaded for the archive. A found image
+    that is the last entry already adds nothing. `extra` adds fields to the entry. None when the
     image does not exist."""
     facts = image_facts(tag)
     if facts is None:
@@ -623,16 +646,12 @@ def record_image(recipe: Recipe, task: Task, tag: str, *, step: str, event: str,
     if event == "found" and builds and builds[-1].get("image_id") == facts["image_id"]:
         return builds[-1]
     base = base_tag(recipe)
-    entry = {"step": step, "event": event,
-             "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+    entry = {"step": step, "event": event, "recorded_at": now_utc(),
              "build_s": round(build_s, 1) if build_s is not None else None, **facts,
              # The digest of the base image as it is now. A found image can be older than that.
              "base_image": recipe.base_image, "base_digest": repo_digest(recipe.base_image),
-             "repo_base": base, "repo_base_id": image_id(base)}
-    builds.append(entry)
-    path = builds_path(recipe, task)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(builds, indent=2) + "\n", encoding="utf-8")
+             "repo_base": base, "repo_base_id": image_id(base), **(extra or {})}
+    add_history(recipe, task, entry)
     return entry
 
 
@@ -640,6 +659,12 @@ def build_number(recipe: Recipe, task: Task, image: str | None) -> int | None:
     """The place (1, 2, ...) of the image in the task's history. None when it is not there."""
     ids = [entry.get("image_id") for entry in read_builds(recipe, task)]
     return len(ids) - ids[::-1].index(image) if image and image in ids else None
+
+
+def _archived(recipe: Recipe, task: Task) -> bool:
+    """The task's image, with the current fingerprint, is in the image archive (CMEVAL_IMAGE_ARCHIVE)."""
+    from . import images  # images.py imports this module
+    return images.archived(recipe, task)
 
 
 # ---- validation
@@ -870,11 +895,15 @@ def generate_task(recipe: Recipe, task: Task, repeats: int = DEFAULT_REPEATS, cp
     fingerprint = validation_fingerprint(recipe, task, repeats)
     if saved.exists() and not force:
         record = json.loads(saved.read_text(encoding="utf-8"))
-        if record.get("fingerprint") == fingerprint and (
-                not record.get("valid") or image_label(task_tag(recipe, task)) == image_fingerprint(recipe, task)):
-            if record.get("valid"):
+        if record.get("fingerprint") == fingerprint:
+            if not record.get("valid"):
+                return record
+            if image_label(task_tag(recipe, task)) == image_fingerprint(recipe, task):
                 record_image(recipe, task, task_tag(recipe, task), step="reuse", event="found")
-            return record
+                return record
+            if _archived(recipe, task):
+                # The validated image is in the archive: `cmeval images load` brings it back.
+                return record
     # The old record and test lists must not stay when this attempt fails.
     saved.unlink(missing_ok=True)
     tests_path(recipe, task).unlink(missing_ok=True)
@@ -925,7 +954,8 @@ def rebuild_task(recipe: Recipe, task: Task) -> dict:
     saved test lists stay; `cmeval e2e grader-check` then checks them on the new image. A task
     without a valid record is skipped. A task whose saved record or tests.json has another
     fingerprint than the recipe and the task give now is refused. Returns a short record with the
-    status: built, exists, skipped, refused, or failed."""
+    status: built, exists, archived (the image is in the image archive: load it, do not build it),
+    skipped, refused, or failed."""
     record: dict = {"id": task.id, "status": "skipped", "reason": "", "build_s": None, "image_id": None}
     saved = task_dir(recipe, task) / "result.json"
     if not saved.exists():
@@ -947,6 +977,9 @@ def rebuild_task(recipe: Recipe, task: Task) -> dict:
     if image_label(tag) == image_fingerprint(recipe, task):
         entry = record_image(recipe, task, tag, step="rebuild", event="found")
         return {**record, "status": "exists", "reason": "the image exists", "image_id": entry and entry["image_id"]}
+    if _archived(recipe, task):
+        return {**record, "status": "archived",
+                "reason": f"the image is in the archive; load it with cmeval images load {recipe.name}"}
     try:
         # Not forced: the image is missing or has another label, so it is built in any case.
         tag, build_s = build_task_image(recipe, task)
