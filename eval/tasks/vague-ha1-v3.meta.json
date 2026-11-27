@@ -1,8 +1,8 @@
 {
  "name": "vague-ha1-v3",
  "created": "2026-11-27",
- "tasks": 7,
- "rows": 14,
+ "tasks": 11,
+ "rows": 22,
  "levels": [
   "L1",
   "L2"
@@ -10,15 +10,15 @@
  "task_files": [
   "tasks/e2e/homeassistant.jsonl"
  ],
- "task_choice": "every home-assistant task that the screen of tasks/screen/ha1.jsonl calls fair (two reads, a third read for two tasks): 7 of 33 valid tasks",
+ "task_choice": "every home-assistant task that the screen of tasks/screen/ha1.jsonl calls fair: 7 of the first 33 valid tasks, and 4 of the 15 tasks of the second wave (11 of 48)",
  "rules": "tasks/vague-rules-v3.md",
  "rules_sha256": "8c3396a4eacfeee714112ca420224189708f8109aad0827e05cba426779c3011",
- "writer": "one claude-opus-5-5 session on 2026-11-27, with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions of each task",
+ "writer": "two claude-opus-5-5 sessions on 2026-11-27 (7 tasks, then 4), each with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions of each task",
  "with_done_when": [],
  "checks": {
-  "leak": "the writer searched its texts for the names it removed and for the changed names of the real fix. Then one claude-fable-5-2 session reviewed all 7 tasks against the issue, the real fix, the hidden tests and the screen notes: 4 ok, 3 corrected (a sentence that is not in the issue in 180438 L1; the name of the inner archive, which the fix must match and the hidden tests use, put back in 182220 L1 and L2; a domain name in 182592 L2 and a file's word in 182592 L1). Its corrected texts are used. The archive name supervisor.tar.gz is kept as a term of the backup format: at the base commit a text search finds it only in one comment of a test file, not in the file that the fix changes. Product names that a user says (AiDot, Shelly, SwitchBot Cloud, IKEA TRADFRI, Kodi, Hive, Supervisor) are kept",
+  "leak": "the writer searched its texts for the names it removed and for the changed names of the real fix. Then one claude-fable-5-2 session reviewed all 7 tasks against the issue, the real fix, the hidden tests and the screen notes: 4 ok, 3 corrected (a sentence that is not in the issue in 180438 L1; the name of the inner archive, which the fix must match and the hidden tests use, put back in 182220 L1 and L2; a domain name in 182592 L2 and a file's word in 182592 L1). Its corrected texts are used. The archive name supervisor.tar.gz is kept as a term of the backup format: at the base commit a text search finds it only in one comment of a test file, not in the file that the fix changes. Product names that a user says (AiDot, Shelly, SwitchBot Cloud, IKEA TRADFRI, Kodi, Hive, Supervisor) are kept. Second wave (4 tasks): the same two steps; the review found 2 ok and corrected 2 (a brand that the issue does not state in 183382 L1 and L2; in 183779 L1 and L2 a key of the diagnostics data that exists in the repo's code before the fix, replaced by a description: at the base commit a text search finds it in one line of the same integration)",
   "solvable": "not done (plan section 9, check 2)",
   "human": "not done (plan section 9, check 3)"
  },
- "sha256": "711fa1968120012ec1635c18df1d956093e2407e6d1303e7b6896b421a38aa2b"
+ "sha256": "b2ae66c490a7b899411e51e63c3deeb2ab50c560d8849af79c10fd37234a28c3"
 }
