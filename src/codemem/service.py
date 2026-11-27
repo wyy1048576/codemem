@@ -675,7 +675,7 @@ class CodememService:
         """The chunks a search's keyword ranking puts on top, best first: as many as one ranking
         gives to the merge, under the search's own filters."""
         filters = {k: v for k, v in options.items() if k in _FILTERS}
-        n = max(self.config.candidates, options.get("k") or 0)
+        n = max(self.config.candidates, options.get("candidates_k") or options.get("k") or 0)
         resp = search(self.store, query, self.config, k=n, signals=[BM25], embedder_factory=self.embedder_factory, **filters)
         return [r.chunk_id for r in resp.results]
 

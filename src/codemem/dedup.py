@@ -2,7 +2,7 @@
 
 The MCP server runs one process per agent session, so what this session was sent is kept here, in
 memory: for each chunk key, the chunk's `content_hash` when it was sent, a hash of the card text sent
-(without its number on the page), how it was sent (a card, or in full by get_chunk), and at which call.
+(without its head line: number, place and best lines), how it was sent (a card, or in full by get_chunk), and at which call.
 
 A later `search_code` page walks the ranking in order. A result is shown SHORT (its head line as on
 a card: number, current `path:line`, name and id; then one line "(shown earlier ..., unchanged)") only
@@ -40,7 +40,6 @@ Safe to fail and safe to call at once (review of 2026-11-27 14:10 UTC, D2 and D3
 from __future__ import annotations
 
 import hashlib
-import re
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -63,10 +62,13 @@ class Sent:
     call: int
 
 
-def _card_hash(lines: list[str]) -> str:
-    text = "\n".join(lines)
-    text = re.sub(r"^\d+\. ", "", text)  # the number on the page is not part of what was seen
-    return hashlib.sha1(text.encode("utf8")).hexdigest()
+def _card_hash(lines: list[str], r: ResultCard) -> str:
+    """What the card showed of the code, not where the code is: the card without its head line (the
+    number on the page, `path:line`), and the best lines counted from the chunk's first line. A
+    function that only moved (lines added above it) is the same card (D5 of the review of 14:10 UTC);
+    a short line shows its current place. Its name is in the code, so in `content_hash`."""
+    window = (r.best_lines[0] - r.start_line, r.best_lines[1] - r.start_line) if r.best_lines else None
+    return hashlib.sha1(f"{window}\n{chr(10).join(lines[1:])}".encode("utf8")).hexdigest()
 
 
 def _query_key(query: str, path_prefix: str | None, kinds: list[str] | None, tests: str) -> tuple:
@@ -173,7 +175,7 @@ class SessionMemory:
             if full >= k:
                 break
             card = format_card(r, i)
-            chash, now = _card_hash(card), hashes.get(r.chunk_id)
+            chash, now = _card_hash(card, r), hashes.get(r.chunk_id)
             prev = sent.get(r.key)
             unchanged = prev is not None and now is not None and prev.content_hash == now
             if unchanged and current and not again and (prev.how == "full" or prev.card_hash == chash):

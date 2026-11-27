@@ -231,8 +231,13 @@ def search(
     test_weight: float | None = None,
     kind_weights: dict[str, float] | None = None,
     tests: str = "include",
+    candidates_k: int | None = None,
 ) -> SearchResponse:
-    """`tests`: "include" (default), "exclude" or "only" test code."""
+    """`tests`: "include" (default), "exclude" or "only" test code.
+
+    `candidates_k`: the k each signal's candidate count is set for (default: `k`). A deeper page of
+    the same ranking (search_dedup's refill) passes the k of the page it extends, so its first
+    results are exactly that page's and the rest come from further down the same merged list."""
     if tests not in TEST_FILTERS:
         raise ValueError(f"tests must be one of {'|'.join(TEST_FILTERS)}, got {tests!r}")
     timings: dict[str, float] = {}
@@ -256,7 +261,7 @@ def search(
         only_tests=tests == "only",
     )
     allowed = store.filter_ids(flt) if flt.active else None
-    n = max(config.candidates, k)
+    n = max(config.candidates, k if candidates_k is None else candidates_k)
     ranked: dict[str, list[int]] = {}
     best_part: dict[tuple[str, int], VectorHit] = {}
 

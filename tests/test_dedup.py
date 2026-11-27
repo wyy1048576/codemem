@@ -434,3 +434,85 @@ def test_two_searches_sent_at_once_through_the_server(sample_repo, tmp_path):
         assert _one_lines(texts[short[0]])  # the other page sent those results as cards
     finally:
         svc.close()
+
+
+# ---------------------------------------------------------------- D4: refill reads further down the same ranking
+
+
+D4_QUERIES = ["revoke session", "log out a user session", "session token", "password hash", "login rate limit"]
+
+
+def _small_candidates(sample_repo, tmp_path, mode: str) -> CodememService:
+    """candidates=3, so a deeper search would take longer candidate lists than a page of 5."""
+    cfg = Config(search_dedup=mode, candidates=3)
+    cfg.vectors = {"code": VectorConfig(model="fake:64"), "usage": VectorConfig(model="fake:64")}
+    svc = CodememService(sample_repo, index_dir=tmp_path / f"idx-small-{mode}", config=cfg)
+    svc.update()
+    return svc
+
+
+def test_a_deeper_page_keeps_the_ranking_of_its_first_k(sample_repo, tmp_path):
+    svc = _small_candidates(sample_repo, tmp_path, "refill")
+    try:
+        for q in D4_QUERIES:
+            page = [r.chunk_id for r in svc.search(q, k=5, wait_for_models=False).results]
+            deeper = [r.chunk_id for r in svc.search(q, k=25, candidates_k=5, wait_for_models=False).results]
+            assert deeper[:5] == page and len(deeper) > 5
+    finally:
+        svc.close()
+
+
+def test_refill_pages_follow_off_s_ranking(sample_repo, tmp_path):
+    """Through the server: every refill page lists off's top k first (as cards or short lines), then more."""
+    svc = _small_candidates(sample_repo, tmp_path, "refill")
+    try:
+        texts = _calls(svc, [("search_code", {"query": q, "k": 5}) for q in D4_QUERIES])
+        assert any("shown earlier" in t for t in texts[1:])  # refill had something to do
+        for q, text in zip(D4_QUERIES, texts):
+            off = [r.chunk_id for r in svc.search(q, k=5, wait_for_models=False).results]
+            assert _eval_parse(text)[:5] == off
+    finally:
+        svc.close()
+
+
+# ---------------------------------------------------------------- D5: a function that only moved
+
+
+def test_a_moved_function_is_the_same_card():
+    from dataclasses import replace
+
+    m = SessionMemory("shorten")
+    m.page(_resp([1, 2]), 2, _Store(2), current=True)
+    moved = SearchResponse("q2", ["bm25"], [replace(_card(1), start_line=110, end_line=115), _card(2)])
+    text = m.page(moved, 2, _Store(2), current=True)
+    assert _one_lines(text) == [1, 2]
+    assert "1. m.py:110-115  " in text  # the short line gives the current place
+
+
+def test_lines_added_above_a_function_through_the_server(sample_repo, tmp_path):
+    svc = _service(sample_repo, tmp_path, "shorten")
+    try:
+        from mcp import Client
+
+        from codemem.server import build_server
+
+        texts = []
+
+        async def run():
+            async with Client(build_server(svc)) as client:
+                async def search(q):
+                    texts.append((await client.call_tool("search_code", {"query": q, "k": 3})).content[0].text)
+
+                await search("revoke session")
+                f = sample_repo / "auth" / "sessions.py"
+                f.write_text("# a\n# b\n# c\n" + f.read_text())
+                svc.update()
+                await search("revoke a session")
+
+        anyio.run(run)
+        first = re.search(r"auth/sessions\.py:(\d+)-\d+  \S*revoke_session", texts[0])
+        later = re.search(r"auth/sessions\.py:(\d+)-\d+  \S*revoke_session  \[id \d+\]\n   \(shown earlier as a card, unchanged\)", texts[1])
+        assert first and later and int(later[1]) == int(first[1]) + 3
+        assert "other lines this time" not in texts[1]
+    finally:
+        svc.close()

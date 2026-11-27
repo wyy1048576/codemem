@@ -76,8 +76,11 @@ def build_server(service: CodememService) -> MCPServer:
             memory.release(ticket)
 
     def _search_page(notice, query, k, path_prefix, kinds, tests, depth, ticket) -> str:
+        # With search_dedup on, the candidates are those of a page of k, however deep the page goes
+        # (refill): the same ranking as off, read further down (D4 of the review of 14:10 UTC).
+        deeper = {"candidates_k": k} if ticket is not None else {}
         resp = service.search(
-            query, k=depth, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
+            query, k=depth, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False, **deeper
         )
         fresh = resp.freshness
         if fresh is not None and fresh.unchecked_copy:
