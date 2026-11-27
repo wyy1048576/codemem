@@ -29,12 +29,16 @@ base_setup = [
 # are read through relative paths, so they keep their place under /deps.
 # The requirement files pin uv itself. That install replaces the uv of base_setup, as in a
 # developer's virtual environment.
+# pyproject.toml is here for its [tool.uv] table. CI installs at the repo root, so uv reads that
+# table. From late September 2026 it holds an override of one package's pin on rich; without it
+# the two requirement files of the second step have no solution.
 deps_files = [
     "requirements.txt",
     "requirements_all.txt",
     "requirements_test.txt",
     "requirements_test_pre_commit.txt",
     "homeassistant/package_constraints.txt",
+    "pyproject.toml",
 ]
 deps = [
     "uv pip install --system --exclude-newer {exclude_newer} -r requirements.txt",
