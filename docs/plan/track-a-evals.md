@@ -36,7 +36,8 @@ overnight ([runs.md](runs.md) §6). Sat Nov 28 and Sun Nov 29 are reserved for r
 gap runs beside them on its own endpoint, once the open harness and the open models are ready,
 which is expected on Sat Nov 28. The freeze is aimed at Nov 30, 23:59. The
 hard limit is the presentation on Dec 1 at 14:00. Six more
-days of refining follow, to the paper on December 7. The schedule, night by night, is in §14.
+days of refining follow, to the first submission of the paper on December 7, a soft date. It has
+until December 10 to reach the level of a conference. The schedule, night by night, is in §14.
 
 **What this track does not judge.** Retrieval accuracy is not the goal here. The agent may solve a
 task any way it likes. What counts is whether it solved it, how long it took, and how many tokens
@@ -1512,7 +1513,7 @@ The dates are in [overview.md](overview.md) §8.
 | **Nov 27, 16:30 Pacific** | A1, A2, A3 and the integrity checks of A4; A9 for pandas and playwright, then ruff, kubernetes and duckdb; from A6, mini-SWE-agent and the localization tier; the computed labels of A7; the sample and the analysis plan | the pipeline tested end to end on two repos with today's codemem; validated tasks for every repo that is ready; the open harness working with one model, which is expected on Sat Nov 28; the sample of tasks and the measures fixed before the full runs. Tracks B and C can run the pipeline themselves |
 | **Nov 27, 17:00 Pacific, to Nov 30, first:** the runs for the presentation | A12, with a first A5; A11 with the 9B model | the runs of [runs.md](runs.md), in its order, with the check run first; the model gap for at least one open model, once the open harness and the open models are ready. The freeze is aimed at Nov 30, 23:59. The hard limit is the presentation of Dec 1 at 14:00 |
 | **Nov 27–30, beside the runs** | the rest of A6 and A11; A9 for further repos; A10; A7 and A8 completed; the rest of A4 and A5; the part of A13 that goes with a paper | everything else in the track, as far as the lanes allow without slowing the runs: the other open models, more repos, the retrieval table with Go and Rust, its vague column and its two baselines, a vague version of every prompt. The aim is to leave nothing open after December 1 |
-| **Dec 7:** the paper and final report | the writing, and whatever is still open | the paper, with the code, the task list and the run records |
+| **Dec 7, a soft date:** the first submission of the paper and final report. **Up to Dec 10:** the paper at the level of a conference | the writing, and whatever is still open | the paper, with the code, the task list and the run records |
 | **No date** | Java, in A9 and A10, as a bonus. As future work: a generator that takes any repo without a recipe, and the rest of A13 | a sixth language; tasks from any GitHub link; a dataset release with its datasheet |
 
 ### 14.2 Five lanes that do not wait for each other

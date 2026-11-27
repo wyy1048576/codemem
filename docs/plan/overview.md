@@ -69,10 +69,12 @@ product.
 6. **What runs on what.** The baseline and the final codemem on a fixed sample of tasks from
    every repo, in several languages. Today's codemem on the medium tasks only. An open model, the
    9B first, on easy and medium tasks, with a few hard ones as a probe.
-7. **Dates.** November 25, evening: tracks B and C have delivered, and the improved codemem is
-   frozen. November 26: the full runs start. November 30, 23:59: the freeze we aim for.
-   December 1, 14:00: the presentation, which is the hard deadline. December 7: the paper, after
-   six more days of refining. Bonus goals and future work have no date (§8.3).
+7. **Dates.** November 27, 16:30 Pacific: tracks B and C have delivered, and the improved codemem
+   is frozen. November 27, 17:00 Pacific: the full runs start. November 30, 23:59: the freeze we
+   aim for. December 1, 14:00: the presentation, which is the hard deadline. December 7: the first
+   submission of the paper, after six more days of refining; the date is soft. December 10, at
+   the latest: the paper at the level of a conference. Bonus goals and future work have no date
+   (§8.3).
 
 **Seven things the research changed.** Each is explained where it is used. The middle column is
 *(reported)*, except the last row.
@@ -449,7 +451,7 @@ pipeline's first runs give us, and it sizes everything after it.
 
 ## 8. Timeline
 
-Five dates. The aim is to leave nothing open after December 1 except the paper. Nothing in this plan
+Six dates. The aim is to leave nothing open after December 1 except the paper. Nothing in this plan
 is sized in working days: these are the deadlines, and we work towards them.
 
 | Date | What is due | What "done" means |
@@ -458,7 +460,8 @@ is sized in working days: these are the deadlines, and we work towards them.
 | **Fri Nov 27, 17:00 Pacific** | **the full runs start** | the check run comes first, and its report is read before the batches run unattended overnight ([runs.md](runs.md) §6). Sat Nov 28 and Sun Nov 29 are reserved for running |
 | **Mon Nov 30, 23:59** | **the freeze we aim for** | the full runs have finished on a sample of tasks from every repo that is up, in several languages; the model gap has at least one open model; the tables and the slides are final. This date is soft |
 | **Tue Dec 1, 14:00** | **the presentation: the hard deadline** | the slides are submitted and everything is ready before then. The morning is for preparing the presentation, which is why the freeze is aimed at the night before |
-| **Mon Dec 7** | **the paper and final report,** in the style of a conference paper | the same results, refined for six more days, with the runs that were still open and the limits stated plainly |
+| **Mon Dec 7** | **the paper and final report: the first submission,** in the style of a conference paper. This date is soft, for all of us | the same results, refined for six more days, with the runs that were still open and the limits stated plainly |
+| **Thu Dec 10** | **the paper at the level of a conference,** at the latest | what the first submission left open is closed, or stated plainly as a limit |
 | no date | bonus goals and future work (§8.3) | a bonus is taken up if time is left; future work is beyond this timeline |
 
 ### 8.1 Now to November 30
@@ -495,7 +498,8 @@ perfect.
 | Days | What happens |
 |---|---|
 | **Dec 2–6** | Write the paper and the final report. Finish what is still open: the other open models of the model gap and the second open harness ([track A](track-a-evals.md) §4.6 and §11); what explains the headline, each on a subset (results up front, the placebo, the vague prompts); any repos left on the list; anything in tracks B and C that was not finished by December 1. Fix what the presentation exposed |
-| **Dec 7** | the paper and final report are finished, with the code, the task list and the run records |
+| **Dec 7** | the paper and final report are submitted for the first time, with the code, the task list and the run records. The date is soft |
+| **Dec 8–10** | the paper is brought to the level of a conference, by Dec 10 at the latest |
 
 **If codemem changes after the freeze of Nov 27,** the changed configuration is run on the same
 tasks, and the paper reports both and says which numbers belong to which. No number from the
@@ -551,8 +555,9 @@ Cut scope, never the checks.
 
 ## 9. The paper
 
-**One paper, targeted for December 7, 2026,** written in the style of a conference paper, with
-its limits stated (§8.2). It is also the course's final report.
+**One paper, first submitted on December 7, 2026,** a soft date, written in the style of a
+conference paper, with its limits stated (§8.2). It has until December 10 to reach the level of
+a conference. It is also the course's final report.
 
 **Where it could go afterwards.** This is not part of the plan's deadlines. It is listed so the
 paper is written with a venue's rules in mind. All *(reported)*.
