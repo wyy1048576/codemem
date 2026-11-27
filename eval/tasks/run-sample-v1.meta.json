@@ -116,6 +116,10 @@
       {
         "path": "tasks/screen/hard-playwright.jsonl",
         "sha256": "bec67b16e67d60b31365ddb886c8f389d205c8abbb0eaa937272901690fd9b67"
+      },
+      {
+        "path": "tasks/screen/ha1.jsonl",
+        "sha256": "1e5f347b9ac2f2772dc3d5833c54e8f5fb921cadaebed7adf4a102f45a1baba7"
       }
     ],
     "facts": [
@@ -144,6 +148,10 @@
       {
         "path": "tasks/vague-ruff1-v3.jsonl",
         "sha256": "7222a25c2f92bd5dcd161664733a52e730b97fe5ebbb650daab452578d8ca29d"
+      },
+      {
+        "path": "tasks/vague-ha1-v3.jsonl",
+        "sha256": "711fa1968120012ec1635c18df1d956093e2407e6d1303e7b6896b421a38aa2b"
       }
     ]
   },
@@ -231,6 +239,50 @@
       "run_without_prompts": [],
       "duplicates": {},
       "notes": []
+    },
+    "home-assistant/core": {
+      "tiers": {
+        "easy": {
+          "fair": 6,
+          "target": 6,
+          "run": 6,
+          "spare": 0,
+          "test": 6,
+          "dev": 0,
+          "labels": {
+            "easy": 5,
+            "medium": 1
+          }
+        },
+        "medium": {
+          "fair": 1,
+          "target": 8,
+          "run": 1,
+          "spare": 0,
+          "test": 1,
+          "dev": 0,
+          "labels": {
+            "hard": 1
+          }
+        },
+        "hard": {
+          "fair": 0,
+          "target": 4,
+          "run": 0,
+          "spare": 0,
+          "test": 0,
+          "dev": 0,
+          "labels": {}
+        }
+      },
+      "run_without_prompts": [],
+      "duplicates": {},
+      "notes": [
+        "easy tier: numbers 3, 4, 6 have the label easy, because no task with the label medium is left",
+        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
+        "medium tier: 1 fair tasks, fewer than the target of 8; all of them are run",
+        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
+      ]
     },
     "kubernetes/kubernetes": {
       "tiers": {
@@ -365,12 +417,12 @@
       ]
     }
   },
-  "rows": 125,
-  "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --screen tasks/screen/hard-duckdb.jsonl --screen tasks/screen/hard-playwright.jsonl --force",
+  "rows": 132,
+  "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --screen tasks/screen/hard-duckdb.jsonl --screen tasks/screen/hard-playwright.jsonl --screen tasks/screen/ha1.jsonl --prompts tasks/vague-b10a-v3.jsonl --prompts tasks/vague-b7-v3.jsonl --prompts tasks/vague-duckdb-hard-v3.jsonl --prompts tasks/vague-playwright-hard-v3.jsonl --prompts tasks/vague-ruff1-v3.jsonl --prompts tasks/vague-ha1-v3.jsonl --force",
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "5b12a485fc039f12a5b33ad3488967a3ef54613f",
+    "sha": "163c079f01158ab343f5af708663783c57ad7e55",
     "dirty": false
   },
-  "created": "2026-11-27T19:05:59+00:00"
+  "created": "2026-11-27T22:19:51+00:00"
 }
