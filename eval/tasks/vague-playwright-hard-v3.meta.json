@@ -16,7 +16,7 @@
  "writer": "one claude-opus-5-5 session on 2026-11-27, with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions",
  "with_done_when": [],
  "checks": {
-  "leak": "the writer listed 78 names it removed (code names of the issue's cause section, the protocol event, action and field names, the context option for site logins, the repo's file paths, and every name that the real fix changes or adds) and searched both texts for each, case-insensitive and split into words. No hit of a repo name; the only hits were words of the issue's own reproduction script. It also replaced 'origin' and 'authentication' with plain words, because the first is a field of an existing option and the second is close to a method that the fix changes. No 'Done when' line: the fix adds no option, setting or message that a user would name",
+  "leak": "the writer listed 78 names it removed (code names of the issue's cause section, the protocol event, action and field names, the context option for site logins, the repo's file paths, and every name that the real fix changes or adds) and searched both texts for each, case-insensitive and split into words. No hit of a repo name; the only hits were words of the issue's own reproduction script. It also replaced 'origin' and 'authentication' with plain words, because the first is a field of an existing option and the second is close to a method that the fix changes. No 'Done when' line: the fix adds no option, setting or message that a user would name. Then one claude-fable-5-2 session reviewed both rows against the issue, the hidden test and the screen notes: both ok, none corrected",
   "solvable": "not done (plan section 9, check 2)",
   "human": "not done (plan section 9, check 3)"
  },

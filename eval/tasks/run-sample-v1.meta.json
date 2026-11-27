@@ -132,6 +132,10 @@
         "sha256": "5cb680c45c5960e85044f3cadc81434f91d04bfb0f0c0957d13fb5f4e13b9c6f"
       },
       {
+        "path": "tasks/vague-playwright-hard-v3.jsonl",
+        "sha256": "56f098466c07d90d3702bc6de16aa0d9c9fe8b7b7c3c3f1584d63f5f4b251f61"
+      },
+      {
         "path": "tasks/vague-ruff1-v3.jsonl",
         "sha256": "7222a25c2f92bd5dcd161664733a52e730b97fe5ebbb650daab452578d8ca29d"
       }
@@ -300,8 +304,7 @@
         }
       },
       "run_without_prompts": [
-        "microsoft__playwright-43482",
-        "microsoft__playwright-43342"
+        "microsoft__playwright-43482"
       ],
       "notes": [
         "medium tier: the target is 6, because the hard tier runs 2 (medium and hard together are 8)",
@@ -355,8 +358,8 @@
   "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --screen tasks/screen/hard-duckdb.jsonl --screen tasks/screen/hard-playwright.jsonl --force",
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "f0a1574e74114e639532bb399ac87ff659498751",
+    "sha": "6ad841e127eafa8c96b23bb237e05910c9507b01",
     "dirty": false
   },
-  "created": "2026-11-27T12:39:43+00:00"
+  "created": "2026-11-27T18:29:18+00:00"
 }
