@@ -1,0 +1,28 @@
+{
+ "name": "vague-b10a-v3",
+ "created": "2026-11-27",
+ "tasks": 61,
+ "rows": 122,
+ "levels": [
+  "L1",
+  "L2"
+ ],
+ "task_files": [
+  "tasks/e2e/duckdb.jsonl",
+  "tasks/e2e/kubernetes.jsonl"
+ ],
+ "task_choice": "every duckdb and kubernetes task that the screen of tasks/screen/b10a.jsonl calls fair (two reads, a third read for four tasks): 61 of 112 valid tasks (duckdb 41, kubernetes 20)",
+ "rules": "tasks/vague-rules-v3.md",
+ "rules_sha256": "8c3396a4eacfeee714112ca420224189708f8109aad0827e05cba426779c3011",
+ "writer": "five claude-opus-5-5 sessions on 2026-11-27, each with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions of its batch",
+ "with_done_when": [
+  "kubernetes__kubernetes-140916",
+  "kubernetes__kubernetes-142213"
+ ],
+ "checks": {
+  "leak": "each writer searched its texts for the names it removed and for the changed names of the real fix. Then one more claude-opus-5-5 session reviewed all 61 tasks against the issue, the real fix, the hidden tests and the screen notes: 58 ok, 3 with a code name split into words or a place in the code; its corrected texts are used (4 rows: duckdb-27560 L1, kubernetes-141211 L1, kubernetes-141211 L2, kubernetes-142950 L1). It found no lost or added fact. Known and left: six L1 texts open with words such as 'The issue reports'",
+  "solvable": "not done (plan section 9, check 2)",
+  "human": "not done (plan section 9, check 3)"
+ },
+ "sha256": "d7e1acc6b3815869a95e0d313314da016138d1dd272bf1d32243d60179cc9ade"
+}
