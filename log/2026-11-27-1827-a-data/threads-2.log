@@ -1,0 +1,475 @@
+start 2026-11-27T14:21:43Z load 0.92 1.31 1.33
+=== base: andre/compact-threads
+33f9d0e Plan, track C 4.2: codemem sets the threads, the user never does (proposed)
+codemem 0.2.0 at /home/ripst/codemem-project/codemem-threads/src/codemem (git 33f9d0e on HEAD) | FAISS 1.16.0, OpenMP: libgomp-e985bcbb.so.1.0.0 (GNU) | numpy 2.4.6, BLAS scipy-openblas 0.3.31.188.0 (OpenBLAS 0.3.31.188.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64) | Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64 | AMD Ryzen 9 3950X 16-Core Processor | 16 CPUs, all = 16 | Python 3.11.18
+This shell has OMP_NUM_THREADS=unset, OPENBLAS_NUM_THREADS=unset, MKL_NUM_THREADS=unset, VECLIB_MAXIMUM_THREADS=unset, OMP_WAIT_POLICY=unset, GOMP_SPINCOUNT=unset, KMP_BLOCKTIME=unset, OPENBLAS_THREAD_TIMEOUT=unset; every timing child gets only the variables its table names.
+100,000 vectors: index built in 11 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+200,000 vectors: index built in 21 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+500,000 vectors: index built in 53 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+1,000,000 vectors: index built in 137 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+
+== a: both pools on all cores (tests: the fault as measured) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    4.64    8.46   56.02    3.19    0.22    0.34   74.89 |   20.87
+             p10    1.81    8.01   40.04    2.55    0.19    0.30   55.84 |   19.63
+             p90    8.09   21.13   68.07    5.00    0.32    4.37   96.14 |   22.88
+                 building the compact index from the rows: 3.7 s
+  200,000 median    4.35   16.03   46.06    2.85    0.21    0.35   68.94 |   40.31
+             p10    0.65    9.39   36.11    2.68    0.19    0.32   55.45 |   38.82
+             p90    7.69   20.17   56.15    5.21    0.28    0.47   87.89 |   40.91
+  500,000 median    2.34   26.85   60.18    3.18    0.22    0.41   95.61 |   99.87
+             p10    0.20   20.62   53.99    2.89    0.20    0.36   84.31 |   97.28
+             p90    8.22   43.26   80.04    3.81    0.26    0.47  124.59 |  101.39
+1,000,000 median    3.73   52.09   90.64    3.16    0.23    0.46  149.35 |  194.12
+             p10    0.26   39.69   85.72    3.01    0.20    0.41  140.02 |  191.12
+             p90    8.01   64.75   99.33    3.96    0.26    0.49  171.78 |  208.57
+
+== b: BLAS on 1 thread, FAISS on all (tests: the rotation's product in numpy's BLAS) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 1 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.26    4.81   17.97    3.33    0.23    0.38   26.94 |       -
+             p10    0.22    4.30   17.56    2.57    0.19    0.33   25.94 |       -
+             p90    0.28    5.86   23.68    3.79    0.26    0.41   37.64 |       -
+  200,000 median    0.27    8.60   18.15    3.45    0.22    0.38   30.98 |       -
+             p10    0.23    6.71   17.55    2.67    0.19    0.32   27.66 |       -
+             p90    0.29    8.85   20.47    3.64    0.25    0.41   32.92 |       -
+  500,000 median    0.24   18.72   41.09    2.93    0.22    0.41   63.79 |       -
+             p10    0.21   16.69   40.45    2.81    0.20    0.36   61.34 |       -
+             p90    0.27   19.16   42.11    3.81    0.25    0.45   65.81 |       -
+1,000,000 median    0.26   34.78   81.22    3.09    0.22    0.42  119.76 |       -
+             p10    0.24   33.36   79.91    3.00    0.20    0.40  117.77 |       -
+             p90    0.30   35.84   82.77    3.84    0.24    0.47  123.50 |       -
+
+== c: FAISS on 1 thread, BLAS on all (tests: FAISS's parallel regions, one per query) ==
+given: OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 1, inside a compact search 1; BLAS: openblas 0.3.15: 1 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.14    5.64   25.40    3.66    0.23    0.38   35.54 |       -
+             p10    0.13    5.42   24.41    3.54    0.22    0.36   34.09 |       -
+             p90    0.17    5.79   25.53    3.78    0.26    0.41   35.73 |       -
+  200,000 median    0.10    6.96   17.15    2.73    0.20    0.33   27.72 |       -
+             p10    0.08    6.82   17.01    2.67    0.19    0.32   27.29 |       -
+             p90    0.15   10.49   24.39    3.81    0.25    0.38   37.48 |       -
+  500,000 median    0.35   24.03   59.97    2.89    0.19    0.36   87.96 |       -
+             p10    0.33   16.97   55.13    2.80    0.18    0.34   77.44 |       -
+             p90    0.39   26.24   62.65    3.20    0.23    0.40   89.80 |       -
+1,000,000 median    0.38   45.83   92.02    2.97    0.20    0.40  142.16 |       -
+             p10    0.35   40.98   89.69    2.91    0.19    0.39  138.82 |       -
+             p90    0.41   52.06   93.67    3.10    0.20    0.44  146.99 |       -
+
+== d: both pools on 1 thread (tests: the reference) ==
+given: OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+inside: faiss.omp_get_max_threads() = 1, inside a compact search 1; BLAS: openblas 0.3.31.188.0: 1 threads (pthreads), openblas 0.3.15: 1 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.21    3.63   15.75    2.48    0.18    0.30   22.56 |   19.06
+             p10    0.21    3.56   15.51    2.40    0.18    0.29   22.25 |   18.94
+             p90    0.23    3.77   16.05    2.59    0.20    0.33   23.02 |   19.44
+                 building the compact index from the rows: 15.3 s
+  200,000 median    0.20    6.44   15.91    2.53    0.18    0.32   25.57 |   38.53
+             p10    0.20    6.26   15.75    2.50    0.17    0.30   25.34 |   38.34
+             p90    0.22    6.66   16.28    2.62    0.20    0.34   26.31 |   39.12
+  500,000 median    0.22   16.06   39.67    2.73    0.19    0.36   59.26 |   97.27
+             p10    0.21   15.77   39.42    2.67    0.18    0.34   58.87 |   96.57
+             p90    0.23   16.42   40.19    2.86    0.20    0.38   60.17 |   98.51
+1,000,000 median    0.24   32.41   78.93    2.94    0.19    0.40  115.11 |  202.55
+             p10    0.24   32.00   78.20    2.84    0.18    0.39  114.18 |  201.20
+             p90    0.25   33.08   80.22    3.04    0.21    0.43  117.14 |  204.43
+
+== e: as a, OpenMP's waiting threads passive (tests: FAISS's threads that spin after a region) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16 OMP_WAIT_POLICY=passive GOMP_SPINCOUNT=0
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.11    4.05   16.99    2.63    0.19    0.33   24.27 |       -
+             p10    0.09    3.95   16.89    2.55    0.18    0.30   24.11 |       -
+             p90    0.14    5.88   25.97    3.61    0.23    0.37   36.20 |       -
+  200,000 median    0.12    7.22   17.41    2.69    0.19    0.35   28.02 |       -
+             p10    0.10    7.08   17.24    2.63    0.18    0.33   27.71 |       -
+             p90    0.16   10.91   26.60    3.77    0.24    0.40   41.81 |       -
+  500,000 median    0.35   19.24   58.96    2.92    0.20    0.39   83.18 |       -
+             p10    0.11   17.17   42.59    2.85    0.19    0.37   63.72 |       -
+             p90    0.38   26.75   63.02    3.52    0.23    0.45   90.66 |       -
+1,000,000 median    0.35   46.50   90.90    3.06    0.20    0.41  141.73 |       -
+             p10    0.33   34.25   82.87    2.96    0.19    0.39  123.25 |       -
+             p90    0.39   52.45   93.85    3.42    0.22    0.43  146.91 |       -
+
+== f: as a, OpenBLAS's waiting threads passive (tests: OpenBLAS's threads that spin after the rotation) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16 OPENBLAS_THREAD_TIMEOUT=4
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.41    3.81   17.63    2.57    0.19    0.32   25.18 |       -
+             p10    0.36    3.73   16.48    2.54    0.18    0.31   23.74 |       -
+             p90    0.54    4.77   17.88    3.28    0.22    0.38   26.32 |       -
+  200,000 median    0.42    8.49   18.06    2.72    0.21    0.36   30.25 |       -
+             p10    0.33    6.69   17.33    2.64    0.19    0.33   27.60 |       -
+             p90    0.56    8.67   18.36    3.44    0.24    0.43   31.68 |       -
+  500,000 median    0.25   18.33   40.82    2.92    0.21    0.38   63.53 |       -
+             p10    0.21   16.77   40.19    2.83    0.20    0.35   60.66 |       -
+             p90    0.36   19.18   41.94    3.70    0.25    0.44   66.43 |       -
+1,000,000 median    0.33   35.37   81.59    3.77    0.23    0.45  122.94 |       -
+             p10    0.27   33.82   80.28    3.02    0.20    0.41  119.00 |       -
+             p90    3.89   38.28   84.04    3.96    0.25    0.50  129.62 |       -
+
+== g: as a, trying fix (ii): FAISS calls on 1 thread (tests: fix (ii) without editing the store) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 1; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.11    3.87   16.74    2.79    0.20    0.33   24.16 |       -
+             p10    0.09    3.79   16.58    2.58    0.19    0.31   23.73 |       -
+             p90    0.15    5.68   25.25    3.75    0.24    0.39   35.15 |       -
+  200,000 median    0.12    9.51   23.43    3.65    0.22    0.36   37.12 |       -
+             p10    0.11    6.83   16.95    2.71    0.19    0.31   27.13 |       -
+             p90    0.15   10.59   26.12    3.81    0.24    0.38   41.22 |       -
+  500,000 median    0.33   22.47   60.22    2.86    0.20    0.35   86.50 |       -
+             p10    0.17   16.80   44.61    2.77    0.19    0.34   66.37 |       -
+             p90    0.37   26.19   62.97    3.49    0.22    0.40   89.61 |       -
+1,000,000 median    0.36   47.03   90.63    2.96    0.19    0.40  142.00 |       -
+             p10    0.34   34.11   82.04    2.90    0.18    0.39  124.79 |       -
+             p90    0.39   52.31   94.14    3.07    0.20    0.44  145.91 |       -
+
+== h: as a, trying fix (i): the query rotated without BLAS (tests: fix (i) without editing the store) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.29    4.75   17.89    3.29    0.22    0.38   26.86 |       -
+             p10    0.24    3.84   17.66    2.55    0.19    0.33   25.83 |       -
+             p90    0.31    5.68   26.77    3.75    0.25    0.41   36.81 |       -
+  200,000 median    0.39    7.68   18.00    2.67    0.19    0.36   29.53 |       -
+             p10    0.38    6.70   16.81    2.64    0.19    0.35   27.21 |       -
+             p90    0.43    8.63   18.25    3.37    0.23    0.44   30.75 |       -
+  500,000 median    0.24   18.02   40.77    2.90    0.20    0.38   62.74 |       -
+             p10    0.24   16.79   40.12    2.79    0.19    0.35   60.96 |       -
+             p90    0.30   19.15   41.85    3.62    0.23    0.43   64.83 |       -
+1,000,000 median    0.27   34.84   80.91    3.13    0.21    0.43  119.64 |       -
+             p10    0.25   33.23   80.01    3.01    0.20    0.40  118.15 |       -
+             p90    0.32   37.75   82.56    3.85    0.26    0.49  135.46 |       -
+
+== i: as a, 50 other queries asked for the first time (tests: reads from the disk instead of the page cache) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    7.67   15.98   60.16    3.35    0.23    0.36   89.35 |       -
+             p10    3.69    8.00   52.07    2.64    0.20    0.32   79.81 |       -
+             p90   12.53   23.98   72.07    5.63    0.30    0.45   99.58 |       -
+  200,000 median    5.29   20.08   54.62    2.86    0.21    0.35   87.23 |       -
+             p10    0.72   11.97   36.16    2.64    0.19    0.33   58.69 |       -
+             p90   14.51   32.09   64.13    3.87    0.24    0.66  107.18 |       -
+  500,000 median    3.48   25.84   60.86    3.52    0.22    0.41   97.52 |       -
+             p10    0.23   20.00   57.71    2.88    0.20    0.37   86.14 |       -
+             p90    7.09   40.35   76.55    3.92    0.26    0.48  125.25 |       -
+1,000,000 median    4.71   52.10   88.76    3.37    0.23    0.44  150.72 |       -
+             p10    0.27   47.52   85.68    2.99    0.20    0.40  143.52 |       -
+             p90   10.38   57.29   94.41    3.90    0.25    0.46  162.73 |       -
+
+== j: as d, 50 more other queries asked for the first time (tests: reads from the disk on one thread) ==
+given: OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+inside: faiss.omp_get_max_threads() = 1, inside a compact search 1; BLAS: openblas 0.3.15: 1 threads (openmp), openblas 0.3.31.188.0: 1 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.21    3.65   15.71    2.45    0.18    0.30   22.55 |       -
+             p10    0.21    3.55   15.58    2.42    0.17    0.29   22.29 |       -
+             p90    0.22    3.77   16.16    2.57    0.20    0.32   23.09 |       -
+  200,000 median    0.21    6.45   16.07    2.55    0.18    0.32   25.88 |       -
+             p10    0.20    6.38   15.89    2.52    0.17    0.31   25.59 |       -
+             p90    0.22    6.65   16.37    2.67    0.19    0.37   26.22 |       -
+  500,000 median    0.21   16.19   39.98    2.78    0.19    0.36   59.70 |       -
+             p10    0.21   15.86   39.51    2.70    0.18    0.35   59.23 |       -
+             p90    0.23   16.54   40.64    2.93    0.21    0.40   60.46 |       -
+1,000,000 median    0.23   32.19   78.35    2.86    0.19    0.38  114.13 |       -
+             p10    0.23   31.71   77.75    2.78    0.18    0.37  113.32 |       -
+             p90    0.26   32.81   79.64    2.94    0.20    0.41  116.16 |       -
+
+== k: as a, run again after all the others (tests: whether a's numbers repeat) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    4.75   11.43   56.02    3.01    0.20    0.33   79.70 |       -
+             p10    0.78    8.01   36.05    2.59    0.19    0.30   51.99 |       -
+             p90   11.75   18.41   64.06    4.51    0.26    0.80   91.88 |       -
+  200,000 median    4.67   16.08   56.00    2.74    0.20    0.33   83.29 |       -
+             p10    0.64   13.22   43.63    2.64    0.19    0.31   68.03 |       -
+             p90   12.44   24.17   60.25    3.54    0.25    0.42   94.59 |       -
+  500,000 median    0.29   23.88   58.64    3.07    0.23    0.41   87.99 |       -
+             p10    0.20   19.93   55.80    2.85    0.20    0.36   82.81 |       -
+             p90    4.00   28.22   61.95    3.82    0.25    0.45   96.17 |       -
+1,000,000 median    3.79   50.25   89.42    3.18    0.20    0.43  146.83 |       -
+             p10    0.23   43.66   84.31    3.03    0.20    0.40  140.16 |       -
+             p90    9.36   60.13   95.97    3.88    0.24    0.48  162.68 |       -
+
+== a compact search, ms more than in d (both pools on 1 thread); the exact search's in brackets ==
+  vectors               a               b               c               e               f               g               h               i               j               k
+  100,000    +52.3 (+1.8)            +4.4           +13.0            +1.7            +2.6            +1.6            +4.3           +66.8            -0.0           +57.1
+  200,000    +43.4 (+1.8)            +5.4            +2.2            +2.4            +4.7           +11.6            +4.0           +61.7            +0.3           +57.7
+  500,000    +36.4 (+2.6)            +4.5           +28.7           +23.9            +4.3           +27.2            +3.5           +38.3            +0.4           +28.7
+1,000,000    +34.2 (-8.4)            +4.7           +27.1           +26.6            +7.8           +26.9            +4.5           +35.6            -1.0           +31.7
+
+same results (ids and scores of every hit, query by query), compact index:
+  100,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 833db309ce7e
+  200,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 46705c5bfc6d
+  500,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 21dd98c7947f
+  1,000,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 98f39650b2cc
+same results, exact index (a, d):
+  100,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: 44cc11b58319
+  200,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: fa1893c8bc83
+  500,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: fbb198e2c429
+  1,000,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: 21f1bd13e68f
+  Compare the fingerprints with another run (main against a fix branch): a fix must not change them.
+building the compact index from the rows: 100,000 vectors on all cores (a): 3.7 s; 100,000 vectors on one core (d): 15.3 s
+faiss.omp_set_num_threads changes the calling thread's count only, on this machine: yes
+
+== what this says ==
+THREADS: yes. On all 16 cores (a) a compact search takes +52.3 ms at 100,000 and +43.4 ms at 200,000 and +36.4 ms at 500,000 and +34.2 ms at 1,000,000 vectors more than on one core each (d) and again after all the others (k) +57.1 ms at 100,000 and +57.7 ms at 200,000 and +28.7 ms at 500,000 and +31.7 ms at 1,000,000; the exact search +1.8 ms and +1.8 ms and +2.6 ms and -8.4 ms.
+  It sits in the fine ranking (+25.7 ms), the coarse scan (+11.2 ms), against d, as a mean over the sizes.
+  It disappears in: b, BLAS on 1 thread, FAISS on all (+4.4 ms at 100,000 and +5.4 ms at 200,000 and +4.5 ms at 500,000 and +4.7 ms at 1,000,000); f, as a, OpenBLAS's waiting threads passive (+2.6 ms at 100,000 and +4.7 ms at 200,000 and +4.3 ms at 500,000 and +7.8 ms at 1,000,000); h, as a, trying fix (i): the query rotated without BLAS (+4.3 ms at 100,000 and +4.0 ms at 200,000 and +3.5 ms at 500,000 and +4.5 ms at 1,000,000).
+  It shrinks to between a quarter and three quarters in: none.
+  It stays in: c, FAISS on 1 thread, BLAS on all (+13.0 ms at 100,000 and +2.2 ms at 200,000 and +28.7 ms at 500,000 and +27.1 ms at 1,000,000); e, as a, OpenMP's waiting threads passive (+1.7 ms at 100,000 and +2.4 ms at 200,000 and +23.9 ms at 500,000 and +26.6 ms at 1,000,000); g, as a, trying fix (ii): FAISS calls on 1 thread (+1.6 ms at 100,000 and +11.6 ms at 200,000 and +27.2 ms at 500,000 and +26.9 ms at 1,000,000).
+  So it comes from numpy's BLAS threads (the rotation's product). OpenBLAS's waiting threads passive removes it as well: OpenBLAS's threads spin and hold cores.
+  Measured here: fix (ii) the compact search's FAISS calls on one OpenMP thread leaves +1.6 ms at 100,000 and +11.6 ms at 200,000 and +27.2 ms at 500,000 and +26.9 ms at 1,000,000 (g: stays); fix (i) the query row rotated without the BLAS leaves +4.3 ms at 100,000 and +4.0 ms at 200,000 and +3.5 ms at 500,000 and +4.5 ms at 1,000,000 (h: gone).
+  The fix that applies: (i) the query row rotated without the BLAS. It must also leave the hits the same and the build time as it was (both above).
+DISK: yes. Queries asked for the first time take, on all cores (i against a), +14.5 ms at 100,000 and +18.3 ms at 200,000 and +9.5 ms at 500,000 and +3.9 ms at 1,000,000, and on one thread (j against d) -0.0 ms at 100,000 and +0.3 ms at 200,000 and +0.4 ms at 500,000 and -1.0 ms at 1,000,000; in reading the rows +0.2 ms and +0.0 ms and +0.4 ms and +0.2 ms (i). The index file is not all in memory here, so a first search of a query reads rows from the disk, whatever the thread count. bench_search_scale.py times each query the first time it is asked, so its "search ms" includes these reads on such a machine: read its numbers (last night's too) against this line.
+=> On this machine both: threads: numpy's BLAS threads, in the fine ranking (+25.7 ms), the coarse scan (+11.2 ms); fix (i) the query row rotated without the BLAS applies; and reads from the disk: a query's first search reads its rows from the disk, whatever the threads.
+took 12 min 2 s (222 s building or reading the indexes)
+exit=0 2026-11-27T14:33:46Z
+=== fix: andre/compact-threads-fix-rotation, with --check
+cca0b31 store: a single query is rotated without the BLAS (candidate fix for the thread overhead, to be measured on Linux)
+codemem 0.2.0 at /home/ripst/codemem-project/codemem-threads-fix/src/codemem (git cca0b31 on HEAD) | FAISS 1.16.0, OpenMP: libgomp-e985bcbb.so.1.0.0 (GNU) | numpy 2.4.6, BLAS scipy-openblas 0.3.31.188.0 (OpenBLAS 0.3.31.188.0  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64) | Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39 x86_64 | AMD Ryzen 9 3950X 16-Core Processor | 16 CPUs, all = 16 | Python 3.11.18
+This shell has OMP_NUM_THREADS=unset, OPENBLAS_NUM_THREADS=unset, MKL_NUM_THREADS=unset, VECLIB_MAXIMUM_THREADS=unset, OMP_WAIT_POLICY=unset, GOMP_SPINCOUNT=unset, KMP_BLOCKTIME=unset, OPENBLAS_THREAD_TIMEOUT=unset; every timing child gets only the variables its table names.
+100,000 vectors: index reused in 1 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+200,000 vectors: index reused in 1 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+500,000 vectors: index reused in 2 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+1,000,000 vectors: index reused in 4 s; timing configurations a, b, c, d, e, f, g, h, i, j, k
+
+== a: both pools on all cores (tests: the fault as measured) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.41    4.79   18.16    3.30    0.23    0.38   27.31 |   26.90
+             p10    0.37    3.77   16.97    2.54    0.19    0.31   24.30 |   24.99
+             p90    0.44    4.87   18.36    3.39    0.25    0.41   27.61 |   27.23
+                 building the compact index from the rows: 3.7 s
+  200,000 median    0.32    8.62   18.45    3.46    0.23    0.40   31.48 |   40.72
+             p10    0.27    8.54   18.32    2.70    0.20    0.36   30.63 |   39.79
+             p90    0.34    8.72   18.66    3.53    0.25    0.45   31.81 |   43.16
+  500,000 median    0.39   18.67   41.15    2.92    0.21    0.40   63.57 |  109.05
+             p10    0.37   16.93   40.56    2.83    0.20    0.36   61.73 |   99.38
+             p90    0.43   19.30   42.13    3.72    0.25    0.46   65.67 |  111.77
+1,000,000 median    0.43   35.44   81.03    3.13    0.22    0.42  120.55 |  211.21
+             p10    0.40   33.80   79.47    2.99    0.20    0.38  117.53 |  195.59
+             p90    0.46   36.31   83.28    3.85    0.24    0.47  124.90 |  214.05
+
+== b: BLAS on 1 thread, FAISS on all (tests: the rotation's product in numpy's BLAS) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 1 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.37    4.04   18.15    2.62    0.20    0.33   26.21 |       -
+             p10    0.36    3.77   16.92    2.57    0.18    0.30   24.24 |       -
+             p90    0.44    4.98   21.24    3.46    0.24    0.39   30.81 |       -
+  200,000 median    0.36    8.60   18.37    2.81    0.22    0.39   30.77 |       -
+             p10    0.32    6.79   17.16    2.69    0.20    0.34   27.98 |       -
+             p90    0.41    8.74   18.62    3.56    0.26    0.44   31.75 |       -
+  500,000 median    0.42   19.11   42.63    3.38    0.23    0.42   66.24 |       -
+             p10    0.38   17.46   41.55    2.89    0.20    0.38   63.63 |       -
+             p90    0.45   19.73   43.65    3.75    0.24    0.46   68.53 |       -
+1,000,000 median    0.32   34.86   80.58    3.11    0.21    0.43  119.52 |       -
+             p10    0.30   33.30   79.82    3.03    0.20    0.40  118.09 |       -
+             p90    0.37   35.87   82.22    3.88    0.24    0.48  122.47 |       -
+
+== c: FAISS on 1 thread, BLAS on all (tests: FAISS's parallel regions, one per query) ==
+given: OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 1, inside a compact search 1; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 1 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.35    3.69   16.11    2.49    0.19    0.31   23.12 |       -
+             p10    0.34    3.61   15.92    2.46    0.18    0.30   22.95 |       -
+             p90    0.36    3.83   16.45    2.59    0.20    0.34   23.58 |       -
+  200,000 median    0.37    6.62   16.40    2.60    0.19    0.34   26.55 |       -
+             p10    0.36    6.49   16.18    2.57    0.18    0.33   26.26 |       -
+             p90    0.39    6.81   16.65    2.70    0.21    0.36   26.91 |       -
+  500,000 median    0.37   16.37   40.53    2.85    0.19    0.38   60.65 |       -
+             p10    0.36   16.07   40.26    2.77    0.19    0.36   60.22 |       -
+             p90    0.40   16.68   41.02    2.94    0.21    0.42   61.34 |       -
+1,000,000 median    0.30   32.43   78.78    2.94    0.20    0.41  115.09 |       -
+             p10    0.29   31.81   78.08    2.87    0.19    0.39  114.10 |       -
+             p90    0.32   32.90   79.50    3.11    0.21    0.44  116.59 |       -
+
+== d: both pools on 1 thread (tests: the reference) ==
+given: OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+inside: faiss.omp_get_max_threads() = 1, inside a compact search 1; BLAS: openblas 0.3.15: 1 threads (openmp), openblas 0.3.31.188.0: 1 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.36    3.65   15.91    2.47    0.18    0.30   22.86 |   21.47
+             p10    0.34    3.56   15.72    2.42    0.17    0.29   22.64 |   21.37
+             p90    0.38    3.79   16.51    2.61    0.19    0.32   23.87 |   21.98
+                 building the compact index from the rows: 15.4 s
+  200,000 median    0.38    6.57   16.19    2.55    0.19    0.33   26.33 |   38.44
+             p10    0.37    6.47   16.03    2.50    0.18    0.32   26.00 |   38.21
+             p90    0.41    6.77   16.38    2.68    0.20    0.37   26.51 |   39.83
+  500,000 median    0.31   16.16   39.62    2.73    0.19    0.38   59.42 |  101.63
+             p10    0.30   15.79   39.32    2.68    0.18    0.36   59.02 |  101.11
+             p90    0.33   16.60   40.12    2.87    0.21    0.43   60.18 |  102.74
+1,000,000 median    0.40   32.80   79.42    2.88    0.19    0.37  116.21 |  185.85
+             p10    0.40   32.16   78.92    2.82    0.18    0.36  115.20 |  184.74
+             p90    0.42   33.32   80.42    2.95    0.22    0.39  117.59 |  188.26
+
+== e: as a, OpenMP's waiting threads passive (tests: FAISS's threads that spin after a region) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16 OMP_WAIT_POLICY=passive GOMP_SPINCOUNT=0
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.37    4.37   17.43    2.55    0.19    0.32   25.30 |       -
+             p10    0.36    4.29   17.15    2.50    0.18    0.30   24.94 |       -
+             p90    0.42    4.61   18.00    2.77    0.21    0.38   26.24 |       -
+  200,000 median    0.38    7.40   17.90    2.69    0.19    0.33   28.92 |       -
+             p10    0.37    7.26   17.55    2.61    0.18    0.31   28.42 |       -
+             p90    0.42    7.63   18.36    2.86    0.23    0.38   29.75 |       -
+  500,000 median    0.38   17.22   41.37    2.87    0.20    0.39   62.39 |       -
+             p10    0.38   16.83   40.96    2.78    0.19    0.35   61.75 |       -
+             p90    0.40   17.66   42.61    2.99    0.22    0.43   64.38 |       -
+1,000,000 median    0.31   33.34   80.88    2.99    0.19    0.40  118.21 |       -
+             p10    0.31   32.86   80.33    2.90    0.18    0.39  117.20 |       -
+             p90    0.33   34.13   82.28    3.16    0.21    0.42  120.56 |       -
+
+== f: as a, OpenBLAS's waiting threads passive (tests: OpenBLAS's threads that spin after the rotation) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16 OPENBLAS_THREAD_TIMEOUT=4
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.37    3.82   17.85    2.55    0.20    0.33   25.68 |       -
+             p10    0.36    3.72   16.72    2.52    0.19    0.31   23.93 |       -
+             p90    0.43    4.77   18.22    3.31    0.23    0.40   27.06 |       -
+  200,000 median    0.32    8.44   18.14    2.71    0.20    0.35   30.16 |       -
+             p10    0.29    6.68   17.75    2.63    0.19    0.33   27.92 |       -
+             p90    0.40    8.70   18.39    3.43    0.23    0.40   31.35 |       -
+  500,000 median    0.33   19.02   42.16    2.95    0.22    0.42   65.17 |       -
+             p10    0.30   16.93   40.93    2.85    0.20    0.37   61.67 |       -
+             p90    0.37   19.62   57.12    3.86    0.26    0.48   82.47 |       -
+1,000,000 median    0.30   34.88   80.72    3.13    0.22    0.45  119.48 |       -
+             p10    0.29   33.21   79.75    3.03    0.20    0.41  117.98 |       -
+             p90    0.36   35.79   82.20    3.92    0.25    0.50  122.13 |       -
+
+== g: as a, trying fix (ii): FAISS calls on 1 thread (tests: fix (ii) without editing the store) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 1; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.37    3.63   15.87    2.44    0.18    0.30   22.79 |       -
+             p10    0.36    3.53   15.68    2.40    0.18    0.29   22.57 |       -
+             p90    0.39    3.74   16.20    2.57    0.20    0.33   23.34 |       -
+  200,000 median    0.37    6.63   16.48    2.63    0.19    0.33   26.67 |       -
+             p10    0.36    6.51   16.16    2.57    0.18    0.32   26.23 |       -
+             p90    0.38    6.76   16.73    2.70    0.20    0.34   27.01 |       -
+  500,000 median    0.38   16.28   40.19    2.80    0.19    0.38   60.28 |       -
+             p10    0.38   16.08   39.75    2.72    0.19    0.36   59.63 |       -
+             p90    0.41   16.85   41.20    2.94    0.20    0.42   61.92 |       -
+1,000,000 median    0.39   32.51   78.72    2.86    0.18    0.37  115.10 |       -
+             p10    0.39   32.02   78.03    2.82    0.18    0.36  114.30 |       -
+             p90    0.42   33.46   79.66    2.97    0.20    0.39  116.86 |       -
+
+== h: as a, trying fix (i): the query rotated without BLAS (tests: fix (i) without editing the store) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.15: 16 threads (openmp), openblas 0.3.31.188.0: 16 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.38    4.35   18.04    2.60    0.19    0.32   26.19 |       -
+             p10    0.36    3.77   16.90    2.54    0.18    0.30   24.18 |       -
+             p90    0.44    4.85   18.22    3.39    0.23    0.39   27.36 |       -
+  200,000 median    0.41    8.59   18.34    3.14    0.23    0.40   30.84 |       -
+             p10    0.37    6.80   18.18    2.65    0.20    0.34   28.55 |       -
+             p90    0.44    8.71   18.54    3.59    0.26    0.43   31.77 |       -
+  500,000 median    0.39   18.81   41.80    2.92    0.21    0.41   64.49 |       -
+             p10    0.37   17.07   41.04    2.83    0.19    0.38   62.40 |       -
+             p90    0.44   19.57   42.59    3.68    0.23    0.44   66.51 |       -
+1,000,000 median    0.32   34.89   81.38    3.20    0.23    0.43  120.14 |       -
+             p10    0.27   33.11   80.31    2.99    0.20    0.39  118.32 |       -
+             p90    0.35   35.66   82.59    3.93    0.26    0.47  123.09 |       -
+
+== i: as a, 50 other queries asked for the first time (tests: reads from the disk instead of the page cache) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.40    4.75   18.02    3.31    0.23    0.36   26.33 |       -
+             p10    0.37    3.75   16.87    2.56    0.20    0.31   24.23 |       -
+             p90    0.43    4.88   18.46    3.45    0.24    0.40   28.00 |       -
+  200,000 median    0.41    8.68   18.38    3.45    0.23    0.41   31.55 |       -
+             p10    0.37    7.98   18.24    2.71    0.20    0.36   29.92 |       -
+             p90    0.43    8.80   18.57    3.56    0.24    0.44   31.95 |       -
+  500,000 median    0.30   18.91   41.76    2.90    0.21    0.43   64.09 |       -
+             p10    0.30   16.97   40.84    2.84    0.20    0.39   62.16 |       -
+             p90    0.37   19.65   42.66    3.71    0.24    0.49   66.47 |       -
+1,000,000 median    0.32   34.60   80.46    3.09    0.20    0.42  119.22 |       -
+             p10    0.31   32.98   79.74    3.00    0.20    0.39  117.59 |       -
+             p90    0.37   35.60   81.51    3.79    0.24    0.46  120.90 |       -
+
+== j: as d, 50 more other queries asked for the first time (tests: reads from the disk on one thread) ==
+given: OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+inside: faiss.omp_get_max_threads() = 1, inside a compact search 1; BLAS: openblas 0.3.15: 1 threads (openmp), openblas 0.3.31.188.0: 1 threads (pthreads)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.37    3.68   15.96    2.45    0.18    0.30   22.96 |       -
+             p10    0.36    3.58   15.86    2.42    0.18    0.29   22.77 |       -
+             p90    0.38    3.83   16.23    2.56    0.20    0.32   23.71 |       -
+  200,000 median    0.30    6.57   16.16    2.57    0.19    0.34   26.15 |       -
+             p10    0.29    6.39   16.01    2.52    0.18    0.32   25.92 |       -
+             p90    0.34    6.70   16.43    2.69    0.20    0.38   26.51 |       -
+  500,000 median    0.38   16.40   39.88    2.76    0.19    0.39   60.00 |       -
+             p10    0.37   16.12   39.63    2.69    0.18    0.38   59.66 |       -
+             p90    0.39   16.73   40.49    2.88    0.20    0.43   60.89 |       -
+1,000,000 median    0.27   32.47   78.79    2.89    0.20    0.39  115.01 |       -
+             p10    0.26   31.92   78.30    2.81    0.19    0.38  114.31 |       -
+             p90    0.28   32.97   79.46    3.00    0.21    0.42  116.17 |       -
+
+== k: as a, run again after all the others (tests: whether a's numbers repeat) ==
+given: OMP_NUM_THREADS=16 OPENBLAS_NUM_THREADS=16 MKL_NUM_THREADS=16 VECLIB_MAXIMUM_THREADS=16
+inside: faiss.omp_get_max_threads() = 16, inside a compact search 16; BLAS: openblas 0.3.31.188.0: 16 threads (pthreads), openblas 0.3.15: 16 threads (openmp)
+  vectors         rotate  coarse    fine    read   score   other  search |   exact   ms over 50 searches
+  100,000 median    0.39    4.43   17.95    2.56    0.20    0.35   26.00 |       -
+             p10    0.36    3.77   16.80    2.51    0.19    0.32   24.10 |       -
+             p90    0.44    4.90   18.36    3.33    0.25    0.42   27.83 |       -
+  200,000 median    0.36    8.18   18.11    2.72    0.19    0.34   29.92 |       -
+             p10    0.35    6.74   16.91    2.67    0.18    0.31   27.23 |       -
+             p90    0.41    8.65   18.29    3.30    0.24    0.39   31.14 |       -
+  500,000 median    0.39   18.79   41.57    2.93    0.21    0.42   64.51 |       -
+             p10    0.37   16.92   40.71    2.86    0.20    0.38   61.75 |       -
+             p90    0.44   19.46   42.73    3.78    0.25    0.47   66.59 |       -
+1,000,000 median    0.32   35.06   81.40    3.78    0.23    0.45  120.66 |       -
+             p10    0.27   33.23   79.93    3.02    0.20    0.40  118.46 |       -
+             p90    0.34   35.84   82.66    3.91    0.24    0.48  122.75 |       -
+
+== a compact search, ms more than in d (both pools on 1 thread); the exact search's in brackets ==
+  vectors               a               b               c               e               f               g               h               i               j               k
+  100,000     +4.5 (+5.4)            +3.4            +0.3            +2.4            +2.8            -0.1            +3.3            +3.5            +0.1            +3.1
+  200,000     +5.2 (+2.3)            +4.4            +0.2            +2.6            +3.8            +0.3            +4.5            +5.2            -0.2            +3.6
+  500,000     +4.1 (+7.4)            +6.8            +1.2            +3.0            +5.7            +0.9            +5.1            +4.7            +0.6            +5.1
+1,000,000    +4.3 (+25.4)            +3.3            -1.1            +2.0            +3.3            -1.1            +3.9            +3.0            -1.2            +4.5
+
+same results (ids and scores of every hit, query by query), compact index:
+  100,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 833db309ce7e
+  200,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 46705c5bfc6d
+  500,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 21dd98c7947f
+  1,000,000 vectors: yes, 50 of 50 queries, in a, b, c, d, e, f, g, h, k; fingerprint of a: 98f39650b2cc
+same results, exact index (a, d):
+  100,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: 44cc11b58319
+  200,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: fa1893c8bc83
+  500,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: fbb198e2c429
+  1,000,000 vectors: yes, 50 of 50 queries, in a, d; fingerprint of a: 21f1bd13e68f
+  Compare the fingerprints with another run (main against a fix branch): a fix must not change them.
+building the compact index from the rows: 100,000 vectors on all cores (a): 3.7 s; 100,000 vectors on one core (d): 15.4 s
+faiss.omp_set_num_threads changes the calling thread's count only, on this machine: yes
+
+== what this says ==
+THREADS: not shown. Of the two runs on all 16 cores only a was slower than one core each (d): a +4.5 ms at 100,000 and +5.2 ms at 200,000 and +4.1 ms at 500,000 and +4.3 ms at 1,000,000, k +3.1 ms at 100,000 and +3.6 ms at 200,000 and +5.1 ms at 500,000 and +4.5 ms at 1,000,000, in the coarse scan (+2.1 ms), the fine ranking (+1.9 ms). A thread setting slows both; a change of one run is what a page pushed out of memory during it does. Run the script again to be sure.
+DISK: no. Queries asked for the first time take, on all cores (i against a), +0.3 ms at 100,000 and +1.6 ms at 200,000 and +0.5 ms at 500,000 and -1.3 ms at 1,000,000, and on one thread (j against d) +0.1 ms at 100,000 and -0.2 ms at 200,000 and +0.6 ms at 500,000 and -1.2 ms at 1,000,000: the operating system keeps the index file in memory here.
+=> Not settled on this machine: only one of two runs on all cores (a) was slower than one core: run the script again.
+took 7 min 29 s (7 s building or reading the indexes)
+check: passed: on all cores no slower than on one, and the same hits everywhere
+exit=0 2026-11-27T14:41:15Z
+=== fix: build times (goal 4)
+codemem 0.2.0 | FAISS 1.16.0 | x86_64 Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39 | 16 CPUs | OMP_NUM_THREADS unset
+  vectors index     memory MB  saved MB from file s from rows s  search ms filtered ms | in turns:   exact  compact FAISS own same top 10 same candidates
+   100000 exact         199.1     180.0         0.5        1.55      23.69         7.5
+          compact        88.0      59.6        0.35        3.96      25.87       25.35 |             23.79    26.24    131.77         1.0          0.9106
+  1000000 exact        1942.9    1800.0        5.22       19.48     198.69       63.41
+          compact       702.0     596.0        3.39       37.22     122.78       62.32 |            218.44   121.39    391.48         1.0             1.0
+
+written to /home/ripst/.cmeval/andre/out/scale-fix-rotation.json
+exit=0 2026-11-27T14:51:31Z
+=== fix: test suite (goal 5)
+........................................................................ [ 97%]
+......s........s...                                                      [100%]
+737 passed, 2 skipped, 4 deselected in 180.28s (0:03:00)
+exit=0 2026-11-27T14:54:33Z
+DONE 2026-11-27T14:54:33Z
