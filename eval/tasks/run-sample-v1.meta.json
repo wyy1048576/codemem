@@ -1,0 +1,348 @@
+{
+  "kind": "run-sample",
+  "seed": "runs-v1",
+  "plan": "docs/plan/runs.md section 3",
+  "draw": "per repo and tier: test split first, then dev; each group by the lowest sha256 of '<seed>:<repo>:<task id>'; the easy tier follows the label pattern medium, easy, medium, medium, easy, medium, again from the start after number 6",
+  "run_per_tier": {
+    "easy": 6,
+    "medium": 4,
+    "hard": 4
+  },
+  "medium_and_hard": 8,
+  "fair_rule": "status fair in e2e_screen.completion_set; reads with another content hash (with facts) are stale",
+  "stale_reads": 0,
+  "inputs": {
+    "task_files": [
+      {
+        "path": "tasks/e2e/airflow.jsonl",
+        "sha256": "59e61f83b42e7a16920850f492e14a9b9cee71d34efbb3c2d00f1cdf58c8c06e"
+      },
+      {
+        "path": "tasks/e2e/duckdb-large.jsonl",
+        "sha256": "429af85e91cbbba5001cde8bfcae7a61afb38fdc93873d238eeb594c065a72c1"
+      },
+      {
+        "path": "tasks/e2e/duckdb.jsonl",
+        "sha256": "501df858365a24e84c669f12e5b94efeffdd4a54725a4eec02ff78de27b13648"
+      },
+      {
+        "path": "tasks/e2e/homeassistant-large.jsonl",
+        "sha256": "d18f50722e5941fb80de4c3a651e624fa1d88e54dd6b994e8e71ee3b4a1cf87d"
+      },
+      {
+        "path": "tasks/e2e/homeassistant.jsonl",
+        "sha256": "7f7a84fab3a4b19fc4e01c72d4cbfac83b27df3cab9ca757ba3ebb9e6e55496e"
+      },
+      {
+        "path": "tasks/e2e/kubernetes-large.jsonl",
+        "sha256": "c933422856446fd04d0455f7052763833973eee0456d820fdb97418aa89a9c17"
+      },
+      {
+        "path": "tasks/e2e/kubernetes.jsonl",
+        "sha256": "8c80d8bc69474e1220e25b7d53e3ff85c8fe5fc6c2fea46b07affc0cf0c603f7"
+      },
+      {
+        "path": "tasks/e2e/pandas-large.jsonl",
+        "sha256": "bb7dbd38bc53a6bca31fee7895962701224e0e573c6b71f1a86f787bde0c2091"
+      },
+      {
+        "path": "tasks/e2e/pandas.jsonl",
+        "sha256": "d1808b2150009b6e386e67d09e45b397de83dfeff5ff2ba146f8c2b368704160"
+      },
+      {
+        "path": "tasks/e2e/playwright-large.jsonl",
+        "sha256": "64b55bff373d90d9d24b470fab07058222c201e02daeae91f493a12417c038d6"
+      },
+      {
+        "path": "tasks/e2e/playwright.jsonl",
+        "sha256": "b023cefedac60727740ff8f19cc76d05e520cfd64111f720cf8f704e4c390900"
+      },
+      {
+        "path": "tasks/e2e/ruff-large.jsonl",
+        "sha256": "3145d5c81bfa9fc2254c3eaf843738be3c87d3bc68877aefd0b5eb42480ad0a2"
+      },
+      {
+        "path": "tasks/e2e/ruff.jsonl",
+        "sha256": "3c616de157932cc295a4cfdde276dd6449487d516fc3ed5f40f292337b1c8052"
+      },
+      {
+        "path": "tasks/e2e/trino-large.jsonl",
+        "sha256": "90a4168d96c7415c2e7ade38c5ed209994931e6e738db8f72c7dadbf1c9d518f"
+      },
+      {
+        "path": "tasks/e2e/trino.jsonl",
+        "sha256": "4b3233e5b2a26bf8a82a17990de8a075b306ee1c3b5304f65c264832c20b3795"
+      },
+      {
+        "path": "tasks/e2e/vllm.jsonl",
+        "sha256": "baf524aba2d5c17d5f82cb581d61c4d4b576ec32bbbbd83d88c837037ab41143"
+      },
+      {
+        "path": "tasks/e2e/vscode-large.jsonl",
+        "sha256": "0ed10a66adea04c830153fe81beb3f10863cdb4e59df9b08b5265cb49cd0ef32"
+      },
+      {
+        "path": "tasks/e2e/vscode.jsonl",
+        "sha256": "8a8716a5e92ed32df3053bb3dc1b465fb1dd0f4b2f64b439b705bd849e2dad81"
+      }
+    ],
+    "screens": [
+      {
+        "path": "tasks/screen/b7.jsonl",
+        "sha256": "8f0ea5a709448db7da6b9d5ff5624f607794be9e61e7b3dcd7b25011a441fb66"
+      },
+      {
+        "path": "tasks/screen/b10a.jsonl",
+        "sha256": "8905a2a85a84d0b6174c94a3b9c66cefabe43a21d2cd322f54b495287df23548"
+      },
+      {
+        "path": "tasks/screen/ruff1.jsonl",
+        "sha256": "c6ef2831fac330b317433920b5e3ac16ff83d67f3e80cdad81b1abc2695567aa"
+      }
+    ],
+    "facts": [
+      {
+        "path": "tasks/screen/facts.jsonl",
+        "sha256": "3b9299b0c6d508aed3374ea7f84f1ad6a17b74194be7311eb11822538974de2f"
+      }
+    ],
+    "prompts": [
+      {
+        "path": "tasks/vague-b10a-v3.jsonl",
+        "sha256": "d7e1acc6b3815869a95e0d313314da016138d1dd272bf1d32243d60179cc9ade"
+      },
+      {
+        "path": "tasks/vague-b7-v3.jsonl",
+        "sha256": "1797ae6317aedfa9d96078e5b3bcd7fb844233cc073b18cb53ddc20d74857736"
+      }
+    ]
+  },
+  "repos": {
+    "astral-sh/ruff": {
+      "tiers": {
+        "easy": {
+          "fair": 10,
+          "target": 6,
+          "run": 6,
+          "spare": 4,
+          "test": 7,
+          "dev": 3,
+          "labels": {
+            "easy": 6,
+            "medium": 4
+          }
+        },
+        "medium": {
+          "fair": 3,
+          "target": 8,
+          "run": 3,
+          "spare": 0,
+          "test": 3,
+          "dev": 0,
+          "labels": {
+            "hard": 3
+          }
+        },
+        "hard": {
+          "fair": 0,
+          "target": 4,
+          "run": 0,
+          "spare": 0,
+          "test": 0,
+          "dev": 0,
+          "labels": {}
+        }
+      },
+      "run_without_prompts": [
+        "astral-sh__ruff-27689",
+        "astral-sh__ruff-26747",
+        "astral-sh__ruff-26716",
+        "astral-sh__ruff-27700",
+        "astral-sh__ruff-26631",
+        "astral-sh__ruff-26955",
+        "astral-sh__ruff-27053",
+        "astral-sh__ruff-27000",
+        "astral-sh__ruff-26628"
+      ],
+      "notes": [
+        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
+        "medium tier: 3 fair tasks, fewer than the target of 8; all of them are run",
+        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
+      ]
+    },
+    "duckdb/duckdb": {
+      "tiers": {
+        "easy": {
+          "fair": 30,
+          "target": 6,
+          "run": 6,
+          "spare": 24,
+          "test": 26,
+          "dev": 4,
+          "labels": {
+            "easy": 15,
+            "medium": 15
+          }
+        },
+        "medium": {
+          "fair": 11,
+          "target": 8,
+          "run": 8,
+          "spare": 3,
+          "test": 11,
+          "dev": 0,
+          "labels": {
+            "hard": 11
+          }
+        },
+        "hard": {
+          "fair": 0,
+          "target": 4,
+          "run": 0,
+          "spare": 0,
+          "test": 0,
+          "dev": 0,
+          "labels": {}
+        }
+      },
+      "run_without_prompts": [],
+      "notes": [
+        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
+        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
+      ]
+    },
+    "kubernetes/kubernetes": {
+      "tiers": {
+        "easy": {
+          "fair": 18,
+          "target": 6,
+          "run": 6,
+          "spare": 12,
+          "test": 13,
+          "dev": 5,
+          "labels": {
+            "easy": 13,
+            "medium": 5
+          }
+        },
+        "medium": {
+          "fair": 2,
+          "target": 8,
+          "run": 2,
+          "spare": 0,
+          "test": 0,
+          "dev": 2,
+          "labels": {
+            "hard": 2
+          }
+        },
+        "hard": {
+          "fair": 0,
+          "target": 4,
+          "run": 0,
+          "spare": 0,
+          "test": 0,
+          "dev": 0,
+          "labels": {}
+        }
+      },
+      "run_without_prompts": [],
+      "notes": [
+        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
+        "medium tier: 2 fair tasks, fewer than the target of 8; all of them are run",
+        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
+      ]
+    },
+    "microsoft/playwright": {
+      "tiers": {
+        "easy": {
+          "fair": 20,
+          "target": 6,
+          "run": 6,
+          "spare": 14,
+          "test": 16,
+          "dev": 4,
+          "labels": {
+            "easy": 11,
+            "medium": 9
+          }
+        },
+        "medium": {
+          "fair": 8,
+          "target": 8,
+          "run": 8,
+          "spare": 0,
+          "test": 7,
+          "dev": 1,
+          "labels": {
+            "hard": 8
+          }
+        },
+        "hard": {
+          "fair": 0,
+          "target": 4,
+          "run": 0,
+          "spare": 0,
+          "test": 0,
+          "dev": 0,
+          "labels": {}
+        }
+      },
+      "run_without_prompts": [],
+      "notes": [
+        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
+        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
+      ]
+    },
+    "pandas-dev/pandas": {
+      "tiers": {
+        "easy": {
+          "fair": 14,
+          "target": 6,
+          "run": 6,
+          "spare": 8,
+          "test": 12,
+          "dev": 2,
+          "labels": {
+            "easy": 9,
+            "medium": 5
+          }
+        },
+        "medium": {
+          "fair": 3,
+          "target": 8,
+          "run": 3,
+          "spare": 0,
+          "test": 3,
+          "dev": 0,
+          "labels": {
+            "hard": 3
+          }
+        },
+        "hard": {
+          "fair": 0,
+          "target": 4,
+          "run": 0,
+          "spare": 0,
+          "test": 0,
+          "dev": 0,
+          "labels": {}
+        }
+      },
+      "run_without_prompts": [],
+      "notes": [
+        "medium tier: the target is 8, because the hard tier runs 0 (medium and hard together are 8)",
+        "medium tier: 3 fair tasks, fewer than the target of 8; all of them are run",
+        "hard tier: 0 fair tasks, fewer than the target of 4; all of them are run"
+      ]
+    }
+  },
+  "rows": 119,
+  "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl",
+  "cmeval_version": "0.1.0",
+  "cmeval_git": {
+    "sha": "5e617e8d44ed78cfc81b64b660a1a8e92724b155",
+    "dirty": false
+  },
+  "created": "2026-11-27T10:38:41+00:00"
+}
