@@ -1,0 +1,596 @@
+{
+ "codemem": "09c4ef0",
+ "faiss": "1.16.0",
+ "faiss_threads": 16,
+ "machine": "x86_64 Linux-6.18.58.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+ "cpus": 16,
+ "memory_gb": 50.5,
+ "measured": "2026-11-26 21:51 -0800",
+ "index": "/home/ripst/.cmeval/e2e/indexes/pandas/pandas-dev__pandas-70742/index",
+ "index_db_bytes": 223789056,
+ "repo": "pandas-dev/pandas",
+ "tasks": "fresh-v1",
+ "questions": 352,
+ "splits": {
+  "test": 286,
+  "dev": 66
+ },
+ "vectors": {
+  "code": 41932,
+  "usage": 6419
+ },
+ "embedder": "jinaai/jina-code-embeddings-0.5b|doc|L1024|float16|cuda",
+ "settings": {
+  "faiss": {
+   "index": "faiss",
+   "why": "vector_backend = \"faiss\"",
+   "load_s": 0.81,
+   "memory_mb": {
+    "code": 77.8,
+    "usage": 11.9
+   },
+   "against_first": {
+    "dev": {
+     "questions": 66,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 11.45,
+      "usage": 1.64,
+      "search": 302.12
+     }
+    },
+    "test": {
+     "questions": 286,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 11.46,
+      "usage": 1.64,
+      "search": 305.12
+     }
+    },
+    "all": {
+     "questions": 352,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 11.46,
+      "usage": 1.64,
+      "search": 304.32
+     }
+    }
+   }
+  },
+  "auto": {
+   "index": "faiss",
+   "why": "auto: the exact index takes 90 MB, within the budget of 1,010 MB (2% of this machine's 50.5 GB)",
+   "load_s": 0.71,
+   "memory_mb": {
+    "code": 77.8,
+    "usage": 11.9
+   },
+   "against_first": {
+    "dev": {
+     "questions": 66,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 11.52,
+      "usage": 2.04,
+      "search": 306.08
+     }
+    },
+    "test": {
+     "questions": 286,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 11.46,
+      "usage": 1.66,
+      "search": 302.58
+     }
+    },
+    "all": {
+     "questions": 352,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 11.47,
+      "usage": 1.67,
+      "search": 303.42
+     }
+    }
+   }
+  },
+  "compact:bits=4,rescore=200": {
+   "index": "compact",
+   "why": "vector_backend = \"compact\"",
+   "load_s": 2.04,
+   "memory_mb": {
+    "code": 26.3,
+    "usage": 4.0
+   },
+   "against_first": {
+    "dev": {
+     "questions": 66,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 90.46,
+      "usage": 80.18,
+      "search": 443.72
+     }
+    },
+    "test": {
+     "questions": 286,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 88.42,
+      "usage": 80.79,
+      "search": 466.86
+     }
+    },
+    "all": {
+     "questions": 352,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 88.78,
+      "usage": 80.67,
+      "search": 462.48
+     }
+    }
+   }
+  },
+  "compact:bits=2,rescore=500": {
+   "index": "compact",
+   "why": "vector_backend = \"compact\"",
+   "load_s": 1.77,
+   "memory_mb": {
+    "code": 16.9,
+    "usage": 2.6
+   },
+   "against_first": {
+    "dev": {
+     "questions": 66,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 80.27,
+      "usage": 72.74,
+      "search": 429.14
+     }
+    },
+    "test": {
+     "questions": 286,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 82.06,
+      "usage": 69.64,
+      "search": 453.88
+     }
+    },
+    "all": {
+     "questions": 352,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 81.77,
+      "usage": 70.41,
+      "search": 450.13
+     }
+    }
+   }
+  },
+  "compact:bits=1,rescore=500": {
+   "index": "compact",
+   "why": "vector_backend = \"compact\"",
+   "load_s": 1.3,
+   "memory_mb": {
+    "code": 6.7,
+    "usage": 1.0
+   },
+   "against_first": {
+    "dev": {
+     "questions": 66,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 46.65,
+      "usage": 35.66,
+      "search": 370.5
+     }
+    },
+    "test": {
+     "questions": 286,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 0.9999,
+      "top10_differ": 0,
+      "worst_top50_overlap": 0.98
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 43.36,
+      "usage": 35.85,
+      "search": 387.63
+     }
+    },
+    "all": {
+     "questions": 352,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 0.9999,
+      "top10_differ": 0,
+      "worst_top50_overlap": 0.98
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 43.66,
+      "usage": 35.81,
+      "search": 384.83
+     }
+    }
+   }
+  },
+  "compact:bits=1,rescore=1000": {
+   "index": "compact",
+   "why": "vector_backend = \"compact\"",
+   "load_s": 1.23,
+   "memory_mb": {
+    "code": 6.7,
+    "usage": 1.0
+   },
+   "against_first": {
+    "dev": {
+     "questions": 66,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 58.75,
+      "usage": 51.38,
+      "search": 385.53
+     }
+    },
+    "test": {
+     "questions": 286,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 62.44,
+      "usage": 53.95,
+      "search": 410.43
+     }
+    },
+    "all": {
+     "questions": 352,
+     "code": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "usage": {
+      "top10_same_set": 1.0,
+      "top10_overlap": 1.0,
+      "top50_overlap": 1.0,
+      "top10_differ": 0,
+      "worst_top50_overlap": 1.0
+     },
+     "search": {
+      "same_10_in_order": 1.0,
+      "same_10_as_a_set": 1.0,
+      "differ": 0,
+      "questions_that_differ": []
+     },
+     "ms_p50": {
+      "code": 61.46,
+      "usage": 53.83,
+      "search": 404.9
+     }
+    }
+   }
+  }
+ },
+ "verdict": "PASS: auto and compact:bits=4,rescore=200 returned what the exact index returns, for every question"
+}
