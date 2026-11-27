@@ -1546,10 +1546,10 @@ It does not wait for the date.
 
 | Night of | Lane 1: seats | Lane 2: Docker | Lane 3: GPU | Lane 4: endpoint | Lane 5 |
 |---|---|---|---|---|---|
-| **Fri Nov 27** | 16:30 Pacific: codemem is frozen. 17:00: **the check run** ([runs.md](runs.md) §6), and its report. When it has passed, **repetition 1 of Haiku and of Sonnet** starts, repo by repo in the order of [runs.md](runs.md) §7, and runs unattended overnight | grading as runs finish. The hard tier of the repos that are run | index the tasks that are about to run, with the frozen codemem | — | the sample of each repo committed before its first run |
-| **Sat Nov 28:** reserved for running | repetition 1 goes on; then Opus; then repetitions 2 and 3 of Haiku start | grading; the hard tier, and the medium tier where a repo is short | index the hard tasks as they are ready | the open harness and the open models are expected to be ready: end to end with the 9B model, repetition 1 | a first report, after repetition 1 of the first two repos |
-| **Sun Nov 29:** reserved for running | repetitions 2 and 3 of Haiku; then kubernetes, once | grading | — | the 9B model: repetitions 2 and 3, and the probe; then the 27B model | the tables, per language and overall |
-| **Mon Nov 30** | only what is missing; repetitions 2 and 3 of Sonnet if time is left. No new run after 18:00 | grading | — | the 14B model, if the 27B is done; only what is missing | the final tables, by 23:59 |
+| **Fri Nov 27** | 16:30 Pacific: codemem is frozen. 17:00: **the check run** ([runs.md](runs.md) §6), and its report. When it has passed, **repetition 1 of Haiku** starts, repo by repo in the order of [runs.md](runs.md) §7, and runs unattended overnight | grading as runs finish. The hard tier of the repos that are run | index the tasks that are about to run, with the frozen codemem | — | the sample of each repo committed before its first run |
+| **Sat Nov 28:** reserved for running | repetition 1 of Haiku goes on; then repetition 1 of Sonnet, on its four repos | grading; the hard tier, and the medium tier where a repo is short | index the hard tasks as they are ready | the open harness and the open models are expected to be ready: end to end with the 9B model, repetition 1 | a first report, after repetition 1 of the first two repos |
+| **Sun Nov 29:** reserved for running | Sonnet's repetition 1 ends; Opus; then repetition 2 of Haiku | grading | — | the 9B model: repetitions 2 and 3, and the probe; then the 27B model | the tables, per language and overall |
+| **Mon Nov 30** | repetition 2 of Haiku, then its repetition 3 and Sonnet's repetitions as far as time allows. No new run after 18:00 | grading | — | the 14B model, if the 27B is done; only what is missing | the final tables, by 23:59 |
 
 **Nov 30, 23:59 is the freeze we aim for.** The hard limit is Dec 1, before the presentation at
 14:00, and that morning is for preparing the presentation, not for runs.

@@ -685,7 +685,7 @@ documents. Decide from that whether it is an extension of this paper or a second
 | 1 | Who takes which track | decided: A is Andrew's, B is Wilson's, C is Andre's ([CONTRIBUTING.md](../../CONTRIBUTING.md)) |
 | 2 | The order of the repos our tasks come from | pandas, playwright, ruff, kubernetes and duckdb for five languages, then home-assistant, vscode, airflow and vllm. A Java repo is a bonus ([track A](track-a-evals.md) §8.3). kafka cannot be collected, because its issues are not on GitHub; keycloak, quarkus and trino are the candidates *(probed by track A)*. Godot has 7 tasks with tests and stays in the retrieval eval only. llama.cpp is the reserve for C++ |
 | 3 | Where containers run | the team's x86 machine; a rented Linux machine if it is not free in time |
-| 4 | Which Claude model carries the main comparison | Haiku 5.5: every task of the sample, three repetitions. Sonnet 5.5 runs the same tasks once, and its repetitions are a bonus; Opus 5.5 runs a part of them ([runs.md](runs.md) §4) |
+| 4 | Which Claude model carries the main comparison | Haiku 5.5: every task of the sample, three repetitions. Sonnet 5.5 runs four of the repos once, and its repetitions are a bonus; Opus 5.5 runs a part of the tasks ([runs.md](runs.md) §4) |
 | 5 | Is agent localization in scope | yes: it needs no containers, and it is the measure small models need |
 | 6 | The small models | Qwen3.5-9B and Qwen3-14B, on our Macs |
 | 7 | The frozen reference | `codemem-today` = the current `main`, tagged on Nov 23 |

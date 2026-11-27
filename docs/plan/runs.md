@@ -43,9 +43,10 @@ task is run at all three levels.
 agent with codemem added; `upfront` is the same agent as `grep`, whose first message also holds the
 20 best results of one codemem search on the prompt, one line each (`path:line`, two spaces, the
 name), under the line "Possibly relevant code, from a search by meaning (it may be wrong):". No
-codemem tool is offered in `upfront`, and it runs at L1 and L2, not at L0. `tool` and `upfront`
-are both codemem: as a tool the agent may call, and with its results placed in the first message.
-The headline comparison is `grep` against codemem.
+codemem tool is offered in `upfront`. It is a run of its own, at L1 and L2, not at L0, and in the
+first repetition only (§4). `tool` and `upfront` are both codemem: as a tool the agent may call,
+and with its results placed in the first message. The headline comparison is `grep` against
+codemem.
 
 **A repetition** is the same run again, from the start. An agent's run has chance in it: in the
 pilot, two runs of one task that used the same tools differed by up to 8 times in tokens (2.14
@@ -111,21 +112,22 @@ short needs that many more in medium (§3).
 
 **What this size can show.** The unit of every comparison is the task: `grep` against each
 codemem setup on the same task, at one prompt level, with one model. `tool` is paired with `grep`
-at L0, L1 and L2, `upfront` at L1 and L2. The four repos that are run fully (§5) give 56 tasks, so
-56 pairs at each level, and kubernetes adds 14. The numbers below are planning numbers, under the
-assumptions of [track A](track-a-evals.md) §13: 75 pairs show a difference of 15% in tokens or
-time, and 150 pairs a difference of 10 points in tasks solved. With fewer pairs the difference has
-to be larger, by the square root of how many fewer.
+at L0, L1 and L2, `upfront` at L1 and L2. For Haiku the six repos that are run fully (§5) give 84
+tasks, so 84 pairs at each level, and kubernetes and trino add 28. Sonnet runs four repos: 56
+pairs. The numbers below are planning numbers, under the assumptions of
+[track A](track-a-evals.md) §13: 75 pairs show a difference of 15% in tokens or time, and 150 pairs
+a difference of 10 points in tasks solved. With fewer pairs the difference has to be larger, by
+the square root of how many fewer.
 
-| Comparison | Pairs in the four repos | What it can show | With kubernetes |
-|---|---|---|---|
-| all tasks, at one prompt level | 56 | a difference of about 17% in tokens or time; in tasks solved, only a difference of 16 points or more | 70 pairs: about 16%, and 15 points |
-| the easy tier | 24 | a difference of about 27% | 30 pairs: about 24% |
-| the medium or the hard tier | 16 | large differences only, about 32% | 20 pairs: about 29% |
-| one repo | 14 | a direction, not a result | |
-
-Opus runs 6 tasks of each repo (§4), 24 pairs in the four repos: it can show large differences
-only.
+| Comparison | Pairs | What it can show |
+|---|---|---|
+| Haiku, all tasks of the six repos, at one prompt level | 84 | a difference of about 14% in tokens or time; in tasks solved, only a difference of 13 points or more |
+| Haiku, with kubernetes and trino | 112 | about 12%, and 12 points |
+| Sonnet, its four repos | 56 | about 17%, and 16 points |
+| Haiku, the easy tier | 36 | a difference of about 22% |
+| Haiku, the medium or the hard tier | 24 | large differences only, about 27% |
+| Opus, its 6 tasks of each of the six repos | 36 | about 22% |
+| one repo | 14 | a direction, not a result |
 
 Tier and prompt level are two separate dimensions, and the sample covers both: every task of
 every tier is run at L0, L1 and L2.
@@ -138,8 +140,8 @@ Every model runs a part of the same sample, so that models are compared on the s
 
 | Model | Tasks of each repo | Prompts | Setups | Repetitions | Runs per repo |
 |---|---|---|---|---|---|
-| **Haiku** (the cheap tier) | all 14 | L0, L1, L2 | `grep`, `tool`; `upfront` at L1 and L2 | 3 | 112 for each repetition |
-| **Sonnet** (the middle tier) | all 14 | L0, L1, L2 | `grep`, `tool`; `upfront` at L1 and L2 | 3; repetitions 2 and 3 are a bonus | 112 for each repetition |
+| **Haiku** (the cheap tier) | all 14 | L0, L1, L2 | `grep`, `tool`; `upfront` at L1 and L2, in repetition 1 | 3 | 112 in repetition 1, 84 in repetitions 2 and 3 |
+| **Sonnet** (the middle tier), in four of the repos (§5) | all 14 | L0, L1, L2 | `grep`, `tool`; `upfront` at L1 and L2, in repetition 1 | 3; repetitions 2 and 3 are a bonus | 112 in repetition 1, 84 in repetitions 2 and 3 |
 | **Opus** (the top; few runs, because of their cost) | 6: number 1 of easy, number 1 of medium, and the 4 hard ones | L0, L2 | `grep`, `tool`; `upfront` at L2 | 1 | 30 |
 | **Open models:** the 9B first, then the 27B, then the 14B | the 6 easy ones | L0, L1 | `grep`, `tool` | 3 | 72 for each model |
 | **Open models, a probe** | 3: numbers 1 to 3 of medium | L0 | `grep`, `tool` | 1 | 6 for each model |
@@ -148,6 +150,14 @@ Every model runs a part of the same sample, so that models are compared on the s
   nearly every `tool` run. Sonnet and Opus rarely do. They are run to record how often they use
   it, and what `upfront` gives them: in `upfront`, codemem's results reach all three. Sonnet's
   repetitions 2 and 3 are a bonus (§7).
+- **Sonnet runs four of the repos:** pandas, duckdb, playwright and kubernetes. A model of its
+  size places many tasks from memory, so its runs go where that differs most. In a probe with no
+  repository and no tools, Sonnet named the right file first in 15 of 17 pandas tasks, 13 of 20
+  kubernetes tasks, 10 of 28 playwright tasks and 12 of 41 duckdb tasks. kubernetes is the very
+  large one of the four.
+- **`upfront` runs in the first repetition only.** It is a run of its own, 28 for a repo and a
+  model, and one repetition answers its two questions: what codemem's results give Sonnet and
+  Opus, and whether results in the first message cost Haiku less than the tool does.
 - The three Claude models are for the presentation. Codex is considered for the paper.
 - **The Claude runs go on Andrew's PC, and they come first there.**
 - **The open models run on a rented GPU** (Nebius), in their own harness, started by Andre. They
@@ -173,22 +183,22 @@ far each is run; §7 gives the order. Three things decide the rank:
 
 | Rank | Repo | Language | Issues that name the code | Why this rank | How far |
 |---|---|---|---|---|---|
-| 1 | pandas | Python | 57% | medium size; its tasks are ready; the check run (§6) starts here | fully |
+| 1 | pandas | Python | 57% | medium size; its tasks are ready; the check run (§6) starts here | fully, and Sonnet |
 | 2 | ruff | Rust | 8% | the vaguest issues of all: even L0 gives little to grep for | fully |
-| 3 | duckdb | C++ | 21% | vague issues, in C++ | fully |
-| 4 | playwright | TypeScript | 64% | its tasks are ready; medium size | fully |
-| 5 | vscode | TypeScript | 26% | very large and vague, with the most candidates for the hard tier: where an index should show most. Fifth only because its environment is the costliest: a long build, and tests that need a display | if time is left |
-| 6 | home-assistant | Python | 54% | very large, 18,700 Python files; the largest pool | if time is left |
-| 7 | kubernetes | Go | 55% | a fifth language, very large. The smallest pool of these: 86 candidates | Haiku and Sonnet, once, after Haiku's repetitions |
-| 8 | trino | Java | 27% | a sixth language. A small pool: 64 candidates | if time is left |
+| 3 | duckdb | C++ | 21% | vague issues, in C++ | fully, and Sonnet |
+| 4 | playwright | TypeScript | 64% | its tasks are ready; medium size | fully, and Sonnet |
+| 5 | vscode | TypeScript | 26% | very large and vague, with the most candidates for the hard tier: where an index should show most. Fifth only because its environment is the costliest: a long build, and tests that need a display | fully |
+| 6 | home-assistant | Python | 54% | very large, 18,700 Python files; the largest pool | fully |
+| 7 | kubernetes | Go | 55% | a fifth language, very large. The smallest pool of these: 86 candidates | once, and Sonnet |
+| 8 | trino | Java | 27% | a sixth language. A small pool: 64 candidates | once |
 | 9 | airflow | Python | 60% | a third Python repo | reserve |
 | 10 | vllm | Python | 76% | a fourth Python repo, with the issues that name the code most often | reserve |
 
-- **fully:** every row of §4, with Haiku's three repetitions. Sonnet's repetitions 2 and 3 are a
-  bonus.
-- **Haiku and Sonnet, once:** one repetition of Haiku and one of Sonnet on the repo's whole
-  sample, so that the language is in the table.
-- **if time is left:** run fully, but only after everything before it in §7 is done.
+- **fully:** Haiku's three repetitions, Opus's runs and the open models' (§4).
+- **once:** one repetition of Haiku on the repo's whole sample, so that the language is in the
+  table.
+- **and Sonnet:** the repo is one of Sonnet's four (§4): one repetition. Its repetitions 2 and 3
+  are a bonus, on the three of them that are run fully.
 - **reserve:** runs only in place of a repo above it that cannot be built.
 
 Every repo that is run has all three tiers.
@@ -202,7 +212,7 @@ Every fix in every pool was merged between July 1 and October 22, 2026.
 Before the batches are automated, one small batch shows that the whole chain works with the
 locked codemem, and that Haiku calls codemem.
 
-**What runs.** On pandas and on one more repo that is ready (playwright, or ruff if it is):
+**What runs.** On pandas and on playwright, which Haiku and Sonnet both run (§5):
 numbers 1 and 2 of easy and number 1 of medium, at L0 and at L2, in `grep` and `tool`, with Haiku
 and with Sonnet, once. That is 24 runs for each model, 48 in all, under two hours on three seats.
 
@@ -233,21 +243,22 @@ track C the index, before any more seats are spent.
 ## 7. The order
 
 1. the check run (§6);
-2. repetition 1 of Haiku and of Sonnet, on repos 1 to 4 in the order of their rank;
-3. Opus, on repos 1 to 4;
-4. repetitions 2 and 3 of Haiku, on repos 1 to 4: **the plan counts on reaching the end of this
-   step**;
-5. kubernetes, once, with Haiku and Sonnet;
-6. repetitions 2 and 3 of Sonnet, on repos 1 to 4: a bonus, and it is fine if this step is not
-   completed;
-7. vscode, home-assistant and trino, if time is left.
+2. **Haiku, repetition 1:** repos 1 to 6 in the order of their rank, then kubernetes and trino;
+3. **Sonnet, repetition 1:** its four repos, in the order of their rank;
+4. **Opus:** repos 1 to 6;
+5. **Haiku, repetition 2, then repetition 3:** repos 1 to 6 in the order of their rank. **The plan
+   counts on reaching the end of repetition 2;**
+6. **Sonnet, repetition 2, then repetition 3:** pandas, duckdb and playwright, in that order. A
+   bonus, and it is fine if this step is not completed.
 
 - **The hard tier comes later than the other two** (§10). Easy and medium do not wait for it.
   When a repo's hard tasks are ready, they are run for the steps that have passed, and are in
   step from then on.
-- **`upfront` joins a repo's runs as soon as the runner has it,** on the same tasks. It is run
-  for the steps that have passed, and is in step from then on.
-- A repo that is not ready when its turn comes is passed over and taken up when it is.
+- **`upfront` joins a repo's runs as soon as the runner has it,** on the same tasks. If a
+  model's repetition 1 of a repo has passed by then, its `upfront` runs are made next.
+- A repo that is not ready when its turn comes is passed over and taken up when it is. It then
+  starts at step 2, before further repetitions of the repos ahead of it: every repo is run once
+  before any is run again.
 - A batch that is cut short leaves a complete table with fewer repetitions, never a table with
   holes. The setups of a task go turn about in the same batch, and which of them goes first
   changes from task to task, so that their times can be compared.
@@ -258,25 +269,29 @@ track C the index, before any more seats are spent.
 
 | | Runs | On three seats, at 5 to 7 minutes a run |
 |---|---|---|
-| step 2: repetition 1 of Haiku and of Sonnet | 896, the 48 of the check run among them | 25 to 35 hours |
-| step 3: Opus | 120 | 3 to 5 hours |
-| step 4: repetitions 2 and 3 of Haiku | 896 | 25 to 35 hours |
-| steps 1 to 4 | 1,912 (Haiku 1,344, Sonnet 448, Opus 120) | 53 to 74 hours |
-| step 5: kubernetes, once | 224 | 6 to 9 hours |
-| step 6: repetitions 2 and 3 of Sonnet | 896 | 25 to 35 hours |
-| step 7: the repos run if time is left | not counted | |
-| the open models, on the rented GPU | 312 for each model, on the four repos that are run fully | about 5 hours for each model, if a run takes as long as a Claude run and six run at once |
+| step 2: Haiku, repetition 1, eight repos | 896, 24 of the check run among them | 25 to 35 hours |
+| step 3: Sonnet, repetition 1, four repos | 448, 24 of the check run among them | 12 to 17 hours |
+| step 4: Opus, six repos | 180 | 5 to 7 hours |
+| steps 1 to 4 | 1,524 (Haiku 896, Sonnet 448, Opus 180) | 42 to 59 hours |
+| step 5: Haiku, repetition 2 | 504 | 14 to 20 hours |
+| steps 1 to 4 and Haiku's repetition 2 | 2,028 | 56 to 79 hours |
+| step 5: Haiku, repetition 3 | 504 | 14 to 20 hours |
+| step 6: Sonnet, repetitions 2 and 3 | 252 each | 7 to 10 hours each |
+| the open models, on the rented GPU | 468 for each model, on the six repos that are run fully | about 8 hours for each model, if a run takes as long as a Claude run and six run at once |
 
 **What fits.** codemem is locked on Nov 27 at 16:30 Pacific. The runs start at 17:00 Pacific
 (Nov 28, 01:00 UTC), and the results are frozen on Nov 30 at 23:59 Pacific (Dec 1, 07:59 UTC):
-79 hours. Sat Nov 28 and Sun Nov 29 are reserved for running. Steps 1 to 4 take 53 to 74 of the
-79 hours without a pause, which leaves 5 to 26 hours for steps 5 to 7.
+79 hours. Sat Nov 28 and Sun Nov 29 are reserved for running. With 14 tasks in every repo and
+every repo ready, steps 1 to 4 take 42 to 59 of the 79 hours without a pause, and Haiku's
+repetition 2 brings that to 56 to 79. Its repetition 3 is complete only if a run takes less than
+about 5.6 minutes. A repo that is short of tasks, or not ready, takes less.
 
 - **The 5 to 7 minutes are an assumption.** The pilot measured 4.3 to 5.5 minutes for Haiku at
   L0. Nobody has measured Sonnet or Opus, vague prompts took more tokens in the pilot, and a
   task of the hard tier will take longer. The check run measures it.
-- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 4 are
-  what the presentation counts on, and steps 5 to 7 fill the time that is left, in that order.
+- **Usage limits are the unknown.** A seat pauses when it reaches its limit. So steps 1 to 4 and
+  Haiku's repetition 2 are what the presentation counts on, and the rest fills the time that is
+  left, in the order of §7.
 - Checking candidates, writing the L1 and L2 prompts and building the indexes come before a
   repo's runs and are not in these numbers.
 
