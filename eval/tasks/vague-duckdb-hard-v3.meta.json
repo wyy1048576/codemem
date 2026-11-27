@@ -1,0 +1,24 @@
+{
+ "name": "vague-duckdb-hard-v3",
+ "created": "2026-11-27",
+ "tasks": 4,
+ "rows": 8,
+ "levels": [
+  "L1",
+  "L2"
+ ],
+ "task_files": [
+  "tasks/e2e/duckdb-large.jsonl"
+ ],
+ "task_choice": "every duckdb hard-tier task that the screen of tasks/screen/hard-duckdb.jsonl calls fair (two reads that agree): 4 of 13 valid tasks",
+ "rules": "tasks/vague-rules-v3.md",
+ "rules_sha256": "8c3396a4eacfeee714112ca420224189708f8109aad0827e05cba426779c3011",
+ "writer": "one claude-opus-5-5 session on 2026-11-27, with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions",
+ "with_done_when": [],
+ "checks": {
+  "leak": "the writer searched its texts for the names it removed and for the changed names of the real fix. Then one claude-fable-5-2 session reviewed the 4 tasks against the issue, the real fix, the hidden tests and the screen notes: 3 ok, 1 row corrected (24150 L2: 'flat or nested' was a fact the issue does not state; its data has a nested column but no query on it). Its corrected text is used",
+  "solvable": "not done (plan section 9, check 2)",
+  "human": "not done (plan section 9, check 3)"
+ },
+ "sha256": "5cb680c45c5960e85044f3cadc81434f91d04bfb0f0c0957d13fb5f4e13b9c6f"
+}

@@ -128,6 +128,10 @@
         "sha256": "1797ae6317aedfa9d96078e5b3bcd7fb844233cc073b18cb53ddc20d74857736"
       },
       {
+        "path": "tasks/vague-duckdb-hard-v3.jsonl",
+        "sha256": "5cb680c45c5960e85044f3cadc81434f91d04bfb0f0c0957d13fb5f4e13b9c6f"
+      },
+      {
         "path": "tasks/vague-ruff1-v3.jsonl",
         "sha256": "7222a25c2f92bd5dcd161664733a52e730b97fe5ebbb650daab452578d8ca29d"
       }
@@ -213,12 +217,7 @@
           }
         }
       },
-      "run_without_prompts": [
-        "duckdb__duckdb-24805",
-        "duckdb__duckdb-23634",
-        "duckdb__duckdb-24150",
-        "duckdb__duckdb-23923"
-      ],
+      "run_without_prompts": [],
       "notes": []
     },
     "kubernetes/kubernetes": {
@@ -351,8 +350,8 @@
   "command": "cmeval e2e sample --seed runs-v1 --out tasks/run-sample-v1.jsonl --screen tasks/screen/b7.jsonl --screen tasks/screen/b10a.jsonl --screen tasks/screen/ruff1.jsonl --screen tasks/screen/hard-pandas.jsonl --screen tasks/screen/hard-duckdb.jsonl --screen tasks/screen/hard-playwright.jsonl --force",
   "cmeval_version": "0.1.0",
   "cmeval_git": {
-    "sha": "e36865c9d90d5431b13de30b300d652d1069039e",
+    "sha": "de3ec3550cf8a1cf0acd9e8ea24785f73b9e8169",
     "dirty": false
   },
-  "created": "2026-11-27T11:56:49+00:00"
+  "created": "2026-11-27T12:03:24+00:00"
 }

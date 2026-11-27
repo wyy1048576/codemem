@@ -52,10 +52,10 @@
 {"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23881", "tier": "medium", "label": "hard", "split": "test", "number": 9, "run": false, "has_prompts": true}
 {"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23920", "tier": "medium", "label": "hard", "split": "test", "number": 10, "run": false, "has_prompts": true}
 {"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24105", "tier": "medium", "label": "hard", "split": "test", "number": 11, "run": false, "has_prompts": true}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24805", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": false}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23634", "tier": "hard", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": false}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24150", "tier": "hard", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": false}
-{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23923", "tier": "hard", "label": "hard", "split": "dev", "number": 4, "run": true, "has_prompts": false}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24805", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23634", "tier": "hard", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-24150", "tier": "hard", "label": "hard", "split": "test", "number": 3, "run": true, "has_prompts": true}
+{"repo": "duckdb/duckdb", "id": "duckdb__duckdb-23923", "tier": "hard", "label": "hard", "split": "dev", "number": 4, "run": true, "has_prompts": true}
 {"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140607", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true}
 {"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140926", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true}
 {"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142138", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true}
