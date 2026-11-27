@@ -105,7 +105,7 @@
 {"repo": "microsoft/playwright", "id": "microsoft__playwright-43148", "tier": "medium", "label": "hard", "split": "test", "number": 7, "run": false, "has_prompts": true}
 {"repo": "microsoft/playwright", "id": "microsoft__playwright-43305", "tier": "medium", "label": "hard", "split": "dev", "number": 8, "run": false, "has_prompts": true}
 {"repo": "microsoft/playwright", "id": "microsoft__playwright-43482", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": false}
-{"repo": "microsoft/playwright", "id": "microsoft__playwright-43342", "tier": "hard", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": false}
+{"repo": "microsoft/playwright", "id": "microsoft__playwright-43342", "tier": "hard", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true}
 {"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68278", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true}
 {"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-68945", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true}
 {"repo": "pandas-dev/pandas", "id": "pandas-dev__pandas-69924", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true}

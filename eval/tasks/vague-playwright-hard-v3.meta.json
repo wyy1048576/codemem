@@ -1,0 +1,24 @@
+{
+ "name": "vague-playwright-hard-v3",
+ "created": "2026-11-27",
+ "tasks": 1,
+ "rows": 2,
+ "levels": [
+  "L1",
+  "L2"
+ ],
+ "task_files": [
+  "tasks/e2e/playwright-large.jsonl"
+ ],
+ "task_choice": "the first of the two playwright hard-tier tasks that the screen of tasks/screen/hard-playwright.jsonl calls fair (2 of 26 valid tasks). The two, 43342 and 43482, are fixes of one issue with one hidden test; only 43342 has prompts",
+ "rules": "tasks/vague-rules-v3.md",
+ "rules_sha256": "8c3396a4eacfeee714112ca420224189708f8109aad0827e05cba426779c3011",
+ "writer": "one claude-opus-5-5 session on 2026-11-27, with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions",
+ "with_done_when": [],
+ "checks": {
+  "leak": "the writer listed 78 names it removed (code names of the issue's cause section, the protocol event, action and field names, the context option for site logins, the repo's file paths, and every name that the real fix changes or adds) and searched both texts for each, case-insensitive and split into words. No hit of a repo name; the only hits were words of the issue's own reproduction script. It also replaced 'origin' and 'authentication' with plain words, because the first is a field of an existing option and the second is close to a method that the fix changes. No 'Done when' line: the fix adds no option, setting or message that a user would name. Then one claude-fable-5-2 session reviewed both rows against the issue, the hidden test and the screen notes: both ok, none corrected",
+  "solvable": "not done (plan section 9, check 2)",
+  "human": "not done (plan section 9, check 3)"
+ },
+ "sha256": "56f098466c07d90d3702bc6de16aa0d9c9fe8b7b7c3c3f1584d63f5f4b251f61"
+}
