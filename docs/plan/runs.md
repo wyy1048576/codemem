@@ -173,6 +173,9 @@ Every model runs a part of the same sample, so that models are compared on the s
 the agent first sees a gold file in a result, first opens one, and first edits one. The last
 three answer "did it reach the right place, and how fast", for the small models too.
 
+**The search made for the agent counts as one codemem search of the run,** and its results count as
+seen before the first turn. A `codemem` run's count of searches is that one and the agent's own.
+
 ---
 
 ## 5. The repos, ranked
