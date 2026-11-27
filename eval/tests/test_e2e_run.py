@@ -713,6 +713,7 @@ def _codemem_install(tmp_path, monkeypatch, recipe, task):
 
 def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
     monkeypatch.delenv("CMEVAL_CODEMEM_STEERING", raising=False)
+    monkeypatch.delenv("CMEVAL_CODEMEM_SEARCH_DEDUP", raising=False)
     recipe, task = gen.Recipe(name="r", repo="acme/auth", base_image="i", test="pytest"), make_task()
     checkout, python_root, hf, meta = _codemem_install(tmp_path, monkeypatch, recipe, task)
     codemem = e2e_run.codemem_preconditions(recipe, task, RunSettings(gpus=True))
@@ -733,6 +734,13 @@ def test_codemem_mcp_config(make_task, tmp_path, monkeypatch):
     assert env["CODEMEM_STEERING"] == "strong"
     monkeypatch.setenv("CMEVAL_CODEMEM_STEERING", "hard")
     with pytest.raises(gen.GenerateError, match="must be one of none, light, strong"):
+        e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4))
+    monkeypatch.delenv("CMEVAL_CODEMEM_STEERING")
+    monkeypatch.setenv("CMEVAL_CODEMEM_SEARCH_DEDUP", "refill")
+    env = e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4))["mcpServers"]["codemem"]["env"]
+    assert env["CODEMEM_SEARCH_DEDUP"] == "refill" and "CODEMEM_STEERING" not in env
+    monkeypatch.setenv("CMEVAL_CODEMEM_SEARCH_DEDUP", "on")
+    with pytest.raises(gen.GenerateError, match="must be one of off, shorten, refill"):
         e2e_run.codemem_mcp_config(codemem, RunSettings(cpus=4))
 
 

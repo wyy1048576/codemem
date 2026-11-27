@@ -20,26 +20,32 @@ def card_label(r: ResultCard) -> str:
     return r.qualname
 
 
+def format_card(r: ResultCard, i: int, *, debug: bool = False, preview: bool = True) -> list[str]:
+    """The lines of one result's card; `i` is its number on the page."""
+    head = f"{i}. {r.location}  {card_label(r)}  [id {r.chunk_id}]"
+    if r.best_lines:
+        head += f"  best {r.best_lines[0]}-{r.best_lines[1]}"
+    if debug and r.ranks is not None:
+        head += "  " + " ".join(f"{s}={rank}" for s, rank in sorted(r.ranks.items())) + f" rrf={r.score:.4f}"
+    out = [head]
+    if r.kind != "block":
+        out.append(f"   {r.signature}")
+    if r.doc:
+        out.append(f"   {r.doc}")
+    if preview and r.preview:
+        body = r.preview.splitlines()
+        if r.kind != "block" and not r.best_lines:
+            body = body[1:]  # first line repeats the signature/decorator
+        out.extend(f"   | {line}" for line in body[:6])
+    return out
+
+
 def format_results(resp: SearchResponse, *, debug: bool = False, preview: bool = True) -> str:
     if not resp.results:
         return f"No results for {resp.query!r}."
     out: list[str] = []
     for i, r in enumerate(resp.results, start=1):
-        head = f"{i}. {r.location}  {card_label(r)}  [id {r.chunk_id}]"
-        if r.best_lines:
-            head += f"  best {r.best_lines[0]}-{r.best_lines[1]}"
-        if debug and r.ranks is not None:
-            head += "  " + " ".join(f"{s}={rank}" for s, rank in sorted(r.ranks.items())) + f" rrf={r.score:.4f}"
-        out.append(head)
-        if r.kind != "block":
-            out.append(f"   {r.signature}")
-        if r.doc:
-            out.append(f"   {r.doc}")
-        if preview and r.preview:
-            body = r.preview.splitlines()
-            if r.kind != "block" and not r.best_lines:
-                body = body[1:]  # first line repeats the signature/decorator
-            out.extend(f"   | {line}" for line in body[:6])
+        out.extend(format_card(r, i, debug=debug, preview=preview))
     return "\n".join(out)
 
 

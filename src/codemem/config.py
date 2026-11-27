@@ -207,6 +207,12 @@ class Config:
     # multiplies the fused score of chunks of a kind; a config's table is merged over the defaults
     kind_weights: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_KIND_WEIGHTS))
     steering: str = "light"  # none | light | strong
+    # The MCP server's search_code, within one session (dedup.py): "off" (every result as a card, as
+    # always), "shorten" (a result the session was sent, unchanged, becomes one line), "refill" (as
+    # shorten, and the page goes deeper in the ranking until it has k full cards).
+    search_dedup: str = "off"
+    # A result sent this many tool calls ago or earlier counts as not sent (compaction, subagents). 0: never.
+    search_dedup_forget_calls: int = 10
     preview_lines: int = 12
     preview_chars: int = 800
     debounce_ms: int = 500  # start an update once saves stop for this long ...
@@ -460,6 +466,8 @@ def _env_overrides() -> dict[str, Any]:
         raw["device"] = dev
     if steering := os.environ.get("CODEMEM_STEERING"):
         raw["steering"] = steering
+    if dedup := os.environ.get("CODEMEM_SEARCH_DEDUP"):
+        raw["search_dedup"] = dedup
     if model := os.environ.get("CODEMEM_MODEL"):
         # Applies to every vec type; handy for `CODEMEM_MODEL=fake` in tests/dev.
         raw["vectors"] = {name: {"model": model} for name in _default_vectors()}
@@ -485,7 +493,8 @@ _FLAT_KEYS = (
     "candidates", "use_default_ignore", "skip_generated", "languages", "code_header", "window_chars",
     "window_overlap_lines", "max_block_lines", "vector_cache", "vector_cache_max_gb",
     "vector_cache_max_age_days", "vector_backend", "vector_memory_mb", "kinds", "test_weight", "kind_weights",
-    "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes",
+    "debounce_ms", "debounce_max_wait_ms", "catchup_budget_ms", "model_idle_minutes", "search_dedup",
+    "search_dedup_forget_calls",
 )
 
 
@@ -530,6 +539,10 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ValueError(f"dtype must be {'|'.join(DTYPES)}, got {cfg.dtype!r}")
     if cfg.steering not in {"none", "light", "strong"}:
         raise ValueError(f"steering must be none|light|strong, got {cfg.steering!r}")
+    if cfg.search_dedup not in {"off", "shorten", "refill"}:
+        raise ValueError(f"search_dedup must be off|shorten|refill, got {cfg.search_dedup!r}")
+    if isinstance(cfg.search_dedup_forget_calls, bool) or not isinstance(cfg.search_dedup_forget_calls, int) or cfg.search_dedup_forget_calls < 0:
+        raise ValueError(f"search_dedup_forget_calls must be a whole number, 0 or more, got {cfg.search_dedup_forget_calls!r}")
     if cfg.vector_cache not in {"global", "off"}:
         raise ValueError(f"vector_cache must be global|off, got {cfg.vector_cache!r}")
     if not isinstance(cfg.model_idle_minutes, (int, float)) or cfg.model_idle_minutes < 0:

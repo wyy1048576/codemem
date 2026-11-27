@@ -10,9 +10,10 @@ import logging
 import sys
 from pathlib import Path
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
 from . import __version__, prompts
+from .dedup import SessionMemory
 from .render import format_chunk, format_refresh, format_results, format_status, freshness_note
 from .schema import KINDS
 from .search import TEST_FILTERS
@@ -27,6 +28,8 @@ def build_server(service: CodememService) -> MCPServer:
     # client that shows that to the model shows the line ends as the two characters `\n`: code
     # previews then read as one escaped line.
     steering = service.config.steering
+    # One server process per agent session: what this session was sent (search_dedup, off by default).
+    memory = SessionMemory(service.config.search_dedup, service.config.search_dedup_forget_calls)
     server = MCPServer(
         name=prompts.SERVER_NAME,
         version=__version__,
@@ -38,7 +41,7 @@ def build_server(service: CodememService) -> MCPServer:
     )
     def search_code(
         query: str, k: int = 10, path_prefix: str | None = None, kinds: list[str] | None = None,
-        tests: str = "include",
+        tests: str = "include", ctx: Context | None = None,
     ) -> str:
         k = max(1, min(int(k), 50))
         if unknown := [kind for kind in kinds or [] if kind not in KINDS]:
@@ -55,8 +58,11 @@ def build_server(service: CodememService) -> MCPServer:
             return "The codemem index is not available yet." + (
                 f" Last error: {service.last_error}" if service.last_error else ""
             )
+        if memory.on:
+            memory.for_client(_client_of(ctx))
+        depth = memory.depth(k, query, path_prefix, kinds, tests) if memory.on else k
         resp = service.search(
-            query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
+            query, k=depth, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
         )
         fresh = resp.freshness
         if fresh is not None and fresh.unchecked_copy:
@@ -66,17 +72,27 @@ def build_server(service: CodememService) -> MCPServer:
             notes.append(prompts.vectors_unavailable_notice(resp.models_error) if resp.models_error else prompts.models_loading_notice())
         # Appended here, not in format_results: the eval builds its hit text from format_results.
         notes.append(prompts.search_footer(steering))
-        return notice + format_results(resp) + "".join(f"\n\n{n}" for n in notes if n)
+        if memory.on:  # one line for what this session was sent and is unchanged: dedup.py
+            current = (fresh is None or fresh.complete) and not resp.models_loading
+            body = memory.page(resp, k, service.store, current=current, path_prefix=path_prefix, kinds=kinds, tests=tests)
+        else:
+            body = format_results(resp)
+        return notice + body + "".join(f"\n\n{n}" for n in notes if n)
 
     @server.tool(
         name="get_chunk", description=prompts.tool_description("get_chunk", steering), structured_output=False
     )
-    def get_chunk(ref: str) -> str:
+    def get_chunk(ref: str, ctx: Context | None = None) -> str:
         d = service.get_chunk(ref)
         if d is None:
             missing = f"No indexed function matches {ref!r}. Use a chunk id, path:line, or path::qualname."
             # In a copy of another checkout's index, a function of this checkout may only be missing still.
             return f"{missing}\n\n{prompts.copy_notice()}" if service.copy_unchecked() else missing
+        if memory.on:  # never shortened; only recorded, so a later search can name it in one line
+            memory.for_client(_client_of(ctx))
+            chunk = service.store.get_chunk(d["chunk_id"])
+            if chunk is not None:
+                memory.got_chunk(chunk.key, chunk.content_hash, whole=d["code"] == chunk.code)
         return (prompts.copy_notice() + "\n\n" if d.get("unchecked_copy") else "") + format_chunk(d)
 
     @server.tool(
@@ -95,6 +111,16 @@ def build_server(service: CodememService) -> MCPServer:
         )
 
     return server
+
+
+def _client_of(ctx: Context | None) -> object:
+    """Which client this is: the name and version it gave in its `initialize` (the eval's gate is
+    "cmeval-gate", Claude Code another). The params object itself can be new on every request."""
+    try:
+        info = ctx.session.client_params.client_info
+        return (info.name, info.version)
+    except Exception:  # outside a request, or a client that gave no info: one client
+        return None
 
 
 def run_stdio(repo: Path | str | None = None, index_dir: Path | str | None = None) -> None:

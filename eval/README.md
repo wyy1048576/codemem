@@ -157,6 +157,8 @@ After a `tool` run, `integrity.codemem_fallback_searches` in `run.json` counts e
 
 codemem's tool texts have three steering levels (`none`, `light`, `strong`) that say how hard they push the agent to codemem. Set `CMEVAL_CODEMEM_STEERING` to use one of them for a batch; when it is not set, codemem uses its default. Do not mix levels in one run ID.
 
+`CMEVAL_CODEMEM_SEARCH_DEDUP` (`off`, `shorten`, `refill`) sets codemem's `search_dedup` for a batch: a later `search_code` of a session shows a result it was already sent, unchanged, as its head line and one line `(shown earlier ..., unchanged)`; `refill` also goes deeper so the page keeps `k` full cards. Unset, codemem uses its default (`off`). `run.json` records it under `identity.codemem.search_dedup`. Do not mix modes in one run ID.
+
 `run.json` of a `tool` run records the codemem commit, the program, the task's `index.json`, the steering level and the index size before and after the run (`identity.codemem`). `outcome.unexpected_paths` lists files of the agent's patch such as `.codemem*` or `.mcp.json`, which codemem should never write.
 
 ### Prompt levels

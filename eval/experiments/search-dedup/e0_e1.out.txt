@@ -1,0 +1,10 @@
+E0. Haiku sessions with the tool: 102 arms {'tool-q': 34, 'tool-v0': 34, 'tool': 34}
+ searches per session (4 = four or more): {1: 59, 2: 27, 3: 9, 4: 7}
+ sessions with 2+ searches: 43 | results of later searches: 536 | already sent in the session: 156 (29%)
+ later search finds a gold function the first missed: by name 4 | by the records' flag 13 of 43
+
+E1. shorten, replayed (Haiku tool sessions):
+ forget after never: search text 777,507 chars, saved 62,436 (8%); sessions that save: 39; new-text tokens saved 15,609, later cache-read tokens saved 56,028
+ forget after 10: search text 777,507 chars, saved 62,436 (8%); sessions that save: 39; new-text tokens saved 15,609, later cache-read tokens saved 56,028
+ forget after 3: search text 777,507 chars, saved 52,379 (7%); sessions that save: 36; new-text tokens saved 13,095, later cache-read tokens saved 47,089
+ Sonnet tool sessions: 34 with 2+ searches: 0
