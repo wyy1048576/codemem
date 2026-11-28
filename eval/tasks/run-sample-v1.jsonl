@@ -67,6 +67,7 @@
 {"repo": "home-assistant/core", "id": "home-assistant__core-182592", "tier": "easy", "label": "easy", "split": "test", "number": 9, "run": false, "has_prompts": true, "duplicate_of": null}
 {"repo": "home-assistant/core", "id": "home-assistant__core-182765", "tier": "medium", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
 {"repo": "home-assistant/core", "id": "home-assistant__core-184035", "tier": "medium", "label": "hard", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
+{"repo": "home-assistant/core", "id": "home-assistant__core-175759", "tier": "hard", "label": "hard", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
 {"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140607", "tier": "easy", "label": "medium", "split": "test", "number": 1, "run": true, "has_prompts": true, "duplicate_of": null}
 {"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-140926", "tier": "easy", "label": "easy", "split": "test", "number": 2, "run": true, "has_prompts": true, "duplicate_of": null}
 {"repo": "kubernetes/kubernetes", "id": "kubernetes__kubernetes-142138", "tier": "easy", "label": "medium", "split": "test", "number": 3, "run": true, "has_prompts": true, "duplicate_of": null}
