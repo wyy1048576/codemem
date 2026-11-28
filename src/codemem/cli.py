@@ -13,8 +13,7 @@ from . import __version__, agents
 from .config import SERVE_HOST, SERVE_KEY_ENV, SERVE_PORT, find_repo_root, load_config
 
 # .render, .embedder and .embedserver (and through them the search stack: numpy, faiss) are
-# imported inside the commands that need them, so that `codemem hook`, which runs on every Grep
-# and Glob, starts fast.
+# imported inside the commands that need them, so that the light commands start fast.
 
 
 def _progress_printer(enabled: bool):
@@ -86,7 +85,7 @@ def cmd_init(args) -> int:
     config = load_config(repo)
     names = [a.strip() for a in args.agents.split(",") if a.strip()] if args.agents else []
     actions = agents.plan(
-        repo, names, write_agent_notes=not args.no_agent_notes, write_hooks=args.write_hooks, steering=config.steering
+        repo, names, write_agent_notes=not args.no_agent_notes, steering=config.steering
     )
     print(f"repo: {repo}")
     for a in actions:
@@ -268,9 +267,12 @@ def cmd_mcp(args) -> int:
 
 
 def cmd_hook(args) -> int:
-    from .hook import run
-
-    return run(sys.stdin, sys.stdout)
+    """codemem no longer has Claude Code hooks. A `.claude/settings.json` written by an older
+    `init --write-hooks` still runs this command on every Grep, Glob and Read: it does nothing and
+    ends with 0, which Claude Code reads as "go on". An unknown command would end with 2, which
+    Claude Code reads as a refusal of the tool call. Remove those entries from the file."""
+    sys.stdin.read()
+    return 0
 
 
 def cmd_serve_embeddings(args) -> int:
@@ -332,10 +334,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     # The note used to be opt-in. The old flag is still accepted, so that existing commands run.
     sp.add_argument("--write-agent-notes", action="store_true", help=argparse.SUPPRESS)
-    sp.add_argument(
-        "--write-hooks", action="store_true",
-        help="Claude Code: add two hooks to .claude/settings.json that point the agent at search_code when it has no lead",
-    )
+    # The hooks are gone; the old flag is still accepted and does nothing, so that existing commands run.
+    sp.add_argument("--write-hooks", action="store_true", help=argparse.SUPPRESS)
     sp.add_argument("--dry-run", action="store_true", help="show what would be written")
     sp.add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
     sp.set_defaults(func=cmd_init)
@@ -385,7 +385,7 @@ def build_parser() -> argparse.ArgumentParser:
     common(sub.add_parser("mcp", help="MCP server over stdio (what agents launch)")).set_defaults(func=cmd_mcp)
     sub.add_parser("languages", help="list supported languages and file extensions").set_defaults(func=cmd_languages)
     sub.add_parser(
-        "hook", help="Claude Code hooks: point the agent at search_code when it has no lead (see the README)"
+        "hook", help="does nothing; kept so that hooks written by older versions do not refuse tool calls"
     ).set_defaults(func=cmd_hook)
     return p
 

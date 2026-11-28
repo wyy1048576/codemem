@@ -1287,6 +1287,20 @@ class Store:
         rows = self.conn.execute(f"SELECT {_CHUNK_COLS} FROM chunks WHERE path = ? ORDER BY start_line", (path,))
         return [_row_to_chunk(r) for r in rows]
 
+    def chunks_named(self, name: str) -> list[Chunk]:
+        """Every chunk whose own name (not qualified) is `name`."""
+        rows = self.conn.execute(f"SELECT {_CHUNK_COLS} FROM chunks WHERE name = ? ORDER BY path, start_line", (name,))
+        return [_row_to_chunk(r) for r in rows]
+
+    def paths_ending_with(self, tail: str, limit: int = 10) -> list[str]:
+        """Indexed file paths equal to `tail` or ending with `/<tail>` (at most `limit`)."""
+        escaped = tail.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        rows = self.conn.execute(
+            "SELECT DISTINCT path FROM chunks WHERE path = ? OR path LIKE ? ESCAPE '\\' ORDER BY path LIMIT ?",
+            (tail, f"%/{escaped}", limit),
+        )
+        return [r[0] for r in rows]
+
     def get_chunks(self, ids: Iterable[int]) -> dict[int, Chunk]:
         ids = list(ids)
         out: dict[int, Chunk] = {}
