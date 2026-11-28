@@ -1,0 +1,12 @@
+{
+ "run": "v3s1-v2t-68945-L2-haiku-r1",
+ "arm": "v2-tool",
+ "task": "pandas-dev__pandas-68945",
+ "level": "L2",
+ "model": "claude-haiku-5-5",
+ "cell": "v3s1-68945-L2-haiku",
+ "cd": true,
+ "block": "v3s1",
+ "rep": 1,
+ "src": "<codemem>/.cache/wt/compare-main/src"
+}

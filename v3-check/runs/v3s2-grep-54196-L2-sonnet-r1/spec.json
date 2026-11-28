@@ -1,0 +1,12 @@
+{
+ "run": "v3s2-grep-54196-L2-sonnet-r1",
+ "arm": "grep",
+ "task": "vllm-project__vllm-54196",
+ "level": "L2",
+ "model": "claude-sonnet-5-5",
+ "cell": "v3s2-54196-L2-sonnet",
+ "cd": true,
+ "block": "v3s2",
+ "rep": 1,
+ "src": null
+}

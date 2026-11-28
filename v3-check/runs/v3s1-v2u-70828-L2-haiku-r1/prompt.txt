@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/tests/extension/json/test_json.py:143  TestJSONArray.test_fillna_with_none
+pandas/tests/io/json/test_pandas.py:398  TestPandasContainer.test_frame_read_json_dtype_missing_value
+pandas/io/json/_json.py:1718  _is_default_filled
+pandas/tests/io/json/test_ujson.py:345  TestUltraJSONTests.test_encode_as_null
+pandas/_libs/src/vendored/ujson/python/ujson.c:347  object_is_na_type
+pandas/tests/tools/test_to_datetime.py:1611  TestToDatetime.test_to_datetime_converts_null_like_to_nat
+pandas/tests/io/parser/test_parse_dates.py:322  test_parse_dates_missing_value
+pandas/tests/extension/json/test_json.py:133  TestJSONArray.test_fillna_series
+pandas/_libs/src/vendored/ujson/python/ujson.c:325  object_is_nat_type
+pandas/tests/io/json/test_pandas.py:1436  TestPandasContainer.test_to_json_datetimelike_subclass_missing_creso
+pandas/tests/series/test_constructors.py:1222  TestSeriesConstructors.test_constructor_timedelta64_bigendian
+pandas/tests/io/json/test_pandas.py:1441  TestPandasContainer.test_to_json_datetimelike_subclass_missing_creso.Fake
+pandas/tests/io/json/test_pandas.py:2577  TestPandasContainer.test_read_json_nullable_series
+pandas/tests/tools/test_to_datetime.py:2245  TestToDatetimeUnit.test_round_float_to_datetime_oob_object_path
+pandas/_libs/missing.pyi:14  is_matching_na
+pandas/tests/arrays/arrow/test_datetimelike.py:750  test_dt_timedelta_components_negative_and_nulls
+pandas/core/series.py:7048  Series.dropna
+pandas/tests/io/json/test_pandas.py:2394  TestPandasContainer.test_json_pandas_nulls
+pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c:395  decode_null
+pandas/tests/io/json/test_pandas.py:2635  test_to_json_ea_null
+
+Reading a JSON object with only a null value as a Series turns the null into NaT; it should stay an ordinary missing value.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

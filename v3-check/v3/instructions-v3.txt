@@ -1,0 +1,7 @@
+codemem searches this repository by meaning: every function and class, with callers and tests.
+Call search_code, describing the behaviour in plain words:
+- for your first search on a task, before any grep or file listing, unless you already have a clear anchor: an exact function, class or file name, or an error string, that leads straight to the code. Fill in its intent, symptom and anchors from the task too;
+- whenever you lose the trail and don't know which direction to grep: a grep found nothing or too many files, or several searches in a row found no file worth opening.
+Once you have an exact name, path or error string, grep or read the file directly.
+- get_chunk(ref): read one result in full with its callers and callees.
+- refresh_index(): after git checkout, pull or rebase (the index follows your own edits).

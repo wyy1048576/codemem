@@ -1,0 +1,13 @@
+{
+ "_note": "reduced: codemem's tool definitions in full, other tools by name only, and codemem's server instructions if the request carried them",
+ "tools": [
+  {
+   "name": "Bash"
+  },
+  {
+   "name": "Read"
+  }
+ ],
+ "system": [],
+ "messages": []
+}

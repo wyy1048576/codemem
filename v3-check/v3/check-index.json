@@ -1,0 +1,774 @@
+{
+ "pandas-dev__pandas-70205": {
+  "v2": {
+   "commit": "463171c",
+   "seconds_to_handshake": 18.1,
+   "seconds_to_ready": 19.0,
+   "status_first": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 40063,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 41574,
+       "memory_mb": 77.2
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 6380,
+       "memory_mb": 11.8
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_ready": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 40063,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 41574,
+       "memory_mb": 77.2
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 6380,
+       "memory_mb": 11.8
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_after_search": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 40063,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 41574,
+       "memory_mb": 77.2
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 6380,
+       "memory_mb": 11.8
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "search_error": false,
+   "search_cards": 10,
+   "search_keyword_only": false,
+   "before": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 74833326,
+      "sha256": "749674b0bc1ea597"
+     },
+     "vec_code.json": {
+      "bytes": 273,
+      "sha256": "56bbf1362deb4b56"
+     },
+     "vec_usage.faiss": {
+      "bytes": 11484126,
+      "sha256": "9545ddd7186dbbd6"
+     },
+     "vec_usage.json": {
+      "bytes": 271,
+      "sha256": "c241e1bdc2c3799a"
+     }
+    },
+    "chunks": 40063,
+    "file_rows": 1615,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "meta": {
+     "dirty_seq": "1",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200, \"vector_backend\": \"faiss\"}",
+     "indexed_at": "1795716184.937591",
+     "last_scan_at": "1795716174.1477451",
+     "last_update": "{\"files_scanned\": 1615, \"files_changed\": 1615, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 40063, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 154487, \"relinked\": 40063, \"queued\": 40063, \"pending\": 0, \"embedded\": {\"code\": 41574, \"usage\": 6380}, \"model_embedded\": {\"code\": 111, \"usage\": 33}, \"reused\": {\"code\": 0, \"usage\": 0}, \"cache_hits\": {\"code\": 41463, \"usage\": 6347}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [\"pandas/_libs/include/pandas/moments.h\", \"pandas/_libs/include/pandas/datetime/pd_datetime.h\", \"pandas/_libs/include/pandas/parser/pd_parser.h\", \"pandas/_libs/include/pandas/parser/tokenizer.h\", \"pandas/_libs/include/pandas/vendored/klib/khash.h\", \"pandas/_libs/include/pandas/vendored/klib/khash_python.h\", \"pandas/_libs/include/pandas/vendored/ujson/lib/ultrajson.h\", \"pandas/_libs/src/datetime/pd_datetime.c\", \"pandas/_libs/src/parser/pd_parser.c\", \"pandas/_libs/src/parser/tokenizer.cpp\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsonenc.c\", \"pandas/_libs/src/vendored/ujson/python/ujson.c\"], \"timings\": {\"scan\": 0.30904258298687637, \"chunk\": 5.898957791971043, \"write_chunks\": 5.112589250085875, \"build_texts\": 4.155449123587459, \"write_vectors\": 2.799786748830229, \"embed\": 53.821980664273724, \"total\": 73.20109712495469}}",
+     "repo_path": "\"<codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo\"",
+     "schema_version": "4"
+    }
+   },
+   "after": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 74833326,
+      "sha256": "749674b0bc1ea597"
+     },
+     "vec_code.json": {
+      "bytes": 273,
+      "sha256": "56bbf1362deb4b56"
+     },
+     "vec_usage.faiss": {
+      "bytes": 11484126,
+      "sha256": "9545ddd7186dbbd6"
+     },
+     "vec_usage.json": {
+      "bytes": 271,
+      "sha256": "c241e1bdc2c3799a"
+     }
+    },
+    "chunks": 40063,
+    "file_rows": 1615,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "meta": {
+     "dirty_seq": "2",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200, \"vector_backend\": \"faiss\"}",
+     "indexed_at": "1795830826.9892092",
+     "last_scan_at": "1795830826.6743941",
+     "last_update": "{\"files_scanned\": 1615, \"files_changed\": 1615, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 40063, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 154487, \"relinked\": 40063, \"queued\": 40063, \"pending\": 0, \"embedded\": {\"code\": 41574, \"usage\": 6380}, \"model_embedded\": {\"code\": 111, \"usage\": 33}, \"reused\": {\"code\": 0, \"usage\": 0}, \"cache_hits\": {\"code\": 41463, \"usage\": 6347}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [\"pandas/_libs/include/pandas/moments.h\", \"pandas/_libs/include/pandas/datetime/pd_datetime.h\", \"pandas/_libs/include/pandas/parser/pd_parser.h\", \"pandas/_libs/include/pandas/parser/tokenizer.h\", \"pandas/_libs/include/pandas/vendored/klib/khash.h\", \"pandas/_libs/include/pandas/vendored/klib/khash_python.h\", \"pandas/_libs/include/pandas/vendored/ujson/lib/ultrajson.h\", \"pandas/_libs/src/datetime/pd_datetime.c\", \"pandas/_libs/src/parser/pd_parser.c\", \"pandas/_libs/src/parser/tokenizer.cpp\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsonenc.c\", \"pandas/_libs/src/vendored/ujson/python/ujson.c\"], \"timings\": {\"scan\": 0.30904258298687637, \"chunk\": 5.898957791971043, \"write_chunks\": 5.112589250085875, \"build_texts\": 4.155449123587459, \"write_vectors\": 2.799786748830229, \"embed\": 53.821980664273724, \"total\": 73.20109712495469}}",
+     "repo_path": "\"<codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo\"",
+     "schema_version": "4"
+    }
+   },
+   "same_search_files": true,
+   "same_counts": true,
+   "meta_changed": [
+    "dirty_seq",
+    "indexed_at",
+    "last_scan_at"
+   ],
+   "log_lines": [
+    "0.75 codemem INFO codemem MCP server for <codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo (index <codemem>/.cache/review/compare/idx/v3check-index-v2-70205)",
+    "0.75 codemem INFO watching <codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo",
+    "7.74 codemem INFO loading jinaai/jina-code-embeddings-0.5b on mps (float16)",
+    "7.76 codemem INFO Loading SentenceTransformer model from jinaai/jina-code-embeddings-0.5b.",
+    "8.05 codemem INFO Loaded 10 prompts with these keys: ['nl2code_query', 'nl2code_document', 'code2code_query', 'code2code_document', 'code2nl_query', 'code2nl_document', 'code2completion_query', 'code2completion_document', 'qa_query', 'qa_document']"
+   ]
+  },
+  "v3": {
+   "commit": "4902671",
+   "seconds_to_handshake": 17.5,
+   "seconds_to_ready": 18.3,
+   "status_first": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 40063,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 41574,
+       "memory_mb": 77.2
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 6380,
+       "memory_mb": 11.8
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_ready": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 40063,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 41574,
+       "memory_mb": 77.2
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 6380,
+       "memory_mb": 11.8
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_after_search": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 40063,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 41574,
+       "memory_mb": 77.2
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 6380,
+       "memory_mb": 11.8
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "search_error": false,
+   "search_cards": 10,
+   "search_keyword_only": false,
+   "before": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 74833326,
+      "sha256": "749674b0bc1ea597"
+     },
+     "vec_code.json": {
+      "bytes": 273,
+      "sha256": "56bbf1362deb4b56"
+     },
+     "vec_usage.faiss": {
+      "bytes": 11484126,
+      "sha256": "9545ddd7186dbbd6"
+     },
+     "vec_usage.json": {
+      "bytes": 271,
+      "sha256": "c241e1bdc2c3799a"
+     }
+    },
+    "chunks": 40063,
+    "file_rows": 1615,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "meta": {
+     "dirty_seq": "1",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200, \"vector_backend\": \"faiss\"}",
+     "indexed_at": "1795716184.937591",
+     "last_scan_at": "1795716174.1477451",
+     "last_update": "{\"files_scanned\": 1615, \"files_changed\": 1615, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 40063, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 154487, \"relinked\": 40063, \"queued\": 40063, \"pending\": 0, \"embedded\": {\"code\": 41574, \"usage\": 6380}, \"model_embedded\": {\"code\": 111, \"usage\": 33}, \"reused\": {\"code\": 0, \"usage\": 0}, \"cache_hits\": {\"code\": 41463, \"usage\": 6347}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [\"pandas/_libs/include/pandas/moments.h\", \"pandas/_libs/include/pandas/datetime/pd_datetime.h\", \"pandas/_libs/include/pandas/parser/pd_parser.h\", \"pandas/_libs/include/pandas/parser/tokenizer.h\", \"pandas/_libs/include/pandas/vendored/klib/khash.h\", \"pandas/_libs/include/pandas/vendored/klib/khash_python.h\", \"pandas/_libs/include/pandas/vendored/ujson/lib/ultrajson.h\", \"pandas/_libs/src/datetime/pd_datetime.c\", \"pandas/_libs/src/parser/pd_parser.c\", \"pandas/_libs/src/parser/tokenizer.cpp\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsonenc.c\", \"pandas/_libs/src/vendored/ujson/python/ujson.c\"], \"timings\": {\"scan\": 0.30904258298687637, \"chunk\": 5.898957791971043, \"write_chunks\": 5.112589250085875, \"build_texts\": 4.155449123587459, \"write_vectors\": 2.799786748830229, \"embed\": 53.821980664273724, \"total\": 73.20109712495469}}",
+     "repo_path": "\"<codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo\"",
+     "schema_version": "4"
+    }
+   },
+   "after": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 74833326,
+      "sha256": "749674b0bc1ea597"
+     },
+     "vec_code.json": {
+      "bytes": 273,
+      "sha256": "56bbf1362deb4b56"
+     },
+     "vec_usage.faiss": {
+      "bytes": 11484126,
+      "sha256": "9545ddd7186dbbd6"
+     },
+     "vec_usage.json": {
+      "bytes": 271,
+      "sha256": "c241e1bdc2c3799a"
+     }
+    },
+    "chunks": 40063,
+    "file_rows": 1615,
+    "vectors": {
+     "code": 41574,
+     "usage": 6380
+    },
+    "meta": {
+     "dirty_seq": "2",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200, \"vector_backend\": \"faiss\"}",
+     "indexed_at": "1795830864.369267",
+     "last_scan_at": "1795830864.054867",
+     "last_update": "{\"files_scanned\": 1615, \"files_changed\": 1615, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 40063, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 154487, \"relinked\": 40063, \"queued\": 40063, \"pending\": 0, \"embedded\": {\"code\": 41574, \"usage\": 6380}, \"model_embedded\": {\"code\": 111, \"usage\": 33}, \"reused\": {\"code\": 0, \"usage\": 0}, \"cache_hits\": {\"code\": 41463, \"usage\": 6347}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [\"pandas/_libs/include/pandas/moments.h\", \"pandas/_libs/include/pandas/datetime/pd_datetime.h\", \"pandas/_libs/include/pandas/parser/pd_parser.h\", \"pandas/_libs/include/pandas/parser/tokenizer.h\", \"pandas/_libs/include/pandas/vendored/klib/khash.h\", \"pandas/_libs/include/pandas/vendored/klib/khash_python.h\", \"pandas/_libs/include/pandas/vendored/ujson/lib/ultrajson.h\", \"pandas/_libs/src/datetime/pd_datetime.c\", \"pandas/_libs/src/parser/pd_parser.c\", \"pandas/_libs/src/parser/tokenizer.cpp\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c\", \"pandas/_libs/src/vendored/ujson/lib/ultrajsonenc.c\", \"pandas/_libs/src/vendored/ujson/python/ujson.c\"], \"timings\": {\"scan\": 0.30904258298687637, \"chunk\": 5.898957791971043, \"write_chunks\": 5.112589250085875, \"build_texts\": 4.155449123587459, \"write_vectors\": 2.799786748830229, \"embed\": 53.821980664273724, \"total\": 73.20109712495469}}",
+     "repo_path": "\"<codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo\"",
+     "schema_version": "4"
+    }
+   },
+   "same_search_files": true,
+   "same_counts": true,
+   "meta_changed": [
+    "dirty_seq",
+    "indexed_at",
+    "last_scan_at"
+   ],
+   "log_lines": [
+    "0.58 codemem INFO codemem MCP server for <codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo (index <codemem>/.cache/review/compare/idx/v3check-index-v3-70205)",
+    "0.58 codemem INFO watching <codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70205/repo",
+    "7.13 codemem INFO loading jinaai/jina-code-embeddings-0.5b on mps (float16)",
+    "7.14 codemem INFO Loading SentenceTransformer model from jinaai/jina-code-embeddings-0.5b.",
+    "7.42 codemem INFO Loaded 10 prompts with these keys: ['nl2code_query', 'nl2code_document', 'code2code_query', 'code2code_document', 'code2nl_query', 'code2nl_document', 'code2completion_query', 'code2completion_document', 'qa_query', 'qa_document']"
+   ]
+  }
+ },
+ "vllm-project__vllm-51573": {
+  "v2": {
+   "commit": "463171c",
+   "seconds_to_handshake": 18.6,
+   "seconds_to_ready": 21.7,
+   "status_first": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 102224,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 109562,
+       "memory_mb": 203.3
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 35167,
+       "memory_mb": 65.3
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_ready": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 102224,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 109562,
+       "memory_mb": 203.3
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 35167,
+       "memory_mb": 65.3
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_after_search": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 102224,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 109562,
+       "memory_mb": 203.3
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 35167,
+       "memory_mb": 65.3
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "search_error": false,
+   "search_cards": 10,
+   "search_keyword_only": false,
+   "before": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 197211726,
+      "sha256": "9b4d16fe9bbef0fb"
+     },
+     "vec_code.json": {
+      "bytes": 207,
+      "sha256": "265a6fee231d5b8a"
+     },
+     "vec_usage.faiss": {
+      "bytes": 63300726,
+      "sha256": "07d8395d8173f7db"
+     },
+     "vec_usage.json": {
+      "bytes": 207,
+      "sha256": "64772db94ecdd655"
+     }
+    },
+    "chunks": 102224,
+    "file_rows": 6236,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "meta": {
+     "dirty_seq": "5",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200}",
+     "indexed_at": "1795662352.8252292",
+     "last_scan_at": "1795662352.291007",
+     "last_update": "{\"files_scanned\": 6236, \"files_changed\": 0, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 0, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 305482, \"relinked\": 0, \"queued\": 0, \"pending\": 0, \"embedded\": {\"code\": 38296, \"usage\": 15078}, \"model_embedded\": {\"code\": 38295, \"usage\": 15077}, \"reused\": {\"code\": 1, \"usage\": 1}, \"cache_hits\": {\"code\": 0, \"usage\": 0}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [], \"timings\": {\"scan\": 0.45041766692884266, \"chunk\": 1.708976924419403e-06, \"write_chunks\": 0.23338733287528157, \"build_texts\": 7.795114453649148, \"embed\": 9326.24129296327, \"write_vectors\": 17.833655836060643, \"total\": 9360.964306124952}}",
+     "repo_path": "\"<codemem>/.cache/repos/vllm\"",
+     "schema_version": "4"
+    }
+   },
+   "after": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 197211726,
+      "sha256": "9b4d16fe9bbef0fb"
+     },
+     "vec_code.json": {
+      "bytes": 275,
+      "sha256": "b943521b9f569e03"
+     },
+     "vec_usage.faiss": {
+      "bytes": 63300726,
+      "sha256": "07d8395d8173f7db"
+     },
+     "vec_usage.json": {
+      "bytes": 275,
+      "sha256": "d894ff6c643f5fdc"
+     }
+    },
+    "chunks": 102224,
+    "file_rows": 6236,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "meta": {
+     "dirty_seq": "6",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200, \"vector_backend\": \"faiss\"}",
+     "indexed_at": "1795830902.885507",
+     "last_scan_at": "1795830901.834369",
+     "last_update": "{\"files_scanned\": 6236, \"files_changed\": 0, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 0, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 305482, \"relinked\": 0, \"queued\": 0, \"pending\": 0, \"embedded\": {\"code\": 38296, \"usage\": 15078}, \"model_embedded\": {\"code\": 38295, \"usage\": 15077}, \"reused\": {\"code\": 1, \"usage\": 1}, \"cache_hits\": {\"code\": 0, \"usage\": 0}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [], \"timings\": {\"scan\": 0.45041766692884266, \"chunk\": 1.708976924419403e-06, \"write_chunks\": 0.23338733287528157, \"build_texts\": 7.795114453649148, \"embed\": 9326.24129296327, \"write_vectors\": 17.833655836060643, \"total\": 9360.964306124952}}",
+     "repo_path": "\"<codemem>/.cache/review/compare/tasks/vllm-project__vllm-51573/repo\"",
+     "schema_version": "4"
+    }
+   },
+   "same_search_files": false,
+   "same_counts": true,
+   "meta_changed": [
+    "dirty_seq",
+    "index_settings",
+    "indexed_at",
+    "last_scan_at",
+    "repo_path"
+   ],
+   "log_lines": [
+    "0.64 codemem INFO codemem MCP server for <codemem>/.cache/review/compare/tasks/vllm-project__vllm-51573/repo (index <codemem>/.cache/review/compare/idx/v3check-index-v2-51573)",
+    "0.64 codemem INFO watching <codemem>/.cache/review/compare/tasks/vllm-project__vllm-51573/repo",
+    "8.29 codemem INFO loading jinaai/jina-code-embeddings-0.5b on mps (float16)",
+    "8.30 codemem INFO Loading SentenceTransformer model from jinaai/jina-code-embeddings-0.5b.",
+    "8.59 codemem INFO Loaded 10 prompts with these keys: ['nl2code_query', 'nl2code_document', 'code2code_query', 'code2code_document', 'code2nl_query', 'code2nl_document', 'code2completion_query', 'code2completion_document', 'qa_query', 'qa_document']"
+   ]
+  },
+  "v3": {
+   "commit": "4902671",
+   "seconds_to_handshake": 18.3,
+   "seconds_to_ready": 21.1,
+   "status_first": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 102224,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 109562,
+       "memory_mb": 203.3
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 35167,
+       "memory_mb": 65.3
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_ready": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 102224,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 109562,
+       "memory_mb": 203.3
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 35167,
+       "memory_mb": 65.3
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "status_after_search": {
+    "state": "ready",
+    "progress": null,
+    "chunks": 102224,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "models_loaded": true,
+    "search_index": {
+     "setting": "faiss",
+     "index": "faiss",
+     "why": "vector_backend = \"faiss\"",
+     "types": {
+      "code": {
+       "index": "faiss",
+       "vectors": 109562,
+       "memory_mb": 203.3
+      },
+      "usage": {
+       "index": "faiss",
+       "vectors": 35167,
+       "memory_mb": 65.3
+      }
+     }
+    },
+    "stale": {
+     "changed_files": 0,
+     "deleted_files": 0,
+     "head": null,
+     "head_moved": false
+    }
+   },
+   "search_error": false,
+   "search_cards": 10,
+   "search_keyword_only": false,
+   "before": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 197211726,
+      "sha256": "9b4d16fe9bbef0fb"
+     },
+     "vec_code.json": {
+      "bytes": 207,
+      "sha256": "265a6fee231d5b8a"
+     },
+     "vec_usage.faiss": {
+      "bytes": 63300726,
+      "sha256": "07d8395d8173f7db"
+     },
+     "vec_usage.json": {
+      "bytes": 207,
+      "sha256": "64772db94ecdd655"
+     }
+    },
+    "chunks": 102224,
+    "file_rows": 6236,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "meta": {
+     "dirty_seq": "5",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200}",
+     "indexed_at": "1795662352.8252292",
+     "last_scan_at": "1795662352.291007",
+     "last_update": "{\"files_scanned\": 6236, \"files_changed\": 0, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 0, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 305482, \"relinked\": 0, \"queued\": 0, \"pending\": 0, \"embedded\": {\"code\": 38296, \"usage\": 15078}, \"model_embedded\": {\"code\": 38295, \"usage\": 15077}, \"reused\": {\"code\": 1, \"usage\": 1}, \"cache_hits\": {\"code\": 0, \"usage\": 0}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [], \"timings\": {\"scan\": 0.45041766692884266, \"chunk\": 1.708976924419403e-06, \"write_chunks\": 0.23338733287528157, \"build_texts\": 7.795114453649148, \"embed\": 9326.24129296327, \"write_vectors\": 17.833655836060643, \"total\": 9360.964306124952}}",
+     "repo_path": "\"<codemem>/.cache/repos/vllm\"",
+     "schema_version": "4"
+    }
+   },
+   "after": {
+    "files": {
+     "vec_code.faiss": {
+      "bytes": 197211726,
+      "sha256": "9b4d16fe9bbef0fb"
+     },
+     "vec_code.json": {
+      "bytes": 275,
+      "sha256": "105959e039007465"
+     },
+     "vec_usage.faiss": {
+      "bytes": 63300726,
+      "sha256": "07d8395d8173f7db"
+     },
+     "vec_usage.json": {
+      "bytes": 275,
+      "sha256": "b608297f22a24026"
+     }
+    },
+    "chunks": 102224,
+    "file_rows": 6236,
+    "vectors": {
+     "code": 109562,
+     "usage": 35167
+    },
+    "meta": {
+     "dirty_seq": "6",
+     "index_settings": "{\"text_format\": 3, \"chunker\": 2, \"vectors\": {\"code\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}, \"usage\": {\"model\": \"jinaai/jina-code-embeddings-0.5b\"}}, \"embedding_dim\": null, \"dtype\": \"auto\", \"batch_size\": 16, \"max_seq_length\": 1024, \"bm25_stem\": false, \"bm25_stopwords\": false, \"max_defs_per_name\": 5, \"max_usage_items\": 20, \"include_commits\": false, \"max_file_size\": 10000000, \"ignore\": [], \"use_default_ignore\": true, \"skip_generated\": true, \"languages\": null, \"code_header\": true, \"window_chars\": 2976, \"window_overlap_lines\": 3, \"max_block_lines\": 200, \"vector_backend\": \"faiss\"}",
+     "indexed_at": "1795830945.480014",
+     "last_scan_at": "1795830944.6466749",
+     "last_update": "{\"files_scanned\": 6236, \"files_changed\": 0, \"files_deleted\": 0, \"files_skipped\": 0, \"chunks_added\": 0, \"chunks_updated\": 0, \"chunks_deleted\": 0, \"chunks_moved\": 0, \"edges\": 305482, \"relinked\": 0, \"queued\": 0, \"pending\": 0, \"embedded\": {\"code\": 38296, \"usage\": 15078}, \"model_embedded\": {\"code\": 38295, \"usage\": 15077}, \"reused\": {\"code\": 1, \"usage\": 1}, \"cache_hits\": {\"code\": 0, \"usage\": 0}, \"vectors_removed\": {}, \"errors\": [], \"parse_errors\": [], \"timings\": {\"scan\": 0.45041766692884266, \"chunk\": 1.708976924419403e-06, \"write_chunks\": 0.23338733287528157, \"build_texts\": 7.795114453649148, \"embed\": 9326.24129296327, \"write_vectors\": 17.833655836060643, \"total\": 9360.964306124952}}",
+     "repo_path": "\"<codemem>/.cache/review/compare/tasks/vllm-project__vllm-51573/repo\"",
+     "schema_version": "4"
+    }
+   },
+   "same_search_files": false,
+   "same_counts": true,
+   "meta_changed": [
+    "dirty_seq",
+    "index_settings",
+    "indexed_at",
+    "last_scan_at",
+    "repo_path"
+   ],
+   "log_lines": [
+    "0.62 codemem INFO codemem MCP server for <codemem>/.cache/review/compare/tasks/vllm-project__vllm-51573/repo (index <codemem>/.cache/review/compare/idx/v3check-index-v3-51573)",
+    "0.62 codemem INFO watching <codemem>/.cache/review/compare/tasks/vllm-project__vllm-51573/repo",
+    "7.93 codemem INFO loading jinaai/jina-code-embeddings-0.5b on mps (float16)",
+    "7.93 codemem INFO Loading SentenceTransformer model from jinaai/jina-code-embeddings-0.5b.",
+    "8.20 codemem INFO Loaded 10 prompts with these keys: ['nl2code_query', 'nl2code_document', 'code2code_query', 'code2code_document', 'code2nl_query', 'code2nl_document', 'code2completion_query', 'code2completion_document', 'qa_query', 'qa_document']"
+   ]
+  }
+ }
+}

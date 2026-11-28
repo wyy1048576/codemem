@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+rust/src/server/src/routes/tests.rs:76  request_output_with_stop_reason
+tests/entrypoints/scale_out/token_in_token_out/test_serving_tokens.py:486  test_stop_strings_rejected_when_tokens_only
+vllm/v1/core/sched/utils.py:98  check_stop
+rust/src/server/src/routes/openai/utils/types.rs:138  tests.validate_stop_rejects_more_than_four_stop_strings
+tests/detokenizer/test_stop_strings.py:74  _stop_partial_token
+rust/src/text/src/request.rs:359  tests.validate_rejects_empty_stop_string_at_shared_chokepoint
+vllm/sampling_params.py:1050  SamplingParams._validate_stop_token_ids
+rust/src/text/src/lower/token_ids.rs:43  validate_param
+rust/src/text/src/lower/token_ids.rs:108  validate_vocab_range
+tests/v1/core/test_scheduler.py:1777  test_check_stop_length_cap_below_min_tokens
+examples/features/structured_diffusion/structured_server.py:401  constrained_xargs
+rust/src/server/src/routes/openai/utils/types.rs:101  max_stop_strings
+rust/src/server/src/grpc/tests.rs:1181  unary_generate_accepts_request_larger_than_tonic_default
+rust/src/server/src/routes/inference/generate/validate.rs:223  tests.validate_request_compat_rejects_empty_token_ids
+rust/src/server/src/routes/openai/utils/types.rs:109  validate_stop
+tests/v1/structured_output/test_validation.py:58  test_structured_outputs_rejected_for_diffusion_models
+rust/src/server/src/error.rs:336  tests.out_of_vocab_validation_maps_to_invalid_request
+tests/entrypoints/scale_out/derender/test_derender_stream.py:2079  TestServingDerenderStreamValidation.test_chat_stop_strings_rejected
+rust/src/text/src/lower.rs:1340  tests.lower_sampling_params_rejects_out_of_vocab_stop_token_ids
+rust/src/server/src/routes/inference/generate/validate.rs:171  tests.validate_request_compat_rejects_stop_strings
+
+A request with a stop token id larger than the vocabulary crashes the whole engine. Such a request should be rejected with a clear error instead.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

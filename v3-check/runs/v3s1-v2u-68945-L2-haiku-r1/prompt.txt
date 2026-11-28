@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/core/arrays/categorical.py:658  Categorical._maybe_convert_categories
+pandas/io/parsers/base_parser.py:775  date_converter
+pandas/io/parsers/base_parser.py:586  ParserBase._do_date_conversions
+pandas/io/parsers/base_parser.py:579  ParserBase._do_date_conversions
+pandas/plotting/_matplotlib/converter.py:385  DatetimeConverter._convert_1d.try_parse
+pandas/core/arrays/categorical.py:770  Categorical._from_converted_categories
+pandas/io/parsers/base_parser.py:593  ParserBase._do_date_conversions
+pandas/core/arrays/categorical.py:785  Categorical._from_inferred_categories
+pandas/core/arrays/categorical.py:3260  _get_codes_for_values
+pandas/_libs/tslib.pyi:15  array_to_datetime
+asv_bench/benchmarks/categoricals.py:46  Constructor.time_datetimes
+pandas/core/arrays/datetimelike.py:324  DatetimeLikeArrayMixin._format_native_types
+pandas/core/arrays/datetimes.py:2790  objects_to_datetime64
+asv_bench/benchmarks/categoricals.py:108  AsType.astype_datetime
+pandas/core/arrays/datetimes.py:2621  _sequence_to_dt64
+pandas/core/indexes/base.py:2587  Index.has_duplicates
+asv_bench/benchmarks/categoricals.py:49  Constructor.time_interval
+pandas/tests/strings/test_extract.py:392  test_extract_single_group_returns_frame
+pandas/core/tools/datetimes.py:170  should_cache
+pandas/core/arrays/datetimes.py:2850  maybe_convert_dtype
+
+Converting a categorical of date strings to datetime values returns a categorical index once it has more than 50 values; it should always return datetime values.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

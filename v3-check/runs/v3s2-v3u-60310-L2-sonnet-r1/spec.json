@@ -1,0 +1,12 @@
+{
+ "run": "v3s2-v3u-60310-L2-sonnet-r1",
+ "arm": "v3",
+ "task": "vllm-project__vllm-60310",
+ "level": "L2",
+ "model": "claude-sonnet-5-5",
+ "cell": "v3s2-60310-L2-sonnet",
+ "cd": true,
+ "block": "v3s2",
+ "rep": 1,
+ "src": "<codemem>/.cache/wt/compare-pr85/src"
+}

@@ -1,0 +1,5 @@
+pandas' Series/DataFrame equality assertion crashes with an unhashable-list TypeError when object columns hold lists of different nesting. It should raise a normal assertion failure.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

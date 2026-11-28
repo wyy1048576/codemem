@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/core/groupby/ops.py:1066  BaseGrouper._reduceat_aggregate
+pandas/tests/groupby/test_timegrouper.py:793  TestGroupBy.test_first_last_max_min_on_time_data
+pandas/core/groupby/groupby.py:1531  GroupBy._cython_agg_general
+pandas/tests/groupby/methods/test_rank.py:555  test_rank_min_int
+pandas/core/series.py:2119  Series.groupby
+asv_bench/benchmarks/groupby.py:700  Cumulative.setup
+pandas/tests/groupby/test_cumulative.py:366  test_nullable_int_dtype_preserved_with_na_group_key
+pandas/core/groupby/groupby.py:1596  GroupBy._cython_transform
+pandas/core/window/rolling.py:3219  Rolling.rank
+pandas/tests/groupby/test_cumulative.py:166  test_cummin_max_all_nan_column
+pandas/core/generic.py:9775  NDFrame.rank
+pandas/core/groupby/generic.py:2507  DataFrameGroupBy._cython_transform
+pandas/tests/groupby/test_reductions.py:958  test_min_date_with_nans
+pandas/core/groupby/generic.py:798  SeriesGroupBy._cython_transform
+pandas/core/groupby/groupby.py:4698  GroupBy.rank
+pandas/tests/groupby/test_reductions.py:1082  test_groupby_min_max_nullable
+asv_bench/benchmarks/groupby.py:692  Cumulative
+pandas/core/groupby/groupby.py:5792  GroupBy._wrap_idxmax_idxmin
+pandas/tests/groupby/test_categorical.py:39  <block>
+pandas/core/groupby/groupby.py:1484  GroupBy._agg_py_fallback
+
+Group-by cumulative sum, min, max and rank give wrong results on datetime or timedelta columns when a group key is NaN. Please fix.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

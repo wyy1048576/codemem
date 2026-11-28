@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/core/generic.py:7588  NDFrame.bfill
+pandas/core/generic.py:7486  NDFrame.ffill
+pandas/core/internals/blocks.py:2033  EABackedBlock.pad_or_backfill
+pandas/core/internals/managers.py:555  BaseBlockManager.pad_or_backfill
+pandas/core/internals/blocks.py:1509  Block.pad_or_backfill
+pandas/core/groupby/groupby.py:4124  GroupBy.ffill
+pandas/core/arrays/base.py:1347  ExtensionArray._pad_or_backfill
+pandas/_libs/algos.pyi:92  backfill_2d_inplace
+pandas/core/groupby/groupby.py:4048  GroupBy._fill
+pandas/core/groupby/groupby.py:4219  GroupBy.bfill
+pandas/core/frame.py:13422  DataFrame.update
+pandas/core/generic.py:4540  NDFrame.reindex_like
+pandas/core/frame.py:281  DataFrame
+pandas/tests/copy_view/test_setitem.py:59  test_set_columns_with_dataframe
+asv_bench/benchmarks/frame_methods.py:460  Fillna.time_bfill
+asv_bench/benchmarks/frame_methods.py:457  Fillna.time_ffill
+pandas/tests/copy_view/test_methods.py:253  test_rename_columns_modify_parent
+pandas/tests/copy_view/test_methods.py:1496  test_unstack_multiblock
+pandas/core/generic.py:7204  NDFrame._pad_or_backfill
+pandas/core/internals/blocks.py:1536  Block.interpolate
+
+Forward/backward filling a DataFrame in place along the columns leaves it unchanged and returns a copy. Make it modify and return the original.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

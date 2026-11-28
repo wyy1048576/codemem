@@ -1,0 +1,3 @@
+{"run": "v3s1-v3t-69924-L2-haiku-r2", "moved_to": "v3s1-v3t-69924-L2-haiku-r2.discard-1795834986", "why": "the server died at the first search (the hold did not wait for the warm-up)", "time": "19:03:06"}
+{"run": "v3s2-v3u-56576-L2-haiku-r2", "moved_to": "v3s2-v3u-56576-L2-haiku-r2.discard-1795839645", "why": "the server died at the first search (the hold did not wait for the warm-up)", "time": "20:20:45"}
+{"run": "v3s2-v3u-51866-L2-haiku-r1", "moved_to": "v3s2-v3u-51866-L2-haiku-r1.discard-1795840207", "why": "the server died at the first search (the hold did not wait for the warm-up)", "time": "20:30:07"}

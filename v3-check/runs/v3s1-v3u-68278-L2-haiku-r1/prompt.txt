@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/core/generic.py:12477  NDFrame.ewm
+pandas/core/window/ewm.py:126  ExponentialMovingWindow
+pandas/core/window/online.py:13  generate_online_numba_ewma_func
+pandas/core/groupby/groupby.py:3906  GroupBy.ewm
+pandas/core/window/online.py:109  EWMMeanState.run_ewm
+pandas/core/window/online.py:40  generate_online_numba_ewma_func.online_ewma
+pandas/core/window/ewm.py:1121  OnlineExponentialMovingWindow.mean
+pandas/core/window/online.py:92  EWMMeanState
+pandas/core/window/ewm.py:536  ExponentialMovingWindow.mean
+pandas/core/window/ewm.py:1049  OnlineExponentialMovingWindow
+pandas/_libs/window/aggregations.pyi:139  ewm
+pandas/core/window/ewm.py:1015  ExponentialMovingWindowGroupBy
+pandas/core/groupby/groupby.py:3833  GroupBy.expanding
+pandas/core/window/numba_.py:113  generate_numba_ewm_func.ewm
+pandas/core/window/online.py:133  EWMMeanState.reset
+pandas/core/window/ewm.py:1089  OnlineExponentialMovingWindow.reset
+pandas/core/window/ewm.py:990  ExponentialMovingWindow.corr.cov_func._cov
+pandas/_libs/include/pandas/simd/moments_simd.hpp:97  pandas.moments.detail.accumulate_mean_direct
+pandas/core/window/expanding.py:42  Expanding
+asv_bench/benchmarks/rolling.py:378  TableMethod.time_ewm_mean
+
+The incremental exponentially weighted mean in pandas ignores the decay for single-column DataFrames and returns a plain cumulative mean. Please make it match the normal one.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

@@ -1,0 +1,5 @@
+Reading a JSON object with only a null value as a Series turns the null into NaT; it should stay an ordinary missing value.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

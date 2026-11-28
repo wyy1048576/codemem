@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+tests/entrypoints/cli/test_serve.py:35  test_headless_imports_reasoning_parser_plugin_before_engine_config.create_engine_config
+tests/entrypoints/cli/test_serve.py:17  test_headless_imports_reasoning_parser_plugin_before_engine_config
+vllm/reasoning/abs_reasoning_parsers.py:370  ReasoningParserManager.import_reasoning_parser
+vllm/reasoning/abs_reasoning_parsers.py:265  ReasoningParserManager._load_lazy_parser
+vllm/entrypoints/cli/serve.py:181  run_headless
+tests/reasoning/test_granite_thinking_reasoning_parser.py:447  _make_reasoning_parser._GraniteThinkingDelegating
+vllm/entrypoints/common/cli_args.py:576  init_parser_plugin
+rust/src/chat/src/lib.rs:310  ChatLlm.with_reasoning_parser
+rust/src/chat/src/parser/reasoning/mod.rs:53  ReasoningParserFactory.global
+tests/reasoning/test_kimi_k3_reasoning_parser.py:50  ReasoningOnlyParser
+rust/src/server/src/render.rs:164  tests.serve_render_rejects_unknown_parser_before_startup
+vllm/parser/parser_manager.py:56  ParserManager.get_reasoning_parser
+vllm/reasoning/abs_reasoning_parsers.py:260  ReasoningParserManager.list_registered
+vllm/reasoning/abs_reasoning_parsers.py:238  ReasoningParserManager.get_reasoning_parser
+vllm/parser/engine/adapters.py:56  ParserEngineReasoningAdapter._skip_tool_parsing
+tests/parser/test_streaming.py:633  Qwen3ReasoningNoToolParser
+vllm/reasoning/__init__.py:195  register_lazy_reasoning_parsers
+rust/src/chat/src/parser/reasoning/mod.rs:122  ReasoningParserFactory.register_parser
+tests/parser/engine/test_gemma4_streaming_reasoning.py:1402  TestBareThoughtWithoutChannelOpener
+vllm/reasoning/abs_reasoning_parsers.py:225  ReasoningParserManager
+
+A custom reasoning parser plugin is not loaded when the server starts in headless mode, so startup fails. It should be loaded as in normal mode.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

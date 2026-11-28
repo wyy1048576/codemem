@@ -1,0 +1,5 @@
+Converting a categorical of date strings to datetime values returns a categorical index once it has more than 50 values; it should always return datetime values.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

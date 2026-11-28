@@ -1,0 +1,560 @@
+{
+ "pandas-dev__pandas-70205": {
+  "rows": [
+   {
+    "run": "f1-v0-70205-L2-haiku",
+    "query": "read_excel multi-row header with index_col raises error while read_csv returns empty DataFrame",
+    "cards_v2": 10,
+    "cards_v3": 10,
+    "same_cards": true,
+    "same_text": true,
+    "chars_v2": 6701,
+    "chars_v3": 6701,
+    "diff_lines": []
+   },
+   {
+    "run": "g1-off-70205-L2-haiku",
+    "query": "read_excel with two-row header and index_col first column returns error while read_csv returns empty DataFrame",
+    "cards_v2": 10,
+    "cards_v3": 10,
+    "same_cards": true,
+    "same_text": true,
+    "chars_v2": 7608,
+    "chars_v3": 7608,
+    "diff_lines": []
+   },
+   {
+    "run": "g2-off-70205-L2-haiku",
+    "query": "read_excel multi-row header with index_col raises error when data is empty, CSV returns empty DataFrame",
+    "cards_v2": 10,
+    "cards_v3": 10,
+    "same_cards": true,
+    "same_text": true,
+    "chars_v2": 6578,
+    "chars_v3": 6578,
+    "diff_lines": []
+   }
+  ],
+  "texts": {
+   "v2": [
+    {
+     "query": "read_excel multi-row header with index_col raises error while read_csv returns empty DataFrame",
+     "text": "1. pandas/io/excel/_base.py:840-992  BaseExcelReader._parse_sheet  [id 11039]  best 935-992\n   def _parse_sheet( self, data: list[list[Any]], output: dict[Any, DataFrame], asheetname: str | int | None = None, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | Sequence[int] | None = None, usecols=None, dtype: DtypeArg | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, na_values=None, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, **kwds, ):\n   |                             data[row][col] = last\n   |                         else:\n   |                             last = data[row][col]\n   | \n   |         # GH 12292 : error when read one empty column from excel file\n   |         try:\n2. pandas/io/excel/_util.py:271-303  pop_header_name  [id 11160]\n   def pop_header_name( row: list[Hashable], index_col: int | Sequence[int] ) -> tuple[Hashable | None, list[Hashable]]:\n   Pop the header name for MultiIndex parsing.\n   |     row: list[Hashable], index_col: int | Sequence[int]\n   | ) -> tuple[Hashable | None, list[Hashable]]:\n   |     \"\"\"\n   |     Pop the header name for MultiIndex parsing.\n   | \n   |     Parameters\n3. pandas/io/excel/_base.py:166-560  read_excel  [id 11022]  best 231-280\n   def read_excel( io, sheet_name: str | int | list[IntStrT] | None = 0, *, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | str | Sequence[int] | None = None, usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = None, dtype: DtypeArg | None = None, engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = None, converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, na_values=None, keep_default_na: bool = True, na_filter: bool = True, verbose: bool = False, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, storage_options: StorageOptions | None = None, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, engine_kwargs: dict[str, Any] | None = None, ) -> DataFrame | dict[IntStrT, DataFrame]:\n   Read an Excel file into a ``DataFrame``.\n   |         * ``None``: Returns a dictionary containing DataFrames for each sheet.\n   | \n   |     header : int, list of int, default 0\n   |         Row (0-indexed) to use for the column labels of the parsed\n   |         DataFrame. If a list of integers is passed those row positions will\n   |         be combined into a ``MultiIndex``. Use None if there is no header.\n4. pandas/tests/io/excel/test_readers.py:1804-1818  TestExcelFileRead.test_header_with_index_col  [id 28072]\n   def test_header_with_index_col(self, filename): # GH 33476\n   |         \"ignore:The default engine for reading:pandas.errors.Pandas4Warning\"\n   |     )\n   |     @pytest.mark.parametrize(\"filename\", [\"df_empty.xlsx\", \"df_equals.xlsx\"])\n   |     def test_header_with_index_col(self, filename):\n   |         # GH 33476\n   |         idx = pd.Index([\"Z\"], name=\"I2\")\n5. pandas/io/excel/_base.py:676-738  BaseExcelReader._calc_rows  [id 11036]\n   def _calc_rows( self, header: int | Sequence[int] | None, index_col: int | Sequence[int] | None, skiprows: Sequence[int] | int | Callable[[int], object] | None, nrows: int | None, ) -> int | None:\n   If nrows specified, find the number of rows needed from the\n   |         self,\n   |         header: int | Sequence[int] | None,\n   |         index_col: int | Sequence[int] | None,\n   |         skiprows: Sequence[int] | int | Callable[[int], object] | None,\n   |         nrows: int | None,\n   |     ) -> int | None:\n6. pandas/tests/io/excel/test_readers.py:1498-1509  TestReaders.test_no_header_with_list_index_col  [id 28049]\n   def test_no_header_with_list_index_col(self, read_ext): # GH 31783\n   |         # GH 31783\n   |         file_name = \"testmultiindex\" + read_ext\n   |         data = [(\"B\", \"B\"), (\"key\", \"val\"), (3, 4), (3, 4)]\n   |         idx = pd.MultiIndex.from_tuples(\n   |             [(\"A\", \"A\"), (\"key\", \"val\"), (1, 2), (1, 2)], names=(0, 1)\n   |         )\n7. pandas/tests/io/excel/test_writers.py:94-108  TestRoundTrip.test_read_one_empty_col_no_header  [id 28104]\n   def test_read_one_empty_col_no_header(self, tmp_excel, header, expected): # xref gh-12292\n   |         \"header,expected\",\n   |         [(None, [np.nan] * 4), (0, {\"Unnamed: 0\": [np.nan] * 3})],\n   |     )\n   |     def test_read_one_empty_col_no_header(self, tmp_excel, header, expected):\n   |         # xref gh-12292\n   |         filename = \"no_header\"\n8. pandas/tests/io/excel/test_writers.py:110-123  TestRoundTrip.test_read_one_empty_col_with_header  [id 28105]\n   def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         \"header,expected_extra\",\n   |         [(None, [0]), (0, [])],\n   |     )\n   |     def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         filename = \"with_header\"\n   |         df = pd.DataFrame([[\"\", 1, 100], [\"\", 2, 200], [\"\", 3, 300], [\"\", 4, 400]])\n9. pandas/tests/io/excel/test_readers.py:474-483  TestReaders.test_index_col_empty  [id 27997]\n   def test_index_col_empty(self, read_ext): # see gh-9208\n   |         # see gh-9208\n   |         result = pd.read_excel(\n   |             \"test1\" + read_ext, sheet_name=\"Sheet3\", index_col=[\"A\", \"B\", \"C\"]\n   |         )\n   |         expected = pd.DataFrame(\n   |             columns=[\"D\", \"E\", \"F\"],\n10. pandas/tests/io/excel/test_openpyxl.py:481-492  test_read_multiindex_header_no_index_names  [id 27956]\n   def test_read_multiindex_header_no_index_names(datapath, ext): # GH#47487\n   |     # GH#47487\n   |     path = datapath(\"io\", \"data\", \"excel\", f\"multiindex_no_index_names{ext}\")\n   |     result = pd.read_excel(path, index_col=[0, 1, 2], header=[0, 1, 2])\n   |     expected = pd.DataFrame(\n   |         [[np.nan, \"x\", \"x\", \"x\"], [\"x\", np.nan, np.nan, np.nan]],\n   |         columns=pd.MultiIndex.from_tuples(\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "read_excel with two-row header and index_col first column returns error while read_csv returns empty DataFrame",
+     "text": "1. pandas/io/excel/_base.py:840-992  BaseExcelReader._parse_sheet  [id 11039]  best 935-992\n   def _parse_sheet( self, data: list[list[Any]], output: dict[Any, DataFrame], asheetname: str | int | None = None, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | Sequence[int] | None = None, usecols=None, dtype: DtypeArg | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, na_values=None, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, **kwds, ):\n   |                             data[row][col] = last\n   |                         else:\n   |                             last = data[row][col]\n   | \n   |         # GH 12292 : error when read one empty column from excel file\n   |         try:\n2. pandas/io/excel/_base.py:166-560  read_excel  [id 11022]  best 231-280\n   def read_excel( io, sheet_name: str | int | list[IntStrT] | None = 0, *, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | str | Sequence[int] | None = None, usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = None, dtype: DtypeArg | None = None, engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = None, converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, na_values=None, keep_default_na: bool = True, na_filter: bool = True, verbose: bool = False, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, storage_options: StorageOptions | None = None, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, engine_kwargs: dict[str, Any] | None = None, ) -> DataFrame | dict[IntStrT, DataFrame]:\n   Read an Excel file into a ``DataFrame``.\n   |     names : array-like, default None\n   |         List of column names to use. If file contains no header row,\n   |         then you should explicitly pass header=None.\n   |     index_col : int, str, list of int, default None\n   |         Column (0-indexed) to use as the row labels of the DataFrame.\n   |         Pass None if there is no such column.  If a list is passed,\n3. pandas/io/excel/_util.py:271-303  pop_header_name  [id 11160]\n   def pop_header_name( row: list[Hashable], index_col: int | Sequence[int] ) -> tuple[Hashable | None, list[Hashable]]:\n   Pop the header name for MultiIndex parsing.\n   |     row: list[Hashable], index_col: int | Sequence[int]\n   | ) -> tuple[Hashable | None, list[Hashable]]:\n   |     \"\"\"\n   |     Pop the header name for MultiIndex parsing.\n   | \n   |     Parameters\n4. pandas/io/excel/_base.py:127-163  read_excel  [id 11021]\n   def read_excel( io, # sheet name is list or None -> dict[IntStrT, DataFrame] sheet_name: list[IntStrT] | None, *, header: int | Sequence[int] | None = ..., names: SequenceNotStr[Hashable] | range | None = ..., index_col: int | str | Sequence[int] | None = ..., usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = ..., dtype: DtypeArg | None = ..., engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = ..., converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = ..., true_values: Iterable[Hashable] | None = ..., false_values: Iterable[Hashable] | None = ..., skiprows: Sequence[int] | int | Callable[[int], object] | None = ..., nrows: int | None = ..., na_values=..., keep_default_na: bool = ..., na_filter: bool = ..., verbose: bool = ..., parse_dates: list[Hashable] | bool = ..., date_format: dict[Hashable, str] | str | None = ..., thousands: str | None = ..., decimal: str = ..., comment: str | None = ..., skipfooter: int = ..., storage_options: StorageOptions = ..., dtype_backend: DtypeBackend | lib.NoDefault = ..., ) -> dict[IntStrT, DataFrame]:\n   | def read_excel(\n   |     io,\n   |     # sheet name is list or None -> dict[IntStrT, DataFrame]\n   |     sheet_name: list[IntStrT] | None,\n   |     *,\n   |     header: int | Sequence[int] | None = ...,\n5. pandas/io/excel/_base.py:676-738  BaseExcelReader._calc_rows  [id 11036]\n   def _calc_rows( self, header: int | Sequence[int] | None, index_col: int | Sequence[int] | None, skiprows: Sequence[int] | int | Callable[[int], object] | None, nrows: int | None, ) -> int | None:\n   If nrows specified, find the number of rows needed from the\n   |         self,\n   |         header: int | Sequence[int] | None,\n   |         index_col: int | Sequence[int] | None,\n   |         skiprows: Sequence[int] | int | Callable[[int], object] | None,\n   |         nrows: int | None,\n   |     ) -> int | None:\n6. pandas/tests/io/excel/test_readers.py:1804-1818  TestExcelFileRead.test_header_with_index_col  [id 28072]\n   def test_header_with_index_col(self, filename): # GH 33476\n   |         \"ignore:The default engine for reading:pandas.errors.Pandas4Warning\"\n   |     )\n   |     @pytest.mark.parametrize(\"filename\", [\"df_empty.xlsx\", \"df_equals.xlsx\"])\n   |     def test_header_with_index_col(self, filename):\n   |         # GH 33476\n   |         idx = pd.Index([\"Z\"], name=\"I2\")\n7. pandas/tests/io/excel/test_writers.py:94-108  TestRoundTrip.test_read_one_empty_col_no_header  [id 28104]\n   def test_read_one_empty_col_no_header(self, tmp_excel, header, expected): # xref gh-12292\n   |         \"header,expected\",\n   |         [(None, [np.nan] * 4), (0, {\"Unnamed: 0\": [np.nan] * 3})],\n   |     )\n   |     def test_read_one_empty_col_no_header(self, tmp_excel, header, expected):\n   |         # xref gh-12292\n   |         filename = \"no_header\"\n8. pandas/tests/io/excel/test_writers.py:110-123  TestRoundTrip.test_read_one_empty_col_with_header  [id 28105]\n   def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         \"header,expected_extra\",\n   |         [(None, [0]), (0, [])],\n   |     )\n   |     def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         filename = \"with_header\"\n   |         df = pd.DataFrame([[\"\", 1, 100], [\"\", 2, 200], [\"\", 3, 300], [\"\", 4, 400]])\n9. pandas/tests/io/excel/test_readers.py:1498-1509  TestReaders.test_no_header_with_list_index_col  [id 28049]\n   def test_no_header_with_list_index_col(self, read_ext): # GH 31783\n   |         # GH 31783\n   |         file_name = \"testmultiindex\" + read_ext\n   |         data = [(\"B\", \"B\"), (\"key\", \"val\"), (3, 4), (3, 4)]\n   |         idx = pd.MultiIndex.from_tuples(\n   |             [(\"A\", \"A\"), (\"key\", \"val\"), (1, 2), (1, 2)], names=(0, 1)\n   |         )\n10. pandas/tests/io/excel/test_readers.py:474-483  TestReaders.test_index_col_empty  [id 27997]\n   def test_index_col_empty(self, read_ext): # see gh-9208\n   |         # see gh-9208\n   |         result = pd.read_excel(\n   |             \"test1\" + read_ext, sheet_name=\"Sheet3\", index_col=[\"A\", \"B\", \"C\"]\n   |         )\n   |         expected = pd.DataFrame(\n   |             columns=[\"D\", \"E\", \"F\"],\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "read_excel multi-row header with index_col raises error when data is empty, CSV returns empty DataFrame",
+     "text": "1. pandas/io/excel/_base.py:840-992  BaseExcelReader._parse_sheet  [id 11039]  best 935-992\n   def _parse_sheet( self, data: list[list[Any]], output: dict[Any, DataFrame], asheetname: str | int | None = None, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | Sequence[int] | None = None, usecols=None, dtype: DtypeArg | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, na_values=None, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, **kwds, ):\n   |                             data[row][col] = last\n   |                         else:\n   |                             last = data[row][col]\n   | \n   |         # GH 12292 : error when read one empty column from excel file\n   |         try:\n2. pandas/io/excel/_base.py:166-560  read_excel  [id 11022]  best 231-280\n   def read_excel( io, sheet_name: str | int | list[IntStrT] | None = 0, *, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | str | Sequence[int] | None = None, usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = None, dtype: DtypeArg | None = None, engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = None, converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, na_values=None, keep_default_na: bool = True, na_filter: bool = True, verbose: bool = False, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, storage_options: StorageOptions | None = None, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, engine_kwargs: dict[str, Any] | None = None, ) -> DataFrame | dict[IntStrT, DataFrame]:\n   Read an Excel file into a ``DataFrame``.\n   |         * ``None``: Returns a dictionary containing DataFrames for each sheet.\n   | \n   |     header : int, list of int, default 0\n   |         Row (0-indexed) to use for the column labels of the parsed\n   |         DataFrame. If a list of integers is passed those row positions will\n   |         be combined into a ``MultiIndex``. Use None if there is no header.\n3. pandas/tests/io/excel/test_readers.py:1804-1818  TestExcelFileRead.test_header_with_index_col  [id 28072]\n   def test_header_with_index_col(self, filename): # GH 33476\n   |         \"ignore:The default engine for reading:pandas.errors.Pandas4Warning\"\n   |     )\n   |     @pytest.mark.parametrize(\"filename\", [\"df_empty.xlsx\", \"df_equals.xlsx\"])\n   |     def test_header_with_index_col(self, filename):\n   |         # GH 33476\n   |         idx = pd.Index([\"Z\"], name=\"I2\")\n4. pandas/io/excel/_base.py:676-738  BaseExcelReader._calc_rows  [id 11036]\n   def _calc_rows( self, header: int | Sequence[int] | None, index_col: int | Sequence[int] | None, skiprows: Sequence[int] | int | Callable[[int], object] | None, nrows: int | None, ) -> int | None:\n   If nrows specified, find the number of rows needed from the\n   |         self,\n   |         header: int | Sequence[int] | None,\n   |         index_col: int | Sequence[int] | None,\n   |         skiprows: Sequence[int] | int | Callable[[int], object] | None,\n   |         nrows: int | None,\n   |     ) -> int | None:\n5. pandas/io/excel/_util.py:271-303  pop_header_name  [id 11160]\n   def pop_header_name( row: list[Hashable], index_col: int | Sequence[int] ) -> tuple[Hashable | None, list[Hashable]]:\n   Pop the header name for MultiIndex parsing.\n   |     row: list[Hashable], index_col: int | Sequence[int]\n   | ) -> tuple[Hashable | None, list[Hashable]]:\n   |     \"\"\"\n   |     Pop the header name for MultiIndex parsing.\n   | \n   |     Parameters\n6. pandas/tests/io/excel/test_readers.py:1498-1509  TestReaders.test_no_header_with_list_index_col  [id 28049]\n   def test_no_header_with_list_index_col(self, read_ext): # GH 31783\n   |         # GH 31783\n   |         file_name = \"testmultiindex\" + read_ext\n   |         data = [(\"B\", \"B\"), (\"key\", \"val\"), (3, 4), (3, 4)]\n   |         idx = pd.MultiIndex.from_tuples(\n   |             [(\"A\", \"A\"), (\"key\", \"val\"), (1, 2), (1, 2)], names=(0, 1)\n   |         )\n7. pandas/tests/io/excel/test_writers.py:94-108  TestRoundTrip.test_read_one_empty_col_no_header  [id 28104]\n   def test_read_one_empty_col_no_header(self, tmp_excel, header, expected): # xref gh-12292\n   |         \"header,expected\",\n   |         [(None, [np.nan] * 4), (0, {\"Unnamed: 0\": [np.nan] * 3})],\n   |     )\n   |     def test_read_one_empty_col_no_header(self, tmp_excel, header, expected):\n   |         # xref gh-12292\n   |         filename = \"no_header\"\n8. pandas/tests/io/excel/test_writers.py:110-123  TestRoundTrip.test_read_one_empty_col_with_header  [id 28105]\n   def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         \"header,expected_extra\",\n   |         [(None, [0]), (0, [])],\n   |     )\n   |     def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         filename = \"with_header\"\n   |         df = pd.DataFrame([[\"\", 1, 100], [\"\", 2, 200], [\"\", 3, 300], [\"\", 4, 400]])\n9. pandas/tests/io/excel/test_readers.py:474-483  TestReaders.test_index_col_empty  [id 27997]\n   def test_index_col_empty(self, read_ext): # see gh-9208\n   |         # see gh-9208\n   |         result = pd.read_excel(\n   |             \"test1\" + read_ext, sheet_name=\"Sheet3\", index_col=[\"A\", \"B\", \"C\"]\n   |         )\n   |         expected = pd.DataFrame(\n   |             columns=[\"D\", \"E\", \"F\"],\n10. pandas/errors/__init__.py:391-413  EmptyDataError  [id 10228]\n   class EmptyDataError(ValueError):\n   Exception raised in ``pd.read_csv`` when empty data or header is encountered.\n   |     \"\"\" Exception raised in ``pd.read_csv`` when empty data or header is encountered. This error is typically encountered when attempting to read an empty file or an invalid file where no data or heade...\n\nLost the trail later? Search again in different words.",
+     "error": false
+    }
+   ],
+   "v3": [
+    {
+     "query": "read_excel multi-row header with index_col raises error while read_csv returns empty DataFrame",
+     "text": "1. pandas/io/excel/_base.py:840-992  BaseExcelReader._parse_sheet  [id 11039]  best 935-992\n   def _parse_sheet( self, data: list[list[Any]], output: dict[Any, DataFrame], asheetname: str | int | None = None, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | Sequence[int] | None = None, usecols=None, dtype: DtypeArg | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, na_values=None, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, **kwds, ):\n   |                             data[row][col] = last\n   |                         else:\n   |                             last = data[row][col]\n   | \n   |         # GH 12292 : error when read one empty column from excel file\n   |         try:\n2. pandas/io/excel/_util.py:271-303  pop_header_name  [id 11160]\n   def pop_header_name( row: list[Hashable], index_col: int | Sequence[int] ) -> tuple[Hashable | None, list[Hashable]]:\n   Pop the header name for MultiIndex parsing.\n   |     row: list[Hashable], index_col: int | Sequence[int]\n   | ) -> tuple[Hashable | None, list[Hashable]]:\n   |     \"\"\"\n   |     Pop the header name for MultiIndex parsing.\n   | \n   |     Parameters\n3. pandas/io/excel/_base.py:166-560  read_excel  [id 11022]  best 231-280\n   def read_excel( io, sheet_name: str | int | list[IntStrT] | None = 0, *, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | str | Sequence[int] | None = None, usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = None, dtype: DtypeArg | None = None, engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = None, converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, na_values=None, keep_default_na: bool = True, na_filter: bool = True, verbose: bool = False, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, storage_options: StorageOptions | None = None, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, engine_kwargs: dict[str, Any] | None = None, ) -> DataFrame | dict[IntStrT, DataFrame]:\n   Read an Excel file into a ``DataFrame``.\n   |         * ``None``: Returns a dictionary containing DataFrames for each sheet.\n   | \n   |     header : int, list of int, default 0\n   |         Row (0-indexed) to use for the column labels of the parsed\n   |         DataFrame. If a list of integers is passed those row positions will\n   |         be combined into a ``MultiIndex``. Use None if there is no header.\n4. pandas/tests/io/excel/test_readers.py:1804-1818  TestExcelFileRead.test_header_with_index_col  [id 28072]\n   def test_header_with_index_col(self, filename): # GH 33476\n   |         \"ignore:The default engine for reading:pandas.errors.Pandas4Warning\"\n   |     )\n   |     @pytest.mark.parametrize(\"filename\", [\"df_empty.xlsx\", \"df_equals.xlsx\"])\n   |     def test_header_with_index_col(self, filename):\n   |         # GH 33476\n   |         idx = pd.Index([\"Z\"], name=\"I2\")\n5. pandas/io/excel/_base.py:676-738  BaseExcelReader._calc_rows  [id 11036]\n   def _calc_rows( self, header: int | Sequence[int] | None, index_col: int | Sequence[int] | None, skiprows: Sequence[int] | int | Callable[[int], object] | None, nrows: int | None, ) -> int | None:\n   If nrows specified, find the number of rows needed from the\n   |         self,\n   |         header: int | Sequence[int] | None,\n   |         index_col: int | Sequence[int] | None,\n   |         skiprows: Sequence[int] | int | Callable[[int], object] | None,\n   |         nrows: int | None,\n   |     ) -> int | None:\n6. pandas/tests/io/excel/test_readers.py:1498-1509  TestReaders.test_no_header_with_list_index_col  [id 28049]\n   def test_no_header_with_list_index_col(self, read_ext): # GH 31783\n   |         # GH 31783\n   |         file_name = \"testmultiindex\" + read_ext\n   |         data = [(\"B\", \"B\"), (\"key\", \"val\"), (3, 4), (3, 4)]\n   |         idx = pd.MultiIndex.from_tuples(\n   |             [(\"A\", \"A\"), (\"key\", \"val\"), (1, 2), (1, 2)], names=(0, 1)\n   |         )\n7. pandas/tests/io/excel/test_writers.py:94-108  TestRoundTrip.test_read_one_empty_col_no_header  [id 28104]\n   def test_read_one_empty_col_no_header(self, tmp_excel, header, expected): # xref gh-12292\n   |         \"header,expected\",\n   |         [(None, [np.nan] * 4), (0, {\"Unnamed: 0\": [np.nan] * 3})],\n   |     )\n   |     def test_read_one_empty_col_no_header(self, tmp_excel, header, expected):\n   |         # xref gh-12292\n   |         filename = \"no_header\"\n8. pandas/tests/io/excel/test_writers.py:110-123  TestRoundTrip.test_read_one_empty_col_with_header  [id 28105]\n   def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         \"header,expected_extra\",\n   |         [(None, [0]), (0, [])],\n   |     )\n   |     def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         filename = \"with_header\"\n   |         df = pd.DataFrame([[\"\", 1, 100], [\"\", 2, 200], [\"\", 3, 300], [\"\", 4, 400]])\n9. pandas/tests/io/excel/test_readers.py:474-483  TestReaders.test_index_col_empty  [id 27997]\n   def test_index_col_empty(self, read_ext): # see gh-9208\n   |         # see gh-9208\n   |         result = pd.read_excel(\n   |             \"test1\" + read_ext, sheet_name=\"Sheet3\", index_col=[\"A\", \"B\", \"C\"]\n   |         )\n   |         expected = pd.DataFrame(\n   |             columns=[\"D\", \"E\", \"F\"],\n10. pandas/tests/io/excel/test_openpyxl.py:481-492  test_read_multiindex_header_no_index_names  [id 27956]\n   def test_read_multiindex_header_no_index_names(datapath, ext): # GH#47487\n   |     # GH#47487\n   |     path = datapath(\"io\", \"data\", \"excel\", f\"multiindex_no_index_names{ext}\")\n   |     result = pd.read_excel(path, index_col=[0, 1, 2], header=[0, 1, 2])\n   |     expected = pd.DataFrame(\n   |         [[np.nan, \"x\", \"x\", \"x\"], [\"x\", np.nan, np.nan, np.nan]],\n   |         columns=pd.MultiIndex.from_tuples(\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "read_excel with two-row header and index_col first column returns error while read_csv returns empty DataFrame",
+     "text": "1. pandas/io/excel/_base.py:840-992  BaseExcelReader._parse_sheet  [id 11039]  best 935-992\n   def _parse_sheet( self, data: list[list[Any]], output: dict[Any, DataFrame], asheetname: str | int | None = None, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | Sequence[int] | None = None, usecols=None, dtype: DtypeArg | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, na_values=None, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, **kwds, ):\n   |                             data[row][col] = last\n   |                         else:\n   |                             last = data[row][col]\n   | \n   |         # GH 12292 : error when read one empty column from excel file\n   |         try:\n2. pandas/io/excel/_base.py:166-560  read_excel  [id 11022]  best 231-280\n   def read_excel( io, sheet_name: str | int | list[IntStrT] | None = 0, *, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | str | Sequence[int] | None = None, usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = None, dtype: DtypeArg | None = None, engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = None, converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, na_values=None, keep_default_na: bool = True, na_filter: bool = True, verbose: bool = False, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, storage_options: StorageOptions | None = None, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, engine_kwargs: dict[str, Any] | None = None, ) -> DataFrame | dict[IntStrT, DataFrame]:\n   Read an Excel file into a ``DataFrame``.\n   |     names : array-like, default None\n   |         List of column names to use. If file contains no header row,\n   |         then you should explicitly pass header=None.\n   |     index_col : int, str, list of int, default None\n   |         Column (0-indexed) to use as the row labels of the DataFrame.\n   |         Pass None if there is no such column.  If a list is passed,\n3. pandas/io/excel/_util.py:271-303  pop_header_name  [id 11160]\n   def pop_header_name( row: list[Hashable], index_col: int | Sequence[int] ) -> tuple[Hashable | None, list[Hashable]]:\n   Pop the header name for MultiIndex parsing.\n   |     row: list[Hashable], index_col: int | Sequence[int]\n   | ) -> tuple[Hashable | None, list[Hashable]]:\n   |     \"\"\"\n   |     Pop the header name for MultiIndex parsing.\n   | \n   |     Parameters\n4. pandas/io/excel/_base.py:127-163  read_excel  [id 11021]\n   def read_excel( io, # sheet name is list or None -> dict[IntStrT, DataFrame] sheet_name: list[IntStrT] | None, *, header: int | Sequence[int] | None = ..., names: SequenceNotStr[Hashable] | range | None = ..., index_col: int | str | Sequence[int] | None = ..., usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = ..., dtype: DtypeArg | None = ..., engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = ..., converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = ..., true_values: Iterable[Hashable] | None = ..., false_values: Iterable[Hashable] | None = ..., skiprows: Sequence[int] | int | Callable[[int], object] | None = ..., nrows: int | None = ..., na_values=..., keep_default_na: bool = ..., na_filter: bool = ..., verbose: bool = ..., parse_dates: list[Hashable] | bool = ..., date_format: dict[Hashable, str] | str | None = ..., thousands: str | None = ..., decimal: str = ..., comment: str | None = ..., skipfooter: int = ..., storage_options: StorageOptions = ..., dtype_backend: DtypeBackend | lib.NoDefault = ..., ) -> dict[IntStrT, DataFrame]:\n   | def read_excel(\n   |     io,\n   |     # sheet name is list or None -> dict[IntStrT, DataFrame]\n   |     sheet_name: list[IntStrT] | None,\n   |     *,\n   |     header: int | Sequence[int] | None = ...,\n5. pandas/io/excel/_base.py:676-738  BaseExcelReader._calc_rows  [id 11036]\n   def _calc_rows( self, header: int | Sequence[int] | None, index_col: int | Sequence[int] | None, skiprows: Sequence[int] | int | Callable[[int], object] | None, nrows: int | None, ) -> int | None:\n   If nrows specified, find the number of rows needed from the\n   |         self,\n   |         header: int | Sequence[int] | None,\n   |         index_col: int | Sequence[int] | None,\n   |         skiprows: Sequence[int] | int | Callable[[int], object] | None,\n   |         nrows: int | None,\n   |     ) -> int | None:\n6. pandas/tests/io/excel/test_readers.py:1804-1818  TestExcelFileRead.test_header_with_index_col  [id 28072]\n   def test_header_with_index_col(self, filename): # GH 33476\n   |         \"ignore:The default engine for reading:pandas.errors.Pandas4Warning\"\n   |     )\n   |     @pytest.mark.parametrize(\"filename\", [\"df_empty.xlsx\", \"df_equals.xlsx\"])\n   |     def test_header_with_index_col(self, filename):\n   |         # GH 33476\n   |         idx = pd.Index([\"Z\"], name=\"I2\")\n7. pandas/tests/io/excel/test_writers.py:94-108  TestRoundTrip.test_read_one_empty_col_no_header  [id 28104]\n   def test_read_one_empty_col_no_header(self, tmp_excel, header, expected): # xref gh-12292\n   |         \"header,expected\",\n   |         [(None, [np.nan] * 4), (0, {\"Unnamed: 0\": [np.nan] * 3})],\n   |     )\n   |     def test_read_one_empty_col_no_header(self, tmp_excel, header, expected):\n   |         # xref gh-12292\n   |         filename = \"no_header\"\n8. pandas/tests/io/excel/test_writers.py:110-123  TestRoundTrip.test_read_one_empty_col_with_header  [id 28105]\n   def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         \"header,expected_extra\",\n   |         [(None, [0]), (0, [])],\n   |     )\n   |     def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         filename = \"with_header\"\n   |         df = pd.DataFrame([[\"\", 1, 100], [\"\", 2, 200], [\"\", 3, 300], [\"\", 4, 400]])\n9. pandas/tests/io/excel/test_readers.py:1498-1509  TestReaders.test_no_header_with_list_index_col  [id 28049]\n   def test_no_header_with_list_index_col(self, read_ext): # GH 31783\n   |         # GH 31783\n   |         file_name = \"testmultiindex\" + read_ext\n   |         data = [(\"B\", \"B\"), (\"key\", \"val\"), (3, 4), (3, 4)]\n   |         idx = pd.MultiIndex.from_tuples(\n   |             [(\"A\", \"A\"), (\"key\", \"val\"), (1, 2), (1, 2)], names=(0, 1)\n   |         )\n10. pandas/tests/io/excel/test_readers.py:474-483  TestReaders.test_index_col_empty  [id 27997]\n   def test_index_col_empty(self, read_ext): # see gh-9208\n   |         # see gh-9208\n   |         result = pd.read_excel(\n   |             \"test1\" + read_ext, sheet_name=\"Sheet3\", index_col=[\"A\", \"B\", \"C\"]\n   |         )\n   |         expected = pd.DataFrame(\n   |             columns=[\"D\", \"E\", \"F\"],\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "read_excel multi-row header with index_col raises error when data is empty, CSV returns empty DataFrame",
+     "text": "1. pandas/io/excel/_base.py:840-992  BaseExcelReader._parse_sheet  [id 11039]  best 935-992\n   def _parse_sheet( self, data: list[list[Any]], output: dict[Any, DataFrame], asheetname: str | int | None = None, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | Sequence[int] | None = None, usecols=None, dtype: DtypeArg | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, na_values=None, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, **kwds, ):\n   |                             data[row][col] = last\n   |                         else:\n   |                             last = data[row][col]\n   | \n   |         # GH 12292 : error when read one empty column from excel file\n   |         try:\n2. pandas/io/excel/_base.py:166-560  read_excel  [id 11022]  best 231-280\n   def read_excel( io, sheet_name: str | int | list[IntStrT] | None = 0, *, header: int | Sequence[int] | None = 0, names: SequenceNotStr[Hashable] | range | None = None, index_col: int | str | Sequence[int] | None = None, usecols: int | str | Sequence[int] | Sequence[str] | Callable[[HashableT], bool] | None = None, dtype: DtypeArg | None = None, engine: Literal[\"xlrd\", \"openpyxl\", \"odf\", \"pyxlsb\", \"calamine\"] | None = None, converters: dict[str, Callable[..., Any]] | dict[int, Callable[..., Any]] | None = None, true_values: Iterable[Hashable] | None = None, false_values: Iterable[Hashable] | None = None, skiprows: Sequence[int] | int | Callable[[int], object] | None = None, nrows: int | None = None, na_values=None, keep_default_na: bool = True, na_filter: bool = True, verbose: bool = False, parse_dates: list[Hashable] | bool = False, date_format: dict[Hashable, str] | str | None = None, thousands: str | None = None, decimal: str = \".\", comment: str | None = None, skipfooter: int = 0, storage_options: StorageOptions | None = None, dtype_backend: DtypeBackend | lib.NoDefault = lib.no_default, engine_kwargs: dict[str, Any] | None = None, ) -> DataFrame | dict[IntStrT, DataFrame]:\n   Read an Excel file into a ``DataFrame``.\n   |         * ``None``: Returns a dictionary containing DataFrames for each sheet.\n   | \n   |     header : int, list of int, default 0\n   |         Row (0-indexed) to use for the column labels of the parsed\n   |         DataFrame. If a list of integers is passed those row positions will\n   |         be combined into a ``MultiIndex``. Use None if there is no header.\n3. pandas/tests/io/excel/test_readers.py:1804-1818  TestExcelFileRead.test_header_with_index_col  [id 28072]\n   def test_header_with_index_col(self, filename): # GH 33476\n   |         \"ignore:The default engine for reading:pandas.errors.Pandas4Warning\"\n   |     )\n   |     @pytest.mark.parametrize(\"filename\", [\"df_empty.xlsx\", \"df_equals.xlsx\"])\n   |     def test_header_with_index_col(self, filename):\n   |         # GH 33476\n   |         idx = pd.Index([\"Z\"], name=\"I2\")\n4. pandas/io/excel/_base.py:676-738  BaseExcelReader._calc_rows  [id 11036]\n   def _calc_rows( self, header: int | Sequence[int] | None, index_col: int | Sequence[int] | None, skiprows: Sequence[int] | int | Callable[[int], object] | None, nrows: int | None, ) -> int | None:\n   If nrows specified, find the number of rows needed from the\n   |         self,\n   |         header: int | Sequence[int] | None,\n   |         index_col: int | Sequence[int] | None,\n   |         skiprows: Sequence[int] | int | Callable[[int], object] | None,\n   |         nrows: int | None,\n   |     ) -> int | None:\n5. pandas/io/excel/_util.py:271-303  pop_header_name  [id 11160]\n   def pop_header_name( row: list[Hashable], index_col: int | Sequence[int] ) -> tuple[Hashable | None, list[Hashable]]:\n   Pop the header name for MultiIndex parsing.\n   |     row: list[Hashable], index_col: int | Sequence[int]\n   | ) -> tuple[Hashable | None, list[Hashable]]:\n   |     \"\"\"\n   |     Pop the header name for MultiIndex parsing.\n   | \n   |     Parameters\n6. pandas/tests/io/excel/test_readers.py:1498-1509  TestReaders.test_no_header_with_list_index_col  [id 28049]\n   def test_no_header_with_list_index_col(self, read_ext): # GH 31783\n   |         # GH 31783\n   |         file_name = \"testmultiindex\" + read_ext\n   |         data = [(\"B\", \"B\"), (\"key\", \"val\"), (3, 4), (3, 4)]\n   |         idx = pd.MultiIndex.from_tuples(\n   |             [(\"A\", \"A\"), (\"key\", \"val\"), (1, 2), (1, 2)], names=(0, 1)\n   |         )\n7. pandas/tests/io/excel/test_writers.py:94-108  TestRoundTrip.test_read_one_empty_col_no_header  [id 28104]\n   def test_read_one_empty_col_no_header(self, tmp_excel, header, expected): # xref gh-12292\n   |         \"header,expected\",\n   |         [(None, [np.nan] * 4), (0, {\"Unnamed: 0\": [np.nan] * 3})],\n   |     )\n   |     def test_read_one_empty_col_no_header(self, tmp_excel, header, expected):\n   |         # xref gh-12292\n   |         filename = \"no_header\"\n8. pandas/tests/io/excel/test_writers.py:110-123  TestRoundTrip.test_read_one_empty_col_with_header  [id 28105]\n   def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         \"header,expected_extra\",\n   |         [(None, [0]), (0, [])],\n   |     )\n   |     def test_read_one_empty_col_with_header(self, tmp_excel, header, expected_extra):\n   |         filename = \"with_header\"\n   |         df = pd.DataFrame([[\"\", 1, 100], [\"\", 2, 200], [\"\", 3, 300], [\"\", 4, 400]])\n9. pandas/tests/io/excel/test_readers.py:474-483  TestReaders.test_index_col_empty  [id 27997]\n   def test_index_col_empty(self, read_ext): # see gh-9208\n   |         # see gh-9208\n   |         result = pd.read_excel(\n   |             \"test1\" + read_ext, sheet_name=\"Sheet3\", index_col=[\"A\", \"B\", \"C\"]\n   |         )\n   |         expected = pd.DataFrame(\n   |             columns=[\"D\", \"E\", \"F\"],\n10. pandas/errors/__init__.py:391-413  EmptyDataError  [id 10228]\n   class EmptyDataError(ValueError):\n   Exception raised in ``pd.read_csv`` when empty data or header is encountered.\n   |     \"\"\" Exception raised in ``pd.read_csv`` when empty data or header is encountered. This error is typically encountered when attempting to read an empty file or an invalid file where no data or heade...\n\nLost the trail later? Search again in different words.",
+     "error": false
+    }
+   ]
+  },
+  "schemas": {
+   "v2": {
+    "search_code": {
+     "properties": {
+      "query": {
+       "title": "Query",
+       "type": "string"
+      },
+      "k": {
+       "default": 10,
+       "title": "K",
+       "type": "integer"
+      },
+      "path_prefix": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Path Prefix"
+      },
+      "kinds": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Kinds"
+      },
+      "tests": {
+       "default": "include",
+       "title": "Tests",
+       "type": "string"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "type": "object",
+     "title": "search_codeArguments"
+    },
+    "get_chunk": {
+     "properties": {
+      "ref": {
+       "title": "Ref",
+       "type": "string"
+      }
+     },
+     "required": [
+      "ref"
+     ],
+     "type": "object",
+     "title": "get_chunkArguments"
+    },
+    "refresh_index": {
+     "properties": {},
+     "type": "object",
+     "title": "refresh_indexArguments"
+    },
+    "index_status": {
+     "properties": {},
+     "type": "object",
+     "title": "index_statusArguments"
+    }
+   },
+   "v3": {
+    "search_code": {
+     "properties": {
+      "query": {
+       "title": "Query",
+       "type": "string"
+      },
+      "k": {
+       "default": 10,
+       "title": "K",
+       "type": "integer"
+      },
+      "path_prefix": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Path Prefix"
+      },
+      "kinds": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Kinds"
+      },
+      "tests": {
+       "default": "include",
+       "title": "Tests",
+       "type": "string"
+      },
+      "intent": {
+       "default": "",
+       "title": "Intent",
+       "type": "string"
+      },
+      "symptom": {
+       "default": "",
+       "title": "Symptom",
+       "type": "string"
+      },
+      "anchors": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Anchors"
+      },
+      "locations": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Locations"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "type": "object",
+     "title": "search_codeArguments"
+    },
+    "get_chunk": {
+     "properties": {
+      "ref": {
+       "title": "Ref",
+       "type": "string"
+      }
+     },
+     "required": [
+      "ref"
+     ],
+     "type": "object",
+     "title": "get_chunkArguments"
+    },
+    "refresh_index": {
+     "properties": {},
+     "type": "object",
+     "title": "refresh_indexArguments"
+    },
+    "index_status": {
+     "properties": {},
+     "type": "object",
+     "title": "index_statusArguments"
+    }
+   }
+  },
+  "descriptions": {
+   "v2": {
+    "search_code": "Find code from a plain-words description when you have no exact name to grep for: \"where do users log in?\", \"why are disabled users still logged in?\". Use it first on a new task, and again whenever you lose the trail. Returns ranked functions, classes and code blocks with file:line, signature and a short preview. Once you have an exact identifier or string, use grep. Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests (include, exclude, only).",
+    "get_chunk": "Return the full source of one function plus its callers and callees. `ref` is a chunk id from search_code, a `path:line` location, or a `path::qualname` key.",
+    "refresh_index": "Check every file now and index what changed. The index follows your edits on its own; call this after git checkout, pull or rebase, or when results look out of date. Waits up to a minute and says what changed.",
+    "index_status": "Report whether the code index is ready or still indexing (with progress), counts, models in use, the indexed git commit, anything still being indexed, and which files are not indexed and why (too large, generated, not code, ignored)."
+   },
+   "v3": {
+    "search_code": "Find code from a plain-words description of what it does: \"where do users log in?\", \"why are disabled users still logged in?\". Use it:\n- for your first search on a task, unless you already have a clear anchor: an exact function, class or file name, or an error string, that leads straight to the code. Fill in intent, symptom and anchors too (below);\n- whenever you lose the trail and don't know which direction to grep: a grep found nothing or too many files, or several searches in a row found no file worth opening.\nReturns ranked functions, classes and code blocks with file:line, signature and a short preview. Once you have an exact name or string, grep or read the file. k: how many results, 1 to 10 (default 10). Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests (include, exclude, only).\nOptional, most useful on your first search of a task, written from the task: intent (one or two sentences: what the code that has to change does, in the words source code would use), symptom (one sentence: the wrong behaviour or the missing feature), anchors (up to 20 strings copied exactly from the task that may appear in the code: identifiers, option names, file names, fragments of error messages), locations (files or functions that the task itself says are where the change belongs; their code is shown first).",
+    "get_chunk": "Return the full source of one function plus its callers and callees. `ref` is a chunk id from search_code, a `path:line` location, or a `path::qualname` key.",
+    "refresh_index": "Check every file now and index what changed. The index follows your edits on its own; call this after git checkout, pull or rebase, or when results look out of date. Waits up to a minute and says what changed.",
+    "index_status": "Report whether the code index is ready or still indexing (with progress), counts, models in use, the indexed git commit, anything still being indexed, and which files are not indexed and why (too large, generated, not code, ignored)."
+   }
+  }
+ },
+ "vllm-project__vllm-51573": {
+  "rows": [
+   {
+    "run": "S-v-51573-B",
+    "query": "load YAML config file and convert options to CLI args, false values",
+    "cards_v2": 10,
+    "cards_v3": 10,
+    "same_cards": true,
+    "same_text": true,
+    "chars_v2": 4148,
+    "chars_v3": 4148,
+    "diff_lines": []
+   },
+   {
+    "run": "S-v-51866-C",
+    "query": "CPU sampler per-request generator seed batched with unseeded requests",
+    "cards_v2": 10,
+    "cards_v3": 10,
+    "same_cards": true,
+    "same_text": true,
+    "chars_v2": 4899,
+    "chars_v3": 4899,
+    "diff_lines": []
+   },
+   {
+    "run": "S-v-53124-B",
+    "query": "load reasoning parser plugin at server startup; headless mode",
+    "cards_v2": 10,
+    "cards_v3": 10,
+    "same_cards": true,
+    "same_text": true,
+    "chars_v2": 4265,
+    "chars_v3": 4265,
+    "diff_lines": []
+   }
+  ],
+  "texts": {
+   "v2": [
+    {
+     "query": "load YAML config file and convert options to CLI args, false values",
+     "text": "1. vllm/utils/argparse_utils.py:606-673  FlexibleArgumentParser.load_config_file  [id 94228]\n   def load_config_file(self, file_path: str) -> list[str]:\n   Loads a yaml file and returns the key value pairs as a\n   |         \"\"\"Loads a yaml file and returns the key value pairs as a\n   |         flattened list with argparse like pattern.\n   | \n   |         Supports both flat configs and nested YAML structures.\n   | \n   |         Flat config example:\n2. tools/recipes/recipe_json_to_vllm_config.py:541-551  coerce  [id 53151]\n   def coerce(value: str) -> Any:\n   Convert CLI string values to useful YAML scalar/object types.\n   |     \"\"\"Convert CLI string values to useful YAML scalar/object types.\"\"\"\n   |     # Recipes may preserve Python-style booleans in dotted config aliases,\n   |     # for example: -cc.pass_config.fuse_rope_kvcache=True.\n   |     if value in (\"True\", \"False\"):\n   |         return value == \"True\"\n   | \n3. tools/recipes/recipe_json_to_vllm_config.py:573-600  merge_value  [id 53153]\n   def merge_value(dst: dict[str, Any], path: list[str], value: Any) -> None:\n   Merge dotted CLI args into nested YAML dictionaries.\n   |     \"\"\"Merge dotted CLI args into nested YAML dictionaries.\"\"\"\n   |     cur = dst\n   |     for part in path[:-1]:\n   |         existing = cur.get(part)\n   |         if existing is None:\n   |             cur[part] = {}\n4. benchmarks/attention_benchmarks/benchmark.py:391-394  load_config_from_yaml  [id 688]\n   def load_config_from_yaml(config_path: str) -> dict:\n   Load configuration from YAML file.\n   |     \"\"\"Load configuration from YAML file.\"\"\"\n   |     with open(config_path) as f:\n   |         return yaml.safe_load(f)\n5. vllm/utils/argparse_utils.py:516-604  FlexibleArgumentParser._pull_args_from_config  [id 94227]  best 516-566\n   def _pull_args_from_config(self, args: list[str]) -> list[str]:\n   Method to pull arguments specified in the config file\n   |             raise ValueError(\n   |                 \"No config file specified! Please check your command-line arguments.\"\n   |             )\n   | \n   |         file_path = args[index + 1]\n   | \n6. tools/recipes/sweep/sweep_recommendation.py:362-366  _load_config  [id 53295]\n   def _load_config(path: Path) -> dict[str, Any]:\n   |     data = yaml.safe_load(path.read_text(encoding=\"utf-8\"))\n   |     if not isinstance(data, dict):\n   |         raise ValueError(f\"{path} does not contain a YAML configuration object.\")\n   |     return data\n7. rust/src/cmd/src/cli.rs:926-938  FrontendArgs.into_config  [id 11014]\n   pub fn into_config(self) -> Config\n   Convert the CLI arguments into the OpenAI server's runtime config.\n   |         let data_parallel_size = self.data_parallel_size.unwrap_or(self.engine_count);\n   |         self.runtime.into_bootstrapped_config(\n   |             self.listen_fd,\n   |             self.grpc_listen_fd,\n   |             self.input_listener_fd,\n   |             self.output_listener_fd,\n8. tests/utils_/test_argparse_utils.py:451-469  test_load_config_file_false_store_true_dropped  [id 41745]\n   def test_load_config_file_false_store_true_dropped(tmp_path):\n   False values for store_true flags are silently dropped (correct).\n   |     \"\"\"False values for store_true flags are silently dropped (correct).\"\"\"\n   |     config_data = {\n   |         \"enable-feature\": False,\n   |         \"port\": 8000,\n   |     }\n   | \n9. tools/recipes/recipe_json_to_vllm_config.py:614-759  argv_to_config  [id 53155]  best 687-759\n   def argv_to_config(argv: list[Any]) -> dict[str, Any]:\n   |         if \"=\" in token:\n   |             short_name, raw_value = token.split(\"=\", 1)\n   |             if short_name in VALUE_SHORT_ALIASES:\n   |                 merge_value(\n   |                     config,\n   |                     [VALUE_SHORT_ALIASES[short_name]],\n10. tools/recipes/recipe_json_to_vllm_config.py:554-570  is_option_token  [id 53152]\n   def is_option_token(token: str) -> bool:\n   |     if token.startswith(\"--\"):\n   |         return True\n   | \n   |     short_name = token.split(\"=\", 1)[0]\n   |     if (\n   |         short_name in VALUE_SHORT_ALIASES\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "CPU sampler per-request generator seed batched with unseeded requests",
+     "text": "1. rust/src/bench/src/datasets/mod.rs:125-144  batch_requests  [id 9225]\n   pub fn batch_requests( requests: Vec<SampleRequest>, batch_size: usize, request_id_prefix: &str, ) -> Vec<SampleRequest>\n   Group already-generated single-input requests into batched requests of\n   |     requests: Vec<SampleRequest>,\n   |     batch_size: usize,\n   |     request_id_prefix: &str,\n   | ) -> Vec<SampleRequest> {\n   |     if batch_size <= 1 {\n   |         return requests;\n2. tests/v1/determinism/test_xpu_batch_invariant_ut.py:198-228  test_seeded_sampler_preserves_full_distribution_and_rng  [id 44474]\n   def test_seeded_sampler_preserves_full_distribution_and_rng(position, monkeypatch):\n   Moving a request must preserve its distribution and per-request RNG.\n   | def test_seeded_sampler_preserves_full_distribution_and_rng(position, monkeypatch):\n   |     \"\"\"Moving a request must preserve its distribution and per-request RNG.\"\"\"\n   |     from vllm.triton_utils import HAS_TRITON\n   |     from vllm.v1.sample.ops.topk_topp_sampler import TopKTopPSampler\n   | \n   |     assert HAS_TRITON, \"XPU sampling must exercise the Triton top-k/top-p path\"\n3. vllm/v1/worker/gpu_model_runner.py:5865-5983  GPUModelRunner._dummy_sampler_run  [id 100884]  best 5920-5983\n   def _dummy_sampler_run( self, hidden_states: torch.Tensor, ) -> torch.Tensor: # The dummy hidden states may contain special values, # like `inf` or `nan`. # To avoid breaking the sampler, we use a random tensor here instead.\n   |                     sampling_metadata=replace(\n   |                         dummy_metadata,\n   |                         generators={\n   |                             0: torch.Generator(device=self.device).manual_seed(0)\n   |                         },\n   |                     ),\n4. rust/src/mock-engine/src/engine.rs:30-36  request_seed  [id 12230]\n   fn request_seed(base_seed: u64, engine_index: u32, request_id: &str) -> u64\n   Derive a stable per-request seed from the CLI seed, engine, and request id.\n   |     let mut hasher = std::hash::DefaultHasher::new();\n   |     base_seed.hash(&mut hasher);\n   |     engine_index.hash(&mut hasher);\n   |     request_id.hash(&mut hasher);\n   |     hasher.finish()\n   | }\n5. tests/v1/sample/test_topk_topp_sampler.py:50-51  _seed_default_generator  [id 50553]\n   def _seed_default_generator(seed: int) -> None:\n   |     set_random_seed(seed)\n6. tests/benchmarks/test_random_dataset.py:44-61  _collect_samples  [id 17712]\n   def _collect_samples( dataset: RandomDataset, tokenizer: PreTrainedTokenizerBase, num_requests: int = 16, prefix_len: int = 7, range_ratio: float = 0.3, input_len: int = 50, output_len: int = 20, ) -> list[tuple[str, int, int]]:\n   |     dataset: RandomDataset,\n   |     tokenizer: PreTrainedTokenizerBase,\n   |     num_requests: int = 16,\n   |     prefix_len: int = 7,\n   |     range_ratio: float = 0.3,\n   |     input_len: int = 50,\n7. vllm/v1/worker/gpu/model_runner.py:990-1002  GPUModelRunner._dummy_sampler_run  [id 101485]\n   def _dummy_sampler_run(self, hidden_states: torch.Tensor) -> None:\n   |     def _dummy_sampler_run(self, hidden_states: torch.Tensor) -> None:\n   |         num_reqs = hidden_states.shape[0]\n   |         logits = self.model.compute_logits(hidden_states)\n   |         dummy_input_batch = InputBatch.make_dummy(\n   |             num_reqs, num_reqs, self.input_buffers\n   |         )\n8. benchmarks/kernels/bench_cpu_sampling.py:100-104  run_profile.avg_us  [id 810]\n   def avg_us(prof, label):\n   |         for e in prof.key_averages():\n   |             if e.key == label:\n   |                 return e.cpu_time_total / e.count\n   |         return 0.0\n9. vllm/v1/sample/rejection_sampler.py:689-742  generate_uniform_probs  [id 99932]\n   def generate_uniform_probs( num_tokens: int, num_draft_tokens: list[int], generators: dict[int, torch.Generator], device: torch.device, ) -> torch.Tensor:\n   Generates a batch of uniform random samples, with optional seeding\n   |     num_tokens: int,\n   |     num_draft_tokens: list[int],\n   |     generators: dict[int, torch.Generator],\n   |     device: torch.device,\n   | ) -> torch.Tensor:\n   |     \"\"\"Generates a batch of uniform random samples, with optional seeding\n10. tests/v1/worker/test_gpu_rejection_sampler_chunking.py:46-60  _make_rejection_sampler  [id 51995]\n   def _make_rejection_sampler( sampler: SimpleNamespace, num_speculative_steps: int ) -> RejectionSampler:\n   RejectionSampler for standard, fixed-boundary, unwatermarked verification.\n   |     sampler: SimpleNamespace, num_speculative_steps: int\n   | ) -> RejectionSampler:\n   |     \"\"\"RejectionSampler for standard, fixed-boundary, unwatermarked verification.\"\"\"\n   |     rejection_sampler = object.__new__(RejectionSampler)\n   |     rejection_sampler.sampler = sampler\n   |     rejection_sampler.num_speculative_steps = num_speculative_steps\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "load reasoning parser plugin at server startup; headless mode",
+     "text": "1. vllm/reasoning/abs_reasoning_parsers.py:370-373  ReasoningParserManager.import_reasoning_parser  [id 90877]\n   def import_reasoning_parser(cls, plugin_path: str) -> None:\n   Import a user-defined reasoning parser.\n   |     def import_reasoning_parser(cls, plugin_path: str) -> None:\n   |         \"\"\"Import a user-defined reasoning parser.\"\"\"\n   |         import_plugin(plugin_path)\n2. vllm/entrypoints/common/cli_args.py:576-583  init_parser_plugin  [id 60928]\n   def init_parser_plugin(args: argparse.Namespace):\n   |     from vllm.reasoning import ReasoningParserManager\n   | \n   |     if args.tool_parser_plugin and len(args.tool_parser_plugin) > 3:\n   |         ToolParserManager.import_tool_parser(args.tool_parser_plugin)\n   | \n   |     if args.reasoning_parser_plugin and len(args.reasoning_parser_plugin) > 3:\n3. vllm/reasoning/abs_reasoning_parsers.py:265-286  ReasoningParserManager._load_lazy_parser  [id 90872]\n   def _load_lazy_parser(cls, name: str) -> type[ReasoningParser]:\n   Import and register a lazily loaded reasoning parser.\n   |     def _load_lazy_parser(cls, name: str) -> type[ReasoningParser]:\n   |         \"\"\"Import and register a lazily loaded reasoning parser.\"\"\"\n   |         module_path, class_name = cls.lazy_parsers[name]\n   |         try:\n   |             mod = importlib.import_module(module_path)\n   |             parser_cls = getattr(mod, class_name)\n4. tests/entrypoints/cli/test_serve.py:17-42  test_headless_imports_reasoning_parser_plugin_before_engine_config  [id 20955]\n   def test_headless_imports_reasoning_parser_plugin_before_engine_config():\n   |     plugin_path = \"/tmp/custom_reasoning_parser.py\"\n   |     args = argparse.Namespace(\n   |         api_server_count=0,\n   |         reasoning_parser_plugin=plugin_path,\n   |     )\n   |     engine_args = MagicMock()\n5. vllm/entrypoints/cli/serve.py:181-266  run_headless  [id 60756]\n   def run_headless(args: argparse.Namespace):\n   |     if args.api_server_count > 1:\n   |         raise ValueError(\"api_server_count can't be set in headless mode\")\n   | \n   |     if args.reasoning_parser_plugin and len(args.reasoning_parser_plugin) > 3:\n   |         ReasoningParserManager.import_reasoning_parser(args.reasoning_parser_plugin)\n   | \n6. rust/src/chat/src/parser/reasoning/mod.rs:53-57  ReasoningParserFactory.global  [id 10256]\n   pub fn global() -> &'static Self\n   Get the global reasoning parser factory with built-in registrations and\n   |         static INSTANCE: LazyLock<ReasoningParserFactory> =\n   |             LazyLock::new(ReasoningParserFactory::new);\n   |         &INSTANCE\n   |     }\n7. vllm/parser/parser_manager.py:56-72  ParserManager.get_reasoning_parser  [id 89979]\n   def get_reasoning_parser( cls, reasoning_parser_name: str | None, ) -> type[ReasoningParser] | None:\n   Get the reasoning parser based on the name.\n   |     def get_reasoning_parser(\n   |         cls,\n   |         reasoning_parser_name: str | None,\n   |     ) -> type[ReasoningParser] | None:\n   |         \"\"\"Get the reasoning parser based on the name.\"\"\"\n   |         from vllm.reasoning import ReasoningParserManager\n8. vllm/reasoning/__init__.py:195-198  register_lazy_reasoning_parsers  [id 90850]\n   def register_lazy_reasoning_parsers():\n   |     for name, (file_name, class_name) in _REASONING_PARSERS_TO_REGISTER.items():\n   |         module_path = f\"vllm.reasoning.{file_name}\"\n   |         ReasoningParserManager.register_lazy_module(name, module_path, class_name)\n9. vllm/reasoning/abs_reasoning_parsers.py:260-263  ReasoningParserManager.list_registered  [id 90871]\n   def list_registered(cls) -> list[str]:\n   Return names of all eagerly and lazily registered reasoning parsers.\n   |     def list_registered(cls) -> list[str]:\n   |         \"\"\"Return names of all eagerly and lazily registered reasoning parsers.\"\"\"\n   |         return sorted(set(cls.reasoning_parsers.keys()) | set(cls.lazy_parsers.keys()))\n10. tests/entrypoints/cli/test_serve.py:35-37  test_headless_imports_reasoning_parser_plugin_before_engine_config.create_engine_config  [id 20956]\n   def create_engine_config(**kwargs):\n   |             import_plugin.assert_called_once_with(plugin_path)\n   |             raise _StopAfterEngineConfig\n\nLost the trail later? Search again in different words.",
+     "error": false
+    }
+   ],
+   "v3": [
+    {
+     "query": "load YAML config file and convert options to CLI args, false values",
+     "text": "1. vllm/utils/argparse_utils.py:606-673  FlexibleArgumentParser.load_config_file  [id 94228]\n   def load_config_file(self, file_path: str) -> list[str]:\n   Loads a yaml file and returns the key value pairs as a\n   |         \"\"\"Loads a yaml file and returns the key value pairs as a\n   |         flattened list with argparse like pattern.\n   | \n   |         Supports both flat configs and nested YAML structures.\n   | \n   |         Flat config example:\n2. tools/recipes/recipe_json_to_vllm_config.py:541-551  coerce  [id 53151]\n   def coerce(value: str) -> Any:\n   Convert CLI string values to useful YAML scalar/object types.\n   |     \"\"\"Convert CLI string values to useful YAML scalar/object types.\"\"\"\n   |     # Recipes may preserve Python-style booleans in dotted config aliases,\n   |     # for example: -cc.pass_config.fuse_rope_kvcache=True.\n   |     if value in (\"True\", \"False\"):\n   |         return value == \"True\"\n   | \n3. tools/recipes/recipe_json_to_vllm_config.py:573-600  merge_value  [id 53153]\n   def merge_value(dst: dict[str, Any], path: list[str], value: Any) -> None:\n   Merge dotted CLI args into nested YAML dictionaries.\n   |     \"\"\"Merge dotted CLI args into nested YAML dictionaries.\"\"\"\n   |     cur = dst\n   |     for part in path[:-1]:\n   |         existing = cur.get(part)\n   |         if existing is None:\n   |             cur[part] = {}\n4. benchmarks/attention_benchmarks/benchmark.py:391-394  load_config_from_yaml  [id 688]\n   def load_config_from_yaml(config_path: str) -> dict:\n   Load configuration from YAML file.\n   |     \"\"\"Load configuration from YAML file.\"\"\"\n   |     with open(config_path) as f:\n   |         return yaml.safe_load(f)\n5. vllm/utils/argparse_utils.py:516-604  FlexibleArgumentParser._pull_args_from_config  [id 94227]  best 516-566\n   def _pull_args_from_config(self, args: list[str]) -> list[str]:\n   Method to pull arguments specified in the config file\n   |             raise ValueError(\n   |                 \"No config file specified! Please check your command-line arguments.\"\n   |             )\n   | \n   |         file_path = args[index + 1]\n   | \n6. tools/recipes/sweep/sweep_recommendation.py:362-366  _load_config  [id 53295]\n   def _load_config(path: Path) -> dict[str, Any]:\n   |     data = yaml.safe_load(path.read_text(encoding=\"utf-8\"))\n   |     if not isinstance(data, dict):\n   |         raise ValueError(f\"{path} does not contain a YAML configuration object.\")\n   |     return data\n7. rust/src/cmd/src/cli.rs:926-938  FrontendArgs.into_config  [id 11014]\n   pub fn into_config(self) -> Config\n   Convert the CLI arguments into the OpenAI server's runtime config.\n   |         let data_parallel_size = self.data_parallel_size.unwrap_or(self.engine_count);\n   |         self.runtime.into_bootstrapped_config(\n   |             self.listen_fd,\n   |             self.grpc_listen_fd,\n   |             self.input_listener_fd,\n   |             self.output_listener_fd,\n8. tests/utils_/test_argparse_utils.py:451-469  test_load_config_file_false_store_true_dropped  [id 41745]\n   def test_load_config_file_false_store_true_dropped(tmp_path):\n   False values for store_true flags are silently dropped (correct).\n   |     \"\"\"False values for store_true flags are silently dropped (correct).\"\"\"\n   |     config_data = {\n   |         \"enable-feature\": False,\n   |         \"port\": 8000,\n   |     }\n   | \n9. tools/recipes/recipe_json_to_vllm_config.py:614-759  argv_to_config  [id 53155]  best 687-759\n   def argv_to_config(argv: list[Any]) -> dict[str, Any]:\n   |         if \"=\" in token:\n   |             short_name, raw_value = token.split(\"=\", 1)\n   |             if short_name in VALUE_SHORT_ALIASES:\n   |                 merge_value(\n   |                     config,\n   |                     [VALUE_SHORT_ALIASES[short_name]],\n10. tools/recipes/recipe_json_to_vllm_config.py:554-570  is_option_token  [id 53152]\n   def is_option_token(token: str) -> bool:\n   |     if token.startswith(\"--\"):\n   |         return True\n   | \n   |     short_name = token.split(\"=\", 1)[0]\n   |     if (\n   |         short_name in VALUE_SHORT_ALIASES\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "CPU sampler per-request generator seed batched with unseeded requests",
+     "text": "1. rust/src/bench/src/datasets/mod.rs:125-144  batch_requests  [id 9225]\n   pub fn batch_requests( requests: Vec<SampleRequest>, batch_size: usize, request_id_prefix: &str, ) -> Vec<SampleRequest>\n   Group already-generated single-input requests into batched requests of\n   |     requests: Vec<SampleRequest>,\n   |     batch_size: usize,\n   |     request_id_prefix: &str,\n   | ) -> Vec<SampleRequest> {\n   |     if batch_size <= 1 {\n   |         return requests;\n2. tests/v1/determinism/test_xpu_batch_invariant_ut.py:198-228  test_seeded_sampler_preserves_full_distribution_and_rng  [id 44474]\n   def test_seeded_sampler_preserves_full_distribution_and_rng(position, monkeypatch):\n   Moving a request must preserve its distribution and per-request RNG.\n   | def test_seeded_sampler_preserves_full_distribution_and_rng(position, monkeypatch):\n   |     \"\"\"Moving a request must preserve its distribution and per-request RNG.\"\"\"\n   |     from vllm.triton_utils import HAS_TRITON\n   |     from vllm.v1.sample.ops.topk_topp_sampler import TopKTopPSampler\n   | \n   |     assert HAS_TRITON, \"XPU sampling must exercise the Triton top-k/top-p path\"\n3. vllm/v1/worker/gpu_model_runner.py:5865-5983  GPUModelRunner._dummy_sampler_run  [id 100884]  best 5920-5983\n   def _dummy_sampler_run( self, hidden_states: torch.Tensor, ) -> torch.Tensor: # The dummy hidden states may contain special values, # like `inf` or `nan`. # To avoid breaking the sampler, we use a random tensor here instead.\n   |                     sampling_metadata=replace(\n   |                         dummy_metadata,\n   |                         generators={\n   |                             0: torch.Generator(device=self.device).manual_seed(0)\n   |                         },\n   |                     ),\n4. rust/src/mock-engine/src/engine.rs:30-36  request_seed  [id 12230]\n   fn request_seed(base_seed: u64, engine_index: u32, request_id: &str) -> u64\n   Derive a stable per-request seed from the CLI seed, engine, and request id.\n   |     let mut hasher = std::hash::DefaultHasher::new();\n   |     base_seed.hash(&mut hasher);\n   |     engine_index.hash(&mut hasher);\n   |     request_id.hash(&mut hasher);\n   |     hasher.finish()\n   | }\n5. tests/v1/sample/test_topk_topp_sampler.py:50-51  _seed_default_generator  [id 50553]\n   def _seed_default_generator(seed: int) -> None:\n   |     set_random_seed(seed)\n6. tests/benchmarks/test_random_dataset.py:44-61  _collect_samples  [id 17712]\n   def _collect_samples( dataset: RandomDataset, tokenizer: PreTrainedTokenizerBase, num_requests: int = 16, prefix_len: int = 7, range_ratio: float = 0.3, input_len: int = 50, output_len: int = 20, ) -> list[tuple[str, int, int]]:\n   |     dataset: RandomDataset,\n   |     tokenizer: PreTrainedTokenizerBase,\n   |     num_requests: int = 16,\n   |     prefix_len: int = 7,\n   |     range_ratio: float = 0.3,\n   |     input_len: int = 50,\n7. vllm/v1/worker/gpu/model_runner.py:990-1002  GPUModelRunner._dummy_sampler_run  [id 101485]\n   def _dummy_sampler_run(self, hidden_states: torch.Tensor) -> None:\n   |     def _dummy_sampler_run(self, hidden_states: torch.Tensor) -> None:\n   |         num_reqs = hidden_states.shape[0]\n   |         logits = self.model.compute_logits(hidden_states)\n   |         dummy_input_batch = InputBatch.make_dummy(\n   |             num_reqs, num_reqs, self.input_buffers\n   |         )\n8. benchmarks/kernels/bench_cpu_sampling.py:100-104  run_profile.avg_us  [id 810]\n   def avg_us(prof, label):\n   |         for e in prof.key_averages():\n   |             if e.key == label:\n   |                 return e.cpu_time_total / e.count\n   |         return 0.0\n9. vllm/v1/sample/rejection_sampler.py:689-742  generate_uniform_probs  [id 99932]\n   def generate_uniform_probs( num_tokens: int, num_draft_tokens: list[int], generators: dict[int, torch.Generator], device: torch.device, ) -> torch.Tensor:\n   Generates a batch of uniform random samples, with optional seeding\n   |     num_tokens: int,\n   |     num_draft_tokens: list[int],\n   |     generators: dict[int, torch.Generator],\n   |     device: torch.device,\n   | ) -> torch.Tensor:\n   |     \"\"\"Generates a batch of uniform random samples, with optional seeding\n10. tests/v1/worker/test_gpu_rejection_sampler_chunking.py:46-60  _make_rejection_sampler  [id 51995]\n   def _make_rejection_sampler( sampler: SimpleNamespace, num_speculative_steps: int ) -> RejectionSampler:\n   RejectionSampler for standard, fixed-boundary, unwatermarked verification.\n   |     sampler: SimpleNamespace, num_speculative_steps: int\n   | ) -> RejectionSampler:\n   |     \"\"\"RejectionSampler for standard, fixed-boundary, unwatermarked verification.\"\"\"\n   |     rejection_sampler = object.__new__(RejectionSampler)\n   |     rejection_sampler.sampler = sampler\n   |     rejection_sampler.num_speculative_steps = num_speculative_steps\n\nLost the trail later? Search again in different words.",
+     "error": false
+    },
+    {
+     "query": "load reasoning parser plugin at server startup; headless mode",
+     "text": "1. vllm/reasoning/abs_reasoning_parsers.py:370-373  ReasoningParserManager.import_reasoning_parser  [id 90877]\n   def import_reasoning_parser(cls, plugin_path: str) -> None:\n   Import a user-defined reasoning parser.\n   |     def import_reasoning_parser(cls, plugin_path: str) -> None:\n   |         \"\"\"Import a user-defined reasoning parser.\"\"\"\n   |         import_plugin(plugin_path)\n2. vllm/entrypoints/common/cli_args.py:576-583  init_parser_plugin  [id 60928]\n   def init_parser_plugin(args: argparse.Namespace):\n   |     from vllm.reasoning import ReasoningParserManager\n   | \n   |     if args.tool_parser_plugin and len(args.tool_parser_plugin) > 3:\n   |         ToolParserManager.import_tool_parser(args.tool_parser_plugin)\n   | \n   |     if args.reasoning_parser_plugin and len(args.reasoning_parser_plugin) > 3:\n3. vllm/reasoning/abs_reasoning_parsers.py:265-286  ReasoningParserManager._load_lazy_parser  [id 90872]\n   def _load_lazy_parser(cls, name: str) -> type[ReasoningParser]:\n   Import and register a lazily loaded reasoning parser.\n   |     def _load_lazy_parser(cls, name: str) -> type[ReasoningParser]:\n   |         \"\"\"Import and register a lazily loaded reasoning parser.\"\"\"\n   |         module_path, class_name = cls.lazy_parsers[name]\n   |         try:\n   |             mod = importlib.import_module(module_path)\n   |             parser_cls = getattr(mod, class_name)\n4. tests/entrypoints/cli/test_serve.py:17-42  test_headless_imports_reasoning_parser_plugin_before_engine_config  [id 20955]\n   def test_headless_imports_reasoning_parser_plugin_before_engine_config():\n   |     plugin_path = \"/tmp/custom_reasoning_parser.py\"\n   |     args = argparse.Namespace(\n   |         api_server_count=0,\n   |         reasoning_parser_plugin=plugin_path,\n   |     )\n   |     engine_args = MagicMock()\n5. vllm/entrypoints/cli/serve.py:181-266  run_headless  [id 60756]\n   def run_headless(args: argparse.Namespace):\n   |     if args.api_server_count > 1:\n   |         raise ValueError(\"api_server_count can't be set in headless mode\")\n   | \n   |     if args.reasoning_parser_plugin and len(args.reasoning_parser_plugin) > 3:\n   |         ReasoningParserManager.import_reasoning_parser(args.reasoning_parser_plugin)\n   | \n6. rust/src/chat/src/parser/reasoning/mod.rs:53-57  ReasoningParserFactory.global  [id 10256]\n   pub fn global() -> &'static Self\n   Get the global reasoning parser factory with built-in registrations and\n   |         static INSTANCE: LazyLock<ReasoningParserFactory> =\n   |             LazyLock::new(ReasoningParserFactory::new);\n   |         &INSTANCE\n   |     }\n7. vllm/parser/parser_manager.py:56-72  ParserManager.get_reasoning_parser  [id 89979]\n   def get_reasoning_parser( cls, reasoning_parser_name: str | None, ) -> type[ReasoningParser] | None:\n   Get the reasoning parser based on the name.\n   |     def get_reasoning_parser(\n   |         cls,\n   |         reasoning_parser_name: str | None,\n   |     ) -> type[ReasoningParser] | None:\n   |         \"\"\"Get the reasoning parser based on the name.\"\"\"\n   |         from vllm.reasoning import ReasoningParserManager\n8. vllm/reasoning/__init__.py:195-198  register_lazy_reasoning_parsers  [id 90850]\n   def register_lazy_reasoning_parsers():\n   |     for name, (file_name, class_name) in _REASONING_PARSERS_TO_REGISTER.items():\n   |         module_path = f\"vllm.reasoning.{file_name}\"\n   |         ReasoningParserManager.register_lazy_module(name, module_path, class_name)\n9. vllm/reasoning/abs_reasoning_parsers.py:260-263  ReasoningParserManager.list_registered  [id 90871]\n   def list_registered(cls) -> list[str]:\n   Return names of all eagerly and lazily registered reasoning parsers.\n   |     def list_registered(cls) -> list[str]:\n   |         \"\"\"Return names of all eagerly and lazily registered reasoning parsers.\"\"\"\n   |         return sorted(set(cls.reasoning_parsers.keys()) | set(cls.lazy_parsers.keys()))\n10. tests/entrypoints/cli/test_serve.py:35-37  test_headless_imports_reasoning_parser_plugin_before_engine_config.create_engine_config  [id 20956]\n   def create_engine_config(**kwargs):\n   |             import_plugin.assert_called_once_with(plugin_path)\n   |             raise _StopAfterEngineConfig\n\nLost the trail later? Search again in different words.",
+     "error": false
+    }
+   ]
+  },
+  "schemas": {
+   "v2": {
+    "search_code": {
+     "properties": {
+      "query": {
+       "title": "Query",
+       "type": "string"
+      },
+      "k": {
+       "default": 10,
+       "title": "K",
+       "type": "integer"
+      },
+      "path_prefix": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Path Prefix"
+      },
+      "kinds": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Kinds"
+      },
+      "tests": {
+       "default": "include",
+       "title": "Tests",
+       "type": "string"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "type": "object",
+     "title": "search_codeArguments"
+    },
+    "get_chunk": {
+     "properties": {
+      "ref": {
+       "title": "Ref",
+       "type": "string"
+      }
+     },
+     "required": [
+      "ref"
+     ],
+     "type": "object",
+     "title": "get_chunkArguments"
+    },
+    "refresh_index": {
+     "properties": {},
+     "type": "object",
+     "title": "refresh_indexArguments"
+    },
+    "index_status": {
+     "properties": {},
+     "type": "object",
+     "title": "index_statusArguments"
+    }
+   },
+   "v3": {
+    "search_code": {
+     "properties": {
+      "query": {
+       "title": "Query",
+       "type": "string"
+      },
+      "k": {
+       "default": 10,
+       "title": "K",
+       "type": "integer"
+      },
+      "path_prefix": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Path Prefix"
+      },
+      "kinds": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Kinds"
+      },
+      "tests": {
+       "default": "include",
+       "title": "Tests",
+       "type": "string"
+      },
+      "intent": {
+       "default": "",
+       "title": "Intent",
+       "type": "string"
+      },
+      "symptom": {
+       "default": "",
+       "title": "Symptom",
+       "type": "string"
+      },
+      "anchors": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Anchors"
+      },
+      "locations": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Locations"
+      }
+     },
+     "required": [
+      "query"
+     ],
+     "type": "object",
+     "title": "search_codeArguments"
+    },
+    "get_chunk": {
+     "properties": {
+      "ref": {
+       "title": "Ref",
+       "type": "string"
+      }
+     },
+     "required": [
+      "ref"
+     ],
+     "type": "object",
+     "title": "get_chunkArguments"
+    },
+    "refresh_index": {
+     "properties": {},
+     "type": "object",
+     "title": "refresh_indexArguments"
+    },
+    "index_status": {
+     "properties": {},
+     "type": "object",
+     "title": "index_statusArguments"
+    }
+   }
+  },
+  "descriptions": {
+   "v2": {
+    "search_code": "Find code from a plain-words description when you have no exact name to grep for: \"where do users log in?\", \"why are disabled users still logged in?\". Use it first on a new task, and again whenever you lose the trail. Returns ranked functions, classes and code blocks with file:line, signature and a short preview. Once you have an exact identifier or string, use grep. Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests (include, exclude, only).",
+    "get_chunk": "Return the full source of one function plus its callers and callees. `ref` is a chunk id from search_code, a `path:line` location, or a `path::qualname` key.",
+    "refresh_index": "Check every file now and index what changed. The index follows your edits on its own; call this after git checkout, pull or rebase, or when results look out of date. Waits up to a minute and says what changed.",
+    "index_status": "Report whether the code index is ready or still indexing (with progress), counts, models in use, the indexed git commit, anything still being indexed, and which files are not indexed and why (too large, generated, not code, ignored)."
+   },
+   "v3": {
+    "search_code": "Find code from a plain-words description of what it does: \"where do users log in?\", \"why are disabled users still logged in?\". Use it:\n- for your first search on a task, unless you already have a clear anchor: an exact function, class or file name, or an error string, that leads straight to the code. Fill in intent, symptom and anchors too (below);\n- whenever you lose the trail and don't know which direction to grep: a grep found nothing or too many files, or several searches in a row found no file worth opening.\nReturns ranked functions, classes and code blocks with file:line, signature and a short preview. Once you have an exact name or string, grep or read the file. k: how many results, 1 to 10 (default 10). Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests (include, exclude, only).\nOptional, most useful on your first search of a task, written from the task: intent (one or two sentences: what the code that has to change does, in the words source code would use), symptom (one sentence: the wrong behaviour or the missing feature), anchors (up to 20 strings copied exactly from the task that may appear in the code: identifiers, option names, file names, fragments of error messages), locations (files or functions that the task itself says are where the change belongs; their code is shown first).",
+    "get_chunk": "Return the full source of one function plus its callers and callees. `ref` is a chunk id from search_code, a `path:line` location, or a `path::qualname` key.",
+    "refresh_index": "Check every file now and index what changed. The index follows your edits on its own; call this after git checkout, pull or rebase, or when results look out of date. Waits up to a minute and says what changed.",
+    "index_status": "Report whether the code index is ready or still indexing (with progress), counts, models in use, the indexed git commit, anything still being indexed, and which files are not indexed and why (too large, generated, not code, ignored)."
+   }
+  }
+ }
+}

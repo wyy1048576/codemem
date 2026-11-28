@@ -1,0 +1,14 @@
+[hold 0.00] server pid 42337
+0.93 codemem INFO codemem MCP server for <codemem>/.cache/review/compare/tasks/pandas-dev__pandas-67025/repo (index <codemem>/.cache/review/compare/idx/v3s1-v3t-67025-L2-haiku-r1)
+0.93 codemem INFO watching <codemem>/.cache/review/compare/tasks/pandas-dev__pandas-67025/repo
+8.58 W1127 18:16:31.711000 42337 torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+10.47 codemem INFO loading jinaai/jina-code-embeddings-0.5b on mps (float16)
+10.48 codemem INFO Loading SentenceTransformer model from jinaai/jina-code-embeddings-0.5b.
+10.72 
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 5311.63it/s]
+10.90 codemem INFO Loaded 10 prompts with these keys: ['nl2code_query', 'nl2code_document', 'code2code_query', 'code2code_document', 'code2nl_query', 'code2nl_document', 'code2completion_query', 'code2completion_document', 'qa_query', 'qa_document']
+[hold 10.90] model marker seen
+[hold 20.91] handshake released
+[hold 27.09] signal 2: stopping the server
+[hold 27.13] server exited with -15

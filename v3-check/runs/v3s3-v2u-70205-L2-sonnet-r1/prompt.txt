@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/errors/__init__.py:391  EmptyDataError
+pandas/io/excel/_base.py:840  BaseExcelReader._parse_sheet
+pandas/tests/io/excel/test_readers.py:1804  TestExcelFileRead.test_header_with_index_col
+pandas/io/excel/_util.py:236  fill_mi_header
+pandas/io/parsers/readers.py:3309  TextParser
+pandas/tests/io/excel/test_readers.py:1519  TestReaders.test_multiheader_two_blank_lines
+pandas/io/excel/_base.py:1573  ExcelFile
+pandas/io/excel/_base.py:166  read_excel
+pandas/io/excel/_base.py:1482  inspect_excel_format
+pandas/tests/io/excel/test_readers.py:1795  TestExcelFileRead.test_read_excel_header_index_out_of_range
+pandas/tests/io/excel/test_writers.py:82  TestRoundTrip
+pandas/io/parsers/readers.py:783  _read_csv_parallel
+pandas/tests/io/excel/test_openpyxl.py:450  test_read_empty_with_blank_row
+pandas/tests/io/excel/test_writers.py:1217  TestExcelWriter.test_duplicated_multiindex_columns
+pandas/io/excel/_util.py:271  pop_header_name
+pandas/io/common.py:204  validate_header_arg
+pandas/io/excel/_base.py:1731  ExcelFile.parse
+pandas/tests/io/excel/test_readers.py:1259  TestReaders.test_read_excel_multiindex_header_only
+pandas/io/excel/_base.py:645  BaseExcelReader._check_skiprows_func
+pandas/tests/io/formats/test_to_csv.py:30  TestToCSV.test_to_csv_with_single_column
+
+pandas raises an error when reading an Excel file with a two-row header and the first column as index, where the same CSV gives an empty DataFrame. Please fix.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

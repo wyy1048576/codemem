@@ -1,0 +1,5 @@
+A table with a two-level row index shows distinct labels as one merged group when they print identically, like large floats shown as 2.015000e+11. Please fix.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

@@ -1,0 +1,104 @@
+{
+ "_note": "reduced: codemem's tool definitions in full, other tools by name only, and codemem's server instructions if the request carried them",
+ "tools": [
+  {
+   "name": "Bash"
+  },
+  {
+   "name": "Read"
+  },
+  {
+   "name": "mcp__codemem__get_chunk",
+   "description": "Return the full source of one function plus its callers and callees. `ref` is a chunk id from search_code, a `path:line` location, or a `path::qualname` key.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "ref": {
+      "title": "Ref",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ref"
+    ],
+    "title": "get_chunkArguments"
+   }
+  },
+  {
+   "name": "mcp__codemem__index_status",
+   "description": "Report whether the code index is ready or still indexing (with progress), counts, models in use, the indexed git commit, anything still being indexed, and which files are not indexed and why (too large, generated, not code, ignored).",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "title": "index_statusArguments"
+   }
+  },
+  {
+   "name": "mcp__codemem__refresh_index",
+   "description": "Check every file now and index what changed. The index follows your edits on its own; call this after git checkout, pull or rebase, or when results look out of date. Waits up to a minute and says what changed.",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "title": "refresh_indexArguments"
+   }
+  },
+  {
+   "name": "mcp__codemem__search_code",
+   "description": "Find code from a plain-words description when you have no exact name to grep for: \"where do users log in?\", \"why are disabled users still logged in?\". Use it first on a new task, and again whenever you lose the trail. Returns ranked functions, classes and code blocks with file:line, signature and a short preview. Once you have an exact identifier or string, use grep. Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests (include, exclude, only).",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "title": "Query",
+      "type": "string"
+     },
+     "k": {
+      "default": 10,
+      "title": "K",
+      "type": "integer"
+     },
+     "path_prefix": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Path Prefix"
+     },
+     "kinds": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Kinds"
+     },
+     "tests": {
+      "default": "include",
+      "title": "Tests",
+      "type": "string"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "title": "search_codeArguments"
+   }
+  }
+ ],
+ "system": [],
+ "messages": [
+  "codemem searches this repository by meaning: every function and class, with callers and tests.\nCall search_code whenever you have no concrete lead:\n- at the start of a task, before any grep or file listing: describe the behaviour in plain words;\n- whenever you lose the trail: a grep returned nothing or too much, or you don't know which file or symbol to open next.\nOnce you have an exact name, path or error string, grep or read the file directly.\n- get_chunk(ref): read one result in full with its callers and callees.\n- refresh_index(): after git checkout, pull or rebase (the index follows your own edits)."
+ ]
+}

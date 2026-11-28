@@ -1,0 +1,12 @@
+{
+ "run": "v3s2-v3t-51866-L2-haiku-r1",
+ "arm": "v3-tool",
+ "task": "vllm-project__vllm-51866",
+ "level": "L2",
+ "model": "claude-haiku-5-5",
+ "cell": "v3s2-51866-L2-haiku",
+ "cd": true,
+ "block": "v3s2",
+ "rep": 1,
+ "src": "<codemem>/.cache/wt/compare-pr85/src"
+}

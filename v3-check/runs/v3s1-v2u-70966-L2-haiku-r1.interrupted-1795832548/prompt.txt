@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/core/arrays/categorical.py:259  Categorical
+pandas/core/generic.py:8946  NDFrame._clip_with_one_bound
+pandas/core/series.py:6642  Series.between
+pandas/core/generic.py:8983  NDFrame.clip
+pandas/core/arrays/categorical.py:2154  Categorical.check_for_ordered
+pandas/core/arrays/categorical.py:1438  Categorical.reorder_categories
+pandas/core/indexes/datetimelike.py:599  DatetimeIndexOpsMixin._maybe_cast_slice_bound
+pandas/tests/io/pytables/test_categorical.py:446  test_categorical_where_ordering_op_ordered
+pandas/core/indexes/category.py:320  CategoricalIndex.reorder_categories
+pandas/core/indexes/datetimes.py:2124  DatetimeIndex._parsed_string_to_bounds
+pandas/core/indexes/interval.py:1396  IntervalIndex._maybe_cast_slice_bound
+pandas/core/indexes/category.py:54  CategoricalIndex
+pandas/core/dtypes/concat.py:230  union_categoricals
+pandas/core/arrays/categorical.py:1248  Categorical.set_categories
+pandas/core/resample.py:2162  DatetimeIndexResampler._adjust_binner_for_upsample
+pandas/tests/arrays/categorical/test_analytics.py:29  TestCategoricalAnalytics.test_min_max_ordered
+pandas/tests/groupby/test_categorical.py:645  test_dataframe_categorical_ordered_observed_sort
+pandas/tests/groupby/test_categorical.py:2040  test_category_order_transformer
+pandas/tests/reductions/test_reductions.py:599  TestIndexReductions.test_min_max_categorical
+pandas/tests/groupby/test_categorical.py:2071  test_category_order_head_tail
+
+Limiting an ordered categorical Series to a lower and upper bound gives wrong values; the bounds get ordered by value instead of by category order. Please fix.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

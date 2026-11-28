@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/tests/extension/base/methods.py:866  BaseMethodsTests.test_equals_same_data_different_object
+pandas/_libs/hashtable.pyi:283  objects_are_equal
+pandas/tests/util/test_hashing.py:154  test_hash_pandas_object
+pandas/core/dtypes/inference.py:392  is_hashable
+pandas/tests/series/test_arithmetic.py:645  TestSeriesComparison.test_categorical_comparisons
+pandas/_testing/asserters.py:534  assert_attr_equal
+pandas/tests/apply/test_frame_transform.py:183  test_transform_failure_typeerror
+pandas/tests/series/test_arithmetic.py:507  TestSeriesFlexComparison.test_eq_objects.Thing
+pandas/tests/util/test_assert_series_equal.py:408  test_identical_nested_series_is_equal
+pandas/core/arrays/base.py:613  ExtensionArray.__eq__
+pandas/core/series.py:7604  Series.eq
+pandas/tests/series/test_arithmetic.py:504  TestSeriesFlexComparison.test_eq_objects
+pandas/core/frame.py:10725  DataFrame.eq
+pandas/tests/io/pytables/test_append.py:722  test_append_raise
+pandas/tests/series/methods/test_equals.py:87  test_equals_mismatched_nas
+pandas/tests/groupby/test_groupby.py:421  test_frame_multi_key_function_list_partial_failure
+pandas/tests/series/methods/test_equals.py:47  test_equals_false_negative
+pandas/tests/util/test_assert_series_equal.py:51  _assert_not_series_equal_both
+pandas/tests/dtypes/test_missing.py:651  test_array_equivalent_nested_mixed_list
+pandas/tests/series/test_arithmetic.py:701  TestSeriesComparison.test_unequal_categorical_comparison_raises_type_error
+
+pandas' Series/DataFrame equality assertion crashes with an unhashable-list TypeError when object columns hold lists of different nesting. It should raise a normal assertion failure.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

@@ -1,0 +1,287 @@
+{
+ "pandas-dev__pandas-67025": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   1,
+   2,
+   5,
+   6,
+   7,
+   9,
+   10,
+   19
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-70966": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   2,
+   4
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-71232": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   1,
+   2,
+   12,
+   19
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-69779": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   4,
+   16,
+   17
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-71248": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   1,
+   3,
+   4,
+   5
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-71129": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   1,
+   2,
+   5,
+   6,
+   7,
+   8,
+   9,
+   11,
+   12,
+   13,
+   15,
+   16,
+   17,
+   18,
+   19
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-70828": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   3
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-69924": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   1
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-70205": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   2,
+   7,
+   8,
+   9,
+   17,
+   19
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-70734": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   1,
+   2,
+   3,
+   6,
+   7,
+   12,
+   14,
+   15,
+   18,
+   20
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-68278": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   2,
+   3,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   12,
+   15,
+   16,
+   17
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-68195": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   8,
+   11,
+   14,
+   15
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-67897": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   2,
+   3,
+   8
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-69015": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-68945": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [
+   19
+  ],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-68090": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [],
+  "differs_at": []
+ },
+ "pandas-dev__pandas-66352": {
+  "lines": 20,
+  "saved": true,
+  "same_as_saved": true,
+  "same_request": true,
+  "gold_file_ranks": [],
+  "differs_at": []
+ },
+ "vllm-project__vllm-51573": {
+  "lines": 20,
+  "saved": false,
+  "same_as_saved": null,
+  "same_request": null,
+  "gold_file_ranks": [
+   8
+  ],
+  "differs_at": []
+ },
+ "vllm-project__vllm-54196": {
+  "lines": 20,
+  "saved": false,
+  "same_as_saved": null,
+  "same_request": null,
+  "gold_file_ranks": [
+   7
+  ],
+  "differs_at": []
+ },
+ "vllm-project__vllm-56576": {
+  "lines": 20,
+  "saved": false,
+  "same_as_saved": null,
+  "same_request": null,
+  "gold_file_ranks": [
+   7
+  ],
+  "differs_at": []
+ },
+ "vllm-project__vllm-60310": {
+  "lines": 20,
+  "saved": false,
+  "same_as_saved": null,
+  "same_request": null,
+  "gold_file_ranks": [
+   1,
+   4,
+   15,
+   16
+  ],
+  "differs_at": []
+ },
+ "vllm-project__vllm-51866": {
+  "lines": 20,
+  "saved": false,
+  "same_as_saved": null,
+  "same_request": null,
+  "gold_file_ranks": [],
+  "differs_at": []
+ },
+ "vllm-project__vllm-53124": {
+  "lines": 20,
+  "saved": false,
+  "same_as_saved": null,
+  "same_request": null,
+  "gold_file_ranks": [
+   5
+  ],
+  "differs_at": []
+ }
+}

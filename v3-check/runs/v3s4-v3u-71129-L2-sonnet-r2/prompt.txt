@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/io/pytables.py:1574  HDFStore.append
+pandas/io/pytables.py:1345  HDFStore.put
+pandas/core/generic.py:2650  NDFrame.to_hdf
+pandas/tests/io/pytables/test_categorical.py:379  test_categorical_index_table_append
+pandas/io/pytables.py:3924  GenericFixed.write_array
+pandas/io/pytables.py:368  read_hdf
+pandas/io/pytables.py:4816  Table._create_axes
+pandas/io/pytables.py:311  to_hdf
+pandas/io/pytables.py:2360  HDFStore._write_to_group
+pandas/tests/io/pytables/test_categorical.py:322  test_categorical_index_extension_categories
+pandas/io/pytables.py:557  HDFStore
+pandas/io/pytables.py:5585  AppendableTable.write_data_chunk
+pandas/io/pytables.py:1187  HDFStore.select_as_multiple
+pandas/tests/io/pytables/test_categorical.py:289  test_categorical_index_all_nan
+pandas/io/pytables.py:289  _tables
+pandas/io/pytables.py:6168  _convert_index
+pandas/io/pytables.py:204  <block>
+pandas/io/pytables.py:2259  HDFStore._validate_format
+pandas/io/pytables.py:2438  HDFStore._identify_group
+pandas/tests/io/pytables/test_categorical.py:185  test_categorical_nan_rep_collision_append
+
+Appending float categories to integer categories in an HDF5 table now fails with a low-level buffer type error instead of the different-categories error. Please restore it.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

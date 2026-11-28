@@ -1,0 +1,278 @@
+{
+ "v3fake-grep-67025": {
+  "status": "finished",
+  "why": [],
+  "init_s": 0.9,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read"
+  ],
+  "no_upfront": true,
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ },
+ "v3fake-v2t-67025": {
+  "status": "finished",
+  "why": [],
+  "init_s": 21.7,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read",
+   "mcp__codemem__get_chunk",
+   "mcp__codemem__index_status",
+   "mcp__codemem__refresh_index",
+   "mcp__codemem__search_code"
+  ],
+  "search_code_description_is": "v2",
+  "all_codemem_descriptions_match_v2": true,
+  "search_code_inputs": [
+   "k",
+   "kinds",
+   "path_prefix",
+   "query",
+   "tests"
+  ],
+  "schema_matches_v2": true,
+  "other_text_absent": true,
+  "codemem_tool_chars": 2144,
+  "no_upfront": true,
+  "search_result": {
+   "cards": 10,
+   "error": false,
+   "keyword_only": false,
+   "head": "1. web/tests/test_pandas_web.py:23-25  MockResponse.raise_for_status  [id 40607]\n   def raise_for_status() -> None:\n   |     def raise_for_status() -> None:\n   "
+  },
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ },
+ "v3fake-v3t-67025": {
+  "status": "finished",
+  "why": [],
+  "init_s": 21.0,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read",
+   "mcp__codemem__get_chunk",
+   "mcp__codemem__index_status",
+   "mcp__codemem__refresh_index",
+   "mcp__codemem__search_code"
+  ],
+  "search_code_description_is": "v3",
+  "all_codemem_descriptions_match_v3": true,
+  "search_code_inputs": [
+   "anchors",
+   "intent",
+   "k",
+   "kinds",
+   "locations",
+   "path_prefix",
+   "query",
+   "symptom",
+   "tests"
+  ],
+  "schema_matches_v3": true,
+  "other_text_absent": true,
+  "codemem_tool_chars": 3405,
+  "no_upfront": true,
+  "search_result": {
+   "cards": 10,
+   "error": false,
+   "keyword_only": false,
+   "head": "1. pandas/core/arrays/arrow/array.py:1214-1216  ArrowExtensionArray.__arrow_array__  [id 7107]\n   def __arrow_array__(self, type=None):\n   Convert myself to a p"
+  },
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ },
+ "v3fake-v2u-67025": {
+  "status": "finished",
+  "why": [],
+  "init_s": 21.3,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read",
+   "mcp__codemem__get_chunk",
+   "mcp__codemem__index_status",
+   "mcp__codemem__refresh_index",
+   "mcp__codemem__search_code"
+  ],
+  "search_code_description_is": "v2",
+  "all_codemem_descriptions_match_v2": true,
+  "search_code_inputs": [
+   "k",
+   "kinds",
+   "path_prefix",
+   "query",
+   "tests"
+  ],
+  "schema_matches_v2": true,
+  "other_text_absent": true,
+  "codemem_tool_chars": 2144,
+  "prompt_head": true,
+  "prompt_lines": 20,
+  "lines_in_first_request": true,
+  "lines_are_463171c_blocks": true,
+  "search_result": {
+   "cards": 10,
+   "error": false,
+   "keyword_only": false,
+   "head": "1. web/tests/test_pandas_web.py:23-25  MockResponse.raise_for_status  [id 40607]\n   def raise_for_status() -> None:\n   |     def raise_for_status() -> None:\n   "
+  },
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ },
+ "v3fake-v3u-67025": {
+  "status": "finished",
+  "why": [],
+  "init_s": 21.2,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read",
+   "mcp__codemem__get_chunk",
+   "mcp__codemem__index_status",
+   "mcp__codemem__refresh_index",
+   "mcp__codemem__search_code"
+  ],
+  "search_code_description_is": "v3",
+  "all_codemem_descriptions_match_v3": true,
+  "search_code_inputs": [
+   "anchors",
+   "intent",
+   "k",
+   "kinds",
+   "locations",
+   "path_prefix",
+   "query",
+   "symptom",
+   "tests"
+  ],
+  "schema_matches_v3": true,
+  "other_text_absent": true,
+  "codemem_tool_chars": 3405,
+  "prompt_head": true,
+  "prompt_lines": 20,
+  "lines_in_first_request": true,
+  "lines_are_463171c_blocks": true,
+  "search_result": {
+   "cards": 10,
+   "error": false,
+   "keyword_only": false,
+   "head": "1. pandas/core/arrays/arrow/array.py:1214-1216  ArrowExtensionArray.__arrow_array__  [id 7107]\n   def __arrow_array__(self, type=None):\n   Convert myself to a p"
+  },
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ },
+ "v3fake-grep-51573": {
+  "status": "finished",
+  "why": [],
+  "init_s": 0.4,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read"
+  ],
+  "no_upfront": true,
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ },
+ "v3fake-v2u-51573": {
+  "status": "finished",
+  "why": [],
+  "init_s": 22.5,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read",
+   "mcp__codemem__get_chunk",
+   "mcp__codemem__index_status",
+   "mcp__codemem__refresh_index",
+   "mcp__codemem__search_code"
+  ],
+  "search_code_description_is": "v2",
+  "all_codemem_descriptions_match_v2": true,
+  "search_code_inputs": [
+   "k",
+   "kinds",
+   "path_prefix",
+   "query",
+   "tests"
+  ],
+  "schema_matches_v2": true,
+  "other_text_absent": true,
+  "codemem_tool_chars": 2144,
+  "prompt_head": true,
+  "prompt_lines": 20,
+  "lines_in_first_request": true,
+  "lines_are_463171c_blocks": true,
+  "search_result": {
+   "cards": 10,
+   "error": false,
+   "keyword_only": false,
+   "head": "1. rust/src/server/src/middleware/offload.rs:101-103  Response.request_runtime_error_response  [id 14954]\n   fn request_runtime_error_response() -> Self\n   |   "
+  },
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ },
+ "v3fake-v3u-51573": {
+  "status": "finished",
+  "why": [],
+  "init_s": 22.9,
+  "hook_events": 0,
+  "settings_flag": false,
+  "tools": [
+   "Bash",
+   "Read",
+   "mcp__codemem__get_chunk",
+   "mcp__codemem__index_status",
+   "mcp__codemem__refresh_index",
+   "mcp__codemem__search_code"
+  ],
+  "search_code_description_is": "v3",
+  "all_codemem_descriptions_match_v3": true,
+  "search_code_inputs": [
+   "anchors",
+   "intent",
+   "k",
+   "kinds",
+   "locations",
+   "path_prefix",
+   "query",
+   "symptom",
+   "tests"
+  ],
+  "schema_matches_v3": true,
+  "other_text_absent": true,
+  "codemem_tool_chars": 3405,
+  "prompt_head": true,
+  "prompt_lines": 20,
+  "lines_in_first_request": true,
+  "lines_are_463171c_blocks": true,
+  "search_result": {
+   "cards": 10,
+   "error": false,
+   "keyword_only": false,
+   "head": "1. vllm/utils/argparse_utils.py:218-220  FlexibleArgumentParser._FlexibleArgumentGroup.__init__  [id 94218]\n   def __init__(self, container, *args, **kwargs):\n "
+  },
+  "foreign": [],
+  "git_section_empty": true,
+  "agent_files_loaded": []
+ }
+}

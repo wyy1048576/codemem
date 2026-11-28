@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+vllm/entrypoints/serve/utils/request_logger.py:73  RequestLogger.log_request_body
+tests/entrypoints/serve/utils/test_request_logger.py:277  test_request_logger_log_request_body_truncation
+vllm/entrypoints/serve/middleware/log_response.py:60  SSEDecoder.get_complete_content
+vllm/entrypoints/serve/utils/request_logger.py:21  RequestLogger.__init__
+tests/entrypoints/serve/utils/test_request_logger.py:92  test_request_logger_log_outputs_with_truncation
+vllm/entrypoints/serve/middleware/log_response.py:137  _log_non_streaming_response
+vllm/entrypoints/serve/middleware/log_response.py:100  _log_streaming_response.buffered_iterator
+tests/entrypoints/serve/utils/test_request_logger.py:243  test_streaming_complete_logs_full_text_content
+tests/entrypoints/serve/utils/test_request_logger.py:128  test_request_logger_log_output_token_ids_require_debug
+vllm/entrypoints/serve/middleware/log_response.py:95  _log_streaming_response
+vllm/entrypoints/serve/middleware/log_response.py:51  SSEDecoder.extract_content
+tests/entrypoints/launchers/test_run_batch.py:338  _BatchHTTPHandler._send_body
+vllm/entrypoints/serve/middleware/log_response.py:55  SSEDecoder.add_content
+tests/entrypoints/generate/structured_decisions/test_strategies.py:1131  test_decisions_logging_includes_receipt_and_body
+vllm/entrypoints/serve/utils/request_logger.py:91  RequestLogger.log_outputs
+vllm/entrypoints/serve/utils/request_logger.py:20  RequestLogger
+rust/src/server/src/routes/tests.rs:91  request_output_with_logprobs
+rust/src/engine-core-client/src/tests/client.rs:528  multipart_logprob_output_frames
+tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py:25  _fake_request
+tests/entrypoints/launchers/test_run_batch.py:345  _BatchHTTPHandler._write_body
+
+With debug logging on and no maximum log length set, the logged request body loses its last character. The whole body should be logged.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

@@ -1,0 +1,12 @@
+{
+ "run": "v3s3-grep-70205-L2-sonnet-r1",
+ "arm": "grep",
+ "task": "pandas-dev__pandas-70205",
+ "level": "L2",
+ "model": "claude-sonnet-5-5",
+ "cell": "v3s3-70205-L2-sonnet",
+ "cd": true,
+ "block": "v3s3",
+ "rep": 1,
+ "src": null
+}

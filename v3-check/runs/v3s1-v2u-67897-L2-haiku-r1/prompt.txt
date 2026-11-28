@@ -1,0 +1,27 @@
+Possibly relevant code, from a search by meaning (it may be wrong):
+pandas/io/_util.py:334  _normalize_timezone_dtypes
+pandas/core/arrays/arrow/extension_types.py:60  ArrowIntervalType
+pandas/core/arrays/interval.py:1608  IntervalArray.__arrow_array__
+pandas/tests/io/test_parquet.py:1060  TestParquetPyArrow.test_timezone_aware_index
+pandas/tests/io/test_parquet.py:145  timezone_aware_date_list
+pandas/tests/io/parser/dtypes/test_dtypes_basic.py:538  test_explicit_arrow_temporal_dtype
+pandas/tests/io/test_parquet.py:784  TestParquetPyArrow.test_basic
+pandas/core/arrays/arrow/extension_types.py:108  ArrowIntervalType.to_pandas_dtype
+pandas/core/arrays/arrow/array.py:4603  ArrowExtensionArray._dt_to_pydatetime
+pandas/tests/io/test_parquet.py:1231  TestParquetPyArrow.test_datetime64_column_index_roundtrip
+pandas/core/arrays/arrow/array.py:4642  ArrowExtensionArray._dt_tz_convert
+pandas/tests/extension/test_arrow.py:1057  TestArrowArray.test_values_for_json
+pandas/core/arrays/arrow/array.py:4278  ArrowExtensionArray._dt_to_pytimedelta
+pandas/_libs/tslibs/timestamps.pyi:130  Timestamp.timestamp
+pandas/tests/io/test_parquet.py:1154  TestParquetPyArrow.test_empty_column_multiindex
+pandas/tests/io/test_util.py:1  <block>
+pandas/tests/arrays/interval/test_interval_pyarrow.py:83  test_arrow_table_roundtrip
+pandas/io/_util.py:79  arrow_table_to_pandas
+pandas/tests/io/test_parquet.py:1532  TestParquetFastParquet.test_timezone_aware_index
+pandas/tests/arrays/interval/test_interval_pyarrow.py:25  test_arrow_array
+
+Converting pandas intervals with timezone-aware datetime bounds to pyarrow fails. Make it work, and make it round-trip through parquet back to the same dtype.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}

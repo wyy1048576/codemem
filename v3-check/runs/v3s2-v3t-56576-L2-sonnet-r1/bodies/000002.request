@@ -1,0 +1,144 @@
+{
+ "_note": "reduced: codemem's tool definitions in full, other tools by name only, and codemem's server instructions if the request carried them",
+ "tools": [
+  {
+   "name": "Bash"
+  },
+  {
+   "name": "Read"
+  },
+  {
+   "name": "mcp__codemem__get_chunk",
+   "description": "Return the full source of one function plus its callers and callees. `ref` is a chunk id from search_code, a `path:line` location, or a `path::qualname` key.",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "ref": {
+      "title": "Ref",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ref"
+    ],
+    "title": "get_chunkArguments"
+   }
+  },
+  {
+   "name": "mcp__codemem__index_status",
+   "description": "Report whether the code index is ready or still indexing (with progress), counts, models in use, the indexed git commit, anything still being indexed, and which files are not indexed and why (too large, generated, not code, ignored).",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "title": "index_statusArguments"
+   }
+  },
+  {
+   "name": "mcp__codemem__refresh_index",
+   "description": "Check every file now and index what changed. The index follows your edits on its own; call this after git checkout, pull or rebase, or when results look out of date. Waits up to a minute and says what changed.",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "title": "refresh_indexArguments"
+   }
+  },
+  {
+   "name": "mcp__codemem__search_code",
+   "description": "Find code from a plain-words description of what it does: \"where do users log in?\", \"why are disabled users still logged in?\". Use it:\n- for your first search on a task, unless you already have a clear anchor: an exact function, class or file name, or an error string, that leads straight to the code. Fill in intent, symptom and anchors too (below);\n- whenever you lose the trail and don't know which direction to grep: a grep found nothing or too many files, or several searches in a row found no file worth opening.\nReturns ranked functions, classes and code blocks with file:line, signature and a short preview. Once you have an exact name or string, grep or read the file. k: how many results, 1 to 10 (default 10). Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests (include, exclude, only).\nOptional, most useful on your first search of a task, written from the task: intent (one or two sentences: what the code that has to change does, in the words source code would use), symptom (one sentence: the wrong behaviour or the missing feature), anchors (up to 20 strings copied exactly from the task that may appear in the code: identifiers, option names, file names, fragments of error messages), locations (files or functions that the task itself says are where the change belongs; their code is shown first).",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "title": "Query",
+      "type": "string"
+     },
+     "k": {
+      "default": 10,
+      "title": "K",
+      "type": "integer"
+     },
+     "path_prefix": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Path Prefix"
+     },
+     "kinds": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Kinds"
+     },
+     "tests": {
+      "default": "include",
+      "title": "Tests",
+      "type": "string"
+     },
+     "intent": {
+      "default": "",
+      "title": "Intent",
+      "type": "string"
+     },
+     "symptom": {
+      "default": "",
+      "title": "Symptom",
+      "type": "string"
+     },
+     "anchors": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Anchors"
+     },
+     "locations": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Locations"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "title": "search_codeArguments"
+   }
+  }
+ ],
+ "system": [],
+ "messages": [
+  "codemem searches this repository by meaning: every function and class, with callers and tests.\nCall search_code, describing the behaviour in plain words:\n- for your first search on a task, before any grep or file listing, unless you already have a clear anchor: an exact function, class or file name, or an error string, that leads straight to the code. Fill in its intent, symptom and anchors from the task too;\n- whenever you lose the trail and don't know which direction to grep: a grep found nothing or too many files, or several searches in a row found no file worth opening.\nOnce you have an exact name, path or error string, grep or read the file directly.\n- get_chunk(ref): read one result in full with its callers and callees.\n- refresh_index(): after git checkout, pull or rebase (the index follows your own edits)."
+ ]
+}

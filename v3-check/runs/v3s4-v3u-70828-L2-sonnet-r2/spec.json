@@ -1,0 +1,12 @@
+{
+ "run": "v3s4-v3u-70828-L2-sonnet-r2",
+ "arm": "v3",
+ "task": "pandas-dev__pandas-70828",
+ "level": "L2",
+ "model": "claude-sonnet-5-5",
+ "cell": "v3s4-70828-L2-sonnet",
+ "cd": true,
+ "block": "v3s4",
+ "rep": 2,
+ "src": "<codemem>/.cache/wt/compare-pr85/src"
+}

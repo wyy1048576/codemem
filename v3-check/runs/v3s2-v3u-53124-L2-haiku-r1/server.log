@@ -1,0 +1,14 @@
+[hold 0.00] server pid 28619
+0.57 codemem INFO codemem MCP server for <codemem>/.cache/review/compare/tasks/vllm-project__vllm-53124/repo (index <codemem>/.cache/review/compare/idx/v3s2-v3u-53124-L2-haiku-r1)
+0.58 codemem INFO watching <codemem>/.cache/review/compare/tasks/vllm-project__vllm-53124/repo
+6.62 W1127 20:44:41.365000 28619 torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+7.99 codemem INFO loading jinaai/jina-code-embeddings-0.5b on mps (float16)
+8.00 codemem INFO Loading SentenceTransformer model from jinaai/jina-code-embeddings-0.5b.
+8.15 
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 5228.61it/s]
+8.28 codemem INFO Loaded 10 prompts with these keys: ['nl2code_query', 'nl2code_document', 'code2code_query', 'code2code_document', 'code2nl_query', 'code2nl_document', 'code2completion_query', 'code2completion_document', 'qa_query', 'qa_document']
+[hold 8.28] model marker seen
+[hold 18.28] handshake released
+[hold 31.48] signal 2: stopping the server
+[hold 31.55] server exited with -15

@@ -1,0 +1,38 @@
+{
+ "mcpServers": {
+  "codemem": {
+   "command": "<codemem>/.cache/wt/faiss-1-16/.venv/bin/python",
+   "args": [
+    "<codemem>/.cache/review/compare/bin/mcp_hold.py",
+    "<codemem>/.cache/review/compare/runs/v3s1-v2u-70734-L2-haiku-r1/server.log",
+    "10",
+    "120",
+    "--",
+    "<codemem>/.cache/wt/faiss-1-16/.venv/bin/python",
+    "-m",
+    "codemem",
+    "mcp",
+    "<codemem>/.cache/review/compare/tasks/pandas-dev__pandas-70734/repo",
+    "--index-dir",
+    "<codemem>/.cache/review/compare/idx/v3s1-v2u-70734-L2-haiku-r1"
+   ],
+   "env": {
+    "PYTHONPATH": "<codemem>/.cache/wt/compare-main/src",
+    "CODEMEM_STEERING": "light",
+    "CODEMEM_VECTOR_BACKEND": "faiss",
+    "CODEMEM_MODEL_IDLE_MINUTES": "0",
+    "CODEMEM_HOME": "<codemem>/.cache/review/compare/home-runs/v3s1-v2u-70734-L2-haiku-r1",
+    "HF_HOME": "<codemem>/.cache/huggingface",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "TORCH_HOME": "<codemem>/.cache/torch",
+    "XDG_CACHE_HOME": "<codemem>/.cache/xdg",
+    "MPLCONFIGDIR": "<codemem>/.cache/mpl",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1"
+   },
+   "alwaysLoad": true
+  }
+ }
+}

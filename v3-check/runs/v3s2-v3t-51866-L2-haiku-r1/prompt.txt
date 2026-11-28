@@ -1,0 +1,5 @@
+On CPU, a request with a random seed gives different output each run when it is batched with a request that has no seed. Seeded requests should be reproducible.
+
+Do not change any file. Find where in this repository the change for this request has to be
+made. When you are confident, answer with one JSON object and nothing after it:
+{"files": [up to 3 file paths, the most likely first], "functions": [up to 5 function or method names, as Class.method where it applies, the most likely first]}
