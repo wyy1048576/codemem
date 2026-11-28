@@ -871,7 +871,7 @@ def test_score_tables_and_paired_difference(capsys):
     paired = summary["paired"][0]
     # Only t1 has kept runs in both setups: completed 1.0 - 0.5, tokens 600 - 1000, seconds 80 - 100.
     assert paired == {"setup": "other", "baseline": "grep", "tasks": 1, "completed": 0.5, "tokens": -400.0,
-                      "seconds": -20.0}
+                      "seconds": -20.0, "cost": None}
     assert json.loads((e2e_run.e2e_dir() / "runs" / "s1" / "score.json").read_text()) == summary
 
     assert main(["e2e", "score", "s1"]) == 0
@@ -1272,7 +1272,7 @@ def test_score_tool_against_grep(capsys):
     assert (behaviour["codemem_share"], behaviour["codemem_calls_mean"], behaviour["first_codemem_turn_mean"]) == \
         (0.5, 2.5, 1.0)
     assert summary["paired"] == [{"setup": "tool", "baseline": "grep", "tasks": 2, "completed": 0.0,
-                                  "tokens": -150.0, "seconds": -7.5}]
+                                  "tokens": -150.0, "seconds": -7.5, "cost": None}]
     text = format_score(summary)
     assert "tool - grep over 2 tasks: completed 0.00, tokens -150, seconds -7.5" in text
     assert "used  codemem 1st call" in text
