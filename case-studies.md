@@ -139,3 +139,44 @@ discovered port. The fix changes one file, `shelly/config_flow.py`.
   home-assistant (488 lines against 298; larger in 12 of the 18 pairs that differ, p 0.24), but
   not on pandas (506 against 481; larger in 10 of 17). A lean worth watching, not a result.
 - One task, one repetition. The second repetition shows whether it repeats.
+
+---
+
+## 3. home-assistant at L1 and L2: the 20 lines fill with look-alike integrations, and the agents ignore them
+
+*Haiku, repetition 1. Archive `haiku-rep1-homeassistant.tgz`; the 20 lines are in each `codemem`
+run's `prompt.txt`, the files the agent opened in `run.json` (`steps.views`). Added Nov 28.*
+
+**In short.** home-assistant is built from hundreds of integrations with the same parts: a config
+flow, a unique ID, a MAC address. With a vague prompt, codemem's search returns those parts from
+many integrations at once. But the agents almost never open the look-alike files. So the clutter
+costs only the block's own tokens, and it does not explain the home-assistant results.
+
+**The 20 lines, by level** (means over the 8 tasks):
+
+| Level | A fix file in the 20 lines | Lines from the fix's integration | Lines from other integrations | codemem against grep, tokens |
+|---|---|---|---|---|
+| L0 | 7 of 8 | 10 | 9 | +37% |
+| L1 | 4 of 8 | 4 | 15 | −12% |
+| L2 | 7 of 8, three of them below rank 8 | 7 | 13 | +8% |
+
+**An example: 184675 at L1.** The fix is in onvif's `config_flow.py` and `device.py`. The 20 lines
+held 4 other onvif lines, but neither of those files. 15 lines came from other integrations: other
+cameras' unique IDs, MAC address handling.
+
+**The agents ignore the look-alikes.** In all 48 runs, both setups, the agents opened one file of
+another integration in total. None of the look-alike files in the 20 lines was opened.
+
+**And the tokens do not follow the clutter.**
+
+- codemem's best level is L1, where the lines are worst.
+- Pairs whose 20 lines had a fix file in the top 3 used about as many tokens against grep (median
+  1.04) as pairs without (1.09).
+
+**Keep in mind.**
+
+- **The hit rate of the 20 lines falls** with vague prompts on a repo of look-alike modules. Report
+  it per repo and level.
+- **Its cost is the block's own tokens,** read again every turn, not wasted reads.
+- **So what drives codemem's results on home-assistant lies elsewhere.** Case 2, a bigger fix, is
+  one lead.
