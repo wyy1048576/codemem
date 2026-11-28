@@ -23,6 +23,10 @@ from conftest import FIXTURES
 STREAM = FIXTURES / "e2e_stream.jsonl"
 TOOL_STREAM = FIXTURES / "e2e_stream_tool.jsonl"
 FAKE_TOKEN = "FAKE-LOGIN-VALUE-1"
+# A stand-in for GNU cp. The Mac's cp has no --no-preserve option, and it does not keep hard links in any case.
+# The stand-in drops the option of testbed_script's copy and passes every other cp on as it is.
+COPY_SHIM = (f'#!/bin/sh\nif [ "$1 $2" = "-a --no-preserve=links" ]; then shift 2; set -- -a "$@"; fi\n'
+             f'exec {shutil.which("cp")} "$@"\n')
 INIT = json.loads(STREAM.read_text().splitlines()[0])
 GREP = e2e_run.SETUPS["grep"]
 TOOL = e2e_run.SETUPS["tool"]
@@ -169,6 +173,10 @@ def test_read_clock_and_prep(tmp_path):
     (tmp_path / "prep.txt").write_text("start 0\nremove_config 1000000000\nchown 17000000000\nready 17500000000\n")
     prep = e2e_run.read_prep(tmp_path)
     assert prep["steps_s"] == {"remove_config": 1.0, "chown": 16.0, "ready": 0.5} and prep["prep_s"] == 17.5
+    (tmp_path / "prep.txt").write_text("start 0\nremove_config 1000000000\ncopy_failed 3000000000\n"
+                                       "chown 17000000000\nready 17500000000\n")
+    assert e2e_run.read_prep(tmp_path)["steps_s"] == {"remove_config": 1.0, "copy_failed": 2.0, "chown": 14.0,
+                                                      "ready": 0.5}
     assert e2e_run.read_clock(tmp_path / "none") == {}
 
 
@@ -187,6 +195,162 @@ def test_agent_script():
         assert part in script
     assert FAKE_TOKEN not in script and "OAUTH" not in script
     assert "cmgate" not in script and "codemem_warm" not in script
+    # /testbed goes to the agent's user after the removal of the configuration files, and before anything runs as
+    # that user. The script is in /testbed again after it.
+    step = e2e_run.testbed_script()
+    assert step.startswith("cd / || exit 2\n") and step.endswith("fi\ncd /testbed || exit 2\n")
+    assert ("mark remove_config\nid -u agent > /dev/null 2>&1 || useradd -m agent\n" + step
+            + "mkdir -p /run/claude-empty") in script
+    assert ("  if cp -a --no-preserve=links /testbed /testbed.cmeval-copy && chown -R agent:agent "
+            "/testbed.cmeval-copy; then\n") in step
+    # Without the copy: the chown in place, as before.
+    plain = e2e_run.agent_script("claude-haiku-5-5", RunSettings(time_limit_s=3000), copy_testbed=False)
+    assert "cp -a" not in plain and "\nchown -R agent:agent /testbed\nmark chown\n" in plain
+
+
+def test_testbed_mounted():
+    assert not e2e_run.testbed_mounted(["-v", "/x/claude:/usr/local/bin/claude:ro", "-v", "/x/out:/out",
+                                        "-v", "/x/i:/testbed-index", "-v", "/x/t:/testbed.cmeval-copy"])
+    assert e2e_run.testbed_mounted(["-v", "/x/out:/out", "-v", "/x/t:/testbed"])
+    assert e2e_run.testbed_mounted(["-v", "/x/c:/testbed/cache:ro"])
+
+
+def _make_testbed(tmp_path, link=False):
+    """A small /testbed in tmp_path/testbed: a folder, a file, a program and a link. With link, testbed is a link
+    to that folder."""
+    real = tmp_path / ("real" if link else "testbed")
+    (real / "pkg").mkdir(parents=True)
+    (real / "pkg" / "a.py").write_text("x = 1\n")
+    (real / "run.sh").write_text("#!/bin/sh\n")
+    (real / "run.sh").chmod(0o755)
+    (real / "link").symlink_to("pkg/a.py")
+    if link:
+        (tmp_path / "testbed").symlink_to(real)
+
+
+def _testbed_step(tmp_path, *, mounts="overlay / overlay rw 0 0\n", shims=None):
+    """Run testbed_script on tmp_path/testbed, as agent.sh would after remove_config. mounts stands for
+    /proc/mounts (None: no such file). chown is a stand-in that writes its arguments to a log. Returns the exit
+    code, the marks, the folder where the script ended and the chown calls."""
+    if mounts is not None:
+        (tmp_path / "mounts").write_text(mounts)
+    folder = tmp_path / "shims"
+    folder.mkdir()
+    _shim(folder, "chown", f'#!/bin/sh\necho "$@" >> {tmp_path}/chown.log\n')
+    _shim(folder, "cp", COPY_SHIM)
+    for name, text in (shims or {}).items():
+        _shim(folder, name, text)
+    step = e2e_run.testbed_script().replace("/testbed", str(tmp_path / "testbed"))
+    step = step.replace("/proc/mounts", str(tmp_path / "mounts"))
+    script = tmp_path / "step.sh"
+    script.write_text(f'mark() {{ echo "$1" >> {tmp_path}/marks.txt; }}\ncd {tmp_path}/testbed || exit 9\n'
+                      f"{step}pwd -P > {tmp_path}/pwd.txt\n")
+    proc = subprocess.run(["bash", str(script)], env={**os.environ, "PATH": f"{folder}:{os.environ['PATH']}"},
+                          capture_output=True, text=True)
+
+    def read(name):
+        path = tmp_path / name
+        return path.read_text().splitlines() if path.exists() else []
+    return proc.returncode, read("marks.txt"), (read("pwd.txt") or [None])[0], read("chown.log")
+
+
+def _tree(root):
+    """Names, types, content or link targets, modes and mtimes (not of links) below root."""
+    return {str(p.relative_to(root)): (p.is_symlink(), os.readlink(p) if p.is_symlink() else
+                                       p.read_text() if p.is_file() else None,
+                                       p.lstat().st_mode, None if p.is_symlink() else p.lstat().st_mtime_ns)
+            for p in sorted(root.rglob("*"))}
+
+
+def test_testbed_script_copies_and_swaps(tmp_path):
+    _make_testbed(tmp_path)
+    testbed = tmp_path / "testbed"
+    before = _tree(testbed)
+    code, marks, where, chowned = _testbed_step(tmp_path)
+    assert code == 0 and marks == ["copy_swap"] and chowned == [f"-R agent:agent {tmp_path}/testbed.cmeval-copy"]
+    assert where == str(testbed.resolve()) and not (tmp_path / "testbed.cmeval-copy").exists()
+    assert _tree(testbed) == before and len(before) == 4
+
+
+@pytest.mark.parametrize("mount", ["/testbed", "/testbed/cache"])
+def test_testbed_script_changes_the_owner_in_place_at_a_mount(tmp_path, mount):
+    _make_testbed(tmp_path)
+    mounts = f"overlay / overlay rw 0 0\n/dev/x {tmp_path}{mount} ext4 rw 0 0\n"
+    code, marks, where, chowned = _testbed_step(tmp_path, mounts=mounts)
+    assert code == 0 and marks == ["chown"] and chowned == [f"-R agent:agent {tmp_path}/testbed"]
+    assert where == str((tmp_path / "testbed").resolve()) and not (tmp_path / "testbed.cmeval-copy").exists()
+
+
+@pytest.mark.parametrize("mounts, shims", [(None, {}),
+                                           ("overlay / overlay rw 0 0\n", {"awk": "#!/bin/sh\nexit 127\n"})])
+def test_testbed_script_changes_the_owner_in_place_when_it_cannot_check_the_mounts(tmp_path, mounts, shims):
+    _make_testbed(tmp_path)
+    code, marks, _, chowned = _testbed_step(tmp_path, mounts=mounts, shims=shims)
+    assert code == 0 and marks == ["chown"] and chowned == [f"-R agent:agent {tmp_path}/testbed"]
+
+
+def _gnu_cp_drops_links():
+    """True when this machine's cp has --no-preserve=links (GNU cp)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "a").mkdir()
+        return subprocess.run(["cp", "-a", "--no-preserve=links", f"{tmp}/a", f"{tmp}/b"],
+                              capture_output=True).returncode == 0
+
+
+@pytest.mark.skipif(not _gnu_cp_drops_links(), reason="needs GNU cp (the Mac's cp has no --no-preserve)")
+def test_testbed_script_does_not_keep_hard_links(tmp_path):
+    # The chown in place gives each name its own file (the copy up), so the copy must not keep hard links.
+    _make_testbed(tmp_path)
+    os.link(tmp_path / "testbed" / "pkg" / "a.py", tmp_path / "testbed" / "pkg" / "b.py")
+    code, marks, _, _ = _testbed_step(tmp_path, shims={"cp": f'#!/bin/sh\nexec {shutil.which("cp")} "$@"\n'})
+    assert code == 0 and marks == ["copy_swap"]
+    a, b = (tmp_path / "testbed" / "pkg" / "a.py").stat(), (tmp_path / "testbed" / "pkg" / "b.py").stat()
+    assert a.st_ino != b.st_ino and a.st_nlink == b.st_nlink == 1
+
+
+def test_testbed_script_changes_the_owner_in_place_of_a_link(tmp_path):
+    _make_testbed(tmp_path, link=True)
+    code, marks, _, chowned = _testbed_step(tmp_path)
+    assert code == 0 and marks == ["chown"] and chowned == [f"-R agent:agent {tmp_path}/testbed"]
+    assert (tmp_path / "testbed").is_symlink() and not (tmp_path / "testbed.cmeval-copy").exists()
+
+
+def test_testbed_script_falls_back_when_the_copy_fails(tmp_path):
+    _make_testbed(tmp_path)
+    # cp stops part way: the partial copy is removed, and /testbed gets its owner in place.
+    partial = '#!/bin/sh\nmkdir -p "$4/pkg"\necho "cp: no space left on device" >&2\nexit 1\n'
+    code, marks, where, chowned = _testbed_step(tmp_path, shims={"cp": partial})
+    assert code == 0 and marks == ["copy_failed", "chown"] and chowned == [f"-R agent:agent {tmp_path}/testbed"]
+    assert where == str((tmp_path / "testbed").resolve()) and not (tmp_path / "testbed.cmeval-copy").exists()
+    assert (tmp_path / "testbed" / "pkg" / "a.py").read_text() == "x = 1\n"
+
+
+def test_testbed_script_falls_back_when_the_chown_of_the_copy_fails(tmp_path):
+    _make_testbed(tmp_path)
+    fails_on_copy = f'#!/bin/sh\necho "$@" >> {tmp_path}/chown.log\ncase "$3" in *.cmeval-copy) exit 1;; esac\n'
+    code, marks, _, chowned = _testbed_step(tmp_path, shims={"chown": fails_on_copy})
+    assert code == 0 and marks == ["copy_failed", "chown"]
+    assert chowned == [f"-R agent:agent {tmp_path}/testbed.cmeval-copy", f"-R agent:agent {tmp_path}/testbed"]
+    assert not (tmp_path / "testbed.cmeval-copy").exists() and (tmp_path / "testbed" / "pkg" / "a.py").exists()
+
+
+def test_testbed_script_does_not_copy_into_an_old_copy(tmp_path):
+    _make_testbed(tmp_path)
+    (tmp_path / "testbed.cmeval-copy").mkdir()
+    code, marks, _, chowned = _testbed_step(tmp_path)
+    assert code == 0 and marks == ["chown"] and chowned == [f"-R agent:agent {tmp_path}/testbed"]
+    assert list((tmp_path / "testbed.cmeval-copy").iterdir()) == []
+
+
+@pytest.mark.parametrize("name, text", [
+    # rm removes one file of the old /testbed and then fails.
+    ("rm", '#!/bin/sh\ncase "$2" in *.cmeval-copy) exec /bin/rm "$@";; esac\n/bin/rm "$2/run.sh"\nexit 1\n'),
+    ("mv", "#!/bin/sh\nexit 1\n"),
+])
+def test_testbed_script_stops_when_the_swap_fails(tmp_path, name, text):
+    _make_testbed(tmp_path)
+    code, marks, where, _ = _testbed_step(tmp_path, shims={name: text})
+    assert code == 5 and marks == [] and where is None
 
 
 def test_agent_script_with_the_gate():
@@ -399,10 +563,12 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
     stream.write_text("".join(json.dumps(e) + "\n" for e in stream_lines))
     proxy_in = tmp_path / "proxy.in"
     proxy_in.write_text("".join(json.dumps(r) + "\n" for r in proxy_lines))
+    (tmp_path / "mounts").write_text("overlay / overlay rw 0 0\n")  # stands for /proc/mounts: no mount at /testbed
     shims = tmp_path / "shims"
     shims.mkdir()
     for name in ("useradd", "chown"):
         _shim(shims, name, "#!/bin/sh\nexit 0\n")
+    _shim(shims, "cp", COPY_SHIM)
     _shim(shims, "runuser", '#!/bin/sh\nshift 3\nexec "$@"\n')
     _shim(shims, "timeout", '#!/bin/sh\nshift 3\nexec "$@"\n')
     _shim(shims, "date", f"#!/bin/sh\nexec '{sys.executable}' -c 'import time; print(time.time_ns())'\n")
@@ -452,7 +618,7 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
         moves = ((e2e_run.GATE_DIR, gate_dir), ("/testbed", str(testbed)), ("/out", out),
                  (e2e_run.PROOF_DIR, str(tmp_path / "cmproof")))
         for old, new in ((e2e_run.KILL_AGENT, "true"), *moves, ("/run/claude-empty", str(tmp_path / "claude-empty")),
-                         ("/tmp/mcp.json", f"{tmp_path}/mcp.json")):
+                         ("/tmp/mcp.json", f"{tmp_path}/mcp.json"), ("/proc/mounts", f"{tmp_path}/mounts")):
             text = text.replace(old, new)
         for name in ("cmgate.json", "mcp.json"):  # the gate's own paths, as the container would have them
             path = Path(out, name)
@@ -512,7 +678,8 @@ def test_run_one_locally(make_task, tmp_path, monkeypatch):
     assert record["tokens"]["source"] == "proxy" and record["tokens"]["processed_tokens"] == 190930
     assert record["steps"]["turns"] == 5 and record["steps"]["num_turns_result"] == 5
     assert record["identity"]["gold_files"] == ["auth/sessions.py"] and record["steps"]["gold_opened"]
-    assert record["time"]["agent_s"] >= 0 and set(record["time"]["prep_steps_s"]) == {"remove_config", "chown", "ready"}
+    assert record["time"]["agent_s"] >= 0
+    assert set(record["time"]["prep_steps_s"]) == {"remove_config", "copy_swap", "ready"}
     # The patch has the agent's edit, and not the removal of the configuration files.
     assert len(graded) == 1 and e2e_run.patch_files(graded[0]) == {"auth/sessions.py"}
     assert record["outcome"]["patch_files"] == 1 and record["outcome"]["status_lines"] == 1
@@ -865,7 +1032,7 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
     assert warm["ok"] and warm["warmup_searches"] == 2 and warm["status"]["state"] == "ready"
     assert "watching for changes" in warm["status_text"]
     prep = record["time"]["prep_steps_s"]
-    assert list(prep) == ["remove_config", "chown", "mount_proof", "codemem_warm", "ready"]
+    assert list(prep) == ["remove_config", "copy_swap", "mount_proof", "codemem_warm", "ready"]
     assert record["time"]["codemem_warm_s"] == prep["codemem_warm"] >= 1.0
     marks = dict(line.split() for line in (out / "prep.txt").read_text().splitlines())
     clock = e2e_run.read_clock(out)

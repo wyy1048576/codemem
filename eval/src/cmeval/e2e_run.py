@@ -13,13 +13,13 @@ One run (run_one) has these steps:
      reaches the proxy and nothing else. A thread follows the stream of events and stops the agent after
      the turn limit
   4. in the container, as root: remove files that would configure the agent, make a user that is not
-     root. For a codemem setup, make the mount proof as that user (proof_script): the codemem checkout in the
-     container holds only codemem's environment and source (no eval/ with the task files), and no mounted
-     path holds a line of the task's real fix or hidden tests. When it fails, the script stops there. Then
-     start codemem's MCP server through the gate (codemem_gate.py) and wait until
-     its model and search index are in memory and a search has no note. Then start Claude Code as that user
-     with the time limit; its codemem server is the gate's bridge to that warm server. After it stops, save
-     its changes as a patch
+     root, and give /testbed to that user (testbed_script). For a codemem setup, make the mount proof as that
+     user (proof_script): the codemem checkout in the container holds only codemem's environment and source
+     (no eval/ with the task files), and no mounted path holds a line of the task's real fix or hidden tests.
+     When it fails, the script stops there. Then start codemem's MCP server through the gate (codemem_gate.py)
+     and wait until its model and search index are in memory and a search has no note. Then start Claude
+     Code as that user with the time limit; its codemem server is the gate's bridge to that warm server.
+     After it stops, save its changes as a patch
   5. read the stream, the proxy log and the clocks, check the setup, and grade the patch with e2e.grade
   6. write run.json
 
@@ -85,8 +85,10 @@ run.json has these fields:
                       the agent's sums, and the agent's modelUsage as it is
   proxy_errors        the errors of the proxy log
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
-                      preparation step, codemem_warm_s (the wait for codemem, a part of prep_s; null without
-                      codemem), container_start_s, collect_s, container_s, grade_s, host_load_start and
+                      preparation step (the step copy_swap or chown says how /testbed went to the agent's user:
+                      by copy and swap, or by chown in place; copy_failed before chown: the copy failed),
+                      codemem_warm_s (the wait for codemem, a part of prep_s; null without codemem),
+                      container_start_s, collect_s, container_s, grade_s, host_load_start and
                       host_load_end (the host's load averages right before and right after docker run; null
                       where /proc/loadavg does not exist)
   steps               e2e_steps.count_steps (searches, views, edits, tests, turn marks, gold files, and each Bash
@@ -169,6 +171,8 @@ GATE_LOGS = (f"cp {GATE_DIR}/gate.log /out/codemem-gate.log 2>/dev/null; "
              f"cp {GATE_DIR}/server.log /out/codemem-server.log 2>/dev/null")
 # Files of the agent's patch that codemem could have written. `codemem mcp` should write none.
 UNEXPECTED_PATTERNS = (".codemem*", ".mcp.json")
+# Where testbed_script copies /testbed before the copy takes its place.
+TESTBED_COPY = "/testbed.cmeval-copy"
 # The mount proof of a codemem setup (proof_script): the host writes lines of the task's real fix and hidden
 # tests to PROOF_PHRASES in the run's folder. agent.sh moves the file to PROOF_DIR, a folder that only root can
 # read, before anything runs as the agent's user, and deletes it after the search. The result is PROOF_FILE.
@@ -674,11 +678,55 @@ def proof_checks(proof: dict) -> list[str]:
     return failed
 
 
+def testbed_mounted(volumes: list[str]) -> bool:
+    """True when a "-v" argument of docker run mounts a path at or below /testbed."""
+    return any(PurePosixPath(t).is_relative_to("/testbed") for t in mount_targets(volumes))
+
+
+def testbed_script(copy: bool = True) -> str:
+    """The lines of agent.sh that give /testbed to the agent's user. In the image, /testbed is in a lower layer.
+    chown -R in place copies each file up to the container's layer, with one disk sync for each file: about
+    500 s for home-assistant. A new copy is not synced file by file, and its chown copies nothing more. So the
+    script copies /testbed, gives the copy to the agent's user, and puts the copy in the place of /testbed: the
+    same path, content and metadata. The copy does not keep hard links (--no-preserve=links), because the chown in
+    place does not keep them either: the copy up gives each name its own file. The script changes the owner in
+    place when the copy cannot be used: a mount at or below /testbed (the copy would not hold it), /testbed is
+    not a plain folder, or the copy fails (also a cp without --no-preserve, such as busybox's). When the old
+    /testbed is removed but the copy cannot take its place, the script stops (exit 5). The mark
+    copy_swap or chown says which method was used. Without copy, only the chown in place."""
+    in_place = "chown -R agent:agent /testbed\nmark chown\n"
+    if not copy:
+        return in_place
+    return (
+        # No handle of the shell may stay in the old /testbed.
+        "cd / || exit 2\n"
+        "in_place=1\n"
+        f"if [ -d /testbed ] && [ ! -L /testbed ] && [ ! -e {TESTBED_COPY} ] && [ -r /proc/mounts ] && "
+        "awk '$2 == \"/testbed\" || index($2, \"/testbed/\") == 1 {m = 1} END {exit m}' /proc/mounts; then\n"
+        f"  if cp -a --no-preserve=links /testbed {TESTBED_COPY} && chown -R agent:agent {TESTBED_COPY}; then\n"
+        # When rm or mv fails, /testbed is half removed or missing. No step can make that right.
+        f"    rm -rf /testbed && mv {TESTBED_COPY} /testbed || exit 5\n"
+        "    in_place=0\n"
+        "    mark copy_swap\n"
+        "  else\n"
+        "    mark copy_failed\n"
+        f"    rm -rf {TESTBED_COPY}\n"
+        "  fi\n"
+        "fi\n"
+        "if [ \"$in_place\" = 1 ]; then\n"
+        "  chown -R agent:agent /testbed\n"
+        "  mark chown\n"
+        "fi\n"
+        "cd /testbed || exit 2\n"
+    )
+
+
 def agent_script(model: str, settings: RunSettings, gate_python: str | None = None,
-                 proof: dict | None = None) -> str:
+                 proof: dict | None = None, copy_testbed: bool = True) -> str:
     """The shell script that runs in the task's container, as root. It reads and writes /out. With gate_python
     (a codemem setup), it starts codemem through the gate and waits for it before the agent's clock starts.
-    With proof (proof_plan, a codemem setup), it first makes the mount proof (proof_script)."""
+    With proof (proof_plan, a codemem setup), it first makes the mount proof (proof_script). copy_testbed: give
+    /testbed to the agent's user by copy and swap (testbed_script); False when a mount is at or below /testbed."""
     specs = " ".join(shlex.quote(p) for p in CONFIG_PATHSPECS)
     # MCP_TIMEOUT and MCP_TOOL_TIMEOUT are the same in every setup, so that the setups differ only in the server.
     env = ("env -u ANTHROPIC_API_KEY HOME=/home/agent CLAUDE_CONFIG_DIR=/run/claude-empty "
@@ -705,8 +753,7 @@ def agent_script(model: str, settings: RunSettings, gate_python: str | None = No
         "fi\n"
         "mark remove_config\n"
         "id -u agent > /dev/null 2>&1 || useradd -m agent\n"
-        "chown -R agent:agent /testbed\n"
-        "mark chown\n"
+        + testbed_script(copy_testbed) +
         "mkdir -p /run/claude-empty && chown agent /run/claude-empty\n"
         "cp /out/mcp.json /tmp/mcp.json && chmod 644 /tmp/mcp.json\n"
         + (proof_script(proof) if proof else "")
@@ -978,8 +1025,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     volumes = ["-v", f"{ready['claude_bin']}:/usr/local/bin/claude:ro", "-v", f"{out}:/out",
                *(codemem_mounts(codemem, index_copy) if codemem else [])]
     plan = proof_plan(codemem, volumes) if codemem else None
-    (out / "agent.sh").write_text(agent_script(model, settings, codemem_python(codemem) if codemem else None, plan),
-                                  encoding="utf-8")
+    (out / "agent.sh").write_text(agent_script(model, settings, codemem_python(codemem) if codemem else None, plan,
+                                               copy_testbed=not testbed_mounted(volumes)), encoding="utf-8")
     if plan:
         avoid = "".join(p.read_text(encoding="utf-8", errors="replace") for p in sorted(out.iterdir()) if p.is_file())
         phrases = proof_phrases(task, avoid)
