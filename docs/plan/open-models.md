@@ -33,7 +33,7 @@ lets it edit files, and stops when it is done.
 git clone https://github.com/wyy1048576/codemem && cd codemem
 scripts/open/setup.sh                    # checks the machine, builds the environments, tests itself
 scripts/open/prepare.sh pandas           # task images, indexes, the 20 lines of each task
-scripts/open/run.sh qwen-27b pandas      # grep and codemem, in the order of §7
+scripts/open/run.sh qwen-35b pandas      # grep and codemem, in the order of §7
 scripts/open/report.sh                   # the tables
 ```
 
@@ -323,7 +323,7 @@ So the picks are general models that are strong at coding, from one family where
 
 | Rung | Pick | Why | Where | vLLM flags |
 |---|---|---|---|---|
-| about 30B, **first** | `Qwen/Qwen3.8-27B` | the strongest open model of its size: 86.0 on SWE-bench Verified in mini-SWE-agent (vals.ai) | the Nebius API (checked): $0.45 in, $0.10 cached, $3.00 out, per million tokens | none |
+| about 30B, through the API | `Qwen/Qwen3.8-27B` | the strongest open model of its size: 86.0 on SWE-bench Verified in mini-SWE-agent (vals.ai) | the Nebius API (checked): $0.45 in, $0.10 cached, $3.00 out, per million tokens | none |
 | about 30B, on the GPU | `Qwen/Qwen3.6-35B-A3B`, FP8 | 3B of its parameters are active, so it is fast; 73.4 in Qwen's own scaffold | the rented GPU, about 35 GB | `--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen3_coder --language-model-only` |
 | about 9B | `Qwen/Qwen3.5-9B` | the strongest of its size: 45.2 in a shell-only harness | the rented GPU, about 10 GB in FP8 | the same two parsers |
 | the third rung | `allenai/SERA-14B` if its window of 32,768 tokens holds, else `Qwen/Qwen3.5-4B` | SERA is a Qwen3-14B tuned for agents: 41.7 | the rented GPU | `--enable-auto-tool-choice --tool-call-parser hermes` |
@@ -565,15 +565,22 @@ Before you say it is done, check it as someone who expects to find a fault.
 
 ## 11. Decisions for Andre
 
+Each has a proposal. The session that builds this follows the proposal until Andre says
+otherwise: none of the four changes the loop, only `models.toml` and the scripts' defaults.
+
 1. **The three models.** You asked for a code model of about 30B, a code Llama of 8 or 13B, and a
-   Qwen of 13 or 14B. None of the three exists in a current form (§5). The proposal: Qwen3.8-27B or
-   Qwen3.6-35B-A3B, then Qwen3.5-9B, then SERA-14B or Qwen3.5-4B. Yes, or other picks?
-2. **The first rung:** the 27B through the Nebius API, which is checked and costs per run, or the
-   35B on the rented GPU, or both.
+   Qwen of 13 or 14B. None of the three exists in a current form (§5). **The proposal:**
+   Qwen3.6-35B-A3B or Qwen3.8-27B, then Qwen3.5-9B, then SERA-14B, or Qwen3.5-4B if SERA's small
+   window ends its runs early. Yes, or other picks?
+2. **The first rung:** the 35B on the rented GPU, or the 27B through the Nebius API. **The
+   proposal:** the 35B for the runs. The machine is rented anyway, a run on it costs nothing more,
+   and the 27B's runs alone would use a third of the budget in steps 1 and 2. The 27B stays the
+   model of the live tests on the Mac, and the fallback if vLLM's tool calls fail.
 3. **The machine:** a Nebius RTX PRO 6000, on demand or preemptible. The first payment is at
-   least $25.
-4. **Thinking:** off for every model (the proposal: a run then costs cents, and the rungs are
-   alike), or on for the first rung. The 27B's published 86.0 is with thinking on, at about a
+   least $25. **The proposal:** on demand. A preempted machine does not start again by itself, so
+   a night of runs can be lost.
+4. **Thinking:** off for every model, or on for the first rung. **The proposal:** off. A run then
+   costs cents, and the rungs are alike. The 27B's published 86.0 is with thinking on, at about a
    dollar a task.
 
 ---
