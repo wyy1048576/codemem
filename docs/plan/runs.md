@@ -398,3 +398,45 @@ best, and they cannot show whether a model would have asked for a search. Three 
    - **What it is used for:** the share of runs that call the tool, and what the model does
      instead. Its tokens and times are compared with `grep` runs only where both were made on the
      same machine.
+
+---
+
+## 12. Beside the runs: the compact index
+
+The runs use the exact search index: the eval sets `CODEMEM_VECTOR_BACKEND=faiss` for every
+build and every run, so that a container's memory limit never makes codemem change its index
+between a build and a run. So the runs say nothing about the compact index, which is the one
+codemem uses on a machine where the exact one does not fit in memory. Offline it returns the
+same results: on the real vLLM index (144,729 vectors) the true top 10 and the true top 50 in
+all 762 searches, in 106 MB of memory against 278 MB
+([track C's results](../analysis/track-c-results.md), §2). One side experiment shows it on real
+agent runs.
+
+**What runs.** kubernetes: the largest index of the sample, and the kind of repo for which a
+laptop would use the compact index. Its 8 run tasks, in the `codemem` setup, once with the exact
+index (`CODEMEM_VECTOR_BACKEND=faiss`) and once with the compact one
+(`CODEMEM_VECTOR_BACKEND=compact`). Each task's index is built in both forms, and the search
+made for the agent at the start runs on the index of its arm. Haiku once and Sonnet once, at L0,
+L1 and L2, as the plan runs kubernetes (§5). That is 96 runs.
+
+**Who runs it, and how.**
+
+- **Track B, on its own machine, with track A's pipeline as it is:** the same recipe and images,
+  the same runner with its limits and checks, the same block and the same grader, and codemem at
+  the commit of the lock. The index is the only thing that differs between the two arms.
+- **Track A's PC and its runs are not touched.** They stay on the exact index, and track A is
+  asked for nothing here.
+- **Before the first run,** track B posts every point in which its machine or its setup differs
+  from track A's, and waits for the lead's go-ahead. A question is asked in the work log, not
+  settled by an assumption.
+- Both arms run on the same machine, so the comparison is between them. Its numbers are not
+  pooled with track A's.
+
+**What is reported.**
+
+1. **The 20 results at the start, compact against exact,** for every task and level: the same
+   20 in the same order, or which ones differ. This is the direct check, the same query on both
+   indexes.
+2. **Tasks solved, tokens, time and turns** of the two, pair by pair.
+3. **The memory of the search index and its size on disk** in both forms, and the seconds of
+   each build.
