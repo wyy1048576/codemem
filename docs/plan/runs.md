@@ -262,6 +262,8 @@ seats are spent.
 6. **Sonnet, repetition 2, then repetition 3:** pandas, duckdb and playwright, in that order. A
    bonus, and it is fine if this step is not completed.
 
+- **The side batch with the compact index (§12) comes after step 4 and before step 5.** It is
+  48 runs on kubernetes.
 - **The hard tier comes later than the other two** (§10). Easy and medium do not wait for it.
   When a repo's hard tasks are ready, they are run for the steps that have passed, and are in
   step from then on.
@@ -284,6 +286,7 @@ seats are spent.
 | step 3: Sonnet, repetition 1, four repos | 336, 24 of the check run among them | 9 to 13 hours |
 | step 4: Opus, six repos | 144 | 4 to 6 hours |
 | steps 1 to 4 | 1,152 (Haiku 672, Sonnet 336, Opus 144) | 32 to 45 hours |
+| the compact index on kubernetes (§12) | 48 | 1 to 2 hours; 4 to 6 hours with one run at a time |
 | step 5: Haiku, repetition 2 | 504 | 14 to 20 hours |
 | steps 1 to 4 and Haiku's repetition 2 | 1,656 | 46 to 64 hours |
 | step 5: Haiku, repetition 3 | 504 | 14 to 20 hours |
@@ -325,6 +328,8 @@ takes less than about 6.6 minutes. A repo that is short of tasks, or not ready, 
 6. **Run the check run** (§6) with Haiku and with Sonnet, and post its five points and the first
    numbers of both models. Go on only when it has passed.
 7. **Then run in the order of §7.**
+8. **The side batch with the compact index** (§12), after step 4 of §7: let a batch name the
+   search index, build the 8 kubernetes indexes and their blocks as the compact one, and run it.
 
 **One request about labels:** keep today's label of each task in the files as it is, and add the
 tier as a new label. Tables written so far then keep their meaning, and new ones say which of
@@ -398,3 +403,44 @@ best, and they cannot show whether a model would have asked for a search. Three 
    - **What it is used for:** the share of runs that call the tool, and what the model does
      instead. Its tokens and times are compared with `grep` runs only where both were made on the
      same machine.
+
+---
+
+## 12. Beside the runs: the compact index
+
+The runs use the exact search index: the eval sets `CODEMEM_VECTOR_BACKEND=faiss` for every
+build and every run, so that a container's memory limit never makes codemem change its index
+between a build and a run. So the runs say nothing about the compact index, which is the one
+codemem uses on a machine where the exact one does not fit in memory. Offline it returns the
+same results: on the real vLLM index (144,729 vectors) the true top 10 and the true top 50 in
+all 762 searches, in 106 MB of memory against 278 MB
+([track C's results](../analysis/track-c-results.md), §2). One side batch shows it on real agent
+runs.
+
+**What runs.** kubernetes: the largest index of the sample, and the kind of repo for which a
+laptop would use the compact index. Its 8 run tasks, in the `codemem` setup with
+`CODEMEM_VECTOR_BACKEND=compact`: the index of each task is built as the compact one, and the
+search made for the agent at the start runs on it. Haiku once and Sonnet once, at L0, L1 and L2,
+as the plan runs kubernetes (§5). That is 48 runs.
+
+**What it is compared with.** The `codemem` runs of the same tasks, models and levels from §7,
+which use the exact index. `grep` is not run again.
+
+**What is reported.**
+
+1. **The 20 results at the start, compact against exact,** for every task and level: the same
+   20 in the same order, or which ones differ. This is the direct check, the same query on both
+   indexes.
+2. **Tasks solved, tokens, time and turns** of the two, pair by pair.
+3. **The memory of the search index and its size on disk** in both forms, and the seconds of
+   each build.
+
+**Who and when.**
+
+- **Track A, on its PC,** after step 4 of §7 and before the repetitions. Every run records the
+  index it used in `identity.codemem`.
+- **Track B makes the same comparison in its own setup,** with both indexes, 96 runs, if its
+  machine can index kubernetes. Its numbers stand beside track A's and are not pooled with them.
+- **Without any agent run,** the searches that the agents made in the kubernetes runs are sent
+  again to the compact index and compared with the exact index's answers, search by search
+  (track A's replay).
