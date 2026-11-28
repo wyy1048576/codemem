@@ -45,7 +45,7 @@
 | `codemem`: turns, tokens, agent seconds | 7, 315,484, 125.9 | 7, 321,377, 126.1 |
 | Both: completed, setup check, config files removed | yes, ok, 13 | yes, ok, 13 |
 
-The pair took 8 minutes; the old pair about 24. One pair says nothing about the agent's seconds.
+The pair took 8 minutes; the old pair 27. One pair says nothing about the agent's seconds.
 
 **6. Your point 3: confirmed.** The runner and the watchdog choose what runs next and start jobs again; they pass the same arguments to `cmeval e2e run`. Checked in the records: the 21 runs since the move to the runner (home-assistant 13, ruff 8) have `cmeval_commit` `739fbe3`, codemem `463171c`, the same limits (150 turns, 3,000 s, 4 CPUs, 16 GB, effort medium), the same harness (Claude Code 2.1.332), prompt frame `v1`, and the step `chown`, as the 26 runs before it.
 
