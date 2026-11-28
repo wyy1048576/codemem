@@ -304,8 +304,9 @@ tasks solved, turns, tokens, the memory probe, and the first command.
 **Order:** a pilot on pandas and its 9 tasks. **grep alone first, to measure the ceiling**
 (§4.5, piece 5): if grep still opens the fix file in two or three turns on a renamed repo, an index
 has no room there either, and that is the finding. If it needs many more, both setups run. Then
-the decision on a second repo. **Owner:** to be named (§8, point 2). **Status:** not built. The presentation shows
-it as pending.
+the decision on a second repo.
+
+**Owner:** to be named (§8, point 2). **Status:** not built. The presentation shows it as pending.
 
 ### 4.7 The model gap: open models (H3), and F5
 
