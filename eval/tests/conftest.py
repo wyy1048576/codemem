@@ -23,8 +23,9 @@ diff --git a/auth/sessions.py b/auth/sessions.py
 
 @pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
-    """Never touch the real ~/.cmeval from tests."""
+    """Never touch the real ~/.cmeval from tests, and never take the search index of a batch from the shell."""
     monkeypatch.setenv("CMEVAL_HOME", str(tmp_path / "cmeval_home"))
+    monkeypatch.delenv("CMEVAL_CODEMEM_VECTOR_BACKEND", raising=False)
 
 
 @pytest.fixture

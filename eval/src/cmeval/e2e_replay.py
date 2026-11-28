@@ -8,7 +8,10 @@ Part 1, the replay. For each run of a codemem setup:
 
   1. find the first search_code call of the main agent in stream.jsonl: the query and every other argument
   2. start the codemem program as an MCP server on the task's base commit (the src/ worktree that `cmeval e2e
-     index` made) with a private copy of the task's index, as a run starts it (see replay_task)
+     index` made) with a private copy of the task's index, as a run starts it (see replay_task). The search
+     index is the run's: the one its record names (identity.codemem.vector_backend), else the exact one, as
+     every run of a batch that does not set CMEVAL_CODEMEM_VECTOR_BACKEND had. The variable does not change a
+     replay; when it is set and names another search index than a run's, the replay says so in a warning
   3. wait until the index is ready and the embedding model is loaded (codemem_gate.wait_ready, the wait of a
      run's gate)
   4. call search_code with the same arguments at each number of results k. Only k changes
@@ -52,7 +55,8 @@ from pathlib import Path
 from typing import Callable
 
 from .codemem_gate import McpClient, McpError, full_search, notes_of, tool_texts, unwrap, wait_ready  # noqa: F401
-from .e2e_index import CODEMEM_ENV, REPO_ROOT, codemem_checkout, codemem_commit
+from .e2e_index import REPO_ROOT, VECTOR_BACKEND_ENV, codemem_checkout, codemem_commit, codemem_env, form_dir, \
+    index_form, named_vector_backend
 from .e2e_steps import TurnCounter, parse_stream, result_text
 from .files import write_json, write_text_atomic
 from .metrics.matching import excluded, hit_matches
@@ -254,6 +258,7 @@ def run_entry(record: dict, events: list[dict], proxy_records: list[dict] | None
         "level": identity.get("prompt_level"),
         "completed": record.get("completed"),
         "steering": codemem.get("steering"),
+        **({"vector_backend": codemem["vector_backend"]} if "vector_backend" in codemem else {}),
         "run_codemem_commit": codemem.get("commit"),
         "run_index_codemem_commit": (codemem.get("index") or {}).get("codemem_commit"),
         "run_index_base_commit": (codemem.get("index") or {}).get("base_commit"),
@@ -414,12 +419,13 @@ class ReplayError(McpError):
 READY_POLL_S = 2.0
 
 
-def server_env(steering: str | None, home: Path) -> dict:
+def server_env(steering: str | None, home: Path, backend: str = "faiss") -> dict:
     """The environment of the replay's codemem: what a run gives it (e2e_run.codemem_mcp_config), with the
-    host's Hugging Face cache and an empty CODEMEM_HOME. No CODEMEM_ variable of the caller passes."""
+    host's Hugging Face cache and an empty CODEMEM_HOME, for the search index `backend` (faiss, the exact one,
+    or compact). No CODEMEM_ variable of the caller passes."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("CODEMEM_")}
     env.update({"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "CODEMEM_HOME": str(home),
-                "CODEMEM_MODEL_IDLE_MINUTES": "0", **CODEMEM_ENV})
+                "CODEMEM_MODEL_IDLE_MINUTES": "0", **codemem_env(backend)})
     if steering and steering != "default":
         env["CODEMEM_STEERING"] = steering
     return env
@@ -485,13 +491,14 @@ def check_entry(entry: dict, same_commits: bool, bm25: list[dict] | None = None)
 
 def replay_task(entries: list[dict], *, program: Path, program_commit: str | None, src: Path, index: Path,
                 index_meta: dict, steering: str | None, ks: list[int], work: Path, log: Path, iou: float,
-                ready_timeout: float, call_timeout: float, bm25_check: bool) -> None:
-    """Replay the first search of each entry (runs of one task with one steering level) on a private copy of
-    the task's index. Sets entry["replay"] and entry["check"]. The index and src/ are never written."""
+                ready_timeout: float, call_timeout: float, bm25_check: bool, backend: str = "faiss") -> None:
+    """Replay the first search of each entry (runs of one task with one steering level and one search index,
+    `backend`) on a private copy of the task's index of that search index. Sets entry["replay"] and
+    entry["check"]. The index and src/ are never written."""
     copy, home = work / "index", work / "home"
     shutil.copytree(index, copy)
     home.mkdir()
-    env = server_env(steering, home)
+    env = server_env(steering, home, backend)
     client = McpClient([str(program), "mcp", str(src), "--index-dir", str(copy)], env, log)
     try:
         init = client.initialize(call_timeout)
@@ -595,46 +602,58 @@ def replay_entries(entries: list[dict], *, program: Path, ks: list[int], index_r
                    work_root: Path | None = None, iou: float = DEFAULT_IOU, ready_timeout: float = 900,
                    call_timeout: float = 180, bm25_check: bool = True,
                    progress: Callable[[str], None] = lambda m: None) -> dict:
-    """Replay the entries, one MCP server for each task and steering level. Returns the program, its commit and
-    the environment that codemem got. A task that fails gets replay.error in its entries."""
+    """Replay the entries, one MCP server for each task, steering level and search index (the entry's
+    vector_backend, else faiss). The index of a search index is in its folder of the task's folder
+    (e2e_index.form_dir), and both search the task's src/. Returns the program, its commit and the environment
+    that codemem got. A task that fails gets replay.error in its entries."""
     program_commit = codemem_commit(codemem_checkout(program))
     log_dir.mkdir(parents=True, exist_ok=True)
     groups: dict[tuple, list[dict]] = {}
     for entry in entries:
-        groups.setdefault((entry["recipe"], entry["task_id"], entry["steering"]), []).append(entry)
+        key = (entry["recipe"], entry["task_id"], entry["steering"], entry.get("vector_backend", "faiss"))
+        groups.setdefault(key, []).append(entry)
     env_shown = None
-    for n, ((recipe, task_id, steering), group) in enumerate(sorted(groups.items(), key=lambda g: str(g[0])), 1):
-        root = index_root / str(recipe) / str(task_id)
+    ordered = sorted(groups.items(), key=lambda g: (str(g[0][:3]), g[0][3] != "faiss"))  # the exact one first
+    for n, ((recipe, task_id, steering, backend), group) in enumerate(ordered, 1):
+        task_dir = index_root / str(recipe) / str(task_id)
+        root, src = form_dir(task_dir, backend), task_dir / "src"
         try:
             meta = json.loads((root / "index.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             meta = None
         error = None
-        if meta is None or not (root / "index").is_dir() or not (root / "src").is_dir():
-            error = f"no index at {root} (index/, src/ and index.json); run cmeval e2e index {recipe}"
+        if meta is None or not (root / "index").is_dir() or not src.is_dir():
+            error = (f"no index at {root} (index/, src/ and index.json); run cmeval e2e index {recipe}"
+                     if backend == "faiss" else
+                     f"no {backend} index at {root} (index/ and index.json, and src/ in {task_dir}); run "
+                     f"cmeval e2e index {recipe} with {VECTOR_BACKEND_ENV}={backend}")
+        elif index_form(meta) != backend:
+            error = f"the index at {root} holds the {index_form(meta)} search index, not the {backend} one of the runs"
         elif group[0]["base_commit"] and meta.get("base_commit") != group[0]["base_commit"]:
             error = f"the index at {root} is of base commit {str(meta.get('base_commit'))[:12]}, not the task's"
         if error is None:
             work = Path(tempfile.mkdtemp(prefix="cmeval-replay-", dir=work_root))
             t0 = time.monotonic()
             try:
-                replay_task(group, program=program, program_commit=program_commit, src=root / "src",
+                suffix = "" if backend == "faiss" else f"-{backend}"
+                replay_task(group, program=program, program_commit=program_commit, src=src,
                             index=root / "index", index_meta=meta, steering=steering, ks=ks, work=work,
-                            log=log_dir / f"{task_id}-{steering}.log", iou=iou, ready_timeout=ready_timeout,
-                            call_timeout=call_timeout, bm25_check=bm25_check)
-                env_shown = env_shown or {k: v for k, v in server_env(steering, work / "home").items()
+                            log=log_dir / f"{task_id}-{steering}{suffix}.log", iou=iou, ready_timeout=ready_timeout,
+                            call_timeout=call_timeout, bm25_check=bm25_check, backend=backend)
+                env_shown = env_shown or {k: v for k, v in server_env(steering, work / "home", backend).items()
                                           if k.startswith(("CODEMEM_", "HF_", "TRANSFORMERS_"))}
             except (McpError, OSError, ValueError, subprocess.SubprocessError, shutil.Error) as exc:
                 error = str(exc)
             finally:
                 shutil.rmtree(work, ignore_errors=True)
             seconds = round(time.monotonic() - t0)
+        label = steering if backend == "faiss" else f"{steering}, {backend}"
         if error is not None:
             for entry in group:
                 entry["replay"], entry["check"] = {"error": error}, {"verdict": "not checked: replay failed"}
-            progress(f"[{n}/{len(groups)}] {task_id} ({steering}): failed: {error}")
+            progress(f"[{n}/{len(groups)}] {task_id} ({label}): failed: {error}")
         else:
-            progress(f"[{n}/{len(groups)}] {task_id} ({steering}): {len(group)} runs replayed in {seconds} s")
+            progress(f"[{n}/{len(groups)}] {task_id} ({label}): {len(group)} runs replayed in {seconds} s")
     return {"bin": str(program), "commit": program_commit, "env": env_shown}
 
 
@@ -670,6 +689,10 @@ def replay(run_ids: list[str], *, ks: list[int] | tuple[int, ...] = DEFAULT_KS, 
     out = out or e2e_dir() / "replay" / f"replay-{created:%Y%m%d-%H%M%S}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     entries, skipped, warnings = read_runs(run_ids, tasks_files=tasks_files, iou=iou, progress=progress)
+    if (named := named_vector_backend()) and (other := [e for e in entries
+                                                       if e.get("vector_backend", "faiss") != named]):
+        warnings.append(f"{VECTOR_BACKEND_ENV} is {named}, which does not change a replay: {len(other)} runs were "
+                        "made on another search index, and are replayed on it")
     codemem = None
     if not records_only and entries:
         if program is None:
