@@ -87,3 +87,55 @@ still one repetition, and not yet beyond chance (p 0.15 for tokens, 0.09 for tur
   tokens, against grep's 7 and 304K), as it did across pandas.
 - **When the knowledge is outside the repo,** when the agent decides to stop matters more than how
   it searches.
+
+---
+
+## 2. home-assistant 180438: the right function first, and a bigger fix than the tests want
+
+*Haiku, repetition 1, L0 to L2. Runs of Nov 28; release `run-records`, archive
+`haiku-rep1-homeassistant.tgz`, folders `runs/haiku-homeassistant-L*/home-assistant__core-180438/`.
+Suggested by track A (14:15 UTC). Added Nov 28.*
+
+**In short.** codemem's 20 lines put the function to change first at every level. Yet codemem
+failed all three runs, and grep solved two. The difference is the kind of fix each agent wrote,
+not finding. This one task is the whole gap in solved tasks on home-assistant.
+
+**The task.** With Advanced Security on, Home Assistant assumes that a Shelly device uses HTTPS,
+and replaces the port it discovered (80) with the HTTPS port. The issue asks it to keep the
+discovered port. The fix changes one file, `shelly/config_flow.py`.
+
+**What the six runs did.** Every run changed that file and added a test.
+
+| Level | grep | codemem |
+|---|---|---|
+| L0 | failed: an HTTPS check, +80 lines | failed: an HTTPS check, +83 lines |
+| L1 | **solved:** the port swap removed, +11 lines | failed: an HTTPS check, +82 lines |
+| L2 | **solved:** the port swap removed, +11 lines | failed: an HTTPS check, +85 lines |
+
+- **The small fix** deletes the helper that swaps the port (`_check_enhanced_security`) and keeps
+  the discovered one. That is what the hidden tests check.
+- **The big fix** keeps the swap, but first probes the device over HTTPS, and keeps the discovered
+  port if HTTPS does not answer. It does more than the issue asks, and the hidden tests fail it.
+
+**Why codemem may lean to the big fix.**
+
+- Its 20 lines start with the right function, then show the HTTPS code around it: the SSL entry
+  data, the HTTP port helper, the secure set-up of a device, the HTTP server's SSL context. An
+  agent shown that code may build on it.
+- But grep's agent wrote the same big fix at L0 without those lines. So this is a lean, not a proof.
+
+**How it moved the home-assistant results:**
+
+| | All 24 pairs | Without 180438 (21 pairs) |
+|---|---|---|
+| Solved, grep → codemem | 21 → 19 | 19 → 19 |
+| Tokens, codemem against grep | +6% | +6% |
+
+**Keep in mind.**
+
+- **Finding the place is not fixing it.** Every run found it here; the result turned on how big a
+  change the agent made.
+- **Patch size, checked across both repos so far:** codemem's changes outside tests were larger on
+  home-assistant (488 lines against 298; larger in 12 of the 18 pairs that differ, p 0.24), but
+  not on pandas (506 against 481; larger in 10 of 17). A lean worth watching, not a result.
+- One task, one repetition. The second repetition shows whether it repeats.
