@@ -107,6 +107,21 @@ Three points, each with its evidence in [overview.md](overview.md) §3.
      requests; the index's own cost; and an explanation of the result.
 3. **An open record.** The labs and most studies publish no run records. We publish every run:
    the request, each turn, each tool call, the tokens, and the grade.
+4. **grep itself changed, and for the reason we measure.** *(reported: from search results; the
+   pages are still to be read)*
+   - **2024, research agents.** SWE-agent wrapped search in purpose-built commands (`find_file`,
+     `search_file`, `search_dir`) with simple arguments and capped output, because raw grep was
+     hard for the models of the time
+     ([paper](https://arxiv.org/abs/2405.15793v3),
+     [its interface](https://princeton-nlp.github.io/SWE-agent/background/aci)).
+   - **Claude Code, until April 2026,** had dedicated Grep and Glob tools beside its shell tool,
+     each with a description in the prompt.
+   - **From version 2.1.117,** on native macOS and Linux builds, those two tools are gone. Search
+     goes through the shell, with fast search programs built in. The release note gives the
+     reason: "faster searches without a separate tool round-trip"
+     ([what's new, 2026 week 17](https://code.claude.com/docs/en/whats-new/2026-w17)).
+   - **Our runs use 2.1.332.** The agent has no search tool at all: it types `grep` into the
+     shell. §4.5 shows what that buys it.
 
 **How we differ from the closest work.**
 
@@ -211,7 +226,14 @@ cost; the case studies.
 
 ### 4.5 Why grep works so well (H6)
 
-Four pieces. The first two are cheap, and the first results are in.
+Seven pieces. All but the oracle come from records we have or from runs that cost little, and the
+first results are in.
+
+**What they add up to so far** (Haiku, repetition 1, pandas and home-assistant): grep is not
+optimal in general, but in these runs it is within one or two turns of a perfect search. Five
+reasons, each measured below: finding is a small part of the job; the model often knows where to
+look; where it does not, the request's own words lead grep there; in the shell, search and read
+are one turn; and a new tool has a price on every request.
 
 1. **T5, the memory probe.** Each task's request is given to each model with no repo and no tools,
    and the model names the file it would change.
@@ -235,6 +257,25 @@ Four pieces. The first two are cheap, and the first results are in.
 4. **F4, memory against effect.** One point per model and repo: how often the model names the file
    from memory, against what codemem saves there. H6 predicts that the saving falls as memory
    rises.
+5. **The ceiling, from grep runs alone.** How much of a grep run is spent before the fix file is
+   open, beyond the first turn. That is the most a perfect search could save, with no oracle run.
+   - **So far:** 8% of the turns and 6% of the tokens, in 54 runs. codemem wins back about 2 of
+     those 6 points.
+   - **It is the first thing to measure in any new setting** (§4.6, §4.7): it needs grep runs
+     only, and it says whether an index has room to help there.
+6. **Search and read in one turn.** In 49 of 51 grep runs, the agent's first command chains a
+   search and a read (`grep ... && sed -n ...`). A codemem search is one call, and reading the
+   file is another. This is the reason the release note of §3.2 gives for dropping the search
+   tools.
+7. **The price of a new tool.** The model knows grep from its training, so the shell needs no
+   words about it. A tool the model has never seen has to be described on every request.
+   - Every request carries about 36,000 tokens of standing prompt in both setups. codemem adds
+     about 2,500: its four tool descriptions, three resource tools that Claude Code adds for any
+     MCP server, and the 20 lines.
+   - Over the 778 requests of the codemem runs that is about 1.9M tokens, against a gap of 1.6M
+     between the setups. Without it the two would be even.
+   - **For the paper:** an index's fixed prompt is paid on every turn, and can cancel what its
+     search saves. Trimming it is a change for after the freeze (codemem is locked for the runs).
 
 ### 4.6 Unseen repos: renaming (H7)
 
@@ -260,8 +301,10 @@ points anywhere. It stands in for a private codebase.
 **What it shows:** T7, the main comparison again on the renamed tasks, beside the original ones:
 tasks solved, turns, tokens, the memory probe, and the first command.
 
-**Order:** a pilot on pandas and its 9 tasks, one model, both setups. Then the decision on a
-second repo. **Owner:** to be named (§8, point 2). **Status:** not built. The presentation shows
+**Order:** a pilot on pandas and its 9 tasks. **grep alone first, to measure the ceiling**
+(§4.5, piece 5): if grep still opens the fix file in two or three turns on a renamed repo, an index
+has no room there either, and that is the finding. If it needs many more, both setups run. Then
+the decision on a second repo. **Owner:** to be named (§8, point 2). **Status:** not built. The presentation shows
 it as pending.
 
 ### 4.7 The model gap: open models (H3), and F5
@@ -272,6 +315,7 @@ it as pending.
 - **F5, the trend:** the saving from codemem against the size of the model, from 9B to Opus, one
   line per level. With F4 it is the paper's answer to "when": the less a model knows of the repo,
   or the smaller it is, the more an index should help. Both are guesses until the runs are in.
+- **Order:** grep alone first, for the ceiling (§4.5, piece 5), as with the renamed repos.
 - **From:** the open harness on the rented GPU. **Owner:** Andre. **Status:** the harness is
   paused work; the presentation shows it as pending.
 
