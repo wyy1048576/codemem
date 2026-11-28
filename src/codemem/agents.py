@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
-import re
-import shlex
 import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import hook, prompts
+from . import prompts
 
 AGENTS = ("claude", "cursor", "codex")
 COMMAND = "codemem"
@@ -48,82 +45,8 @@ def _merge_mcp_json(path: Path, entry: dict) -> str:
     return json.dumps(data, indent=2) + "\n"
 
 
-HOOK_TIMEOUT = 10  # seconds; the command takes about 0.2
-_OUR_HOOK = re.compile(r"""codemem(\.exe)?["']?\s+hook\s*$""")  # `codemem hook`, `<python> -m codemem hook`
-
-
-def _hook_groups(command: str) -> dict[str, list[dict]]:
-    """What codemem registers with Claude Code: for each event, the groups (a matcher and its
-    commands) in the form of `.claude/settings.json`."""
-    direct = {"type": "command", "command": command, "timeout": HOOK_TIMEOUT}
-    # One command for each word, because a condition holds exactly one rule. Claude Code starts a
-    # command only when its condition matches, so other shell commands cost nothing. A version of
-    # Claude Code without `if` would start it for every shell command; the hook checks the words
-    # again itself, so that is slower but not wrong.
-    shell = [{"type": "command", "if": rule, "command": command, "timeout": HOOK_TIMEOUT} for rule in hook.SHELL_RULES]
-    return {
-        "PreToolUse": [
-            {"matcher": hook.PRE_MATCHER, "hooks": [direct]},
-            {"matcher": hook.SHELL_TOOL, "hooks": shell},
-        ],
-        "PostToolUse": [{"matcher": hook.POST_MATCHER, "hooks": [direct]}],
-    }
-
-
-def hook_command() -> str:
-    """The `codemem hook` command line, as Claude Code's hook shell runs it (a POSIX shell: sh or
-    bash, and Git Bash on Windows). A Windows path is written with forward slashes, which that
-    shell and PowerShell both take, and is quoted only when it has to be. Claude Code falls back
-    to PowerShell where Git Bash is missing; a quoted path does not run there."""
-    command, prefix = launch_command()
-    if os.sep == "\\" and command != COMMAND:
-        command = Path(command).as_posix()
-    return " ".join([shlex.quote(command), *prefix, "hook"])
-
-
-def _is_our_hook(entry: object) -> bool:
-    return isinstance(entry, dict) and isinstance(entry.get("command"), str) and bool(_OUR_HOOK.search(entry["command"]))
-
-
-def _merge_hooks_json(path: Path, command: str) -> str | None:
-    """`.claude/settings.json` with codemem's hooks in it, or None when they are there already.
-    Every other setting and every other hook is kept. Earlier codemem entries are replaced where
-    the first of them stands, so running `init` again never adds them twice."""
-    data: dict = {}
-    if path.is_file():
-        try:
-            data = json.loads(path.read_text("utf-8") or "{}")
-        except json.JSONDecodeError as e:
-            raise ValueError(f"{path} is not valid JSON ({e}); fix or remove it first") from e
-    if not isinstance(data, dict) or not isinstance(data.get("hooks", {}), dict):
-        raise ValueError(f"{path} does not hold a settings object with a `hooks` object; fix or remove it first")
-    before = json.dumps(data, sort_keys=True)
-    hooks = data.setdefault("hooks", {})
-    for event, ours in _hook_groups(command).items():
-        groups = hooks.get(event, [])
-        if not isinstance(groups, list):
-            raise ValueError(f"{path}: hooks.{event} is not a list; fix or remove it first")
-        kept: list = []
-        at: int | None = None  # where the earlier codemem entry stood
-        for group in groups:
-            inner = group.get("hooks") if isinstance(group, dict) else None
-            if not isinstance(inner, list) or not any(_is_our_hook(h) for h in inner):
-                kept.append(group)
-                continue
-            if at is None:
-                at = len(kept)
-            if others := [h for h in inner if not _is_our_hook(h)]:  # the user's own hooks in the same group
-                kept.append({**group, "hooks": others})
-        at = len(kept) if at is None else at
-        hooks[event] = [*kept[:at], *ours, *kept[at:]]
-    if json.dumps(data, sort_keys=True) == before:
-        return None
-    return json.dumps(data, indent=2) + "\n"
-
-
 def plan(
-    repo_root: Path, agents: list[str], *, write_agent_notes: bool = False, write_hooks: bool = False,
-    steering: str = "light",
+    repo_root: Path, agents: list[str], *, write_agent_notes: bool = False, steering: str = "light",
 ) -> list[Action]:
     repo_root = Path(repo_root).resolve()
     actions: list[Action] = []
@@ -143,13 +66,6 @@ def plan(
             "claude", f"add 'codemem' to {path.name} (or run: claude mcp add codemem -- {shown})",
             path, _merge_mcp_json(path, {"command": command, "args": [*prefix, "mcp"], "alwaysLoad": True}),
         ))
-        if write_hooks:  # hooks are a Claude Code feature, so the flag does nothing for other agents
-            path = repo_root / ".claude" / "settings.json"
-            if (content := _merge_hooks_json(path, hook_command())) is not None:
-                actions.append(Action(
-                    "hooks", "add codemem's hooks (first search, lost trail) to .claude/settings.json",
-                    path, content,
-                ))
     if "cursor" in agents:
         path = repo_root / ".cursor" / "mcp.json"
         actions.append(Action(

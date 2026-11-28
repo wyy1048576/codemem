@@ -37,10 +37,14 @@ def build_server(service: CodememService) -> MCPServer:
         name="search_code", description=prompts.tool_description("search_code", steering), structured_output=False
     )
     def search_code(
-        query: str, k: int = 10, path_prefix: str | None = None, kinds: list[str] | None = None,
-        tests: str = "include",
+        query: str, k: int = prompts.MAX_K, path_prefix: str | None = None, kinds: list[str] | None = None,
+        tests: str = "include", intent: str = "", symptom: str = "", anchors: list[str] | None = None,
+        locations: list[str] | None = None,
     ) -> str:
-        k = max(1, min(int(k), 50))
+        k = max(1, min(int(k), prompts.MAX_K))  # 1 to 10, as the description says
+        # The augmented query, written by the agent (search.search: intent, symptom, anchors, locations).
+        aug = {name: value for name, value in (
+            ("intent", intent), ("symptom", symptom), ("anchors", anchors), ("locations", locations)) if value}
         if unknown := [kind for kind in kinds or [] if kind not in KINDS]:
             return f"Unknown kinds {unknown}; choose from {list(KINDS)}."
         if tests not in TEST_FILTERS:
@@ -56,7 +60,7 @@ def build_server(service: CodememService) -> MCPServer:
                 f" Last error: {service.last_error}" if service.last_error else ""
             )
         resp = service.search(
-            query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False
+            query, k=k, path_prefix=path_prefix, kinds=kinds or None, tests=tests, wait_for_models=False, **aug
         )
         fresh = resp.freshness
         if fresh is not None and fresh.unchecked_copy:

@@ -8,9 +8,18 @@ from __future__ import annotations
 
 SERVER_NAME = "codemem"
 
+MAX_K = 10  # search_code returns at most this many results
+
 _FILTERS = (
+    f" k: how many results, 1 to {MAX_K} (default {MAX_K})."
     " Optional filters: path_prefix (a folder), kinds (function, method, class, block), tests "
     "(include, exclude, only)."
+    "\nOptional, most useful on your first search of a task, written from the task: intent (one or two "
+    "sentences: what the code that has to change does, in the words source code would use), symptom "
+    "(one sentence: the wrong behaviour or the missing feature), anchors (up to 20 strings copied "
+    "exactly from the task that may appear in the code: identifiers, option names, file names, "
+    "fragments of error messages), locations (files or functions that the task itself says are where "
+    "the change belongs; their code is shown first)."
 )
 
 _SEARCH_CODE = {
@@ -19,11 +28,15 @@ _SEARCH_CODE = {
         "identifier query. Returns ranked results with file:line, signature and a short preview." + _FILTERS
     ),
     "light": (
-        "Find code from a plain-words description when you have no exact name to grep for: "
-        "\"where do users log in?\", \"why are disabled users still logged in?\". Use it first on a "
-        "new task, and again whenever you lose the trail. Returns ranked functions, classes and code "
-        "blocks with file:line, signature and a short preview. Once you have an exact identifier or "
-        "string, use grep." + _FILTERS
+        "Find code from a plain-words description of what it does: \"where do users log in?\", "
+        "\"why are disabled users still logged in?\". Use it:\n"
+        "- for your first search on a task, unless you already have a clear anchor: an exact "
+        "function, class or file name, or an error string, that leads straight to the code. Fill in "
+        "intent, symptom and anchors too (below);\n"
+        "- whenever you lose the trail and don't know which direction to grep: a grep found nothing "
+        "or too many files, or several searches in a row found no file worth opening.\n"
+        "Returns ranked functions, classes and code blocks with file:line, signature and a short "
+        "preview. Once you have an exact name or string, grep or read the file." + _FILTERS
     ),
     "strong": (
         "Use search_code FIRST to find the code for a task, bug or feature described in plain words, "
@@ -67,11 +80,12 @@ _INSTRUCTIONS = {
     "light": (
         "codemem searches this repository by meaning: every function and class, with callers and "
         "tests.\n"
-        "Call search_code whenever you have no concrete lead:\n"
-        "- at the start of a task, before any grep or file listing: describe the behaviour in plain "
-        "words;\n"
-        "- whenever you lose the trail: a grep returned nothing or too much, or you don't know which "
-        "file or symbol to open next.\n"
+        "Call search_code, describing the behaviour in plain words:\n"
+        "- for your first search on a task, before any grep or file listing, unless you already have "
+        "a clear anchor: an exact function, class or file name, or an error string, that leads "
+        "straight to the code. Fill in its intent, symptom and anchors from the task too;\n"
+        "- whenever you lose the trail and don't know which direction to grep: a grep found nothing "
+        "or too many files, or several searches in a row found no file worth opening.\n"
         "Once you have an exact name, path or error string, grep or read the file directly.\n"
         "- get_chunk(ref): read one result in full with its callers and callees.\n"
         "- refresh_index(): after git checkout, pull or rebase (the index follows your own edits)."
@@ -90,9 +104,16 @@ AGENT_NOTES_MARKER = "<!-- codemem -->"
 
 _AGENT_NOTES = {
     "light": (
-        "This repo is indexed by codemem. With no exact name, path or error string to go on (at the "
-        "start of a task, or when a grep leads nowhere), call `search_code` with a plain-words "
-        "description. Once you have an exact name, use grep."
+        "This repo is indexed by codemem: `search_code` finds code from a plain-words description of "
+        "what it does.\n\n"
+        "- **First search on a task:** call `search_code` before any grep, unless you already have a "
+        "clear anchor: an exact function, class or file name, or an error string, that leads straight "
+        "to the code. Fill in its `intent`, `symptom` and `anchors` from the task too, and `locations` "
+        "if the task names where the change belongs.\n"
+        "- **Lost the trail:** when you don't know which direction to grep (a grep found nothing or "
+        "too many files, or several searches in a row found no file worth opening), call "
+        "`search_code` instead of another grep.\n\n"
+        "Once you have an exact name, grep or read the file."
     ),
     "strong": (
         "This repo is indexed by codemem (MCP server `codemem`). When locating code for an issue, "
@@ -128,35 +149,6 @@ _SEARCH_FOOTER = "Lost the trail later? Search again in different words."
 def search_footer(steering: str = "light") -> str:
     """Last line of every search_code result from the MCP tool; "" when steering is off."""
     return "" if steering == "none" else _SEARCH_FOOTER
-
-
-# Claude Code names an MCP tool mcp__<server>__<tool>.
-MCP_SEARCH_TOOL = f"mcp__{SERVER_NAME}__search_code"
-
-
-def first_search_refusal() -> str:
-    """What `codemem hook` tells the agent when it refuses the first Grep or Glob of a session."""
-    return (
-        "This is the first code search of this session and search_code has not been used yet.\n"
-        "Unless you already have an exact function name, file path or error string that takes you "
-        f"straight to the right file, call {MCP_SEARCH_TOOL} with a plain-words description instead. "
-        "If you do have one, repeat this call and it will go through."
-    )
-
-
-def lost_trail_nudge(reason: str, n: int = 0) -> str:
-    """What `codemem hook` adds after a Grep or Glob that looks like a lost trail. `reason` is
-    `empty` (nothing found), `many` (n files matched) or `streak` (n searches in a row with no
-    file opened in between)."""
-    what = {
-        "empty": "This search found nothing.",
-        "many": f"This search matched {n} files, too many to give a clear lead.",
-        "streak": f"That is {n} searches in a row without opening a file.",
-    }[reason]
-    return (
-        f"{what} If you have no exact name, path or error string to go on, call {MCP_SEARCH_TOOL} "
-        "with a plain-words description of what you are looking for."
-    )
 
 
 def models_loading_notice() -> str:

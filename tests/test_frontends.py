@@ -1,6 +1,7 @@
 """Service, watcher, CLI, agent config and MCP server (all with the fake embedder)."""
 
 import json
+import re
 import threading
 import time
 
@@ -600,130 +601,6 @@ def test_cli_init_writes_no_note_without_steering(sample_repo, tmp_path, fake_en
     assert (sample_repo / ".mcp.json").exists() and not (sample_repo / "CLAUDE.md").exists()
 
 
-def _settings(repo) -> dict:
-    return json.loads((repo / ".claude" / "settings.json").read_text())
-
-
-def _our_hooks(repo) -> dict:
-    """event -> the (matcher, condition, command, timeout) of every codemem hook registered for it."""
-    return {
-        event: [
-            (group["matcher"], h.get("if"), h["command"], h.get("timeout"))
-            for group in groups for h in group["hooks"] if h["command"].endswith("codemem hook")
-        ]
-        for event, groups in _settings(repo)["hooks"].items()
-    }
-
-
-def _expected_hooks() -> dict:
-    from codemem import hook
-
-    t = agents.HOOK_TIMEOUT
-    return {
-        "PreToolUse": [
-            (hook.PRE_MATCHER, None, "codemem hook", t),
-            # Shell commands: one command for each word, started only when its condition matches.
-            ("Bash", "Bash(rg *)", "codemem hook", t),
-            ("Bash", "Bash(grep *)", "codemem hook", t),
-            ("Bash", "Bash(find *)", "codemem hook", t),
-        ],
-        "PostToolUse": [(hook.POST_MATCHER, None, "codemem hook", t)],
-    }
-
-
-@pytest.fixture
-def on_path(monkeypatch):
-    monkeypatch.setattr(agents, "launch_command", lambda: ("codemem", []))
-
-
-def test_cli_init_write_hooks_dry_run_writes_nothing(sample_repo, fake_env, on_path, capsys):
-    assert main(["init", str(sample_repo), "--dry-run", "--write-hooks"]) == 0
-    out = capsys.readouterr().out
-    assert "would write" in out and "settings.json" in out and "codemem hook" in out
-    assert not (sample_repo / ".claude").exists()
-
-
-def test_cli_init_write_hooks(sample_repo, tmp_path, fake_env, on_path, capsys):
-    from codemem import hook
-
-    rc = main(["init", str(sample_repo), "--yes", "--write-hooks", "--index-dir", str(tmp_path / "idx")])
-    assert rc == 0
-    assert _our_hooks(sample_repo) == _expected_hooks()
-    assert (sample_repo / ".mcp.json").exists()
-    # Running again changes nothing, so there is nothing to write for the hooks.
-    again = agents.plan(sample_repo, ["claude"], write_hooks=True)
-    assert [a.agent for a in again] == ["claude"]
-
-
-def test_init_hooks_only_when_asked_and_only_for_claude(sample_repo, on_path):
-    assert "hooks" not in [a.agent for a in agents.plan(sample_repo, ["claude"])]
-    assert "hooks" not in [a.agent for a in agents.plan(sample_repo, ["cursor", "codex"], write_hooks=True)]
-    assert "hooks" in [a.agent for a in agents.plan(sample_repo, ["claude", "cursor"], write_hooks=True)]
-
-
-def test_init_hooks_keep_other_settings_and_hooks(sample_repo, on_path):
-    theirs = {"matcher": "Bash", "hooks": [{"type": "command", "command": "echo checked"}]}
-    stop = [{"hooks": [{"type": "command", "command": "say done"}]}]
-    path = sample_repo / ".claude" / "settings.json"
-    path.parent.mkdir()
-    path.write_text(json.dumps({
-        "permissions": {"allow": ["Bash(ls:*)"]},
-        "hooks": {"PreToolUse": [theirs], "Stop": stop},
-    }))
-    agents.apply(agents.plan(sample_repo, ["claude"], write_hooks=True))
-    data = _settings(sample_repo)
-    assert data["permissions"] == {"allow": ["Bash(ls:*)"]} and data["hooks"]["Stop"] == stop
-    assert data["hooks"]["PreToolUse"][0] == theirs and len(data["hooks"]["PreToolUse"]) == 3
-    assert [len(v) for v in _our_hooks(sample_repo).values()] == [4, 0, 1]  # PreToolUse, Stop, PostToolUse
-
-
-def test_init_hooks_replace_an_earlier_entry_where_it_stands(sample_repo, on_path):
-    from codemem import hook
-
-    old = {"type": "command", "command": "/old/env/bin/python -m codemem hook"}
-    theirs = {"type": "command", "command": "echo checked"}
-    path = sample_repo / ".claude" / "settings.json"
-    path.parent.mkdir()
-    path.write_text(json.dumps({"hooks": {
-        "PreToolUse": [{"matcher": "Grep", "hooks": [old]}, {"matcher": "Bash", "hooks": [theirs]}],
-        # The user put a hook of their own into the same group as codemem's: theirs stays there.
-        "PostToolUse": [{"matcher": "Write", "hooks": [theirs]}, {"matcher": "Grep|Glob", "hooks": [old, theirs]}],
-    }}))
-    agents.apply(agents.plan(sample_repo, ["claude"], write_hooks=True))
-    hooks = _settings(sample_repo)["hooks"]
-    assert [g["matcher"] for g in hooks["PreToolUse"]] == [hook.PRE_MATCHER, "Bash", "Bash"]
-    assert hooks["PreToolUse"][2]["hooks"] == [theirs]  # their own Bash hook, after codemem's
-    assert [g["matcher"] for g in hooks["PostToolUse"]] == ["Write", hook.POST_MATCHER, "Grep|Glob"]
-    assert hooks["PostToolUse"][2]["hooks"] == [theirs]
-    assert _our_hooks(sample_repo) == _expected_hooks()
-    assert "hooks" not in [a.agent for a in agents.plan(sample_repo, ["claude"], write_hooks=True)]
-
-
-def test_init_hooks_refuse_settings_they_cannot_read(sample_repo, on_path):
-    path = sample_repo / ".claude" / "settings.json"
-    path.parent.mkdir()
-    for text in ("{not json", "[]", '{"hooks": []}', '{"hooks": {"PreToolUse": {}}}'):
-        path.write_text(text)
-        with pytest.raises(ValueError, match="fix or remove it first"):
-            agents.plan(sample_repo, ["claude"], write_hooks=True)
-        assert path.read_text() == text
-
-
-def test_hook_command_when_codemem_is_not_on_path(monkeypatch):
-    import os
-
-    monkeypatch.setattr(agents, "launch_command", lambda: ("/opt/my env/bin/python", ["-m", "codemem"]))
-    assert agents.hook_command() == "'/opt/my env/bin/python' -m codemem hook"
-    assert agents._is_our_hook({"type": "command", "command": agents.hook_command()})
-    monkeypatch.setattr(agents, "launch_command", lambda: ("/opt/env/bin/python", ["-m", "codemem"]))
-    assert agents.hook_command() == "/opt/env/bin/python -m codemem hook"
-    if os.sep == "\\":  # a Windows path goes in with forward slashes, which Git Bash takes
-        monkeypatch.setattr(agents, "launch_command", lambda: ("C:\\envs\\cm\\python.exe", ["-m", "codemem"]))
-        assert agents.hook_command() == "C:/envs/cm/python.exe -m codemem hook"
-    assert not agents._is_our_hook({"type": "command", "command": "codemem hook --and-more"})
-    assert not agents._is_our_hook({"type": "command", "command": "echo codemem"})
-
-
 def test_steering_levels_change_text():
     texts = {lvl: prompts.tool_description("search_code", lvl) for lvl in ("none", "light", "strong")}
     assert len(set(texts.values())) == 3 and "FIRST" in texts["strong"] and "grep" not in texts["none"]
@@ -731,230 +608,55 @@ def test_steering_levels_change_text():
     # `light` states when to search (no concrete lead), in all three places an agent reads.
     for text in (texts["light"], prompts.server_instructions("light"), prompts.agent_notes("light")):
         assert "exact" in text and "grep" in text
-    assert "lose the trail" in texts["light"] and "lose the trail" in prompts.server_instructions("light")
     assert prompts.search_footer("none") == ""
     assert prompts.search_footer("light") == prompts.search_footer("strong") != ""
 
 
-# ---------------------------------------------------------------- hook
+def test_light_says_the_two_times_to_search():
+    """What the hooks used to say, now in the texts the agent reads: the first search unless there is
+    a clear anchor, and whenever the trail is lost (no direction to grep)."""
+    for text in (prompts.tool_description("search_code", "light"), prompts.server_instructions("light"),
+                 prompts.agent_notes("light")):
+        flat = " ".join(text.split())
+        assert "first search" in flat.lower() and "clear anchor" in flat
+        assert "lose the trail" in flat.lower() or "lost the trail" in flat.lower()
+        assert "which direction to grep" in flat and "found nothing or too many files" in flat
 
 
-def _hook(event) -> str:
+def test_search_code_k_is_1_to_10(service):
+    from mcp import Client
+
+    from codemem.server import build_server
+
+    for level in ("none", "light", "strong"):
+        assert "k: how many results, 1 to 10 (default 10)." in prompts.tool_description("search_code", level)
+    service.update()
+    counts = {}
+
+    async def run():
+        async with Client(build_server(service)) as client:
+            for k in (0, 1, 3, 10, 11, 50):
+                text = (await client.call_tool("search_code", {"query": "session", "k": k})).content[0].text
+                counts[k] = len(re.findall(r"^\d+\. ", text, re.MULTILINE))
+
+    anyio.run(run)
+    assert counts[0] == counts[1] == 1 and counts[3] == 3
+    assert counts[10] == counts[11] == counts[50] == min(10, counts[10]) and counts[10] > 3
+
+
+def test_the_old_hook_command_does_nothing(monkeypatch, capsys):
+    """A .claude/settings.json from an older `init --write-hooks` still runs `codemem hook`: it must end
+    with 0 (go on) and print nothing, never 2 (Claude Code would refuse the tool call)."""
     import io
 
-    from codemem import hook
-
-    out = io.StringIO()
-    assert hook.run(io.StringIO(event if isinstance(event, str) else json.dumps(event)), out) == 0
-    return out.getvalue()
-
-
-def _call(tool: str, session: str = "s1") -> dict:
-    return {"session_id": session, "hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": {}}
-
-
-def test_hook_refuses_the_first_search_once(isolated_home):
-    out = json.loads(_hook(_call("Grep")))["hookSpecificOutput"]
-    assert out["hookEventName"] == "PreToolUse" and out["permissionDecision"] == "deny"
-    assert out["permissionDecisionReason"] == prompts.first_search_refusal()
-    assert prompts.MCP_SEARCH_TOOL in out["permissionDecisionReason"]
-    # The repeated call goes through, and so does every later search of that session.
-    assert _hook(_call("Grep")) == "" and _hook(_call("Glob")) == ""
-    # Another session gets its own first refusal.
-    assert "deny" in _hook(_call("Glob", session="s2"))
-    assert len(list((isolated_home / "hook-sessions").iterdir())) == 2
-
-
-def _bash(command: str, session: str = "s1") -> dict:
-    return {**_call("Bash", session), "tool_input": {"command": command, "description": "run it"}}
-
-
-def test_hook_counts_a_shell_search_as_the_first_search(isolated_home):
-    # Other shell commands pass and do not use up the refusal.
-    for command in ("git status", "uv run pytest -q", "pip install --find-links wheels x", "cat docs/grep.md"):
-        assert _hook(_bash(command)) == ""
-    assert not (isolated_home / "hook-sessions").exists()
-    out = json.loads(_hook(_bash("cd src && grep -rn revoke_session .")))["hookSpecificOutput"]
-    assert out["permissionDecision"] == "deny" and out["permissionDecisionReason"] == prompts.first_search_refusal()
-    # Once in a session, whichever tool the search came through.
-    assert _hook(_bash("cd src && grep -rn revoke_session .")) == "" and _hook(_call("Grep")) == ""
-    assert "deny" in _hook(_call("Grep", session="s2")) and _hook(_bash("rg revoke", session="s2")) == ""
-    assert _hook(_call(prompts.MCP_SEARCH_TOOL, session="s3")) == "" and _hook(_bash("rg revoke", session="s3")) == ""
-
-
-def test_hook_shell_search_is_a_word_check():
-    from codemem import hook
-
-    assert hook.SHELL_RULES == ("Bash(rg *)", "Bash(grep *)", "Bash(find *)")
-    searches = (
-        "rg foo src", "grep -rn foo .", "find . -name '*.py'", "git grep -n foo", "xargs rg -l foo",
-        "cd a && grep foo b", "pytest | grep FAILED",  # not a code search, but one refusal is harmless
-    )
-    others = (
-        "git status", "cargo test", "git log --grep=fix", "pip install --find-links x pkg", "cat docs/grep.md",
-        "findstr foo bar", "python find_dupes.py", "ls src/find",
-    )
-    for command in searches:
-        assert hook._is_shell_search({"tool_input": {"command": command}}), command
-    for command in others:
-        assert not hook._is_shell_search({"tool_input": {"command": command}}), command
-    for event in ({}, {"tool_input": None}, {"tool_input": {}}, {"tool_input": {"command": 7}}):
-        assert not hook._is_shell_search(event)
-
-
-def test_hook_is_silent_after_search_code(isolated_home):
-    assert _hook(_call(prompts.MCP_SEARCH_TOOL)) == ""
-    assert _hook(_call("Grep")) == "" and _hook(_call("Glob")) == ""
-    # A server that a plugin registered has a longer name.
-    assert _hook(_call("mcp__plugin_x_codemem__search_code", session="s2")) == ""
-    assert _hook(_call("Grep", session="s2")) == ""
-
-
-def test_hook_never_blocks_what_it_does_not_understand(isolated_home):
-    for event in ("", "not json", "[1]", {}, {"session_id": "s1"}, {"tool_name": "Grep"}, _call("Read"), _call("Bash")):
-        assert _hook(event) == ""
-    assert not (isolated_home / "hook-sessions").exists()  # none of these counted as a search
-    assert "deny" in _hook(_call("Grep"))
-
-
-def test_hook_session_ids_cannot_leave_the_folder(isolated_home):
-    assert "deny" in _hook(_call("Grep", session="../../outside"))
-    assert [p.name for p in (isolated_home / "hook-sessions").iterdir()] == ["______outside"]
-
-
-def test_hook_forgets_old_sessions(isolated_home):
-    import os
-
-    folder = isolated_home / "hook-sessions"
-    folder.mkdir(parents=True)
-    old = folder / "old"
-    old.touch()
-    os.utime(old, (0, 0))
-    _hook(_call("Grep"))
-    assert [p.name for p in folder.iterdir()] == ["s1"]
-
-
-def test_cli_hook_reads_stdin(monkeypatch, capsys):
-    import io
-
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(_call("Grep"))))
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"hook_event_name": "PreToolUse", "tool_name": "Grep"}'))
     assert main(["hook"]) == 0
-    assert json.loads(capsys.readouterr().out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert capsys.readouterr().out == ""
 
 
-def test_hook_matchers_name_the_tools():
-    import re
-
-    from codemem import hook
-
-    assert hook.PRE_MATCHER == "Grep|Glob|mcp__codemem__search_code"
-    assert hook.POST_MATCHER == "Grep|Glob|Read|mcp__codemem__(search_code|get_chunk)"
-    # Claude Code reads a matcher with these characters as an unanchored regular expression.
-    for tool in ("Grep", "Glob", "Read", "mcp__codemem__search_code", "mcp__codemem__get_chunk"):
-        assert re.search(hook.POST_MATCHER, tool)
-    assert not re.search(hook.POST_MATCHER, "mcp__codemem__index_status")
-
-
-# Results in the form Claude Code gives them (seen in a session transcript; not documented).
-_NOTHING = {"mode": "files_with_matches", "filenames": [], "numFiles": 0, "totalFiles": 0}
-_FEW = {"mode": "files_with_matches", "filenames": ["a.py", "b.py"], "numFiles": 2, "totalFiles": 2}
-_LINES = {"mode": "content", "numFiles": 0, "filenames": [], "content": "a.py:1:x", "numLines": 1, "totalLines": 1}
-
-
-def _after(tool: str, response=None, session: str = "s1") -> str:
-    event = {**_call(tool, session), "hook_event_name": "PostToolUse", "tool_response": response}
-    out = _hook(event)
-    if not out:
-        return ""
-    out = json.loads(out)["hookSpecificOutput"]
-    assert out["hookEventName"] == "PostToolUse" and set(out) == {"hookEventName", "additionalContext"}
-    return out["additionalContext"]
-
-
-def test_hook_nudges_after_an_empty_search():
-    assert _after("Grep", _NOTHING) == prompts.lost_trail_nudge("empty")
-    assert prompts.MCP_SEARCH_TOOL in prompts.lost_trail_nudge("empty")
-    # Every form of "nothing": Glob, Grep's content and count modes, and plain text.
-    for i, (tool, response) in enumerate([
-        ("Glob", {"filenames": [], "numFiles": 0, "truncated": False, "totalMatches": 0}),
-        ("Grep", {"mode": "content", "numFiles": 0, "filenames": [], "content": "", "numLines": 0, "totalLines": 0}),
-        ("Grep", {"mode": "count", "numFiles": 0, "filenames": [], "content": "", "numMatches": 0}),
-        ("Grep", "No matches found"),
-    ]):
-        assert _after(tool, response, session=f"e{i}") == prompts.lost_trail_nudge("empty")
-
-
-def test_hook_nudges_after_too_many_files():
-    from codemem import hook
-
-    n = hook.MANY_FILES + 1
-    assert _after("Grep", {"mode": "files_with_matches", "numFiles": n, "totalFiles": n}) == prompts.lost_trail_nudge("many", n)
-    # Glob lists at most some of them; its total is what counts.
-    glob = {"filenames": ["x"] * 10, "numFiles": 10, "truncated": True, "totalMatches": 400}
-    assert _after("Glob", glob, session="s2") == prompts.lost_trail_nudge("many", 400)
-    at_limit = {"mode": "count", "numFiles": hook.MANY_FILES, "numMatches": 900}
-    assert _after("Grep", at_limit, session="s3") == ""
-    assert _after("Grep", _LINES, session="s4") == ""  # lines, not files: no count to judge
-
-
-def test_hook_nudges_on_the_third_search_in_a_row():
-    assert _after("Grep", _FEW) == "" and _after("Glob", _FEW) == ""
-    assert _after("Grep", _LINES) == prompts.lost_trail_nudge("streak", 3)
-
-
-def test_hook_streak_ends_when_something_is_opened():
-    for opened in ("Read", "mcp__codemem__get_chunk", "mcp__codemem__search_code"):
-        session = opened[-6:]
-        assert _after("Grep", _FEW, session) == "" and _after("Grep", _FEW, session) == ""
-        assert _after(opened, {"anything": 1}, session) == ""
-        assert _after("Grep", _FEW, session) == "" and _after("Grep", _FEW, session) == ""
-        assert _after("Grep", _FEW, session) == prompts.lost_trail_nudge("streak", 3)
-    # A tool the hook was not registered for changes nothing.
-    assert _after("Grep", _FEW, "x") == "" and _after("Bash", "ok", "x") == "" and _after("Grep", _FEW, "x") == ""
-    assert _after("Grep", _FEW, "x") != ""
-
-
-def test_hook_shell_commands_take_no_part_in_the_lost_trail(isolated_home):
-    def after_bash(command: str) -> str:
-        return _hook({**_bash(command), "hook_event_name": "PostToolUse", "tool_response": {"stdout": "", "stderr": ""}})
-
-    # A shell search that finds nothing is not nudged, however often, and keeps no state.
-    for _ in range(4):
-        assert after_bash("grep -rn nothing_here .") == ""
-    assert not (isolated_home / "hook-sessions").exists()
-    # Nor does it end a run of searches, as a Read would.
-    assert _after("Grep", _FEW) == "" and _after("Grep", _FEW) == "" and after_bash("pytest | grep FAILED") == ""
-    assert _after("Grep", _FEW) == prompts.lost_trail_nudge("streak", 3)
-
-
-def test_hook_stays_quiet_after_a_nudge():
-    from codemem import hook
-
-    assert _after("Grep", _NOTHING) != ""
-    for _ in range(hook.QUIET):
-        assert _after("Grep", _NOTHING) == ""
-    assert _after("Grep", _NOTHING) != ""
-    # search_code starts a new trail, so the next dead end is said at once. A Read does not.
-    assert _after("mcp__codemem__search_code", "1. auth/sessions.py") == ""
-    assert _after("Grep", _NOTHING) != ""
-    assert _after("Read", {"type": "text"}) == ""
-    assert _after("Grep", _NOTHING) == ""
-
-
-def test_hook_after_tool_ignores_what_it_does_not_understand(isolated_home):
-    assert _after("Read", {"type": "text"}) == ""
-    assert not (isolated_home / "hook-sessions").exists()  # a session that has not searched keeps no state
-    for response in (None, 7, [], {"mode": "files_with_matches"}, {"numFiles": True}, "Error: rg failed"):
-        assert _after("Grep", response, session="odd") == ""
-        _after("Read", None, session="odd")
-    (isolated_home / "hook-sessions" / "odd.trail").write_text("not json")
-    assert _after("Grep", _NOTHING, session="odd") == prompts.lost_trail_nudge("empty")
-
-
-def test_hook_two_hooks_keep_separate_state(isolated_home):
-    assert "deny" in _hook(_call("Grep"))  # refused: the search did not run, so nothing follows it
-    assert _hook(_call("Grep")) == "" and _after("Grep", _NOTHING) == prompts.lost_trail_nudge("empty")
-    assert sorted(p.name for p in (isolated_home / "hook-sessions").iterdir()) == ["s1", "s1.trail"]
+def test_init_writes_no_hooks(sample_repo, tmp_path, fake_env):
+    assert main(["init", str(sample_repo), "--yes", "--no-index", "--write-hooks"]) == 0
+    assert (sample_repo / ".mcp.json").exists() and not (sample_repo / ".claude" / "settings.json").exists()
 
 
 # ---------------------------------------------------------------- MCP
@@ -1208,8 +910,8 @@ def test_the_first_mcp_search_does_not_wait_for_the_model_to_load(sample_repo, t
 
 
 def test_the_command_line_starts_without_the_search_stack():
-    """`codemem hook` runs on every search an agent makes, so starting `codemem` must not import
-    numpy, faiss or the embedder: the commands that need them import them themselves."""
+    """Starting `codemem` must not import numpy, faiss or the embedder: the commands that need them
+    import them themselves."""
     import subprocess
     import sys
 

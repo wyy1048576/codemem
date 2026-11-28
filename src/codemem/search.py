@@ -7,6 +7,7 @@ is scored by its best one, and the card says which lines that window covers.
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
@@ -21,6 +22,12 @@ from .store import ChunkFilter, Store, VectorHit
 from .tokenize import fts_or, tokenize
 
 BM25 = "bm25"
+# The augmented query (search(): intent, symptom, anchors, locations).
+MAX_ANCHORS = 20
+MAX_LOCATIONS = 10
+MAX_PINS = 10  # chunks of named locations put first
+PINS_PER_LOCATION = 3
+_FILE_LIKE = re.compile(r"/|\.[A-Za-z0-9+]{1,6}$")
 
 
 @dataclass
@@ -231,8 +238,21 @@ def search(
     test_weight: float | None = None,
     kind_weights: dict[str, float] | None = None,
     tests: str = "include",
+    intent: str = "",
+    symptom: str = "",
+    anchors: Sequence[str] = (),
+    locations: Sequence[str] = (),
 ) -> SearchResponse:
-    """`tests`: "include" (default), "exclude" or "only" test code."""
+    """`tests`: "include" (default), "exclude" or "only" test code.
+
+    The rest is an augmented query, written by the calling agent's model (search_code's fields;
+    the loop of track B wrote it with a model call of its own, eval/experiments/b1-loop):
+    - `intent` and `symptom`: what the code to change does, and the wrong behaviour. Together one
+      more ranking by meaning for each vector signal (`intent_<signal>`).
+    - `anchors`: exact strings from the task that may be in the code. One more keyword ranking.
+    - `locations`: files or functions the task itself names. Their chunks come first (at most
+      MAX_PINS, PINS_PER_LOCATION each), then the merged ranking.
+    With none of them, the search is exactly the plain one."""
     if tests not in TEST_FILTERS:
         raise ValueError(f"tests must be one of {'|'.join(TEST_FILTERS)}, got {tests!r}")
     timings: dict[str, float] = {}
@@ -256,6 +276,9 @@ def search(
         only_tests=tests == "only",
     )
     allowed = store.filter_ids(flt) if flt.active else None
+    dense = "\n".join(part for part in (intent.strip(), symptom.strip()) if part)
+    anchors = [a.strip() for a in anchors if a and a.strip()][:MAX_ANCHORS]
+    locations = [loc for loc in locations if loc and loc.strip()][:MAX_LOCATIONS]
     n = max(config.candidates, k)
     ranked: dict[str, list[int]] = {}
     best_part: dict[tuple[str, int], VectorHit] = {}
@@ -265,38 +288,59 @@ def search(
         match = bm25_match(store, query, config)
         ranked[BM25] = store.bm25_search(match, n, config.bm25_weights5(), flt=flt) if match else []
         timings[BM25] = time.perf_counter() - t
+        if anchors and (match := bm25_match(store, " ".join(anchors), config)):
+            ranked["anchors_bm25"] = store.bm25_search(match, n, config.bm25_weights5(), flt=flt)
 
     vec_signals = [s for s in signals if s != BM25]
     if vec_signals and (allowed is None or allowed):
         # Embed the query once per distinct model (and plugin and weights), not once per vector set.
+        # The intent and symptom are embedded in the same call as the query.
+        texts = [query, dense] if dense else [query]
         query_vecs: dict[tuple, np.ndarray] = {}
         for vec_type in vec_signals:
             spec = config.vectors[vec_type]
             model = (spec.model, spec.embedder, spec.version)
             if model not in query_vecs:
                 t = time.perf_counter()
-                query_vecs[model] = embedder_factory(spec, config).embed_queries([query])[0]
+                query_vecs[model] = embedder_factory(spec, config).embed_queries(texts)
                 label = f"{spec.model}+{spec.embedder}" if spec.embedder else spec.model
                 timings[f"embed_query:{label}"] = time.perf_counter() - t
             t = time.perf_counter()
-            hits = store.vector_search(vec_type, query_vecs[model], n, allowed)
+            hits = store.vector_search(vec_type, query_vecs[model][0], n, allowed)
             ranked[vec_type] = [h.chunk_id for h in hits]
             for h in hits:
                 best_part[(vec_type, h.chunk_id)] = h
+            if dense:
+                ranked[f"intent_{vec_type}"] = [h.chunk_id for h in store.vector_search(vec_type, query_vecs[model][1], n, allowed)]
             timings[vec_type] = time.perf_counter() - t
     elif vec_signals:
         for vec_type in vec_signals:
             ranked[vec_type] = []
 
     t = time.perf_counter()
-    fused = rrf(ranked, k=config.rrf_k, weights=config.rrf_weights)
+    weights = config.rrf_weights
+    if extra := [name for name in ranked if name.startswith(("intent_", "anchors_"))]:
+        # An augmented list weighs as its signal does: intent_code as code, anchors_bm25 as bm25.
+        base = {name: name.split("_", 1)[1] if name.startswith("intent_") else BM25 for name in extra}
+        weights = {**config.rrf_weights, **{name: config.rrf_weights.get(base[name], 1.0) for name in extra}}
+    fused = rrf(ranked, k=config.rrf_k, weights=weights)
     kind_weights = config.kind_weights if kind_weights is None else kind_weights
     if (0 < test_weight != 1) or any(w != 1.0 for w in kind_weights.values()):
         fused = _reweigh(store, fused, test_weight if test_weight > 0 else 1.0, kind_weights)
     rank_of = {s: {doc: r for r, doc in enumerate(ids, start=1)} for s, ids in ranked.items()}
     query_tokens = set(tokenize(query, stopwords=True))
+    if anchors:
+        query_tokens |= set(tokenize(" ".join(anchors), stopwords=True))
+    top = _pick_top(fused, k, store.get_chunks)
+    if locations and (pins := _pins(store, locations, dict(fused), allowed)):
+        pinned = store.get_chunks(pins)
+        scores = dict(fused)
+        first = [(pinned[c], 1.0 + scores.get(c, 0.0)) for c in pins if c in pinned][:k]
+        chosen = {chunk.chunk_id for chunk, _ in first}
+        rest = _pick_top([item for item in fused if item[0] not in chosen], k - len(first), store.get_chunks)
+        top = first + rest
     results: list[ResultCard] = []
-    for chunk, score in _pick_top(fused, k, store.get_chunks):
+    for chunk, score in top:
         doc = chunk.chunk_id
         ranks = {s: rank_of[s][doc] for s in ranked if doc in rank_of[s]} if debug else None
         hit = best_part.get(("code", doc))
@@ -307,3 +351,47 @@ def search(
     timings["fuse"] = time.perf_counter() - t
     timings["total"] = time.perf_counter() - t_total
     return SearchResponse(query=query, signals=list(signals), results=results, timings=timings)
+
+
+def _pins(store: Store, locations: Sequence[str], scores: dict[int, float], allowed: set[int] | None) -> list[int]:
+    """The chunks of the locations a task names, in the order named (at most MAX_PINS)."""
+    ids: list[int] = []
+    for location in locations:
+        ids += _location_ids(store, location, scores, allowed)
+    return list(dict.fromkeys(ids))[:MAX_PINS]
+
+
+def _location_ids(store: Store, location: str, scores: dict[int, float], allowed: set[int] | None) -> list[int]:
+    """One named location: a key (`path::qualname`), `path:line`, a file (its best-ranked chunks, else its
+    first ones), or a symbol (`name`, `Class.name`, `name()`): the chunks of that name in the ranking, or all
+    of them when there are at most PINS_PER_LOCATION. A location that fits nothing, or too much, pins nothing."""
+    text = location.strip().strip("`'\"").replace("\\", "/").removeprefix("./").strip("/")
+    if not text:
+        return []
+
+    def keep(chunks) -> list:
+        return [c for c in chunks if c is not None and (allowed is None or c.chunk_id in allowed)]
+
+    if "::" in text:
+        return [c.chunk_id for c in keep([store.get_chunk_by_key(text)])]
+    path, sep, line = text.rpartition(":")
+    if sep and path and line.split("-")[0].isdigit():
+        return [c.chunk_id for c in keep([store.find_chunk_at(path, int(line.split("-")[0]))])]
+    if _FILE_LIKE.search(text) and (paths := store.paths_ending_with(text, limit=4)):
+        if len(paths) > 3:
+            return []
+        ids: list[int] = []
+        for p in paths:
+            chunks = keep(store.chunks_for_path(p))
+            ranked = sorted((c for c in chunks if c.chunk_id in scores), key=lambda c: -scores[c.chunk_id])
+            ids += [c.chunk_id for c in (ranked or chunks)[:PINS_PER_LOCATION]]
+        return ids
+    parts = [part for part in re.split(r"::|->|\.", re.sub(r"\(.*$", "", text).strip()) if part]
+    if not parts:
+        return []
+    named = keep(store.chunks_named(parts[-1]))
+    if len(parts) > 1:
+        named = [c for c in named if c.qualname.endswith(f"{parts[-2]}.{parts[-1]}")] or named
+    in_ranking = sorted((c for c in named if c.chunk_id in scores), key=lambda c: -scores[c.chunk_id])
+    chosen = in_ranking or (named if len(named) <= PINS_PER_LOCATION else [])
+    return [c.chunk_id for c in chosen[:PINS_PER_LOCATION]]
