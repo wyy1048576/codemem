@@ -25,11 +25,12 @@ track C makes the index small.
 
 | File | Read it if |
 |---|---|
-| `overview.md` (this file) | you are on the team: where we stand, what we want to show, how the tracks connect, the timeline, the paper |
+| `overview.md` (this file) | you are on the team: where we stand, what we want to show, how the tracks connect, the timeline |
 | [track-a-evals.md](track-a-evals.md) | you build or use the evaluation |
 | [track-b-retrieval.md](track-b-retrieval.md) | you work on what codemem stores and how it ranks |
 | [track-c-memory.md](track-c-memory.md) | you work on memory, disk and speed |
 | [runs.md](runs.md) | you run, or want to read, the runs of Nov 27 to 30: which model runs which tasks, in what order |
+| [paper.md](paper.md) | you write the paper or the presentation, or make a table or figure for them: the argument, each result and its owner, the decisions still open |
 
 Each track file can be read on its own. This page holds what all three share. Who has which
 track, and how progress is recorded, is in [CONTRIBUTING.md](../../CONTRIBUTING.md).
@@ -555,70 +556,12 @@ Cut scope, never the checks.
 
 ## 9. The paper
 
-**One paper, first submitted on December 7, 2026,** a soft date, written in the style of a
-conference paper, with its limits stated (§8.2). It has until December 10 to reach the level of
-a conference. It is also the course's final report.
+**The paper has its own plan: [paper.md](paper.md).** It holds the claim and the contributions, the
+hypotheses and where they stand, each section with its tables and figures and the experiment that
+feeds them, the measures, the venues, the presentation of December 1, and the decisions still open.
 
-**Where it could go afterwards.** This is not part of the plan's deadlines. It is listed so the
-paper is written with a venue's rules in mind. All *(reported)*.
-
-| Venue | Deadline | Fit |
-|---|---|---|
-| **NeurIPS 2027, Evaluations & Datasets** (the former Datasets & Benchmarks track) | not announced. In 2026 the abstract was due May 4 and the paper May 6. Nine pages | the best fit: it is the home of benchmark studies, and it accepts tools and generators. It would need the work of §8.3 |
-| ICLR 2027 workshops | papers suggested for Feb 1, 2027; the workshop list appears Nov 29 | the December paper as it stands |
-| FSE 2027 tool demonstrations | Jan 26, 2027; 4 pages | codemem as a tool |
-| TMLR | rolling | no deadline to meet |
-
-**What the NeurIPS track requires** *(reported)*: the data hosted and reachable without asking the authors;
-a Croissant metadata file with its responsible-AI fields; and code at submission for benchmark
-suites, generators and tools. Review is double-blind by default.
-
-**The claim, in one sentence.**
-
-> The first pre-registered, end-to-end study of when an optional, locally built code index helps
-> an agent that already has grep: from open 9B models to a frontier model, on tasks newer than
-> the models, in several languages, with precise and vague versions of a prompt, counting the
-> index's own cost and whether the agent actually calls it.
-
-**Contributions.**
-1. **The study:** search setup × model size × repo size × prompt vagueness, with completion, time
-   and tokens.
-2. **The tasks and their generator:** fresh tasks from our own repos, each with paired precise and
-   vague prompts that are checked to be still solvable and labels for how hard it is to *search*
-   for, and the tool that makes them from a repo and its recipe.
-3. **The system:** a local, always-fresh index with three representations and a measured memory
-   budget, as the thing under test and as a working tool.
-
-**How we differ from the closest work.**
-
-| Study | It has | It lacks |
-|---|---|---|
-| Code Isn't Memory | end to end; tokens and time | one model; 91 tasks; issue texts; index cost not counted; a closed system |
-| Bellam | model sizes from 0.6B to 32B; a placebo; pre-registration | localization only; Python; no completion |
-| CodeNib, CodeGrep | completion for mid-size models; index build cost | results up front only; SWE-bench Verified; one model each |
-| ColGREP | a local tool; time and tokens | models under 2B; file localization only |
-| Sourcegraph CodeScaleBench | 370 tasks, 9 languages | the two setups had different access to the code; a vendor's product |
-
-**Which experiment feeds which part of the paper.**
-
-| Paper element | Comes from |
-|---|---|
-| Figure 1: the effect of codemem on tokens, time and completion, by model size | A12 and A11 |
-| Figure 2: the same effect by repo size and by prompt vagueness | A12 |
-| Figure 3: tool against up-front results against placebo | A12 |
-| Table 1: the task set, by language, size, kind and vagueness | A7 to A9 |
-| Table 2: retrieval in three to five languages, issue texts and vague requests, per layer | A10, B7 |
-| Figure 4: memory, disk and build time against repo size; cost per task with the index counted | C6 |
-| Appendix: adoption by wording; how failed runs ended; link quality | A12, A11, B-E6 |
-
-**What reviewers of this track check** *(reported, from its guidelines and two checklists)*:
-- the claim the benchmark supports is stated, with its limits;
-- another team can rerun it from the paper: "no code = reject" for tools;
-- contamination is addressed (on SWE-bench Verified, models named the right file from the issue
-  alone up to 76% of the time);
-- variance is reported: several repetitions, paired intervals, corrected tests;
-- the tests that grade a task are sound;
-- novelty is argued against named prior work. Negative results count "when rigorously supported".
+It is one paper, first submitted on December 7, 2026 (soft), and at the level of a conference by
+December 10. It is also the course's final report.
 
 ---
 
