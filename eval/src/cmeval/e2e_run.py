@@ -13,7 +13,8 @@ One run (run_one) has these steps:
      reaches the proxy and nothing else. A thread follows the stream of events and stops the agent after
      the turn limit
   4. in the container, as root: remove files that would configure the agent, make a user that is not
-     root, and give /testbed to that user (testbed_script). For a codemem setup, make the mount proof as that
+     root, and give /testbed to that user (testbed_script: copy and swap after git has stopped, with a check of
+     the copy's names; else chown in place). For a codemem setup, make the mount proof as that
      user (proof_script): the codemem checkout in the container holds only codemem's environment and source
      (no eval/ with the task files), and no mounted path holds a line of the task's real fix or hidden tests.
      When it fails, the script stops there. Then start codemem's MCP server through the gate (codemem_gate.py)
@@ -97,8 +98,10 @@ run.json has these fields:
   proxy_errors        the errors of the proxy log
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
                       preparation step (the step copy_swap or chown says how /testbed went to the agent's user:
-                      by copy and swap, or by chown in place; copy_failed before chown: the copy failed; sync:
-                      the wait until the disk has written what the preparation wrote, right before the clock),
+                      by copy and swap, or by chown in place; copy_failed before chown: the copy failed;
+                      git_busy before chown: a git process still ran after the wait; copy_differs before chown:
+                      the names of the copy and of /testbed differ, or the check failed; sync: the wait until
+                      the disk has written what the preparation wrote, right before the clock),
                       codemem_warm_s (the wait for codemem, a part of prep_s; null without codemem),
                       container_start_s, collect_s, container_s, grade_s, host_load_start and
                       host_load_end (the host's load averages right before and right after docker run; null
@@ -187,6 +190,13 @@ GATE_LOGS = (f"cp {GATE_DIR}/gate.log /out/codemem-gate.log 2>/dev/null; "
 UNEXPECTED_PATTERNS = (".codemem*", ".mcp.json")
 # Where testbed_script copies /testbed before the copy takes its place.
 TESTBED_COPY = "/testbed.cmeval-copy"
+# Before the copy, testbed_script waits until no process of the container is git (GIT_PROCS holds the name of
+# each process), for at most GIT_WAIT_S seconds.
+GIT_PROCS = "/proc/[0-9]*/comm"
+GIT_WAIT_S = 600
+# testbed_script writes the sorted names of /testbed and of its copy to NAMES.orig and NAMES.copy, and removes
+# the two files after the comparison.
+NAMES = "/tmp/cmeval-names"
 # The mount proof of a codemem setup (proof_script): the host writes lines of the task's real fix and hidden
 # tests to PROOF_PHRASES in the run's folder. agent.sh moves the file to PROOF_DIR, a folder that only root can
 # read, before anything runs as the agent's user, and deletes it after the search. The result is PROOF_FILE.
@@ -711,7 +721,16 @@ def testbed_script(copy: bool = True) -> str:
     place when the copy cannot be used: a mount at or below /testbed (the copy would not hold it), /testbed is
     not a plain folder, or the copy fails (also a cp without --no-preserve, such as busybox's). When the old
     /testbed is removed but the copy cannot take its place, the script stops (exit 5). The mark
-    copy_swap or chown says which method was used. Without copy, only the chown in place."""
+    copy_swap or chown says which method was used. Without copy, only the chown in place.
+
+    The commit of remove_config can start git's automatic clean-up in the background. A git process that still
+    writes in /testbed/.git during the copy can make the copy incomplete, or make the rm of /testbed fail. The
+    script does not change how git cleans up. Before the copy, it waits until no process of the container is git,
+    so that nothing writes to .git during the copy (at most GIT_WAIT_S seconds, because a large repo can repack
+    for minutes; only /proc, because not every image has pgrep or ps). When git is still busy,
+    the script writes the mark git_busy and changes the owner in place. After the copy, it compares the sorted
+    names of /testbed and of the copy. When they differ, or a tool for the check fails, it removes the copy,
+    writes the mark copy_differs and changes the owner in place."""
     in_place = "chown -R agent:agent /testbed\nmark chown\n"
     if not copy:
         return in_place
@@ -721,11 +740,29 @@ def testbed_script(copy: bool = True) -> str:
         "in_place=1\n"
         f"if [ -d /testbed ] && [ ! -L /testbed ] && [ ! -e {TESTBED_COPY} ] && [ -r /proc/mounts ] && "
         "awk '$2 == \"/testbed\" || index($2, \"/testbed/\") == 1 {m = 1} END {exit m}' /proc/mounts; then\n"
-        f"  if cp -a --no-preserve=links /testbed {TESTBED_COPY} && chown -R agent:agent {TESTBED_COPY}; then\n"
+        # Without /proc the glob matches no file, grep fails, and the script does not wait.
+        "  waited=0\n"
+        f"  while grep -qsx git {GIT_PROCS} && [ \"$waited\" -lt {GIT_WAIT_S} ]; do\n"
+        "    sleep 1\n"
+        "    waited=$((waited + 1))\n"
+        "  done\n"
+        f"  if grep -qsx git {GIT_PROCS}; then\n"
+        "    mark git_busy\n"
+        f"  elif cp -a --no-preserve=links /testbed {TESTBED_COPY} && chown -R agent:agent {TESTBED_COPY}; then\n"
+        "    same=0\n"
+        f"    (cd /testbed && find .) > {NAMES}.orig && (cd {TESTBED_COPY} && find .) > {NAMES}.copy && "
+        f"LC_ALL=C sort -o {NAMES}.orig {NAMES}.orig && LC_ALL=C sort -o {NAMES}.copy {NAMES}.copy && "
+        f"cmp -s {NAMES}.orig {NAMES}.copy && same=1\n"
+        f"    rm -f {NAMES}.orig {NAMES}.copy\n"
+        "    if [ \"$same\" = 1 ]; then\n"
         # When rm or mv fails, /testbed is half removed or missing. No step can make that right.
-        f"    rm -rf /testbed && mv {TESTBED_COPY} /testbed || exit 5\n"
-        "    in_place=0\n"
-        "    mark copy_swap\n"
+        f"      rm -rf /testbed && mv {TESTBED_COPY} /testbed || exit 5\n"
+        "      in_place=0\n"
+        "      mark copy_swap\n"
+        "    else\n"
+        "      mark copy_differs\n"
+        f"      rm -rf {TESTBED_COPY}\n"
+        "    fi\n"
         "  else\n"
         "    mark copy_failed\n"
         f"    rm -rf {TESTBED_COPY}\n"
@@ -765,6 +802,8 @@ def agent_script(model: str, settings: RunSettings, gate_python: str | None = No
         "mark start\n"
         "cd /testbed || exit 2\n"
         # Files that would configure the agent. The removal is committed, so the agent's patch does not hold it.
+        # The commit can start git's automatic clean-up in the background. testbed_script waits until it is done.
+        # The script does not change how git cleans up.
         f"git ls-files -- {specs} > /out/removed.txt\n"
         "if [ -s /out/removed.txt ]; then\n"
         f"  git rm -rq --ignore-unmatch -- {specs} && git commit -qm 'cmeval: remove agent configuration'\n"

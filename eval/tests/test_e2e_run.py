@@ -177,6 +177,12 @@ def test_read_clock_and_prep(tmp_path):
                                        "chown 17000000000\nready 17500000000\n")
     assert e2e_run.read_prep(tmp_path)["steps_s"] == {"remove_config": 1.0, "copy_failed": 2.0, "chown": 14.0,
                                                       "ready": 0.5}
+    # The marks of the two other ways to the chown in place need no special case.
+    for mark in ("git_busy", "copy_differs"):
+        (tmp_path / "prep.txt").write_text(f"start 0\nremove_config 1000000000\n{mark} 121000000000\n"
+                                           "chown 135000000000\nready 135500000000\n")
+        assert e2e_run.read_prep(tmp_path)["steps_s"] == {"remove_config": 1.0, mark: 120.0, "chown": 14.0,
+                                                          "ready": 0.5}
     assert e2e_run.read_clock(tmp_path / "none") == {}
 
 
@@ -201,8 +207,17 @@ def test_agent_script():
     assert step.startswith("cd / || exit 2\n") and step.endswith("fi\ncd /testbed || exit 2\n")
     assert ("mark remove_config\nid -u agent > /dev/null 2>&1 || useradd -m agent\n" + step
             + "mkdir -p /run/claude-empty") in script
-    assert ("  if cp -a --no-preserve=links /testbed /testbed.cmeval-copy && chown -R agent:agent "
+    assert ("  elif cp -a --no-preserve=links /testbed /testbed.cmeval-copy && chown -R agent:agent "
             "/testbed.cmeval-copy; then\n") in step
+    # The script does not change how git cleans up after the commit. It only waits until git is done.
+    assert ("&& git commit -qm 'cmeval: remove agent configuration'\n") in script
+    assert "autoDetach" not in script and "gc.auto" not in script and "pgrep" not in step and " ps " not in step
+    # The order: wait for git, copy, compare the names, then the swap.
+    order = [step.index(part) for part in ("while grep -qsx git /proc/[0-9]*/comm && [ \"$waited\" -lt 600 ]",
+                                           "mark git_busy", "elif cp -a", "cmp -s /tmp/cmeval-names.orig "
+                                           "/tmp/cmeval-names.copy && same=1", "rm -f /tmp/cmeval-names.orig",
+                                           "rm -rf /testbed && mv", "mark copy_differs", "mark copy_failed")]
+    assert order == sorted(order)
     # Without the copy: the chown in place, as before.
     plain = e2e_run.agent_script("claude-haiku-5-5", RunSettings(time_limit_s=3000), copy_testbed=False)
     assert "cp -a" not in plain and "\nchown -R agent:agent /testbed\nmark chown\n" in plain
@@ -231,12 +246,16 @@ def _make_testbed(tmp_path, link=False):
         (tmp_path / "testbed").symlink_to(real)
 
 
-def _testbed_step(tmp_path, *, mounts="overlay / overlay rw 0 0\n", shims=None):
+def _testbed_step(tmp_path, *, mounts="overlay / overlay rw 0 0\n", shims=None, procs=None, wait_s=None):
     """Run testbed_script on tmp_path/testbed, as agent.sh would after remove_config. mounts stands for
-    /proc/mounts (None: no such file). chown is a stand-in that writes its arguments to a log. Returns the exit
-    code, the marks, the folder where the script ended and the chown calls."""
+    /proc/mounts (None: no such file). procs stands for the processes of /proc: {pid: name}. wait_s replaces
+    GIT_WAIT_S. chown is a stand-in that writes its arguments to a log. Returns the exit code, the marks, the
+    folder where the script ended and the chown calls."""
     if mounts is not None:
         (tmp_path / "mounts").write_text(mounts)
+    for pid, name in (procs or {}).items():
+        (tmp_path / "proc" / pid).mkdir(parents=True)
+        (tmp_path / "proc" / pid / "comm").write_text(name + "\n")
     folder = tmp_path / "shims"
     folder.mkdir()
     _shim(folder, "chown", f'#!/bin/sh\necho "$@" >> {tmp_path}/chown.log\n')
@@ -245,6 +264,9 @@ def _testbed_step(tmp_path, *, mounts="overlay / overlay rw 0 0\n", shims=None):
         _shim(folder, name, text)
     step = e2e_run.testbed_script().replace("/testbed", str(tmp_path / "testbed"))
     step = step.replace("/proc/mounts", str(tmp_path / "mounts"))
+    step = step.replace(e2e_run.GIT_PROCS, f"{tmp_path}/proc/[0-9]*/comm").replace(e2e_run.NAMES, f"{tmp_path}/names")
+    if wait_s is not None:
+        step = step.replace(f'-lt {e2e_run.GIT_WAIT_S} ]', f"-lt {wait_s} ]")
     script = tmp_path / "step.sh"
     script.write_text(f'mark() {{ echo "$1" >> {tmp_path}/marks.txt; }}\ncd {tmp_path}/testbed || exit 9\n'
                       f"{step}pwd -P > {tmp_path}/pwd.txt\n")
@@ -354,6 +376,72 @@ def test_testbed_script_stops_when_the_swap_fails(tmp_path, name, text):
     _make_testbed(tmp_path)
     code, marks, where, _ = _testbed_step(tmp_path, shims={name: text})
     assert code == 5 and marks == [] and where is None
+
+
+def test_testbed_script_waits_until_git_has_stopped(tmp_path):
+    _make_testbed(tmp_path)
+    before = _tree(tmp_path / "testbed")
+    # The git process ends during the first sleep.
+    sleep = f'#!/bin/sh\necho "$@" >> {tmp_path}/sleep.log\nrm {tmp_path}/proc/7/comm\n'
+    code, marks, _, chowned = _testbed_step(tmp_path, procs={"1": "bash", "7": "git", "8": "git-lfs"},
+                                            shims={"sleep": sleep})
+    assert code == 0 and marks == ["copy_swap"] and chowned == [f"-R agent:agent {tmp_path}/testbed.cmeval-copy"]
+    assert (tmp_path / "sleep.log").read_text() == "1\n" and _tree(tmp_path / "testbed") == before
+
+
+def test_testbed_script_does_not_wait_without_git(tmp_path):
+    _make_testbed(tmp_path)
+    code, marks, _, _ = _testbed_step(tmp_path, procs={"1": "bash", "8": "gitk"},
+                                      shims={"sleep": f"#!/bin/sh\ntouch {tmp_path}/slept\n"})
+    assert code == 0 and marks == ["copy_swap"] and not (tmp_path / "slept").exists()
+
+
+def test_testbed_script_changes_the_owner_in_place_while_git_runs(tmp_path):
+    _make_testbed(tmp_path)
+    copied = f'#!/bin/sh\ntouch {tmp_path}/copied\n'
+    code, marks, where, chowned = _testbed_step(
+        tmp_path, procs={"7": "git"}, wait_s=3,
+        shims={"sleep": f'#!/bin/sh\necho "$@" >> {tmp_path}/sleep.log\n', "cp": copied})
+    assert code == 0 and marks == ["git_busy", "chown"] and chowned == [f"-R agent:agent {tmp_path}/testbed"]
+    assert (tmp_path / "sleep.log").read_text() == "1\n" * 3 and not (tmp_path / "copied").exists()
+    assert where == str((tmp_path / "testbed").resolve()) and not (tmp_path / "testbed.cmeval-copy").exists()
+
+
+_REAL_CP = f'#!/bin/sh\nshift 2\n{shutil.which("cp")} -a "$@" || exit 1\n'
+
+
+@pytest.mark.parametrize("shims", [
+    # The copy misses a loose object that a git process packed and removed during the copy.
+    {"cp": _REAL_CP + 'rm "$2/.git/objects/ab/cdef"\n'},
+    # A git process wrote a pack into /testbed after cp had read the folder.
+    {"cp": _REAL_CP + 'touch "$1/.git/objects/pack/pack-1.pack"\n'},
+    # A tool of the check is missing or fails.
+    {"find": "#!/bin/sh\nexit 127\n"},
+    {"sort": "#!/bin/sh\nexit 2\n"},
+    {"cmp": "#!/bin/sh\nexit 2\n"},
+])
+def test_testbed_script_falls_back_when_the_copy_differs(tmp_path, shims):
+    _make_testbed(tmp_path)
+    (tmp_path / "testbed" / ".git" / "objects" / "ab").mkdir(parents=True)
+    (tmp_path / "testbed" / ".git" / "objects" / "pack").mkdir()
+    (tmp_path / "testbed" / ".git" / "objects" / "ab" / "cdef").write_text("blob\n")
+    code, marks, where, chowned = _testbed_step(tmp_path, shims=shims)
+    assert code == 0 and marks == ["copy_differs", "chown"]
+    assert chowned == [f"-R agent:agent {tmp_path}/testbed.cmeval-copy", f"-R agent:agent {tmp_path}/testbed"]
+    assert where == str((tmp_path / "testbed").resolve()) and not (tmp_path / "testbed.cmeval-copy").exists()
+    assert (tmp_path / "testbed" / ".git" / "objects" / "ab" / "cdef").exists()
+    assert not list(tmp_path.glob("names*"))
+
+
+def test_testbed_script_compares_hidden_and_nested_names(tmp_path):
+    _make_testbed(tmp_path)
+    (tmp_path / "testbed" / ".git" / "objects" / "ab").mkdir(parents=True)
+    (tmp_path / "testbed" / ".git" / "objects" / "ab" / "cdef").write_text("blob\n")
+    (tmp_path / "testbed" / "name with space").write_text("")
+    before = _tree(tmp_path / "testbed")
+    code, marks, _, _ = _testbed_step(tmp_path)
+    assert code == 0 and marks == ["copy_swap"] and _tree(tmp_path / "testbed") == before
+    assert not list(tmp_path.glob("names*"))
 
 
 def test_agent_script_with_the_gate():
@@ -620,6 +708,9 @@ def _local_run(monkeypatch, tmp_path, make_task, *, stream_lines, proxy_lines=PR
                 text = text.replace(f" {shlex.quote(target)} ", f" {shlex.quote(host)} ")
         moves = ((e2e_run.GATE_DIR, gate_dir), ("/testbed", str(testbed)), ("/out", out),
                  (e2e_run.PROOF_DIR, str(tmp_path / "cmproof")))
+        # The host's processes and /tmp are not the container's.
+        text = text.replace(e2e_run.GIT_PROCS, f"{tmp_path}/proc/[0-9]*/comm")
+        text = text.replace(e2e_run.NAMES, f"{tmp_path}/names")
         for old, new in ((e2e_run.KILL_AGENT, "true"), *moves, ("/run/claude-empty", str(tmp_path / "claude-empty")),
                          ("/tmp/mcp.json", f"{tmp_path}/mcp.json"), ("/proc/mounts", f"{tmp_path}/mounts")):
             text = text.replace(old, new)
@@ -871,7 +962,7 @@ def test_score_tables_and_paired_difference(capsys):
     paired = summary["paired"][0]
     # Only t1 has kept runs in both setups: completed 1.0 - 0.5, tokens 600 - 1000, seconds 80 - 100.
     assert paired == {"setup": "other", "baseline": "grep", "tasks": 1, "completed": 0.5, "tokens": -400.0,
-                      "seconds": -20.0}
+                      "seconds": -20.0, "cost": None}
     assert json.loads((e2e_run.e2e_dir() / "runs" / "s1" / "score.json").read_text()) == summary
 
     assert main(["e2e", "score", "s1"]) == 0
@@ -1272,7 +1363,7 @@ def test_score_tool_against_grep(capsys):
     assert (behaviour["codemem_share"], behaviour["codemem_calls_mean"], behaviour["first_codemem_turn_mean"]) == \
         (0.5, 2.5, 1.0)
     assert summary["paired"] == [{"setup": "tool", "baseline": "grep", "tasks": 2, "completed": 0.0,
-                                  "tokens": -150.0, "seconds": -7.5}]
+                                  "tokens": -150.0, "seconds": -7.5, "cost": None}]
     text = format_score(summary)
     assert "tool - grep over 2 tasks: completed 0.00, tokens -150, seconds -7.5" in text
     assert "used  codemem 1st call" in text
