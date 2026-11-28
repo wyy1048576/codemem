@@ -1,0 +1,24 @@
+{
+ "name": "vague-ha-hard-v3",
+ "created": "2026-11-28",
+ "tasks": 1,
+ "rows": 2,
+ "levels": [
+  "L1",
+  "L2"
+ ],
+ "task_files": [
+  "tasks/e2e/homeassistant-large.jsonl"
+ ],
+ "task_choice": "the home-assistant hard-tier task that the screen of tasks/screen/hard-homeassistant.jsonl calls fair (two reads): 175759, 1 of the first 16 valid tasks",
+ "rules": "tasks/vague-rules-v3.md",
+ "rules_sha256": "8c3396a4eacfeee714112ca420224189708f8109aad0827e05cba426779c3011",
+ "writer": "one claude-opus-5-5 session on 2026-11-28, with the rules, the issue, the real fix, the hidden tests and the screen's deciding assertions",
+ "with_done_when": [],
+ "checks": {
+  "leak": "the writer searched its texts for the names it removed and for the changed names of the real fix. Then one claude-fable-5-2 session reviewed the task against the issue, the real fix, the hidden tests and the screen notes: corrected (L1 and L2 named which action of the integration it is; that is the action's identifier split into words, and the issue says only the integration's services). Its corrected texts are used",
+  "solvable": "not done (plan section 9, check 2)",
+  "human": "not done (plan section 9, check 3)"
+ },
+ "sha256": "5fabbddbf59887454731c86314352eda5932693c165fa56b3d1edb924ef4a4e7"
+}
