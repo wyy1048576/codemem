@@ -8,15 +8,23 @@ starts from a private copy of it. The layout:
   CMEVAL_HOME/e2e/indexes/<recipe>/<task id>/index.json  task_id, repo, base_commit, codemem_commit, seconds, and
                                                          summary (the last line that codemem printed)
   CMEVAL_HOME/e2e/indexes/<recipe>/<task id>/index.log   the output of codemem
+  CMEVAL_HOME/e2e/indexes/<recipe>/<task id>/compact/    index/, index.json and index.log of the compact search
+                                                         index, built from the same src/
 
 The paths in a codemem index are relative, so the index of src/ also works for /testbed in the task's container.
 The index is tied to the device and number type of the embedder. When codemem opens an index of the GPU
 (float16, cuda) on the CPU, it embeds every text again, which takes hours. So the container of a run gets the GPU.
 
-The build and every run search with the same index, the exact one (CODEMEM_ENV). Left to itself, codemem picks
-the search index by the memory of the place it runs in: all of the host's for a build, the container's limit for
-a run. A large index that the build saved as the exact one would then be rebuilt as the compact one at the start
-of every run, and the agent's first searches would be answered from keywords only.
+The search index. Every place where the eval starts codemem for a batch names the same search index
+(codemem_env): the build here, the block's search (e2e_block), the server of a run (e2e_run.codemem_mcp_config)
+and the replay (e2e_replay). It is the exact one (faiss), unless the batch sets CMEVAL_CODEMEM_VECTOR_BACKEND to
+compact (vector_backend). Left to itself, codemem picks the search index by the memory of the place it runs in:
+all of the host's for a build, the container's limit for a run. A large index that the build saved as the exact
+one would then be rebuilt as the compact one at the start of every run, and the agent's first searches would be
+answered from keywords only. The compact form has its own folder, compact/ in the task's folder, so that neither
+form overwrites the other; its index.json says "vector_backend": "compact", and an index.json without that field
+holds the exact one (index_form). A task whose folder for the batch's form holds the other form is in the state
+"another form", and a run or a block refuses it.
 
 The codemem program is <codemem checkout>/.venv/bin/codemem (or CMEVAL_CODEMEM_BIN). The runner mounts only
 what the program reads at run time, each at its own path and read-only: the environment (<checkout>/.venv), the
@@ -43,9 +51,11 @@ from .paths import e2e_dir
 from .tasks import Task
 
 CODEMEM_BIN_ENV = "CMEVAL_CODEMEM_BIN"
-# What codemem gets in its environment wherever the eval starts it: the build of an index here, and the server
-# of a run (e2e_run.codemem_mcp_config). One search index for both, whatever memory each place has.
-CODEMEM_ENV = {"CODEMEM_VECTOR_BACKEND": "faiss"}
+# The search index of a batch's codemem: faiss (the exact one, also when the variable is not set) or compact.
+VECTOR_BACKEND_ENV = "CMEVAL_CODEMEM_VECTOR_BACKEND"
+VECTOR_BACKENDS = ("faiss", "compact")
+# The folder of the compact form's index and blocks, in the task's folder beside the exact form's files.
+COMPACT_DIR = "compact"
 # eval/src/cmeval/ is three levels below the root of the codemem repo.
 REPO_ROOT = Path(__file__).resolve().parents[3]
 # Folders of the system. A Python install there cannot be mounted: it would hide the container's own files.
@@ -182,12 +192,60 @@ def hf_cache() -> Path:
     return Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface")
 
 
-def index_root(recipe: Recipe, task: Task) -> Path:
+def vector_backend() -> str:
+    """The batch's search index: the value of CMEVAL_CODEMEM_VECTOR_BACKEND, faiss when it is not set. Any other
+    value is refused, so that nothing is built or run with it."""
+    value = os.environ.get(VECTOR_BACKEND_ENV)
+    if not value:
+        return "faiss"
+    if value not in VECTOR_BACKENDS:
+        raise GenerateError(f"{VECTOR_BACKEND_ENV} must be one of {', '.join(VECTOR_BACKENDS)}, not {value!r}")
+    return value
+
+
+def named_vector_backend() -> str | None:
+    """The batch's search index when CMEVAL_CODEMEM_VECTOR_BACKEND names one, else None. A record names its search
+    index only then, so that the record of a batch that does not set the variable has no field more."""
+    return vector_backend() if os.environ.get(VECTOR_BACKEND_ENV) else None
+
+
+def codemem_env(backend: str) -> dict:
+    """What codemem gets in its environment wherever the eval starts it for a batch: the build of an index here,
+    the block's search, the server of a run and the replay. One search index for all of them, whatever memory
+    each place has."""
+    return {"CODEMEM_VECTOR_BACKEND": backend}
+
+
+def index_form(meta: object) -> str:
+    """The search index that an index.json (or the copy of one in a block) holds: its vector_backend, or faiss
+    when it has none. The exact form's index.json has no such field."""
+    return meta.get("vector_backend", "faiss") if isinstance(meta, dict) else "faiss"
+
+
+def form_dir(task_dir: Path, backend: str) -> Path:
+    """The folder of one form's index and blocks in a task's folder: the task's folder itself for faiss, its
+    compact/ for compact."""
+    return task_dir / COMPACT_DIR if backend == "compact" else task_dir
+
+
+def task_root(recipe: Recipe, task: Task) -> Path:
+    """The task's folder: src/, the exact form's index and blocks, and the compact form's folder."""
     return e2e_dir() / "indexes" / recipe.name / task.id
 
 
-def read_index_meta(recipe: Recipe, task: Task) -> dict | None:
-    path = index_root(recipe, task) / "index.json"
+def index_root(recipe: Recipe, task: Task, backend: str | None = None) -> Path:
+    """The folder of the task's index of one form (default: the batch's, vector_backend): index/, index.json,
+    index.log and the blocks of e2e_block."""
+    return form_dir(task_root(recipe, task), backend or vector_backend())
+
+
+def src_root(recipe: Recipe, task: Task) -> Path:
+    """The git worktree of the task's base commit, which both forms index."""
+    return task_root(recipe, task) / "src"
+
+
+def read_index_meta(recipe: Recipe, task: Task, backend: str | None = None) -> dict | None:
+    path = index_root(recipe, task, backend) / "index.json"
     try:
         meta = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -195,11 +253,15 @@ def read_index_meta(recipe: Recipe, task: Task) -> dict | None:
     return meta if isinstance(meta, dict) else None
 
 
-def index_state(recipe: Recipe, task: Task) -> str:
-    """ok, missing, or "another commit" (index.json is for another base commit)."""
-    meta = read_index_meta(recipe, task)
-    if meta is None or not (index_root(recipe, task) / "index").is_dir():
+def index_state(recipe: Recipe, task: Task, backend: str | None = None) -> str:
+    """ok, missing, "another form" (the index.json in the folder of the form holds the other search index), or
+    "another commit" (index.json is for another base commit). The form is the batch's when not given."""
+    backend = backend or vector_backend()
+    meta = read_index_meta(recipe, task, backend)
+    if meta is None or not (index_root(recipe, task, backend) / "index").is_dir():
         return "missing"
+    if index_form(meta) != backend:
+        return "another form"
     return "ok" if meta.get("base_commit") == task.base_commit else "another commit"
 
 
@@ -225,17 +287,20 @@ def _summary(log: Path) -> str | None:
     return found[-1] if found else (lines[-1] if lines else None)
 
 
-def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None, force: bool = False) -> dict | None:
-    """Build the task's index. Returns index.json, or None when it exists for the same base commit and the same
-    codemem commit (and force is off). A build always starts from an empty index folder, and deletes the blocks
-    of e2e_block beside the old index."""
-    root = index_root(recipe, task)
-    meta = read_index_meta(recipe, task)
+def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None, force: bool = False,
+               backend: str | None = None) -> dict | None:
+    """Build the task's index of one form (default: the batch's). Returns index.json, or None when it exists for
+    the same base commit, the same codemem commit and the same form (and force is off). A build always starts
+    from an empty index folder, and deletes the blocks of e2e_block beside the old index of its form."""
+    backend = backend or vector_backend()
+    root = index_root(recipe, task, backend)
+    meta = read_index_meta(recipe, task, backend)
     if (not force and meta and meta.get("base_commit") == task.base_commit and meta.get("codemem_commit") == commit
-            and (root / "index").is_dir()):
+            and index_form(meta) == backend and (root / "index").is_dir()):
         return None
-    src, index, log = root / "src", root / "index", root / "index.log"
+    src, index, log = src_root(recipe, task), root / "index", root / "index.log"
     ensure_worktree(task, src)
+    root.mkdir(parents=True, exist_ok=True)
     (root / "index.json").unlink(missing_ok=True)
     for block in root.glob("block-*.json"):  # blocks of e2e_block, made on the old index
         block.unlink()
@@ -244,31 +309,36 @@ def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None,
     log.unlink(missing_ok=True)
     t0 = time.monotonic()
     proc = _run([str(program), "index", str(src), "--index-dir", str(index)], log=log,
-                env={**os.environ, **CODEMEM_ENV})
+                env={**os.environ, **codemem_env(backend)})
     seconds = round(time.monotonic() - t0, 1)
     if proc.returncode != 0:
         raise GenerateError(f"{task.id}: codemem index ended with exit code {proc.returncode}; see {log}")
     meta = {"task_id": task.id, "repo": task.repo, "base_commit": task.base_commit, "codemem_commit": commit,
             "seconds": seconds, "summary": _summary(log)}
+    if backend != "faiss":
+        meta["vector_backend"] = backend
     write_json(root / "index.json", meta)
     return meta
 
 
 def index_tasks(recipe: Recipe, tasks: list[Task], *, force: bool = False,
                 progress: Callable[[str], None] = lambda message: None) -> int:
-    """Build the index of each task, one at a time (codemem uses the GPU). Returns the number of failed tasks."""
+    """Build the index of each task, of the batch's form, one at a time (codemem uses the GPU). Returns the number
+    of failed tasks."""
+    backend = vector_backend()
     program = codemem_bin()
     commit = codemem_commit(codemem_checkout(program))
     failed = 0
     for task in tasks:
         try:
-            meta = index_task(recipe, task, program=program, commit=commit, force=force)
+            meta = index_task(recipe, task, program=program, commit=commit, force=force, backend=backend)
         except (GenerateError, repos.RepoError) as exc:
             failed += 1
             progress(f"{task.id}: failed: {exc}")
             continue
         if meta is None:
-            progress(f"{task.id}: skipped, the index exists for codemem {commit}")
+            form = "compact index" if backend == "compact" else "index"
+            progress(f"{task.id}: skipped, the {form} exists for codemem {commit}")
         else:
             progress(f"{task.id}: {meta['seconds']} s, {meta['summary']}")
     return failed

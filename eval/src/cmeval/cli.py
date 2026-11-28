@@ -635,6 +635,7 @@ def cmd_e2e_run(args) -> int:
 
     try:
         e2e_run.check_model(args.model)
+        named = e2e_run.named_vector_backend()  # a bad CMEVAL_CODEMEM_VECTOR_BACKEND stops here, also a dry run
         setups = list(dict.fromkeys(args.setup or ["grep"]))
         for name in setups:
             e2e_run.get_setup(name)
@@ -679,7 +680,7 @@ def cmd_e2e_run(args) -> int:
     with JobStatus("e2e-run", args.run_id) as status:
         progress = _printer(status)
         progress(f"{recipe.repo}: {len(ready)} tasks x {len(setups)} setups x {args.reps} reps = {len(order)} runs, "
-                 f"model {args.model}")
+                 f"model {args.model}" + (f", codemem search index {named}" if named else ""))
         try:
             batch = e2e_run.run_batch(recipe, ready, run_id=args.run_id, setups=setups, model=args.model,
                                       reps=args.reps, settings=e2e_run.RunSettings(), progress=progress,
@@ -703,6 +704,7 @@ def cmd_e2e_index(args) -> int:
 
     say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
     try:
+        backend = e2e_index.vector_backend()
         recipe = gen.load_recipe(args.recipe)
         tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
         if args.id:
@@ -719,18 +721,20 @@ def cmd_e2e_index(args) -> int:
     except (gen.GenerateError, FileNotFoundError, TaskError) as exc:
         print(f"e2e index: {exc}", file=sys.stderr)
         return 1
-    print(f"{recipe.name}: {len(ready) - failed} of {len(ready)} indexes ready in "
+    form = (f"compact indexes (<task id>/{e2e_index.COMPACT_DIR}/)" if backend == "compact" else "indexes")
+    print(f"{recipe.name}: {len(ready) - failed} of {len(ready)} {form} ready in "
           f"{e2e_index.e2e_dir() / 'indexes' / recipe.name}")
     return 1 if failed else 0
 
 
 def cmd_e2e_block(args) -> int:
-    from . import e2e_block, e2e_run
+    from . import e2e_block, e2e_index, e2e_run
     from . import generate as gen
 
     say = lambda message: print(message, file=sys.stderr, flush=True)  # noqa: E731
     levels = list(dict.fromkeys(args.prompt_level or e2e_run.PROMPT_LEVELS))
     try:
+        backend = e2e_index.vector_backend()
         recipe = gen.load_recipe(args.recipe)
         tasks = [t for t in load_tasks(args.tasks) if t.repo == recipe.repo]
         prompts = {}
@@ -769,8 +773,9 @@ def cmd_e2e_block(args) -> int:
         print(f"e2e block: {exc}", file=sys.stderr)
         return 1
     blocks = sum(len(queries) for _, queries in jobs)
-    print(f"{recipe.name}: {blocks - failed} of {blocks} blocks ready beside the indexes in "
-          f"{e2e_block.index_root(recipe, jobs[0][0]).parent}")
+    form = (f"compact indexes (<task id>/{e2e_index.COMPACT_DIR}/)" if backend == "compact" else "indexes")
+    print(f"{recipe.name}: {blocks - failed} of {blocks} blocks ready beside the {form} in "
+          f"{e2e_index.task_root(recipe, jobs[0][0]).parent}")
     return 1 if failed else 0
 
 

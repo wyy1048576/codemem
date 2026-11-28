@@ -29,11 +29,12 @@ the model was still loading, and codemem answered it from keywords only.
 
 A run is discarded when it hit a usage limit or failed the setup check. The setup check reads the init event
 of the stream (check_setup), and for a codemem setup also the gate's ready file and the first search_code
-result (codemem_checks): a warm-up that failed, or a first search answered from keywords only, fails it. A
-discarded run is not graded, and the next batch does it again. A failed mount proof (proof_checks) also fails
-the setup check. When the mount proof or the warm-up fails, Claude Code does not start, and the run ends in an
-error: three of them in a row stop the batch. A run that ended at the time or turn limit is graded like any
-other.
+result (codemem_checks): a warm-up that failed, or a first search answered from keywords only, fails it. In a
+batch that names its search index (CMEVAL_CODEMEM_VECTOR_BACKEND), so does a warm server whose index_status
+names another one. A discarded run is not graded, and the next batch does it again. A failed mount proof
+(proof_checks) also fails the setup check. When the mount proof or the warm-up fails, Claude Code does not
+start, and the run ends in an error: three of them in a row stop the batch. A run that ended at the time or
+turn limit is graded like any other.
 
 A setup with a block (e2e_block.py) is another setup plus one codemem search made for the agent before it
 starts, with the results at the top of the first message: codemem is tool plus the block, and upfront is grep
@@ -60,10 +61,13 @@ run.json has these fields:
                       token's file, never its text), image tag and id, split, cmeval
                       commit, machine, limits, start time (UTC), the task's gold files. codemem: null for a setup
                       without codemem; else the codemem commit, the program, the task's index.json, the steering
-                      level, and the bytes of the index copy before and after the run. block: null for a setup
-                      without a block; else e2e_block.record_entry: its file and sha256, its result lines, the
-                      search's seconds and codemem commit, searches_made_for_agent (1), the ranks of the first
-                      result in a gold file and on a gold function, and the results (rank, path, line, name)
+                      level, the search index (vector_backend: faiss or compact, only in a batch that sets
+                      CMEVAL_CODEMEM_VECTOR_BACKEND; without it the index was the exact one), and the bytes of
+                      the index copy before and after the run. block: null for a setup without a block; else
+                      e2e_block.record_entry: its file and sha256, its result lines, the search's seconds and
+                      codemem commit, vector_backend (as in codemem), searches_made_for_agent (1), the ranks of
+                      the first result in a gold file and on a gold function, and the results (rank, path, line,
+                      name)
   integrity           setup_ok and the failed checks, the init event's facts, proxy_complete, cross_check, the
                       network, the removed configuration files, the files where the token was found and replaced,
                       gpus (the container had the GPU). codemem setups only, else null: codemem_mount_proof (ok,
@@ -119,8 +123,9 @@ from typing import Callable
 from . import codemem_gate
 from .e2e import grade, patch_files
 from .e2e_block import codemem_program_commit, read_block, record_entry
-from .e2e_index import CODEMEM_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_mount_paths, \
-    codemem_python_root, hf_cache, index_root, index_state, read_index_meta
+from .e2e_index import VECTOR_BACKEND_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_env, \
+    codemem_mount_paths, codemem_python_root, hf_cache, index_root, index_state, named_vector_backend, \
+    read_index_meta, vector_backend
 from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
 from .files import write_json
 from .generate import NO_CORE_DUMPS, GenerateError, Recipe, _run, changed_lines, image_exists, task_tag, tests_path
@@ -402,7 +407,9 @@ def ensure_network(name: str = NETWORK) -> str:
 def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> dict:
     """Check what codemem needs in the container. Returns the program, its checkout, the folders of the checkout
     that the container gets (e2e_index.codemem_mount_paths), the Python install, the Hugging Face cache, the
-    task's index folder and index.json, and the codemem commit."""
+    task's index folder and index.json of the batch's search index, the codemem commit, and that search index
+    (vector_backend)."""
+    backend = vector_backend()
     hint = f"run cmeval e2e index {recipe.name} first"
     if not settings.gpus:
         raise GenerateError(f"a codemem setup needs the GPU in the container ({GPUS_ENV}=1): the index is tied to "
@@ -412,9 +419,9 @@ def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> 
         python_root = codemem_python_root(program)
     except GenerateError as exc:
         raise GenerateError(f"{exc}; then {hint}") from None
-    state = index_state(recipe, task)
+    state = index_state(recipe, task, backend)
     if state != "ok":
-        where = index_root(recipe, task)
+        where = index_root(recipe, task, backend)
         raise GenerateError(f"{task.id}: no index for base commit {task.base_commit[:12]} in {where} "
                             f"({state}); {hint}")
     hf = hf_cache()
@@ -423,8 +430,9 @@ def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> 
                             "which loads the model")
     checkout = codemem_checkout(program)
     return {"bin": program, "checkout": checkout, "mounts": codemem_mount_paths(program),
-            "python_root": python_root, "hf_cache": hf, "index": index_root(recipe, task) / "index",
-            "meta": read_index_meta(recipe, task), "commit": codemem_commit(checkout)}
+            "python_root": python_root, "hf_cache": hf, "index": index_root(recipe, task, backend) / "index",
+            "meta": read_index_meta(recipe, task, backend), "commit": codemem_commit(checkout),
+            "vector_backend": backend}
 
 
 def preconditions(recipe: Recipe, task: Task, settings: RunSettings, setup: Setup | None = None,
@@ -457,11 +465,11 @@ def codemem_mcp_config(codemem: dict, settings: RunSettings) -> dict:
     threads = str(max(1, int(settings.cpus)))
     # The model stays in memory for the whole run: an idle unload is for a user's machine, and a run
     # must not differ by whether one fell into it. The search index is the one the build saved
-    # (CODEMEM_ENV): under the container's memory limit codemem would pick another for a large index,
-    # and rebuild it while the agent's first searches are answered from keywords.
+    # (e2e_index.codemem_env, the batch's): under the container's memory limit codemem would pick another
+    # for a large index, and rebuild it while the agent's first searches are answered from keywords.
     env = {"HF_HOME": HF_MOUNT, "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-           "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0", **CODEMEM_ENV,
-           "OMP_NUM_THREADS": threads, "MKL_NUM_THREADS": threads}
+           "CODEMEM_HOME": "/home/agent/.codemem", "CODEMEM_MODEL_IDLE_MINUTES": "0",
+           **codemem_env(codemem["vector_backend"]), "OMP_NUM_THREADS": threads, "MKL_NUM_THREADS": threads}
     if steering := os.environ.get(STEERING_ENV):
         if steering not in STEERING_LEVELS:
             raise GenerateError(f"{STEERING_ENV} must be one of {', '.join(STEERING_LEVELS)}, not {steering!r}")
@@ -766,14 +774,26 @@ def read_warm(out: Path) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def codemem_checks(warm: dict | None, fallbacks: dict) -> list[str]:
+def warm_search_index(warm: dict | None) -> str | None:
+    """The search index that the warm server named in its index_status answer (search_index.index of the ready
+    file's status), or None when it named none."""
+    status = (warm or {}).get("status")
+    search = status.get("search_index") if isinstance(status, dict) else None
+    return search.get("index") if isinstance(search, dict) else None
+
+
+def codemem_checks(warm: dict | None, fallbacks: dict, backend: str | None = None) -> list[str]:
     """The checks of a codemem setup that fail: the gate was not warm, or the first search_code result came from
-    keywords only. Either way the run did not test codemem's search."""
+    keywords only. With `backend` (a batch that names its search index) also: the warm server named another
+    search index. Either way the run did not test codemem's search as the batch asked."""
     failed = []
     if warm is None:
         failed.append(f"codemem warm-up: no {WARM_FILE}")
     elif not warm.get("ok"):
         failed.append(f"codemem warm-up failed: {warm.get('error')}")
+    elif backend is not None and (index := warm_search_index(warm)) != backend:
+        failed.append(f"codemem searched with the search index {index}, and the batch names {backend} "
+                      f"({VECTOR_BACKEND_ENV})")
     first = fallbacks.get("first")
     if fallbacks.get("first_keywords_only") and first:
         failed.append(f"the first search_code result (turn {first['turn']}) came from keywords only "
@@ -959,6 +979,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
     """One run of Claude Code on one task. `out` is made again. Returns the record, also saved as run.json."""
     spec = get_setup(setup)
     check_model(model)
+    named = named_vector_backend()
     ready = preconditions(recipe, task, settings, spec, prompts)
     codemem = ready["codemem"]
     block, block_file = ready["block"] or (None, None)
@@ -1064,7 +1085,7 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
         proof = {"ok": not proof_failed, **proof}
         failed += proof_failed
         if not proof_failed:
-            failed += codemem_checks(warm, fallbacks)
+            failed += codemem_checks(warm, fallbacks, named)
     usage = (result or {}).get("modelUsage")
     cross = cross_check(summary, usage) if summary and usage else None
     tokens = token_block(summary, result)
@@ -1135,11 +1156,13 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 "bin": str(codemem["bin"]),
                 "index": codemem["meta"],
                 "steering": mcp_config["mcpServers"]["codemem"]["env"].get("CODEMEM_STEERING", "default"),
+                **({"vector_backend": mcp_config["mcpServers"]["codemem"]["env"]["CODEMEM_VECTOR_BACKEND"]}
+                   if named else {}),
                 "index_bytes_before": index_bytes.get("before"),
                 "index_bytes_after": index_bytes.get("after"),
                 "index_copy_removed": index_removed,
             } if codemem else None,
-            "block": record_entry(block, block_file, task) if block else None,
+            "block": record_entry(block, block_file, task, named) if block else None,
         },
         "integrity": {
             "setup_ok": not failed,
@@ -1347,8 +1370,10 @@ def run_batch(recipe: Recipe, tasks: list[Task], *, run_id: str, setups: list[st
               status=None, prompts: PromptSet | None = None) -> BatchResult:
     """The runs of a batch, one at a time, in the order of plan_runs. Stops at a usage limit (exit code 4)
     and after three runs in a row that ended in an error (exit code 5). Does not start while a block that one
-    of its setups needs cannot be used (check_blocks)."""
+    of its setups needs cannot be used (check_blocks), nor with a CMEVAL_CODEMEM_VECTOR_BACKEND that names no
+    search index (e2e_index.vector_backend)."""
     status = status or NullStatus()
+    vector_backend()
     check_blocks(recipe, tasks, setups, prompts)
     order = plan_runs(tasks, setups, reps)
     status.total(len(order), "runs")
