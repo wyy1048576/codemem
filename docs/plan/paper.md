@@ -173,8 +173,8 @@ cost; the case studies.
 
 ### 3.6 Limits
 
-- One index stands for "indexed search". T2 shows that it retrieves well, so a small effect is
-  not a weak retriever.
+- codemem stands for "indexed search" in most runs. T2 and §4.11 set it beside BM25 and ColGREP,
+  so that a small effect cannot be put down to a weak retriever.
 - One main harness (Claude Code), with Codex on a subset.
 - The samples are small: an effect under about 12 to 15 points in tasks solved cannot be shown.
 - The repos are public, even if the tasks are new. That is the subject of §4.5 and §4.6.
@@ -197,7 +197,8 @@ cost; the case studies.
 - **Shows:** on the same requests, how often each search puts a fix file or function near the
   top: grep with keywords from the request, keywords alone (BM25), vectors alone, and codemem.
   Per level L0, L1 and L2. This is the comparison that other papers stop at, and it shows that
-  codemem is a competent retriever.
+  codemem is a competent retriever. In the final paper it also has the two outside retrievers of
+  §4.11: BM25 as SWE-bench runs it, and ColGREP.
 - **From:** the retrieval eval at the locked codemem (`463171c`) on the run sample. Two parts are
   in hand: the October runs on three languages at an earlier codemem, and, from the run records,
   the rank of the first fix file in the 20 lines of every task and level.
@@ -249,11 +250,12 @@ are one turn; and a new tool has a price on every request.
    - grep opens a fix file by turn 3 in 23 of 27 pandas runs and 22 of 24 home-assistant runs. So
      finding costs grep two or three turns, and that is all a better search can save.
    - **To do:** every record, every model. **Owner:** track C.
-3. **The oracle, proposed.** A third setup on a subset: the first message names the fix files, as
-   a perfect search would.
+3. **The oracle, an option that is not planned.** A third setup on a subset: the first message
+   names the fix files, as a perfect search would.
    - grep against the oracle is the most that any index could save. grep against codemem, set
      beside it, says how much of that codemem gets.
-   - It needs seats. **Decision:** §8, point 1.
+   - It needs seats, and piece 5 gives the same number as an estimate without them. So it is run
+     only if seats are free (§8).
 4. **F4, memory against effect.** One point per model and repo: how often the model names the file
    from memory, against what codemem saves there. H6 predicts that the saving falls as memory
    rises.
@@ -306,7 +308,7 @@ tasks solved, turns, tokens, the memory probe, and the first command.
 has no room there either, and that is the finding. If it needs many more, both setups run. Then
 the decision on a second repo.
 
-**Owner:** to be named (§8, point 2). **Status:** not built. The presentation shows it as pending.
+**Owner:** to be named (§8). **Status:** not built. The presentation shows it as pending.
 
 ### 4.7 The model gap: open models (H3), and F5
 
@@ -324,7 +326,8 @@ the decision on a second repo.
 
 - **Shows:** T9, the main comparison in Codex on a subset, to see whether the result belongs to
   Claude Code or to agents with grep.
-- **Owner and subset:** §8, point 4. **Status:** not started.
+- **Owner:** track A, after its current evals. **Subset:** still to name (§8). **Status:** not
+  started.
 
 ### 4.9 T6: what the index costs
 
@@ -340,6 +343,37 @@ the decision on a second repo.
   branch. Today: a fix that needs a fact outside the repo; the right function found and a bigger
   fix than the tests want; look-alike results that the agents ignore.
 - **Owner:** track C.
+
+### 4.11 Two more retrievers: BM25 and ColGREP
+
+**Why.** A reviewer can say that our index is simply not good, and that another search would have
+helped the agent. Two solutions that people know and use answer that. They are for the final
+paper: nothing of this runs before the presentation.
+
+- **BM25, as SWE-bench runs it:** the files of the repo ranked by keywords against the request.
+  It is the retrieval baseline of SWE-bench itself
+  ([paper](https://arxiv.org/pdf/2310.06770)), so every reader of this field knows it.
+- **ColGREP** (LightOn): an open-source search for code that runs on the user's machine, as a
+  shell command. It ranks by many small vectors per piece of code and by keywords, and merges the
+  two ([documentation](https://lightonai.github.io/next-plaid/colgrep.html)). *(reported)*
+  - **Its makers report the opposite of what we see:** 56% fewer search operations than grep in
+    Claude Code *(vendor)*
+    ([launch post](https://lighton.ai/lighton-blogs/lateon-code-colgrep-lighton)).
+  - **It keeps no watcher.** Each search first re-indexes the files whose content has changed,
+    found by a hash of each file. codemem watches every save and catches up before a search.
+  - **It is a shell command, not an MCP tool,** so it puts no tool description into the prompt.
+    That makes it a test of piece 7 of §4.5 too.
+
+**How it is run.**
+
+1. **Offline first, in T2:** for every task and level, where each retriever puts the fix file in
+   its first 20 results. No seat is needed.
+2. **Then end to end on a subset (T10):** the 20 lines come from the other retriever in place of
+   codemem's. For ColGREP the agent may also call it from the shell.
+
+**Owner:** track C for the offline table; track A for the runs, after its current evals and with
+Codex. **Status:** not started. **ColGREP is outside code:** nobody downloads it before Andre has
+looked at it.
 
 ---
 
@@ -357,9 +391,9 @@ the decision on a second repo.
   setups (the marks of each archive). So seconds from these runs are shown only with their marks,
   in the appendix.
   - Most of a run's time is the model's own latency, which turns already count.
-  - If the paper is to make a claim about time, it needs its own small measurement: a subset of
-    tasks, one stream, nothing beside it, both setups, three repetitions, with codemem's start
-    and each search timed apart. **Decision:** §8, point 3.
+  - **Decided: the paper's claim about time rests on its own small measurement,** made after the
+    freeze on pandas alone: its 9 tasks, both setups, three times, one stream, nothing beside it,
+    with codemem's start and each search timed apart.
 - **What reviewers of a benchmark track check** *(reported; overview.md, Sources)*: the claim and
   its limits are stated; another team can rerun it; contamination is addressed; variance is
   reported with repetitions and paired intervals; the grading tests are sound; novelty is argued
@@ -406,20 +440,26 @@ up to date. Results that are not in are named as pending, with the date of the p
 | 4. codemem | the same picture as before, with what is new: the compact index and the memory budget | §3.4, T6 |
 | 5. Results | T3 for the models that are in: tasks solved, turns, tokens, cost | §4.3 |
 | 6. Why grep works | the memory probe and the first command: the model already knows where to look | §4.5 |
-| 7. What comes next | renamed repos, open models, Codex, more repetitions: "in the paper, Dec 7" | §4.6 to §4.8 |
+| 7. What comes next | renamed repos, open models, Codex, two more retrievers (BM25, ColGREP), more repetitions: "in the paper, Dec 7" | §4.6 to §4.8, §4.11 |
 
 ---
 
-## 8. Decisions needed from Andre
+## 8. Decisions
 
-1. **The oracle setup** (§4.5): yes or no, and on which subset. It is the one extra set of runs
-   that bounds the whole question.
-2. **Who builds renaming,** and whether the pilot is pandas.
-3. **Time:** its own small measurement after the freeze, or no claim about time.
-4. **Codex:** who runs it, and on which subset.
-5. **A second retriever.** The 20 lines can come from keywords alone or vectors alone at no cost
-   in code. One such setup on a subset would show that the result is not codemem's alone. Yes or
-   no.
+**Decided on Nov 28** (Andre):
+
+- **The index is tested where memory cannot help:** renamed repos and open models (§4.6, §4.7),
+  with grep alone first in each.
+- **Time:** a small clean measurement after the freeze, on pandas alone (§5).
+- **Codex:** track A runs it, after its current evals.
+- **Two more retrievers in the final paper:** BM25 and ColGREP (§4.11).
+- **The oracle setup is not planned.** It stays an option if seats are free (§4.5).
+
+**Still open:**
+
+1. **Who builds renaming,** and whether the pilot is pandas.
+2. **The subset for Codex.**
+3. **ColGREP:** Andre's look at it, before anyone downloads it.
 
 ---
 
@@ -432,5 +472,5 @@ up to date. Results that are not in are named as pending, with the date of the p
 | | T5, the memory probe on the run sample; F3, the first command on every record; the script that makes the paper's tables from the release archives; T6 | track C |
 | | the slides | Andre, with track C |
 | **Tue Dec 1, 14:00 Pacific** | the presentation | all |
-| **Mon Dec 7** | the renaming pilot; the open models; Codex on its subset; the oracle if decided; Opus and the repetitions of runs.md; the paper's first submission | as named in §4 and §8 |
-| **Thu Dec 10** | the paper at the level of a conference | all |
+| **Mon Dec 7** | the renaming pilot and the open models, grep alone first; Codex on its subset; BM25 and ColGREP in T2; the clean timing of pandas; Opus and the repetitions of runs.md; the paper's first submission | as named in §4 and §8 |
+| **Thu Dec 10** | BM25 and ColGREP end to end on their subset (T10), if the offline table calls for it; the paper at the level of a conference | all |
