@@ -62,7 +62,8 @@ run.json has these fields:
                       commit, machine, limits, start time (UTC), the task's gold files. codemem: null for a setup
                       without codemem; else the codemem commit, the program, the task's index.json, the steering
                       level, the search index (vector_backend: faiss or compact, only in a batch that sets
-                      CMEVAL_CODEMEM_VECTOR_BACKEND; without it the index was the exact one), and the bytes of
+                      CMEVAL_CODEMEM_VECTOR_BACKEND; without it the index was the exact one), the device (device:
+                      cpu, only in a batch that sets CMEVAL_CODEMEM_DEVICE), and the bytes of
                       the index copy before and after the run. block: null for a setup without a block; else
                       e2e_block.record_entry: its file and sha256, its result lines, the search's seconds and
                       codemem commit, vector_backend (as in codemem), searches_made_for_agent (1), the ranks of
@@ -123,7 +124,8 @@ from typing import Callable
 from . import codemem_gate
 from .e2e import grade, patch_files
 from .e2e_block import codemem_program_commit, read_block, record_entry
-from .e2e_index import VECTOR_BACKEND_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_env, \
+from .e2e_index import DEVICE_ENV, VECTOR_BACKEND_ENV, codemem_bin, codemem_checkout, codemem_commit, codemem_device, \
+    codemem_env, \
     codemem_mount_paths, codemem_python_root, hf_cache, index_root, index_state, named_vector_backend, \
     read_index_meta, vector_backend
 from .e2e_steps import TurnCounter, codemem_fallbacks, count_steps, parse_stream
@@ -411,9 +413,10 @@ def codemem_preconditions(recipe: Recipe, task: Task, settings: RunSettings) -> 
     (vector_backend)."""
     backend = vector_backend()
     hint = f"run cmeval e2e index {recipe.name} first"
-    if not settings.gpus:
-        raise GenerateError(f"a codemem setup needs the GPU in the container ({GPUS_ENV}=1): the index is tied to "
-                            "the device that built it, and on the CPU codemem embeds the whole repo again")
+    if not settings.gpus and codemem_device() != "cpu":
+        raise GenerateError(f"a codemem setup needs the GPU in the container ({GPUS_ENV}=1), or indexes built on the "
+                            f"CPU and {DEVICE_ENV}=cpu: the index is tied to the device that built it, and on another "
+                            "device codemem embeds the whole repo again")
     try:
         program = codemem_bin()
         python_root = codemem_python_root(program)
@@ -1158,6 +1161,8 @@ def run_one(recipe: Recipe, task: Task, *, setup: str, model: str, rep: int, out
                 "steering": mcp_config["mcpServers"]["codemem"]["env"].get("CODEMEM_STEERING", "default"),
                 **({"vector_backend": mcp_config["mcpServers"]["codemem"]["env"]["CODEMEM_VECTOR_BACKEND"]}
                    if named else {}),
+                **({"device": mcp_config["mcpServers"]["codemem"]["env"]["CODEMEM_DEVICE"]}
+                   if "CODEMEM_DEVICE" in mcp_config["mcpServers"]["codemem"]["env"] else {}),
                 "index_bytes_before": index_bytes.get("before"),
                 "index_bytes_after": index_bytes.get("after"),
                 "index_copy_removed": index_removed,

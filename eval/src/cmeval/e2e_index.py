@@ -14,6 +14,10 @@ starts from a private copy of it. The layout:
 The paths in a codemem index are relative, so the index of src/ also works for /testbed in the task's container.
 The index is tied to the device and number type of the embedder. When codemem opens an index of the GPU
 (float16, cuda) on the CPU, it embeds every text again, which takes hours. So the container of a run gets the GPU.
+A machine whose containers cannot get a GPU sets CMEVAL_CODEMEM_DEVICE=cpu for the build and for the runs: codemem
+then embeds on the CPU (float32) in every place, so that a run opens the index without embedding again. Its
+index.json says "codemem_device": "cpu". An index built on another device than the batch's is in the state
+"another device", and a run or a block refuses it.
 
 The search index. Every place where the eval starts codemem for a batch names the same search index
 (codemem_env): the build here, the block's search (e2e_block), the server of a run (e2e_run.codemem_mcp_config)
@@ -56,6 +60,10 @@ VECTOR_BACKEND_ENV = "CMEVAL_CODEMEM_VECTOR_BACKEND"
 VECTOR_BACKENDS = ("faiss", "compact")
 # The folder of the compact form's index and blocks, in the task's folder beside the exact form's files.
 COMPACT_DIR = "compact"
+# The device of a batch's codemem, in every place the eval starts it (codemem_env). Not set: codemem picks one, the
+# GPU where there is one. cpu: for a machine whose containers cannot get a GPU (see the top of this file).
+DEVICE_ENV = "CMEVAL_CODEMEM_DEVICE"
+DEVICES = ("cpu",)
 # eval/src/cmeval/ is three levels below the root of the codemem repo.
 REPO_ROOT = Path(__file__).resolve().parents[3]
 # Folders of the system. A Python install there cannot be mounted: it would hide the container's own files.
@@ -209,11 +217,25 @@ def named_vector_backend() -> str | None:
     return vector_backend() if os.environ.get(VECTOR_BACKEND_ENV) else None
 
 
+def codemem_device() -> str | None:
+    """The device that CMEVAL_CODEMEM_DEVICE names for the batch's codemem, or None when it is not set. Any other
+    value than cpu is refused, so that nothing is built or run with it."""
+    value = os.environ.get(DEVICE_ENV)
+    if not value:
+        return None
+    if value not in DEVICES:
+        raise GenerateError(f"{DEVICE_ENV} must be one of {', '.join(DEVICES)} or not set, not {value!r}")
+    return value
+
+
 def codemem_env(backend: str) -> dict:
     """What codemem gets in its environment wherever the eval starts it for a batch: the build of an index here,
     the block's search, the server of a run and the replay. One search index for all of them, whatever memory
-    each place has."""
-    return {"CODEMEM_VECTOR_BACKEND": backend}
+    each place has, and one device when the batch names one (codemem_device)."""
+    env = {"CODEMEM_VECTOR_BACKEND": backend}
+    if device := codemem_device():
+        env["CODEMEM_DEVICE"] = device
+    return env
 
 
 def index_form(meta: object) -> str:
@@ -254,14 +276,17 @@ def read_index_meta(recipe: Recipe, task: Task, backend: str | None = None) -> d
 
 
 def index_state(recipe: Recipe, task: Task, backend: str | None = None) -> str:
-    """ok, missing, "another form" (the index.json in the folder of the form holds the other search index), or
-    "another commit" (index.json is for another base commit). The form is the batch's when not given."""
+    """ok, missing, "another form" (the index.json in the folder of the form holds the other search index),
+    "another device" (index.json names another device than the batch's, codemem_device), or "another commit"
+    (index.json is for another base commit). The form is the batch's when not given."""
     backend = backend or vector_backend()
     meta = read_index_meta(recipe, task, backend)
     if meta is None or not (index_root(recipe, task, backend) / "index").is_dir():
         return "missing"
     if index_form(meta) != backend:
         return "another form"
+    if meta.get("codemem_device") != codemem_device():
+        return "another device"
     return "ok" if meta.get("base_commit") == task.base_commit else "another commit"
 
 
@@ -293,10 +318,11 @@ def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None,
     the same base commit, the same codemem commit and the same form (and force is off). A build always starts
     from an empty index folder, and deletes the blocks of e2e_block beside the old index of its form."""
     backend = backend or vector_backend()
+    device = codemem_device()
     root = index_root(recipe, task, backend)
     meta = read_index_meta(recipe, task, backend)
     if (not force and meta and meta.get("base_commit") == task.base_commit and meta.get("codemem_commit") == commit
-            and index_form(meta) == backend and (root / "index").is_dir()):
+            and index_form(meta) == backend and meta.get("codemem_device") == device and (root / "index").is_dir()):
         return None
     src, index, log = src_root(recipe, task), root / "index", root / "index.log"
     ensure_worktree(task, src)
@@ -317,6 +343,8 @@ def index_task(recipe: Recipe, task: Task, *, program: Path, commit: str | None,
             "seconds": seconds, "summary": _summary(log)}
     if backend != "faiss":
         meta["vector_backend"] = backend
+    if device:
+        meta["codemem_device"] = device
     write_json(root / "index.json", meta)
     return meta
 
