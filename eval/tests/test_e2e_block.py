@@ -361,7 +361,7 @@ def test_run_one_upfront_locally(make_task, tmp_path, monkeypatch):
     assert record["steps"]["codemem_calls"] == grep_steps["codemem_calls"] + 1 == 1
     assert record["steps"]["first_codemem_turn"] == 0 and record["steps"]["first_gold_surfaced_turn"] == 0
     # The search is in no clock of the run.
-    assert set(record["time"]["prep_steps_s"]) == {"remove_config", "copy_swap", "ready"}
+    assert set(record["time"]["prep_steps_s"]) == {"remove_config", "copy_swap", "sync", "ready"}
     assert record["time"]["codemem_warm_s"] is None
 
 

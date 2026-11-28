@@ -17,15 +17,21 @@ One run (run_one) has these steps:
      user (proof_script): the codemem checkout in the container holds only codemem's environment and source
      (no eval/ with the task files), and no mounted path holds a line of the task's real fix or hidden tests.
      When it fails, the script stops there. Then start codemem's MCP server through the gate (codemem_gate.py)
-     and wait until its model and search index are in memory and a search has no note. Then start Claude
-     Code as that user with the time limit; its codemem server is the gate's bridge to that warm server.
-     After it stops, save its changes as a patch
+     and wait until its model and search index are in memory and a search has no note. In every setup, then
+     wait until the disk has written what the preparation wrote (sync). Then start Claude Code as that user
+     with the time limit; its codemem server is the gate's bridge to that warm server. After it stops, save
+     its changes as a patch
   5. read the stream, the proxy log and the clocks, check the setup, and grade the patch with e2e.grade
   6. write run.json
 
 The wait for codemem happens before the agent's clock starts (mark codemem_warm in prep.txt), so it is not part
 of the agent's time, and the setup grep has no such wait. Without it, the agent's first search often came while
 the model was still loading, and codemem answered it from keywords only.
+
+The sync comes right before the agent's clock, in every setup. What the preparation writes (the copy of /testbed,
+for codemem the copy of the index) is in memory first and reaches the disk in the seconds after. The wait for
+codemem would hide those seconds from a codemem setup's clock, and the setup grep has no such wait, so without the
+sync only grep's agent would start while the disk is still busy.
 
 A run is discarded when it hit a usage limit or failed the setup check. The setup check reads the init event
 of the stream (check_setup), and for a codemem setup also the gate's ready file and the first search_code
@@ -86,7 +92,8 @@ run.json has these fields:
   proxy_errors        the errors of the proxy log
   time                agent_s (the run's time, from clock.txt), duration_ms and duration_api_ms, prep_s and each
                       preparation step (the step copy_swap or chown says how /testbed went to the agent's user:
-                      by copy and swap, or by chown in place; copy_failed before chown: the copy failed),
+                      by copy and swap, or by chown in place; copy_failed before chown: the copy failed; sync:
+                      the wait until the disk has written what the preparation wrote, right before the clock),
                       codemem_warm_s (the wait for codemem, a part of prep_s; null without codemem),
                       container_start_s, collect_s, container_s, grade_s, host_load_start and
                       host_load_end (the host's load averages right before and right after docker run; null
@@ -758,6 +765,10 @@ def agent_script(model: str, settings: RunSettings, gate_python: str | None = No
         "cp /out/mcp.json /tmp/mcp.json && chmod 644 /tmp/mcp.json\n"
         + (proof_script(proof) if proof else "")
         + (gate_script(gate_python) if gate_python else "") +
+        # The disk writes what the preparation left in memory (the copy of /testbed above all) before the agent's
+        # clock starts, in every setup (see the top of this file).
+        "sync\n"
+        "mark sync\n"
         "mark ready\n"
         # The run's time: from right before Claude Code starts to right after it ends.
         "s=$(date +%s%N)\n"

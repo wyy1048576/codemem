@@ -206,6 +206,9 @@ def test_agent_script():
     # Without the copy: the chown in place, as before.
     plain = e2e_run.agent_script("claude-haiku-5-5", RunSettings(time_limit_s=3000), copy_testbed=False)
     assert "cp -a" not in plain and "\nchown -R agent:agent /testbed\nmark chown\n" in plain
+    # The disk has written what the preparation wrote right before the agent's clock starts, with the copy or not.
+    for s in (script, plain):
+        assert "\nsync\nmark sync\nmark ready\ns=$(date +%s%N)\n" in s
 
 
 def test_testbed_mounted():
@@ -361,8 +364,8 @@ def test_agent_script_with_the_gate():
     assert serve.startswith("runuser -u agent -- env -u CLAUDE_CODE_OAUTH_TOKEN -u ANTHROPIC_BASE_URL HOME=/home/agent "
                             "'/opt/code mem/.venv/bin/python' /tmp/cmgate/cmgate.py serve /tmp/cmgate/cmgate.json")
     assert serve.endswith("&")
-    order = [lines.index(serve), lines.index("mark codemem_warm"), lines.index("mark ready"),
-             next(i for i, line in enumerate(lines) if line.startswith("s=$(date"))]
+    order = [lines.index(serve), lines.index("mark codemem_warm"), lines.index("sync"), lines.index("mark sync"),
+             lines.index("mark ready"), next(i for i, line in enumerate(lines) if line.startswith("s=$(date"))]
     assert order == sorted(order)
     # Not warm: the script stops before Claude Code, and keeps the gate's logs.
     stop = lines.index("  exit 3")
@@ -679,7 +682,7 @@ def test_run_one_locally(make_task, tmp_path, monkeypatch):
     assert record["steps"]["turns"] == 5 and record["steps"]["num_turns_result"] == 5
     assert record["identity"]["gold_files"] == ["auth/sessions.py"] and record["steps"]["gold_opened"]
     assert record["time"]["agent_s"] >= 0
-    assert set(record["time"]["prep_steps_s"]) == {"remove_config", "copy_swap", "ready"}
+    assert set(record["time"]["prep_steps_s"]) == {"remove_config", "copy_swap", "sync", "ready"}
     # The patch has the agent's edit, and not the removal of the configuration files.
     assert len(graded) == 1 and e2e_run.patch_files(graded[0]) == {"auth/sessions.py"}
     assert record["outcome"]["patch_files"] == 1 and record["outcome"]["status_lines"] == 1
@@ -1032,11 +1035,12 @@ def test_run_one_tool_locally(make_task, tmp_path, monkeypatch):
     assert warm["ok"] and warm["warmup_searches"] == 2 and warm["status"]["state"] == "ready"
     assert "watching for changes" in warm["status_text"]
     prep = record["time"]["prep_steps_s"]
-    assert list(prep) == ["remove_config", "copy_swap", "mount_proof", "codemem_warm", "ready"]
+    assert list(prep) == ["remove_config", "copy_swap", "mount_proof", "codemem_warm", "sync", "ready"]
     assert record["time"]["codemem_warm_s"] == prep["codemem_warm"] >= 1.0
     marks = dict(line.split() for line in (out / "prep.txt").read_text().splitlines())
     clock = e2e_run.read_clock(out)
-    assert int(marks["mount_proof"]) < int(marks["codemem_warm"]) < int(marks["ready"]) <= clock["agent_start"]
+    assert (int(marks["mount_proof"]) < int(marks["codemem_warm"]) < int(marks["sync"]) <= int(marks["ready"])
+            <= clock["agent_start"])
     assert "warm after" in (out / "codemem-gate.log").read_text()
     # The agent's first search went through the bridge to the warm server, and got a full search.
     assert e2e_run.codemem_gate.note_kinds((tmp_path / "agent-search.txt").read_text()) == []
