@@ -159,6 +159,20 @@ def lost_trail_nudge(reason: str, n: int = 0) -> str:
     )
 
 
+# The first line of the starting search's block. The eval's block (eval/src/cmeval/e2e_block.py, HEADER and
+# block_text) is the same text.
+START_SEARCH_HEADER = "Possibly relevant code, from a search by meaning (it may be wrong):"
+
+
+def start_search_block(results: list[dict]) -> str:
+    """What `codemem hook` gives the agent with the first prompt of a session: START_SEARCH_HEADER, then
+    one line per result in rank order, `path:start_line`, two spaces, the qualified name. Every line ends
+    in a newline. `results` are those of `codemem search --json`. tests/fixtures/start_search_block.json
+    holds a sample that the tests of codemem and of the eval both check."""
+    lines = [START_SEARCH_HEADER] + [f"{r['path']}:{r['start_line']}  {r.get('qualname') or ''}" for r in results]
+    return "".join(line + "\n" for line in lines)
+
+
 def models_loading_notice() -> str:
     return (
         "Note: codemem is still loading its embedding model or its search index (the first searches after "

@@ -1,0 +1,12 @@
+{
+  "about": "The block of the starting search for a made-up answer of `codemem search --json`. tests/test_hook.py checks codemem's text (prompts.start_search_block) and eval/tests/test_e2e_block.py the eval's (e2e_block.make_block, block_text) against `text`, so that the agent gets the same block from the hook as from the eval.",
+  "k": 20,
+  "results": [
+    {"path": "auth/sessions.py", "start_line": 33, "end_line": 41, "qualname": "SessionManager.revoke_session", "score": 0.0331},
+    {"path": "auth/tokens.py", "start_line": 12, "end_line": 30, "qualname": "TokenStore.revoke", "score": 0.0325},
+    {"path": "auth/__init__.py", "start_line": 1, "end_line": 8, "qualname": "<block>", "score": 0.0161},
+    {"path": "docs/conf.py", "start_line": 5, "end_line": 9, "qualname": "", "score": 0.0150},
+    {"path": "tests/auth/test_sessions.py", "start_line": 120, "end_line": 140, "qualname": "test_revoke_twice", "score": 0.0102}
+  ],
+  "text": "Possibly relevant code, from a search by meaning (it may be wrong):\nauth/sessions.py:33  SessionManager.revoke_session\nauth/tokens.py:12  TokenStore.revoke\nauth/__init__.py:1  <block>\ndocs/conf.py:5  \ntests/auth/test_sessions.py:120  test_revoke_twice\n"
+}

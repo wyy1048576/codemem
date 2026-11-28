@@ -56,7 +56,7 @@ codemem status
 
 | Command | What it does |
 |---|---|
-| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--no-agent-notes] [--write-hooks] [--dry-run] [-y]` | register with agents, add the agent note, download the model, then build the index (`--no-index` skips the build) |
+| `codemem init [PATH] [--agents claude,cursor,codex] [--no-index] [--no-agent-notes] [--write-hooks] [--start-search] [--dry-run] [-y]` | register with agents, add the agent note, download the model, then build the index (`--no-index` skips the build) |
 | `codemem index [PATH] [--full] [--no-cache] [--verify] [--json]` | build or update the index (`--no-cache`: cold timing; `--verify`: compare with a fresh build) |
 | `codemem search QUERY [-k 10] [--signals bm25,code,usage] [--path-prefix DIR] [--kinds function,method] [--language go] [--tests include\|exclude\|only] [--json] [--debug]` | search. If files changed since the index was last updated (a `git switch`, a pull), it updates the index first and says so |
 | `codemem status [PATH] [--json] [--check-assist]` | what is indexed, pending or skipped, which model, the indexed commit (`--check-assist`: only compare an assist endpoint with the local model, "A second source for a build's embeddings", below) |
@@ -64,7 +64,7 @@ codemem status
 | `codemem mcp [PATH]` | the MCP server over stdio (what agents launch) |
 | `codemem serve-embeddings [PATH] [--host 127.0.0.1] [--port 8791]` | serve the local embedding model to other codemem processes, over HTTP ("One model for several codemem processes", below) |
 | `codemem languages` | supported languages and file extensions |
-| `codemem hook` | two Claude Code hooks that point the agent at `search_code` when it has no lead (see below) |
+| `codemem hook` | Claude Code hooks: the starting search, and two that point the agent at `search_code` when it has no lead (see below) |
 
 The commands that use an index accept `--index-dir DIR`; the eval uses it for one index per commit.
 
@@ -115,6 +115,30 @@ The commands that use an index accept `--index-dir DIR`; the eval uses it for on
 
   Either hook works without the other. The PowerShell tool is not covered. The command
   takes about 0.2 s, and the second hook also runs after every Read.
+- **Claude Code, optional: the starting search.** `init --start-search` adds a third hook to
+  `.claude/settings.json`, on the user's prompt. On the first prompt of a session it makes the
+  search `codemem search -k 20` would make for that prompt, in the repository of the session, and
+  gives the agent the results as context for that prompt. Claude Code adds them to the model's
+  context after the prompt, as a system reminder that starts with the hook's name; they do not show
+  in the chat:
+
+  ```text
+  Possibly relevant code, from a search by meaning (it may be wrong):
+  auth/sessions.py:33  SessionManager.revoke_session
+  auth/tokens.py:12  TokenStore.revoke
+  ```
+
+  Later prompts of the session get nothing. The prompt goes to the agent as it would without the
+  hook when there is no index or its first build has not finished, when the search could not use
+  the embedding model (keywords only), when it finds nothing or fails, and after 50 s. The first
+  search loads the embedding model (about 9 s on a laptop), and the agent waits for it, so the
+  hook has a timeout of its own. It works with or without the two hooks above; both flags together
+  write all three. By hand:
+
+  ```json
+  {"hooks": {"UserPromptSubmit": [
+    {"hooks": [{"type": "command", "command": "codemem hook", "timeout": 60}]}]}}
+  ```
 
 The agent gets four tools: `search_code` (plain-language or identifier search), `get_chunk` (one
 result in full, with its callers and callees), `index_status` and `refresh_index`. Every search

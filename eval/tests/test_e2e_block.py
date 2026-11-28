@@ -89,6 +89,19 @@ def test_block_text(make_task):
     assert not keywords["embedded"] and keywords["text"] == TEXT
 
 
+# The block of codemem's own starting search (`codemem hook` on the first prompt of a session), in codemem's tests.
+START_SEARCH_GOLDEN = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "start_search_block.json"
+
+
+def test_block_text_is_the_text_of_codemems_starting_search(make_task):
+    """The golden file that codemem's tests check its hook's text against (tests/test_hook.py): the eval makes the
+    same text from the same answer of `codemem search --json`, with as many results."""
+    golden = json.loads(START_SEARCH_GOLDEN.read_text(encoding="utf-8"))
+    block = e2e_block.make_block(make_task(), "L0", "q", {"results": golden["results"], "timings": {}}, search_s=1.0,
+                                 program=None, commit=None, index=None)
+    assert block["text"] == golden["text"] and e2e_block.K == golden["k"]
+
+
 def test_first_message_of_codemem_and_upfront(make_task):
     task = make_task()
     plain = e2e_run.make_prompt(task)

@@ -49,25 +49,36 @@ def _merge_mcp_json(path: Path, entry: dict) -> str:
 
 
 HOOK_TIMEOUT = 10  # seconds; the command takes about 0.2
+# Seconds for the starting search: the first search of a process loads the embedding model, about
+# 9 s on a laptop. The hook gives up by itself before this (hook.START_SECONDS).
+START_SEARCH_TIMEOUT = 60
 _OUR_HOOK = re.compile(r"""codemem(\.exe)?["']?\s+hook\s*$""")  # `codemem hook`, `<python> -m codemem hook`
 
 
-def _hook_groups(command: str) -> dict[str, list[dict]]:
+def _hook_groups(command: str, *, write_hooks: bool = True, start_search: bool = False) -> dict[str, list[dict]]:
     """What codemem registers with Claude Code: for each event, the groups (a matcher and its
-    commands) in the form of `.claude/settings.json`."""
-    direct = {"type": "command", "command": command, "timeout": HOOK_TIMEOUT}
-    # One command for each word, because a condition holds exactly one rule. Claude Code starts a
-    # command only when its condition matches, so other shell commands cost nothing. A version of
-    # Claude Code without `if` would start it for every shell command; the hook checks the words
-    # again itself, so that is slower but not wrong.
-    shell = [{"type": "command", "if": rule, "command": command, "timeout": HOOK_TIMEOUT} for rule in hook.SHELL_RULES]
-    return {
-        "PreToolUse": [
+    commands) in the form of `.claude/settings.json`. `write_hooks`: the first search and the lost
+    trail (PreToolUse, PostToolUse); `start_search`: the starting search (UserPromptSubmit)."""
+    groups: dict[str, list[dict]] = {}
+    if write_hooks:
+        direct = {"type": "command", "command": command, "timeout": HOOK_TIMEOUT}
+        # One command for each word, because a condition holds exactly one rule. Claude Code starts
+        # a command only when its condition matches, so other shell commands cost nothing. A
+        # version of Claude Code without `if` would start it for every shell command; the hook
+        # checks the words again itself, so that is slower but not wrong.
+        shell = [
+            {"type": "command", "if": rule, "command": command, "timeout": HOOK_TIMEOUT} for rule in hook.SHELL_RULES
+        ]
+        groups["PreToolUse"] = [
             {"matcher": hook.PRE_MATCHER, "hooks": [direct]},
             {"matcher": hook.SHELL_TOOL, "hooks": shell},
-        ],
-        "PostToolUse": [{"matcher": hook.POST_MATCHER, "hooks": [direct]}],
-    }
+        ]
+        groups["PostToolUse"] = [{"matcher": hook.POST_MATCHER, "hooks": [direct]}]
+    if start_search:
+        # No matcher: Claude Code runs it on every prompt, and the hook searches on the first only.
+        start = {"type": "command", "command": command, "timeout": START_SEARCH_TIMEOUT}
+        groups["UserPromptSubmit"] = [{"hooks": [start]}]
+    return groups
 
 
 def hook_command() -> str:
@@ -85,10 +96,11 @@ def _is_our_hook(entry: object) -> bool:
     return isinstance(entry, dict) and isinstance(entry.get("command"), str) and bool(_OUR_HOOK.search(entry["command"]))
 
 
-def _merge_hooks_json(path: Path, command: str) -> str | None:
-    """`.claude/settings.json` with codemem's hooks in it, or None when they are there already.
-    Every other setting and every other hook is kept. Earlier codemem entries are replaced where
-    the first of them stands, so running `init` again never adds them twice."""
+def _merge_hooks_json(path: Path, command: str, *, write_hooks: bool = True, start_search: bool = False) -> str | None:
+    """`.claude/settings.json` with codemem's hooks in it (those `_hook_groups` gives for the two
+    flags), or None when they are there already. Every other setting and every other hook is kept,
+    codemem's entries of the other events too. Earlier codemem entries of an event are replaced
+    where the first of them stands, so running `init` again never adds them twice."""
     data: dict = {}
     if path.is_file():
         try:
@@ -99,7 +111,7 @@ def _merge_hooks_json(path: Path, command: str) -> str | None:
         raise ValueError(f"{path} does not hold a settings object with a `hooks` object; fix or remove it first")
     before = json.dumps(data, sort_keys=True)
     hooks = data.setdefault("hooks", {})
-    for event, ours in _hook_groups(command).items():
+    for event, ours in _hook_groups(command, write_hooks=write_hooks, start_search=start_search).items():
         groups = hooks.get(event, [])
         if not isinstance(groups, list):
             raise ValueError(f"{path}: hooks.{event} is not a list; fix or remove it first")
@@ -123,7 +135,7 @@ def _merge_hooks_json(path: Path, command: str) -> str | None:
 
 def plan(
     repo_root: Path, agents: list[str], *, write_agent_notes: bool = False, write_hooks: bool = False,
-    steering: str = "light",
+    start_search: bool = False, steering: str = "light",
 ) -> list[Action]:
     repo_root = Path(repo_root).resolve()
     actions: list[Action] = []
@@ -143,12 +155,14 @@ def plan(
             "claude", f"add 'codemem' to {path.name} (or run: claude mcp add codemem -- {shown})",
             path, _merge_mcp_json(path, {"command": command, "args": [*prefix, "mcp"], "alwaysLoad": True}),
         ))
-        if write_hooks:  # hooks are a Claude Code feature, so the flag does nothing for other agents
+        if write_hooks or start_search:  # hooks are a Claude Code feature: the flags do nothing for other agents
             path = repo_root / ".claude" / "settings.json"
-            if (content := _merge_hooks_json(path, hook_command())) is not None:
+            content = _merge_hooks_json(path, hook_command(), write_hooks=write_hooks, start_search=start_search)
+            if content is not None:
+                what = ["first search", "lost trail"] if write_hooks else []
+                what += ["starting search"] if start_search else []
                 actions.append(Action(
-                    "hooks", "add codemem's hooks (first search, lost trail) to .claude/settings.json",
-                    path, content,
+                    "hooks", f"add codemem's hooks ({', '.join(what)}) to .claude/settings.json", path, content,
                 ))
     if "cursor" in agents:
         path = repo_root / ".cursor" / "mcp.json"
