@@ -1111,3 +1111,19 @@ def test_the_service_follows_the_compact_settings_in_the_config_file(sample_repo
         assert svc.config.compact.rescore == 64 and svc.store._type_index("code").store is second
     finally:
         svc.close()
+
+
+def test_a_query_rotated_without_the_blas_finds_what_the_blas_rotation_found(monkeypatch):
+    vecs = for_index(_vecs(6000, 896, seed=21), 896)
+    queries = for_index(_vecs(40, 896, seed=22), 896)
+    index = CompactVectorStore(896, bits=4)
+    index.upsert(list(range(1, 6001)), vecs)
+    index.bind(lambda ids: (np.asarray(ids, dtype=np.int64), vecs[np.asarray(ids, dtype=np.int64) - 1]))
+    by_numpy = [index._coded(q, query=True) for q in queries]
+    by_blas = [index._coded(q) for q in queries]
+    assert all(np.allclose(a, b, rtol=0, atol=1e-6) for a, b in zip(by_numpy, by_blas))  # the last bits only
+    allowed = list(range(1, 6001, 3))
+    found = [index.search(q, 10) for q in queries] + [index.search(q, 10, allowed) for q in queries]
+    coded = index._coded
+    monkeypatch.setattr(index, "_coded", lambda vecs, query=False: coded(vecs))  # the BLAS, as before
+    assert found == [index.search(q, 10) for q in queries] + [index.search(q, 10, allowed) for q in queries]

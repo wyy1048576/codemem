@@ -208,6 +208,19 @@ pilot says both work on jina vectors. The open questions are whether that holds 
 for real queries, for very short vectors, and above all for issue-to-code search, where published
 numbers are least kind to 1-bit codes.
 
+**Proposed (Andre, Nov 27): codemem sets the threads, the user never does.** Found on a 16-core
+Linux PC: a compact search took 34 to 58 ms longer on all cores than on one (80 ms against 22 at
+100,000 vectors), because numpy's BLAS and FAISS each spread a single query's small steps over
+every core. The exact index does not have this. The cause on the PC is not established yet:
+threads, or cold reads of the rows from the disk, which `scripts/time_compact_search.py` tells
+apart. Three parts; the state of each is checked at the end of this phase.
+
+| Part | What | State |
+|---|---|---|
+| 1. One query, one thread | the steps of a single search run on one thread; a build keeps the cores | in work: branch `andre/compact-threads`, measured on the PC by track A |
+| 2. The container's CPU limit | codemem reads the CPUs its process may use (the affinity mask and the cgroup's CPU quota), as it reads the memory limit, and gives a build no more threads than that. Today a process in a container sees every CPU of the host | asked of track A, who has the containers to test it; else after the runs |
+| 3. A guard | `scripts/time_compact_search.py --check` fails when a search is slower on all cores than on one, or when two thread settings return different results | on the branch `andre/compact-threads` |
+
 ### 4.3 No ANN index
 
 **What it is.** Keep comparing the query with every vector, and add no HNSW or IVF structure.
