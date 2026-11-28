@@ -28,7 +28,7 @@
 - vscode and trino have no run tasks and are not in a queue. Opus and Haiku's repetitions 2 and 3 are not in a queue yet; we add them before the queues end (by our estimate not before 09:00 UTC on Nov 29).
 - The preparation step is the old one in every step. The draft pull request #92 is not in use.
 
-**4. The move to the runner cost two set-aside folders without a record** ( 26631 ,  181276 , each ): each stream was stopped right after a finished run, and the run that was in preparation is done again. No agent time was lost.
+**4. The move to the runner cost two set-aside folders without a record** (`haiku-ruff-L0` 26631 `grep`, `haiku-homeassistant-L1` 181276 `grep`, each `1.discarded-1`): each stream was stopped right after a finished run, and the run that was in preparation is done again. No agent time was lost.
 
 **5. Status.** The 25 missing run images are all built and in the archive (09:34 UTC). Stream 1 is in ruff L0, stream 2 in home-assistant L1. The build queue goes on with home-assistant's hard tier.
 
