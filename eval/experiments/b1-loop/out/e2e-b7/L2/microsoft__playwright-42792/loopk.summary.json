@@ -1,0 +1,151 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 3,
+  "explanation": "_configure only handles mode, retries and timeout. Suite already has a _locks array that _describe fills from validated details. I added a lock option, a string or an array of strings, that is pushed onto suite._locks.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "ks": [
+  3,
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 3,
+  "loopk": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0824,
+ "seconds": 33,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 11 ++++++++++-\n 1 file changed, 10 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "test.describe.configure implementation accepts options like mode, retries, timeout; add a new option (e.g. lock / resource lock names, string or string array) that is validated and stored on the current suite (the enclosing describe group) and honored by the scheduler/dispatcher.",
+    "symptom": "test.describe.configure does not accept a lock option (single name or array of names) to declare a lock for the whole enclosing group.",
+    "anchors": [
+     "configure",
+     "mode",
+     "timeout",
+     "lock"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "tests/playwright-test/test-locks.spec.ts",
+     39,
+     45
+    ],
+    [
+     "packages/utils/third_party/lockfile.ts",
+     184,
+     261
+    ],
+    [
+     "packages/utils/third_party/lockfile.ts",
+     105,
+     107
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Results are only a test helper and a third-party lockfile, not the describe.configure implementation. The configure logic is likely in packages/playwright/src/common/testType.ts (_configure) and the suite stores it in suite.ts.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "test.describe.configure implementation in testType that validates options mode, retries, timeout and stores them on the current suite",
+    "symptom": "test.describe.configure does not accept a lock option.",
+    "anchors": [
+     "lock"
+    ],
+    "look_in": [
+     "packages/playwright/src/common/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/common/testType.ts",
+     78,
+     92
+    ],
+    [
+     "packages/playwright/src/common/validators.ts",
+     63,
+     84
+    ],
+    [
+     "packages/playwright/src/common/test.ts",
+     44,
+     266
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Suite already has _locks and validateTestDetails parses locks, but the describe.configure implementation in testType.ts has not been shown. It likely handles mode, retries, timeout and must also accept lock and push to suite._locks.",
+   "picked": []
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "TestTypeImpl._configure method handling test.describe.configure options mode, retries, timeout, and storing them on the current suite",
+    "symptom": "test.describe.configure does not accept a lock option (string or array).",
+    "anchors": [
+     "_currentSuite",
+     "_parallelMode",
+     "_retries",
+     "_timeout",
+     "_locks",
+     "validateTestDetails"
+    ],
+    "look_in": [
+     "packages/playwright/src/common/testType.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright/src/common/testType.ts",
+     34,
+     316
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     192,
+     215
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "_configure only handles mode, retries and timeout. Suite already has a _locks array that _describe fills from validated details. I added a lock option, a string or an array of strings, that is pushed onto suite._locks.",
+   "picked": [
+    "packages/playwright/src/common/testType.ts:TestTypeImpl._configure"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

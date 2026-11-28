@@ -1,0 +1,296 @@
+{
+ "arm": "codemem-loop",
+ "task": "pandas-dev__pandas-68358",
+ "fixed": {
+  "round": 1,
+  "explanation": "When one side is empty, `difference` and `union` return the non-empty operand unchanged. This keeps a negative step, so the result isn't sorted. The general `Index.symmetric_difference` path sorts by default. The edit reverses any negative-step `RangeIndex` result so it is ascending, which gives `RangeIndex(-4, -1, 2)` for the issue's example.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0743,
+ "seconds": 21,
+ "diff_stat": "pandas/core/indexes/range.py | 5 +++++\n 1 file changed, 5 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "RangeIndex.symmetric_difference (and its helper _symmetric_difference) has a shortcut when one side is empty that returns self without applying the sort, so a RangeIndex with negative step is not sorted ascending. It should return the result sorted (e.g. reversed to a positive step) when sort is not False.",
+    "symptom": "RangeIndex(-2, -5, -2).symmetric_difference(RangeIndex(0)) returns the unsorted RangeIndex(start=-2, stop=-5, step=-2) instead of the sorted RangeIndex(start=-4, stop=-1, step=2).",
+    "anchors": [
+     "RangeIndex.symmetric_difference",
+     "symmetric_difference",
+     "RangeIndex",
+     "pd.RangeIndex(-2, -5, -2).symmetric_difference(pd.RangeIndex(0))"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/indexes/range.py",
+     1142,
+     1154
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3651,
+     3751
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     1055,
+     1140
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3634,
+     3643
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     89,
+     1704
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3562,
+     3632
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     419,
+     443
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     905,
+     922
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     264,
+     296
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     846,
+     863
+    ],
+    [
+     "pandas/tests/indexes/base_class/test_setops.py",
+     171,
+     179
+    ],
+    [
+     "pandas/tests/indexes/numeric/test_setops.py",
+     137,
+     150
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     301,
+     335
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     1254,
+     1337
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     886,
+     903
+    ],
+    [
+     "pandas/tests/indexes/multi/test_setops.py",
+     90,
+     109
+    ],
+    [
+     "pandas/tests/indexes/interval/test_setops.py",
+     148,
+     171
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     875,
+     884
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     392,
+     417
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     357,
+     372
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     865,
+     873
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     476,
+     498
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     980,
+     1053
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     13,
+     443
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     140,
+     290
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     337,
+     355
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     374,
+     381
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     383,
+     390
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3141,
+     3147
+    ],
+    [
+     "pandas/core/indexes/frozen.py",
+     59,
+     75
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     199,
+     245
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     969,
+     978
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3645,
+     3649
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3753,
+     3757
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     631,
+     660
+    ],
+    [
+     "pandas/tests/indexes/ranges/test_setops.py",
+     446,
+     453
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     1163,
+     1199
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     3759,
+     3765
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     833,
+     844
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     4202,
+     4218
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     715,
+     722
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     6775,
+     6798
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     807,
+     814
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     816,
+     822
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     8543,
+     8560
+    ],
+    [
+     "pandas/tests/indexes/multi/test_setops.py",
+     112,
+     120
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     4707,
+     4713
+    ],
+    [
+     "pandas/_libs/lib.pyi",
+     236,
+     239
+    ],
+    [
+     "pandas/core/indexes/range.py",
+     1156,
+     1161
+    ],
+    [
+     "pandas/tests/indexes/test_setops.py",
+     824,
+     831
+    ]
+   ],
+   "analysis": "RangeIndex.symmetric_difference in range.py takes a fast path when `other` is a RangeIndex and sort is None. It builds `left` and `right` from the two ranges. It likely computes the result with `_difference`, and that path returns self unsorted when one side is empty, so a negative step is kept. The fix belongs in this method, or in the `_difference` or `_union` call it makes.",
+   "picked": [
+    "pandas/core/indexes/range.py:RangeIndex.symmetric_difference"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/indexes/range.py lines 1142-1154 (RangeIndex.symmetric_difference)"
+   ],
+   "fix_attempt": "applied: When one side is empty, `difference` and `union` return the non-empty operand unchanged. This keeps a negative step, so the result isn't sorted. The general `Index.symmetric_difference` path sorts by default. The edit reverses any negative-step `RangeIndex` result so it is ascending, which gives `RangeIndex(-4, -1, 2)` for the issue's example."
+  }
+ ]
+}

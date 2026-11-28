@@ -1,0 +1,27 @@
+diff --git a/pandas/io/excel/_base.py b/pandas/io/excel/_base.py
+index d970d4e..b5a73dc 100644
+--- a/pandas/io/excel/_base.py
++++ b/pandas/io/excel/_base.py
+@@ -878,7 +878,7 @@ class BaseExcelReader(Generic[_WorkbookT]):
+             assert isinstance(header, Sequence)
+ 
+             header_names = []
+-            control_row = [True] * len(data[0])
++            control_row = [True] * (len(data[0]) if len(data) else 0)
+ 
+             for row in header:
+                 if is_integer(skiprows):
+diff --git a/pandas/io/excel/_util.py b/pandas/io/excel/_util.py
+index 2d0b63b..053f4dc 100644
+--- a/pandas/io/excel/_util.py
++++ b/pandas/io/excel/_util.py
+@@ -297,7 +297,8 @@ def pop_header_name(
+         assert not isinstance(index_col, Iterable)
+         i = index_col
+ 
+-    header_name = row[i]
++    # Rows may be shorter than the index column (e.g. trimmed trailing cells)
++    header_name = row[i] if i < len(row) else ""
+     header_name = None if header_name == "" else header_name
+ 
+     return header_name, [*row[:i], "", *row[i + 1 :]]

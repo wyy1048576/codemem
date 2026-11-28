@@ -1,0 +1,35 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "The message \"tolerance must be positive\" is raised for negative tolerance only, so zero is allowed. Change the message to \"tolerance must be non-negative\" in all three branches and update the test.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0248,
+ "seconds": 25,
+ "diff_stat": "pandas/core/reshape/merge.py                  | 6 +++---\n pandas/tests/reshape/merge/test_merge_asof.py | 2 +-\n 2 files changed, 4 insertions(+), 4 deletions(-)"
+}
+round 1: k=2 action=edit picked=['pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance', 'pandas/tests/reshape/merge/test_merge_asof.py:TestAsOfMerge.test_tolerance_negative_one_nanosecond'] applied
+
+parse errors in pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  26%|██▌       | 74/290 [00:00<00:00, 672.00it/s]
+Loading weights:  49%|████▉     | 142/290 [00:00<00:00, 598.54it/s]
+Loading weights:  70%|███████   | 203/290 [00:00<00:00, 542.05it/s]
+Loading weights:  92%|█████████▏| 267/290 [00:00<00:00, 537.55it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 594.45it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

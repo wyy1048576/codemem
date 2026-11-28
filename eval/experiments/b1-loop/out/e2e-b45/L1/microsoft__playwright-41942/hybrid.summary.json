@@ -1,0 +1,107 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41942",
+ "fixed": {
+  "step": 3,
+  "explanation": "defaultCacheDirectory and defaultRegistryDirectory are computed at module load and throw on unsupported platforms like Android, even when PLAYWRIGHT_BROWSERS_PATH is set. I turned defaultCacheDirectory into a function and only call it when the env variable doesn't decide the location. I also updated its caller in browserFactory.ts.",
+  "edits": 3
+ },
+ "rounds": 3,
+ "tools": {
+  "grep": 2,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0602,
+ "seconds": 21,
+ "diff_stat": "packages/playwright-core/src/server/registry/index.ts    | 10 ++++++----\n packages/playwright-core/src/tools/mcp/browserFactory.ts |  2 +-\n 2 files changed, 7 insertions(+), 5 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "PLAYWRIGHT_BROWSERS_PATH|cacheDirectory|does not support platform|not supported",
+    "path": "packages/playwright-core/src/server",
+    "ignore_case": false
+   },
+   "matches": 24,
+   "grep_shown": [
+    "packages/playwright-core/src/server/bidi/bidiFirefox.ts:48",
+    "packages/playwright-core/src/server/browserContext.ts:786",
+    "packages/playwright-core/src/server/browserContext.ts:788",
+    "packages/playwright-core/src/server/chromium/chromium.ts:482",
+    "packages/playwright-core/src/server/chromium/crInput.ts:50",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:7873",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:18747",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:18752",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:19093",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:19097",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:19101",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:19120",
+    "packages/playwright-core/src/server/chromium/protocol.d.ts:21375",
+    "packages/playwright-core/src/server/firefox/firefox.ts:62",
+    "packages/playwright-core/src/server/frameSelectors.ts:132",
+    "packages/playwright-core/src/server/frames.ts:838",
+    "packages/playwright-core/src/server/frames.ts:840",
+    "packages/playwright-core/src/server/registry/dependencies.ts:72",
+    "packages/playwright-core/src/server/registry/index.ts:513",
+    "packages/playwright-core/src/server/registry/index.ts:631",
+    "packages/playwright-core/src/server/registry/index.ts:989",
+    "packages/playwright-core/src/server/registry/index.ts:1031",
+    "packages/playwright-core/src/server/webkit/webview/wvPage.ts:493",
+    "packages/playwright-core/src/server/webkit/wkInput.ts:157"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "registry/index.ts line 513 is a module-level block reading PLAYWRIGHT_BROWSERS_PATH, which likely computes the default cache directory eagerly. I need to see it before making the edit.",
+   "picked": [
+    "packages/playwright-core/src/server/registry/index.ts:<block>"
+   ]
+  },
+  {
+   "step": 2,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright-core/src/server/registry/index.ts lines 498-530 (<block>)"
+   ],
+   "action": "grep",
+   "analysis": "defaultCacheDirectory is evaluated at module load and throws on unsupported platforms. I need to find other users before turning it into a lazy function.",
+   "picked": []
+  },
+  {
+   "step": 3,
+   "tool": "grep",
+   "input": {
+    "pattern": "defaultCacheDirectory|defaultRegistryDirectory",
+    "path": "packages",
+    "ignore_case": false
+   },
+   "matches": 7,
+   "grep_shown": [
+    "packages/playwright-core/src/server/registry/index.ts:498",
+    "packages/playwright-core/src/server/registry/index.ts:508",
+    "packages/playwright-core/src/server/registry/index.ts:519",
+    "packages/playwright-core/src/serverRegistry.ts:245",
+    "packages/playwright-core/src/serverRegistry.ts:255",
+    "packages/playwright-core/src/tools/mcp/browserFactory.ts:22",
+    "packages/playwright-core/src/tools/mcp/browserFactory.ts:198"
+   ],
+   "picked_shown": [
+    "packages/playwright-core/src/server/registry/index.ts lines 498-530 (<block>)"
+   ],
+   "action": "edit",
+   "analysis": "defaultCacheDirectory and defaultRegistryDirectory are computed at module load and throw on unsupported platforms like Android, even when PLAYWRIGHT_BROWSERS_PATH is set. I turned defaultCacheDirectory into a function and only call it when the env variable doesn't decide the location. I also updated its caller in browserFactory.ts.",
+   "picked": [
+    "packages/playwright-core/src/server/registry/index.ts:<block>"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

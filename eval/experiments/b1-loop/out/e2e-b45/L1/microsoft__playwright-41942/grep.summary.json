@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-41942",
+ "exit": 0,
+ "seconds": 27,
+ "cost_usd": 0.0623094,
+ "turns": 12,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 6930,
+  "cache_read_input_tokens": 55214,
+  "output_tokens": 2904,
+  "output_tokens_details": {
+   "thinking_tokens": 30
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 6930,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 367,
+    "cache_read_input_tokens": 10237,
+    "cache_creation_input_tokens": 2085,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2085
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 4,
+  "Read": 2,
+  "Edit": 5
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/server/registry/index.ts    | 10 ++++++----\n packages/playwright-core/src/serverRegistry.ts           | 10 ++++++----\n packages/playwright-core/src/tools/mcp/browserFactory.ts |  2 +-\n 3 files changed, 13 insertions(+), 9 deletions(-)",
+ "final": "The default cache folder is no longer worked out when Playwright loads, so setting `PLAYWRIGHT_BROWSERS_PATH` (to `0` or to a folder) now avoids the \"Unsupported platform\" error on Termux. I haven't built or run anything.\n\n- **`packages/playwright-core/src/server/registry/index.ts`**: `defaultCacheDirectory` and `defaultRegistryDirectory` were constants evaluated at import. They are now functions. `registryDirectory` only calls `defaultRegistryDirectory()` when the variable isn't set.\n- **`packages/playwright-core/src/serverRegistry.ts`**: it had the same eager lookup, so its default cache and registry directories are now functions too. They are only called when `PWTEST_SERVER_REGISTRY` isn't set.\n- **`packages/playwright-core/src/tools/mcp/browserFactory.ts`**: updated the one caller to `defaultCacheDirectory()`.\n\nThe error is still thrown when the default folder is actually needed on an unsupported platform, such as when the variable isn't set.",
+ "stderr": ""
+}

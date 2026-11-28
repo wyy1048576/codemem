@@ -1,0 +1,30 @@
+diff --git a/packages/playwright/src/transform/esmLoader.ts b/packages/playwright/src/transform/esmLoader.ts
+index 9789320..8dec07b 100644
+--- a/packages/playwright/src/transform/esmLoader.ts
++++ b/packages/playwright/src/transform/esmLoader.ts
+@@ -80,6 +80,10 @@ async function load(moduleUrl: string, context: { format?: string }, defaultLoad
+   if (!shouldTransform(filename))
+     return defaultLoad(moduleUrl, context, defaultLoad);
+ 
++  // Hand unknown file types to other registered loaders.
++  if (!/\.(?:[cm]?[jt]sx?)$/i.test(filename))
++    return defaultLoad(moduleUrl, context, defaultLoad);
++
+   const originalModuleUrl = isPreflight ? moduleUrl.slice(0, -esmPreflightExtension.length) : moduleUrl;
+   const originalFilename = isPreflight ? url.fileURLToPath(originalModuleUrl) : filename;
+ 
+diff --git a/packages/playwright/src/transform/esmLoaderSync.ts b/packages/playwright/src/transform/esmLoaderSync.ts
+index 9de1fc7..40ecbce 100644
+--- a/packages/playwright/src/transform/esmLoaderSync.ts
++++ b/packages/playwright/src/transform/esmLoaderSync.ts
+@@ -74,6 +74,10 @@ export function load(moduleUrl: string, context: { format?: string, conditions?:
+   if (!shouldTransform(filename))
+     return nextLoad(moduleUrl, context);
+ 
++  // Hand unknown file types to other registered loaders.
++  if (!/\.(?:[cm]?[jt]sx?)$/i.test(filename))
++    return nextLoad(moduleUrl, context);
++
+   // A file reached via `require` is loaded as CommonJS. Files reached via `import` keep real ESM semantics.
+   // This is a "bundler" behavior, where we go against Node.js semantics, to support extension-less esm imports, path mapping, etc.
+   const isRequire = !new Set(context.conditions).has('import');

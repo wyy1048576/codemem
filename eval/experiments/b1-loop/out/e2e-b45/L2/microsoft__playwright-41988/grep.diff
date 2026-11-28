@@ -1,0 +1,20 @@
+diff --git a/packages/injected/src/ariaSnapshotDistiller.ts b/packages/injected/src/ariaSnapshotDistiller.ts
+index 3481b06..1dad435 100644
+--- a/packages/injected/src/ariaSnapshotDistiller.ts
++++ b/packages/injected/src/ariaSnapshotDistiller.ts
+@@ -205,8 +205,14 @@ const removeNameRepeatingChild: DistillerPlugin = {
+       return;
+     const singleTextChild = node.children.length === 1 && typeof node.children[0] === 'string' ? node.children[0] : undefined;
+     const text = node.name ? (node.children.length ? undefined : node.name) : singleTextChild;
+-    if (text && text === parent.name)
++    if (text && text === parent.name) {
++      // The node may have become a text-only leaf after its children were distilled away (e.g. a
++      // nameless icon was removed), in which case `removeRedundantNames` already cleared its ref
++      // on enter. Removing it means it is no longer represented, so the parent must keep its name.
++      if (node.ref)
++        ctx.pendingContentRefs.add(node.ref);
+       return 'remove';
++    }
+   },
+ };
+ 

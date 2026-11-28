@@ -1,0 +1,802 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "duckdb__duckdb-23952",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10
+ },
+ "sonnet_calls": 10,
+ "cost_usd": 0.337,
+ "seconds": 81,
+ "diff_stat": "",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The hash join's semi/anti join probe path with extra non-equality (residual) conditions must evaluate the residual predicate across all build-side chain matches for a key, and mark a probe row as matched if any duplicate key satisfies it. Currently it likely only checks the first match or mishandles duplicates in the chain when scanning for semi/anti results.",
+    "symptom": "ANTI JOIN with an equality key plus residual predicate returns left rows that do have a matching right row satisfying the predicate when the right side has duplicate keys (e.g. (1,1) is wrongly returned).",
+    "anchors": [
+     "ANTI JOIN",
+     "SEMI",
+     "l.k = r.k",
+     "l.v + r.v > 2"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/execution/join_hashtable.cpp",
+     1874,
+     1902
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1803,
+     1826
+    ],
+    [
+     "src/execution/operator/join/physical_iejoin.cpp",
+     1620,
+     1655
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1838,
+     1846
+    ],
+    [
+     "src/execution/operator/join/physical_nested_loop_join.cpp",
+     71,
+     73
+    ],
+    [
+     "src/planner/subquery/delim_join_cte_rewriter.cpp",
+     1147,
+     1249
+    ],
+    [
+     "src/optimizer/join_elimination.cpp",
+     192,
+     293
+    ],
+    [
+     "src/optimizer/pushdown/pushdown_semi_anti_join.cpp",
+     12,
+     51
+    ],
+    [
+     "src/planner/subquery/delim_join_cte_rewriter.cpp",
+     1028,
+     1145
+    ],
+    [
+     "src/execution/operator/join/physical_iejoin.cpp",
+     1571,
+     1618
+    ]
+   ],
+   "analysis": "Results show NextAntiJoin calls ScanKeyMatches and then NextSemiOrAntiJoin, but ScanKeyMatches and the residual-predicate handling (ResolvePredicates/chain_match_sel_vector with non_equality_predicates) were not shown. The bug is likely in how ScanKeyMatches iterates chains and evaluates the residual predicate for duplicate keys, so a probe row matched earlier is re-evaluated or unmatched incorrectly.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Hash join ScanKeyMatches loop over chain pointers for semi/anti joins that resolves equality predicates, then evaluates non-equality residual predicates and marks found_match for probe rows.",
+    "symptom": "ANTI JOIN with equality key plus residual predicate returns left rows that have a matching right row satisfying the predicate when right has duplicate keys.",
+    "anchors": [
+     "ScanKeyMatches",
+     "ResolvePredicates",
+     "chain_match_sel_vector",
+     "NextSemiOrAntiJoin",
+     "found_match",
+     "PointersExhausted",
+     "NextRightSemiOrAntiJoin"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/join_hashtable.cpp",
+     1781,
+     1801
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1472,
+     1505
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1828,
+     1836
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2134,
+     2182
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1563,
+     1584
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1698,
+     1779
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2069,
+     2132
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2184,
+     2238
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2035,
+     2067
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1294,
+     1362
+    ]
+   ],
+   "analysis": "ScanKeyMatches (truncated) and ResolatePredicates are the semi/anti core. The body of ScanKeyMatches wasn't shown, so I can't confirm how it advances the chain after a residual predicate fails. The bug may be in how non-matching rows continue to the next chain pointer, for example in AdvancePointers, or in how ResolvePredicates fills no_match_sel when the equality match succeeds but the residual fails.",
+   "picked": [
+    "src/execution/join_hashtable.cpp:duckdb.ScanStructure.ScanKeyMatches",
+    "src/execution/join_hashtable.cpp:duckdb.ScanStructure.ResolvePredicates"
+   ],
+   "found": false
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Code that advances chain pointers for probe rows whose equality key matched but whose residual predicate failed, so the next duplicate build row is tried (AdvancePointers, ScanKeyMatches loop, no_match_sel handling).",
+    "symptom": "ANTI JOIN with an equality key and a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "ScanKeyMatches",
+     "ResolvePredicates",
+     "no_match_sel",
+     "chain_match_sel_vector",
+     "chain_no_match_sel_vector",
+     "found_match",
+     "NextSemiOrAntiJoin",
+     "TryProbeConstant"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/join_hashtable.cpp",
+     1848,
+     1872
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     299,
+     368
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1153,
+     1292
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1955,
+     2033
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1515,
+     1561
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     733,
+     758
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     760,
+     798
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1120,
+     1151
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     375,
+     386
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2531,
+     2567
+    ]
+   ],
+   "analysis": "ApplyResidualPredicate and MarkChainsAsFoundLoop are new candidates in the semi/anti residual path, but their bodies were truncated. The bug is probably in how chains are marked as found. Once one duplicate satisfies the residual, other probe rows or chain entries may be left unresolved. The bug could also be in how ScanKeyMatches advances chains after a residual failure.",
+   "picked": [
+    "src/execution/join_hashtable.cpp:duckdb.ScanStructure.ApplyResidualPredicate",
+    "src/execution/join_hashtable.cpp:duckdb.MarkChainsAsFoundLoop"
+   ],
+   "found": false
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "Code that marks chains as found for semi/anti joins after the residual predicate passes, and that handles rows whose residual failed so the next duplicate in the chain is tried.",
+    "symptom": "ANTI JOIN with an equality key and a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "MarkChainsAsFoundLoop",
+     "ApplyResidualPredicate",
+     "ScanKeyMatches",
+     "ResolvePredicates",
+     "no_match_sel",
+     "chain_match_sel_vector",
+     "dead_end_ptr",
+     "NextSemiOrAntiJoin"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/join_hashtable.cpp",
+     486,
+     497
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     800,
+     926
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     47,
+     99
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1364,
+     1408
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1418,
+     1463
+    ],
+    [
+     "src/execution/operator/join/physical_nested_loop_join.cpp",
+     46,
+     65
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1632,
+     1672
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     656,
+     684
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     286,
+     295
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1904,
+     1953
+    ]
+   ],
+   "analysis": "Round 4 results show only peripheral code (constructor, Next, probing, GatherRHS). Bodies of ScanKeyMatches, ApplyResidualPredicate and MarkChainsAsFoundLoop are still unseen. The bug is likely in how the semi/anti path handles a chain whose first equality match fails the residual, or in how it marks a probe row found. For example, it may mark the probe row found, or not found, per chain entry rather than per probe row. It could also be in how the probe row's chain advances after a residual failure.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Semi/anti join residual handling: apply the non-equality predicate on equality-matched chain entries, mark probe rows found, and advance remaining probe rows to the next chain pointer.",
+    "symptom": "ANTI JOIN with an equality key plus a residual predicate wrongly returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "ScanKeyMatches",
+     "ApplyResidualPredicate",
+     "MarkChainsAsFoundLoop",
+     "ResolvePredicates",
+     "chain_match_sel_vector",
+     "chain_no_match_sel_vector",
+     "found_match",
+     "residual_info",
+     "NextSemiOrAntiJoin",
+     "NextAntiJoin"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     133,
+     172
+    ],
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     108,
+     131
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     231,
+     279
+    ],
+    [
+     "src/execution/operator/join/physical_iejoin.cpp",
+     1477,
+     1562
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1083,
+     1105
+    ],
+    [
+     "src/execution/operator/join/physical_iejoin.cpp",
+     1692,
+     1756
+    ],
+    [
+     "src/execution/operator/join/physical_piecewise_merge_join.cpp",
+     640,
+     771
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     40,
+     45
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1622,
+     1625
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1617,
+     1620
+    ]
+   ],
+   "analysis": "Round 5 results show only peripheral code: residual predicate initialization in physical_hash_join.cpp, probing, and the IEJoin and merge join resolvers. The bodies of ScanKeyMatches, ApplyResidualPredicate and MarkChainsAsFoundLoop have still not been seen. The bug is likely in the semi/anti residual path in join_hashtable.cpp. A probe row whose first duplicate fails the residual may be marked unmatched, or the chain may not advance. A found row may also be marked once per chain rather than per probe row.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Semi/anti join scan in the hash table that applies the residual predicate to equality-matched chain entries, marks probe rows as found, and keeps advancing chain pointers for rows still unmatched.",
+    "symptom": "ANTI JOIN with an equality key and a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "ScanKeyMatches",
+     "ApplyResidualPredicate",
+     "MarkChainsAsFoundLoop",
+     "ResolvePredicates",
+     "chain_match_sel_vector",
+     "chain_no_match_sel_vector",
+     "found_match",
+     "residual_info",
+     "NextSemiOrAntiJoin",
+     "NextAntiJoin"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/join_hashtable.cpp",
+     1601,
+     1611
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1507,
+     1513
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     697,
+     732
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2258,
+     2273
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1586,
+     1599
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1116,
+     1118
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     216,
+     229
+    ],
+    [
+     "src/execution/operator/join/perfect_hash_join_executor.cpp",
+     278,
+     308
+    ],
+    [
+     "src/execution/operator/join/physical_iejoin.cpp",
+     961,
+     1136
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     101,
+     144
+    ]
+   ],
+   "analysis": "AdvancePointers returns early with count = 0 when chains_longer_than_one is false. If that flag is not set when duplicate keys are inserted, or the dict-emission loop drops rows, a probe row whose first chain entry fails the residual is never tried against later duplicates. That would match the repro, where (1,1) only matches the second duplicate (1,5). The ScanKeyMatches and ApplyResidualPredicate bodies have still not been seen, and the place where chains_longer_than_one is set has not been seen either.",
+   "picked": [
+    "src/execution/join_hashtable.cpp:duckdb.ScanStructure.AdvancePointers",
+    "src/execution/join_hashtable.cpp:duckdb.AdvancePointersLoop"
+   ],
+   "found": false
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Code that sets chains_longer_than_one during hash table insert or finalize, and code that advances chain pointers for probe rows after the residual predicate failed in semi/anti joins.",
+    "symptom": "ANTI JOIN with an equality key and a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "chains_longer_than_one",
+     "AdvancePointers",
+     "AdvancePointersLoop",
+     "use_dict_emission",
+     "ScanKeyMatches",
+     "ApplyResidualPredicate",
+     "MarkChainsAsFoundLoop",
+     "InsertRowToEntry"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/join_hashtable.cpp",
+     2428,
+     2467
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1613,
+     1615
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1465,
+     1470
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     564,
+     654
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1108,
+     1113
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2717,
+     2766
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     70,
+     650
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1686,
+     1696
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     289,
+     299
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     971,
+     983
+    ]
+   ],
+   "analysis": "GetNextPointer with USE_DICT_EMISSION returns nullptr when chains_longer_than_one is false, because aux_next_ptrs is unallocated. If the flag isn't set when duplicate keys exist, a probe row whose first chain entry fails the residual never reaches later duplicates. That fits the repro, where (1,1) only matches the second (1,5). I haven't seen where the flag is set, which is probably in the dictionary emission build or insert code.",
+   "picked": [
+    "src/include/duckdb/execution/join_hashtable.hpp:duckdb.JoinHashTable.GetNextPointer"
+   ],
+   "found": false
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Code that sets chains_longer_than_one and builds aux_next_ptrs when duplicate keys are inserted for dictionary emission, and chooses whether dictionary emission is allowed with residual predicates.",
+    "symptom": "ANTI JOIN with an equality key and a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "chains_longer_than_one",
+     "aux_next_ptrs",
+     "GetNextPointer",
+     "USE_DICT_EMISSION",
+     "BuildDictionaryArrays",
+     "CanUseDictionaryEmission",
+     "use_dict_emission",
+     "AdvancePointersLoop"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp",
+     "src/include/duckdb/execution/join_hashtable.hpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/join_hashtable.cpp",
+     2655,
+     2701
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2703,
+     2715
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     534,
+     562
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     546,
+     548
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2637,
+     2644
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1674,
+     1684
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     462,
+     468
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     471,
+     484
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     499,
+     532
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     590,
+     592
+    ]
+   ],
+   "analysis": "CanUseDictionaryEmission decides whether NEXT_PTR embedding is allowed, but its body is truncated. I can't see whether it excludes joins with residual predicates. The place where chains_longer_than_one is set, and the semi/anti ScanKeyMatches body, are still unseen. Dictionary emission only activates for large probes, so the tiny repro may fail through a different path.",
+   "picked": [
+    "src/execution/join_hashtable.cpp:duckdb.JoinHashTable.CanUseDictionaryEmission"
+   ],
+   "found": false
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "Code that sets chains_longer_than_one when duplicate keys are inserted into the hash table, and the semi/anti chain-walking code that applies the residual predicate and advances to the next duplicate.",
+    "symptom": "ANTI JOIN with an equality key and a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "chains_longer_than_one",
+     "CanUseDictionaryEmission",
+     "GetNextPointer",
+     "AdvancePointers",
+     "ScanKeyMatches",
+     "ApplyResidualPredicate",
+     "MarkChainsAsFoundLoop",
+     "use_dict_emission"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     834,
+     839
+    ],
+    [
+     "src/execution/aggregate_hashtable.cpp",
+     705,
+     738
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     2607,
+     2631
+    ],
+    [
+     "src/execution/radix_partitioned_hashtable.cpp",
+     490,
+     528
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     388,
+     402
+    ],
+    [
+     "third_party/zstd/compress/zstd_lazy.cpp",
+     1141,
+     1336
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     404,
+     415
+    ],
+    [
+     "third_party/zstd/compress/zstd_lazy.cpp",
+     628,
+     628
+    ],
+    [
+     "third_party/jaro_winkler/details/common.hpp",
+     109,
+     126
+    ],
+    [
+     "third_party/zstd/compress/zstd_lazy.cpp",
+     865,
+     880
+    ]
+   ],
+   "analysis": "Round 9 results are all irrelevant (zstd, aggregate HT, etc.). The earlier picks (ScanKeyMatches, ApplyResidualPredicate, MarkChainsAsFoundLoop, AdvancePointers) are plausible, but their bodies were never fully seen. The bug is most likely in the semi/anti residual path in join_hashtable.cpp, where a probe row already marked found is advanced or re-evaluated and overwritten.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "ScanStructure::ScanKeyMatches body for semi/anti joins with residual predicates: after ApplyResidualPredicate, rows that matched must be removed from the remaining set, and rows that failed must advance to the next chain entry.",
+    "symptom": "ANTI JOIN with an equality key plus a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "ScanKeyMatches",
+     "ApplyResidualPredicate",
+     "MarkChainsAsFoundLoop",
+     "AdvancePointers",
+     "ResolvePredicates",
+     "NextAntiJoin",
+     "NextSemiOrAntiJoin",
+     "found_match",
+     "chain_match_sel_vector",
+     "chain_no_match_sel_vector"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/execution/operator/join/physical_blockwise_nl_join.cpp",
+     97,
+     104
+    ],
+    [
+     "src/execution/operator/join/physical_piecewise_merge_join.cpp",
+     478,
+     525
+    ],
+    [
+     "src/execution/operator/join/physical_iejoin.cpp",
+     1657,
+     1690
+    ],
+    [
+     "src/execution/join_hashtable.cpp",
+     1627,
+     1630
+    ],
+    [
+     "src/execution/operator/join/physical_nested_loop_join.cpp",
+     426,
+     453
+    ],
+    [
+     "src/execution/operator/join/physical_blockwise_nl_join.cpp",
+     126,
+     214
+    ],
+    [
+     "src/planner/subquery/delim_join_cte_rewriter.cpp",
+     1251,
+     1365
+    ],
+    [
+     "src/execution/operator/join/physical_piecewise_merge_join.cpp",
+     323,
+     333
+    ],
+    [
+     "src/execution/nested_loop_join/nested_loop_join_mark.cpp",
+     149,
+     165
+    ],
+    [
+     "src/planner/subquery/delim_join_cte_rewriter.cpp",
+     897,
+     909
+    ]
+   ],
+   "analysis": "Round 10 results are peripheral: blockwise NL join, merge join, IEJoin and nested loop code. The bodies of ScanStructure::ScanKeyMatches, ApplyResidualPredicate and MarkChainsAsFoundLoop in join_hashtable.cpp have still not been shown. The bug most likely sits there. A probe row that already matched is probably advanced or overwritten, or the chain is not advanced after a residual failure.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 11,
+   "query": {
+    "intent": "Body of ScanStructure::ScanKeyMatches and ApplyResidualPredicate in the hash join for semi/anti joins with residual predicates. It should loop over chain pointers, apply the residual, mark found rows, and advance the remaining rows to the next duplicate.",
+    "symptom": "ANTI JOIN with an equality key and a residual predicate returns left rows that have a matching duplicate-key right row satisfying the predicate.",
+    "anchors": [
+     "ScanKeyMatches",
+     "ApplyResidualPredicate",
+     "MarkChainsAsFoundLoop",
+     "AdvancePointers",
+     "ResolvePredicates",
+     "NextAntiJoin",
+     "NextSemiOrAntiJoin",
+     "found_match",
+     "chain_match_sel_vector",
+     "chain_no_match_sel_vector"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   }
+  }
+ ]
+}

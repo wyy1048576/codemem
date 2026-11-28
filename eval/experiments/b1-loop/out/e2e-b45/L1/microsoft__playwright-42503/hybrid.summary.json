@@ -1,0 +1,192 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "step": 5,
+  "explanation": "runDaemonForContext calls browser.bind on every context creation, and the second bind throws because a server is already running. I added a WeakSet of browsers that have already been bound. Later contexts on the same browser skip the bind and the pause, and return false.",
+  "edits": 1
+ },
+ "rounds": 5,
+ "tools": {
+  "codemem": 1,
+  "grep": 2,
+  "read": 2
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 5
+ },
+ "sonnet_calls": 6,
+ "cost_usd": 0.0976,
+ "seconds": 53,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Playwright Test debug integration with the CLI (debug/attach session) that, on every browser context creation, binds/exposes the browser to the CLI tool (browser server start) and throws if already running. It should expose the browser only once.",
+    "symptom": "With multiple browser contexts in a test, the second context creation throws that a browser server is already running when using the CLI debug mode.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/playwright-core/types/types.d.ts",
+     21001,
+     21083
+    ],
+    [
+     "packages/playwright-core/src/server/browser.ts",
+     130,
+     140
+    ],
+    [
+     "tests/mcp/test-debug.spec.ts",
+     338,
+     486
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/browserDispatcher.ts",
+     62,
+     78
+    ],
+    [
+     "packages/playwright-client/types/types.d.ts",
+     21001,
+     21083
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "grep",
+   "analysis": "Need to find where the debug integration binds browser to CLI on context creation and throws 'already running'.",
+   "picked": []
+  },
+  {
+   "step": 2,
+   "tool": "grep",
+   "input": {
+    "pattern": "already running|PLAYWRIGHT_DEBUG_CLI|bindBrowser|browser\\.bind\\(",
+    "path": "packages",
+    "ignore_case": true
+   },
+   "matches": 19,
+   "grep_shown": [
+    "packages/playwright-client/types/types.d.ts:976",
+    "packages/playwright-client/types/types.d.ts:5273",
+    "packages/playwright-client/types/types.d.ts:9241",
+    "packages/playwright-client/types/types.d.ts:10774",
+    "packages/playwright-client/types/types.d.ts:11034",
+    "packages/playwright-client/types/types.d.ts:11779",
+    "packages/playwright-core/src/server/dispatchers/pageDispatcher.ts:399",
+    "packages/playwright-core/src/tools/cli-daemon/program.ts:67",
+    "packages/playwright-core/src/tools/dashboard/dashboardApp.ts:295",
+    "packages/playwright-core/src/tools/mcp/program.ts:114",
+    "packages/playwright-core/src/tools/mcp/program.ts:135",
+    "packages/playwright-core/src/tools/skills/playwright-cli/references/session-management.md:110",
+    "packages/playwright-core/types/types.d.ts:976",
+    "packages/playwright-core/types/types.d.ts:5273",
+    "packages/playwright-core/types/types.d.ts:9241",
+    "packages/playwright-core/types/types.d.ts:10774",
+    "packages/playwright-core/types/types.d.ts:11034",
+    "packages/playwright-core/types/types.d.ts:11779",
+    "packages/playwright/src/index.ts:259"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "packages/playwright/src/index.ts:259 calls browser.bind per worker, likely in a context creation hook. Need to read it to make it bind only once.",
+   "picked": [
+    "packages/playwright/src/index.ts:<block>"
+   ]
+  },
+  {
+   "step": 3,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright/src/index.ts lines 210-263 (<block>)"
+   ],
+   "action": "grep",
+   "analysis": "The browser fixture binds once per worker, but the issue says binding happens on every context creation. There must be another bind call in a context-creation hook; grep for bind callers.",
+   "picked": []
+  },
+  {
+   "step": 4,
+   "tool": "grep",
+   "input": {
+    "pattern": "\\.bind\\(|_bindBrowser|startServer|PLAYWRIGHT_DASHBOARD|PW_TEST_DEBUG|debugController|onDidCreateBrowserContext|onWillCreateBrowserContext",
+    "path": "packages/playwright/src",
+    "ignore_case": false
+   },
+   "matches": 51,
+   "grep_shown": [
+    "packages/playwright/src/common/testType.ts:41",
+    "packages/playwright/src/common/testType.ts:44",
+    "packages/playwright/src/common/testType.ts:45",
+    "packages/playwright/src/common/testType.ts:46",
+    "packages/playwright/src/common/testType.ts:47",
+    "packages/playwright/src/common/testType.ts:48",
+    "packages/playwright/src/common/testType.ts:49",
+    "packages/playwright/src/common/testType.ts:50",
+    "packages/playwright/src/index.ts:258",
+    "packages/playwright/src/index.ts:259",
+    "packages/playwright/src/mcp/test/browserBackend.ts:125",
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts:30",
+    "packages/playwright/src/plugins/webServerPlugin.ts:75",
+    "packages/playwright/src/reporters/dot.ts:79",
+    "packages/playwright/src/reporters/line.ts:58",
+    "packages/playwright/src/reporters/line.ts:91",
+    "packages/playwright/src/reporters/line.ts:94",
+    "packages/playwright/src/reporters/line.ts:115",
+    "packages/playwright/src/reporters/line.ts:127",
+    "packages/playwright/src/reporters/line.ts:137",
+    "packages/playwright/src/reporters/line.ts:144",
+    "packages/playwright/src/reporters/list.ts:174",
+    "packages/playwright/src/reporters/list.ts:255",
+    "packages/playwright/src/reporters/list.ts:267",
+    "packages/playwright/src/runner/dispatcher.ts:617",
+    "packages/playwright/src/runner/dispatcher.ts:618",
+    "packages/playwright/src/runner/dispatcher.ts:619",
+    "packages/playwright/src/runner/dispatcher.ts:620",
+    "packages/playwright/src/runner/dispatcher.ts:621",
+    "packages/playwright/src/runner/dispatcher.ts:622",
+    "packages/playwright/src/runner/dispatcher.ts:623",
+    "packages/playwright/src/runner/dispatcher.ts:624",
+    "packages/playwright/src/worker/testInfo.ts:223"
+   ],
+   "picked_shown": [
+    "packages/playwright/src/index.ts lines 210-263 (<block>)"
+   ],
+   "action": "read",
+   "analysis": "browserBackend.ts:125 calls context.browser().bind on each context creation in runDaemonForContext; the second call throws. I need to read it to guard it so the bind happens only once.",
+   "picked": [
+    "packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext"
+   ]
+  },
+  {
+   "step": 5,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright/src/index.ts lines 210-263 (<block>)",
+    "packages/playwright/src/mcp/test/browserBackend.ts lines 120-137 (runDaemonForContext)"
+   ],
+   "action": "edit",
+   "analysis": "runDaemonForContext calls browser.bind on every context creation, and the second bind throws because a server is already running. I added a WeakSet of browsers that have already been bound. Later contexts on the same browser skip the bind and the pause, and return false.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

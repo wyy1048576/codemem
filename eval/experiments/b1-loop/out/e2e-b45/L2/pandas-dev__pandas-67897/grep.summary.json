@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-67897",
+ "exit": 0,
+ "seconds": 28,
+ "cost_usd": 0.0802889,
+ "turns": 14,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 8853,
+  "cache_read_input_tokens": 56829,
+  "output_tokens": 3917,
+  "output_tokens_details": {
+   "thinking_tokens": 852
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 8853,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 554,
+    "cache_read_input_tokens": 13286,
+    "cache_creation_input_tokens": 959,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 959
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 5,
+  "Read": 4,
+  "Edit": 4
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/arrays/arrow/extension_types.py | 9 ++++++++-\n pandas/core/arrays/interval.py              | 8 +++++++-\n pandas/core/dtypes/dtypes.py                | 8 ++++++--\n 3 files changed, 21 insertions(+), 4 deletions(-)",
+ "final": "I've made timezone-aware interval bounds convert to pyarrow and read back as the same dtype. I haven't run any of it, since I can't build or run code here.\n\n- **`pandas/core/arrays/interval.py`:** `IntervalArray.__arrow_array__` now builds the Arrow subtype for a `DatetimeTZDtype` bound as `pyarrow.timestamp(unit, tz)`. `pyarrow.from_numpy_dtype` can't handle that dtype, which caused the failure. I also imported `DatetimeTZDtype` there.\n- **`pandas/core/arrays/arrow/extension_types.py`:** `ArrowIntervalType` now serializes timestamp subtypes with their unit and tz. It rebuilds them with `pyarrow.timestamp(unit, tz)` on deserialize, because `type_for_alias` can't parse strings like `timestamp[ns, tz=UTC]`. That is what a parquet round trip goes through.\n- **`pandas/core/dtypes/dtypes.py`:** `IntervalDtype.__from_arrow__` now reads the left and right fields of a tz-aware subtype through `DatetimeTZDtype.__from_arrow__`. Before, it used `np.asarray(..., dtype=<tz dtype>)`, which would have failed. The result keeps the tz-aware `IntervalDtype`.\n\nI didn't add tests. A parquet round-trip test for a tz-aware `interval_range` would be worth adding.",
+ "stderr": ""
+}

@@ -1,0 +1,43 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-70205",
+ "fixed": {
+  "round": 1,
+  "explanation": "In _parse_sheet, header_names gets one entry per header row. When the sheet has only header rows, the parser returns an empty frame whose columns are a flat Index with one level. The unconditional set_names call then gets a 2-item list and raises \"Expected 1 names, got 2\". The fix applies header_names only when the number of levels equals len(header_names).",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0966,
+ "seconds": 15,
+ "diff_stat": "pandas/io/excel/_base.py | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)"
+}
+round 1: k=5 action=edit picked=['pandas/io/excel/_base.py:BaseExcelReader._parse_sheet'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  10%|█         | 30/290 [00:00<00:00, 297.11it/s]
+Loading weights:  21%|██        | 60/290 [00:00<00:00, 283.16it/s]
+Loading weights:  31%|███       | 90/290 [00:00<00:00, 282.00it/s]
+Loading weights:  43%|████▎     | 124/290 [00:00<00:00, 301.85it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 674.29it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   5%|▍         | 14/290 [00:00<00:02, 127.78it/s]
+Loading weights:  14%|█▍        | 40/290 [00:00<00:01, 168.00it/s]
+Loading weights:  23%|██▎       | 66/290 [00:00<00:01, 203.63it/s]
+Loading weights:  30%|███       | 87/290 [00:00<00:00, 205.91it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 636.86it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

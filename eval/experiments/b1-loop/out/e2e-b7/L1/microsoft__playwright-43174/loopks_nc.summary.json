@@ -1,0 +1,71 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  3
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0097,
+ "task": "microsoft__playwright-43174",
+ "fixed": {
+  "round": 1,
+  "explanation": "`gracefullyClose` force-killed the process whenever it was called again during a graceful close. On stdin end, the transport close and the exit handler both call it, so the second call killed the browser 1 ms after the graceful close began, before it flushed its profile. The fix makes a reentrant call wait for the in-progress close and cleanup. The first call still force-kills if `attemptToGracefullyClose` fails. A repeated SIGINT no longer force-kills immediately, because I couldn't see the signal handlers and didn't change them.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0418,
+ "seconds": 33,
+ "diff_stat": "packages/utils/processLauncher.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Browser process graceful close logic: calling gracefullyClose a second time while one is in progress falls through to kill the browser process immediately. Also the MCP stdio server shutdown handler on stdin end, which closes the transport and separately triggers closing all browsers (gracefullyCloseAll).",
+    "symptom": "On stdin close, the MCP server runs two shutdown paths; the second graceful close finds one in progress and force-kills the browser (taskkill) 1 ms later, losing persistent profile data.",
+    "anchors": [
+     "taskkill",
+     "close tool",
+     "localStorage"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/browserType.ts",
+     245,
+     257
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/chromium.ts",
+     245,
+     249
+    ],
+    [
+     "packages/utils/processLauncher.ts",
+     210,
+     226
+    ]
+   ],
+   "analysis": "launchProcess.gracefullyClose in processLauncher.ts force-kills when gracefullyClosing is already true. This is the mechanism the issue describes: the second call from the exit handler kills the browser 1 ms after the first graceful close started. The fix is to make the second call await the in-progress graceful close, and force-kill only if that close doesn't finish.",
+   "picked": [
+    "packages/utils/processLauncher.ts:launchProcess.gracefullyClose"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/utils/processLauncher.ts lines 210-226 (launchProcess.gracefullyClose)"
+   ],
+   "fix_attempt": "applied: `gracefullyClose` force-killed the process whenever it was called again during a graceful close. On stdin end, the transport close and the exit handler both call it, so the second call killed the browser 1 ms after the graceful close began, before it flushed its profile. The fix makes a reentrant call wait for the in-progress close and cleanup. The first call still force-kills if `attemptToGracefullyClose` fails. A repeated SIGINT no longer force-kills immediately, because I couldn't see the signal handlers and didn't change them."
+  }
+ ]
+}

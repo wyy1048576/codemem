@@ -1,0 +1,37 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 2,
+  "explanation": "test.describe.configure() is implemented in TestTypeImpl._configure, which only handles mode, retries and timeout. Suites already have a _locks array that _describe fills from details, so I added a lock option there that appends to the current suite's _locks. Nested groups and tests inherit it the same way they inherit describe-details locks.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.051,
+ "seconds": 32,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 12 +++++++++++-\n 1 file changed, 11 insertions(+), 1 deletion(-)"
+}
+round 1: k=3 action=search picked=[] 
+round 2: k=3 action=edit picked=['packages/playwright/src/common/testType.ts:TestTypeImpl._configure'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  26%|██▌       | 75/290 [00:00<00:00, 680.39it/s]
+Loading weights:  50%|████▉     | 144/290 [00:00<00:00, 644.39it/s]
+Loading weights:  72%|███████▏  | 209/290 [00:00<00:00, 556.07it/s]
+Loading weights:  92%|█████████▏| 268/290 [00:00<00:00, 546.81it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 613.67it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

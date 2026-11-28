@@ -1,0 +1,13 @@
+diff --git a/pandas/core/reshape/pivot.py b/pandas/core/reshape/pivot.py
+index 30a251d..5515945 100644
+--- a/pandas/core/reshape/pivot.py
++++ b/pandas/core/reshape/pivot.py
+@@ -539,6 +539,8 @@ def _compute_grand_margin(
+     if values:
+         grand_margin = {}
+         for k, v in data[values].items():
++            if isinstance(aggfunc, dict) and k not in aggfunc:
++                continue
+             try:
+                 if isinstance(aggfunc, str):
+                     grand_margin[k] = getattr(v, aggfunc)(**kwargs)

@@ -1,0 +1,17 @@
+diff --git a/packages/utils/processLauncher.ts b/packages/utils/processLauncher.ts
+index 14a982d..7d69344 100644
+--- a/packages/utils/processLauncher.ts
++++ b/packages/utils/processLauncher.ts
+@@ -213,8 +213,10 @@ export async function launchProcess(options: LaunchProcessOptions): Promise<Laun
+     // reentrancy to this function, for example user sends SIGINT second time.
+     // In this case, let's forcefully kill the process.
+     if (gracefullyClosing) {
+-      options.log(`[pid=${spawnedProcess.pid}] <forcefully close>`);
+-      killProcess();
++      // A graceful close is already in progress (e.g. stdin end handler and transport close
++      // both ask to close). Wait for it instead of killing the browser right away.
++      // The first call force-kills if the graceful close fails.
++      options.log(`[pid=${spawnedProcess.pid}] <gracefully close already in progress, waiting>`);
+       await waitForCleanup;  // Ensure the process is dead and we have cleaned up.
+       return;
+     }

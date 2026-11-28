@@ -1,0 +1,111 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43174",
+ "fixed": {
+  "round": 2,
+  "explanation": "gracefullyClose in the process launcher force-kills when it is called while a graceful close is already running. On stdin end, both the transport close and the exit handler call it, so the second call kills the browser right after the first starts. I changed it to return the in-flight close promise, so a second call waits for the first close. The existing timeout in closeOrKill still force-kills if the close hangs.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0572,
+ "seconds": 20,
+ "diff_stat": "packages/utils/processLauncher.ts | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Browser process launcher's graceful close function should be idempotent: if a graceful close is already in progress, a second call should wait for it rather than force-killing the browser. Also the MCP server's stdin-end shutdown handler duplicates the transport close and should be single-owned.",
+    "symptom": "On stdin close the MCP server triggers two shutdown paths; the second graceful close force-kills the browser (taskkill) 1 ms after graceful close began, losing persistent profile data.",
+    "anchors": [
+     "taskkill",
+     "transport",
+     "close",
+     "forced close",
+     "force kill"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/browserType.ts",
+     245,
+     257
+    ],
+    [
+     "packages/playwright-core/src/server/browserType.ts",
+     199,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/chromium.ts",
+     245,
+     249
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "closeOrKill calls gracefullyClose(), which is defined in launchProcess. The second call finds a close in progress and force-kills. The fix belongs in gracefullyClose in the process launcher, which I haven't seen yet.",
+   "picked": [
+    "packages/playwright-core/src/server/browserType.ts:BrowserType._launchProcess"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "launchProcess function with gracefullyClose, gracefullyCloseSet, killProcess, and the 'Forced close' / 'force kill' logging in the process launcher.",
+    "symptom": "A second gracefullyClose call while one is in progress force-kills the browser instead of waiting.",
+    "anchors": [
+     "gracefullyClose",
+     "launchProcess",
+     "attemptToGracefullyClose",
+     "taskkill"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/utils/processLauncher.ts",
+     210,
+     226
+    ],
+    [
+     "packages/utils/processLauncher.ts",
+     229,
+     249
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/playwright-core/src/server/browserType.ts lines 199-285 (BrowserType._launchProcess)"
+   ],
+   "action": "edit",
+   "analysis": "gracefullyClose in the process launcher force-kills when it is called while a graceful close is already running. On stdin end, both the transport close and the exit handler call it, so the second call kills the browser right after the first starts. I changed it to return the in-flight close promise, so a second call waits for the first close. The existing timeout in closeOrKill still force-kills if the close hangs.",
+   "picked": [
+    "packages/utils/processLauncher.ts:launchProcess.gracefullyClose"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

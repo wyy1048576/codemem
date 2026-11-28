@@ -1,0 +1,21 @@
+diff --git a/packages/isomorphic/urlMatch.ts b/packages/isomorphic/urlMatch.ts
+index 30cd9a9..2e23a95 100644
+--- a/packages/isomorphic/urlMatch.ts
++++ b/packages/isomorphic/urlMatch.ts
+@@ -239,10 +239,14 @@ function resolveGlobBase(baseURL: string | undefined, match: string): string {
+         // Preserve explicit schema as is as it may affect trailing slashes after domain.
+         return token;
+       }
++      // Literal parts go through URL resolution so that they get normalized
++      // (default ports, percent-encoding, punycode hosts).
++      const isGlobby = (s: string) => /[*?{}\\]/.test(s);
+       const questionIndex = token.indexOf('?');
+       if (questionIndex === -1)
+-        return mapToken(token, `$_${index}_$`);
+-      const newPrefix = mapToken(token.substring(0, questionIndex), `$_${index}_$`);
++        return isGlobby(token) ? mapToken(token, `$_${index}_$`) : token;
++      const prefix = token.substring(0, questionIndex);
++      const newPrefix = isGlobby(prefix) ? mapToken(prefix, `$_${index}_$`) : prefix;
+       const newSuffix = mapToken(token.substring(questionIndex), `?$_${index}_$`);
+       return newPrefix + newSuffix;
+     }).join('/');

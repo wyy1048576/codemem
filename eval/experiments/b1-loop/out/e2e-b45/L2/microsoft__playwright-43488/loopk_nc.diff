@@ -1,0 +1,20 @@
+diff --git a/packages/playwright-core/src/server/chromium/crPage.ts b/packages/playwright-core/src/server/chromium/crPage.ts
+index 6850160..289f891 100644
+--- a/packages/playwright-core/src/server/chromium/crPage.ts
++++ b/packages/playwright-core/src/server/chromium/crPage.ts
+@@ -805,6 +805,15 @@ class FrameSession {
+       worker.workerScriptLoaded();
+     // This might fail if the target is closed before we initialize.
+     session._sendMayFail('Runtime.enable');
++    const workerOptions = this._crPage._browserContext._options;
++    if (workerOptions.locale) {
++      emulateLocale(session, workerOptions.locale).catch(() => {});
++      session._sendMayFail('Emulation.setUserAgentOverride', {
++        userAgent: workerOptions.userAgent || '',
++        acceptLanguage: workerOptions.locale,
++        userAgentMetadata: calculateUserAgentMetadata(workerOptions),
++      });
++    }
+     this._crPage._networkManager.addSession(session, this._page.frameManager.frame(event.targetInfo.parentFrameId ?? this._targetId) ?? undefined).catch(() => {});
+     session._sendMayFail('Runtime.runIfWaitingForDebugger');
+     session._sendMayFail('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });

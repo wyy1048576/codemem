@@ -1,0 +1,97 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "pandas-dev__pandas-69478",
+ "fixed": {
+  "round": 1,
+  "explanation": "array_ufunc always unions axes and reindexes all NDFrame inputs. With duplicate labels, reindex raises. The edit skips alignment when differing axes have duplicates and equal length, so the ufunc runs positionally with self's labels. It also skips the union when axes are already equal. It does not change the partial-overlap case with unique labels, which still aligns and gives NaN. That is the documented alignment behavior, but the issue calls it erratic.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.06,
+ "seconds": 31,
+ "diff_stat": "pandas/core/arraylike.py | 25 +++++++++++++++++++------\n 1 file changed, 19 insertions(+), 6 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The DataFrame __array_ufunc__ dispatch for binary ufuncs with two DataFrame inputs (array_ufunc in pandas/core/arraylike.py) aligns the inputs and reindexes them. With duplicate or differing column labels it fails or produces NaN. It should handle alignment of non-identical or duplicate columns correctly, as in 1.x, e.g. by operating elementwise when axes are equal or by aligning with a non-reindexing method.",
+    "symptom": "np.logical_or on two DataFrames with duplicate or partially overlapping column labels raises \"cannot reindex on an axis with duplicate labels\" or returns a frame with mixed NaN and booleans instead of elementwise booleans.",
+    "anchors": [
+     "np.logical_or",
+     "ValueError: cannot reindex on an axis with duplicate labels",
+     "a[2*[\"or\"]]",
+     "a[[\"or\",\"a\"]]"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/tests/frame/test_logical_ops.py",
+     112,
+     118
+    ],
+    [
+     "pandas/tests/frame/test_logical_ops.py",
+     120,
+     126
+    ],
+    [
+     "pandas/core/ops/array_ops.py",
+     367,
+     405
+    ],
+    [
+     "pandas/core/arraylike.py",
+     278,
+     440
+    ],
+    [
+     "pandas/core/ops/array_ops.py",
+     425,
+     436
+    ],
+    [
+     "pandas/tests/arithmetic/test_array_ops.py",
+     15,
+     26
+    ],
+    [
+     "pandas/tests/frame/test_ufunc.py",
+     330,
+     342
+    ],
+    [
+     "pandas/tests/frame/test_logical_ops.py",
+     111,
+     151
+    ],
+    [
+     "pandas/_libs/ops.pyi",
+     29,
+     33
+    ],
+    [
+     "pandas/tests/frame/test_logical_ops.py",
+     153,
+     168
+    ]
+   ],
+   "analysis": "DataFrame.__array_ufunc__ dispatches to array_ufunc in pandas/core/arraylike.py. For binary ufuncs with several DataFrame inputs, it aligns them with reindexing. That fails with duplicate labels and gives NaN when the labels only partly overlap. The other results are tests and the logical-op helpers, which only show the symptom.",
+   "picked": [
+    "pandas/core/arraylike.py:array_ufunc"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/arraylike.py lines 278-440 (array_ufunc)"
+   ],
+   "fix_attempt": "applied: array_ufunc always unions axes and reindexes all NDFrame inputs. With duplicate labels, reindex raises. The edit skips alignment when differing axes have duplicates and equal length, so the ufunc runs positionally with self's labels. It also skips the union when axes are already equal. It does not change the partial-overlap case with unique labels, which still aligns and gives NaN. That is the documented alignment behavior, but the issue calls it erratic."
+  }
+ ]
+}

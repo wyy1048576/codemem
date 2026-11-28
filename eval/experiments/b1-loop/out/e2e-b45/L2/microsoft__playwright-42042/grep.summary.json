@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42042",
+ "exit": 0,
+ "seconds": 24,
+ "cost_usd": 0.1067352,
+ "turns": 16,
+ "usage": {
+  "input_tokens": 18,
+  "cache_creation_input_tokens": 16942,
+  "cache_read_input_tokens": 121412,
+  "output_tokens": 2679,
+  "output_tokens_details": {
+   "thinking_tokens": 181
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 16942,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 334,
+    "cache_read_input_tokens": 21174,
+    "cache_creation_input_tokens": 1160,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1160
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 5,
+  "Read": 8,
+  "Edit": 2
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/tools/cli-client/program.ts | 2 ++\n packages/playwright-core/src/tools/cli-client/session.ts | 2 +-\n 2 files changed, 3 insertions(+), 1 deletion(-)",
+ "final": "I'm checking that nothing else forces exit code 0 after the command runs. `cli.ts` doesn't, so the change should work as written.\n\nThe CLI now exits with status 1 when the daemon reports a tool failure, such as clicking a missing element reference. I haven't built or run anything, so this is untested.\n\nThe cause was that the daemon already sends `isError` with each result (`daemon.ts` `formatResult`). The client dropped it and only printed the text, so the process exited 0.\n\nI made two edits:\n- **`session.ts`:** `Session.run` now declares its return type as `{ text: string, isError?: boolean }`. The value it returns was already carrying `isError`.\n- **`program.ts`:** `runInSession` now sets `process.exitCode = 1` when `result.isError` is true. The error text still prints first, through `output.toolResult`.\n\nThe fix is in the shared path for text and JSON mode, so both exit non-zero. It also covers `open` and `attach` when their implicit goto or snapshot fails.",
+ "stderr": ""
+}

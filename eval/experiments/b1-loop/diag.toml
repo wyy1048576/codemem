@@ -1,0 +1,34 @@
+# Whole issue, v1 one-shot, and the v2 diagnosis prompt with and without suspect lists. Search settings match duckdb-llm.toml.
+
+[[system]]
+name = "whole"
+adapter = "codemem"
+signals = ["bm25", "code", "usage"]
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "oneshot"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "oneshot"
+guess = false
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "diagnose"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "diagnose"
+guess = false
+suspects = true
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+
+[[system]]
+name = "diagnose-base"
+adapter = "llm"
+signals = ["bm25", "code", "usage"]
+mode = "diagnose"
+guess = false
+suspects = false
+config = { device = "xpu", dtype = "float16", batch_size = 32, vectors = { code = { embedder = "arc_embedder:ArcEmbedder" }, usage = { embedder = "arc_embedder:ArcEmbedder" } }, test_weight = 1.0, kind_weights = { function = 1.0, method = 1.0, class = 1.0, block = 1.0 }, candidates = 50, bm25 = { query_terms = 32, common_share = 0.0, weights = [10.0, 3.0, 5.0, 2.0, 1.0] }, rrf = { k = 60, weights = { bm25 = 1.0, code = 1.0, usage = 1.0 } } }
+

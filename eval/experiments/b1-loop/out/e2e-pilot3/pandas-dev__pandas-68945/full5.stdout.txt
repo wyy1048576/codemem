@@ -1,0 +1,35 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 5,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0124,
+ "task": "pandas-dev__pandas-68945",
+ "fixed": {
+  "round": 2,
+  "explanation": "For categorical input, `unique` returned a Categorical, so the cache Series had a categorical index. `_convert_and_box_cache` then mapped through it with categorical dtype and returned a CategoricalIndex. The fix converts categorical input to a plain object ndarray before computing the unique values, so the cache index is object dtype. The map result is then datetime64 and is boxed as a DatetimeIndex, consistent with the uncached path.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.145,
+ "seconds": 41,
+ "diff_stat": "pandas/core/tools/datetimes.py | 6 ++++++\n 1 file changed, 6 insertions(+)"
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=True picked=['pandas/core/tools/datetimes.py:_convert_and_box_cache', 'pandas/core/tools/datetimes.py:_maybe_cache']
+  fix: applied: For categorical input, `unique` returned a Categorical, so the cache Series had a categorical index. `_convert_and_box_cache` then mapped through it with categorical dtype and returned a CategoricalIndex. The fix converts categorical input to a plain object ndarray before computing the unique values, so the cache index is object dtype. The map result is then datetime64 and is boxed as a D
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  12%|█▏        | 34/290 [00:00<00:00, 305.56it/s]
+Loading weights:  22%|██▏       | 65/290 [00:00<00:00, 259.56it/s]
+Loading weights:  32%|███▏      | 92/290 [00:00<00:00, 211.99it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 705.86it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

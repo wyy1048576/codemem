@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intent",
+    "symptom",
+    "anchors",
+    "stated_location",
+    "guessed_location",
+    "k"
+  ],
+  "properties": {
+    "intent": {
+      "type": "string"
+    },
+    "symptom": {
+      "type": "string"
+    },
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stated_location": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "guessed_location": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "k": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        5,
+        10
+      ]
+    }
+  }
+}

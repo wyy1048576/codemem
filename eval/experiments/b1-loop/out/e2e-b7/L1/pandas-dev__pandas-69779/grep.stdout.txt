@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-69779",
+ "exit": 0,
+ "seconds": 28,
+ "cost_usd": 0.0652949,
+ "turns": 11,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 8010,
+  "cache_read_input_tokens": 54969,
+  "output_tokens": 2773,
+  "output_tokens_details": {
+   "thinking_tokens": 324
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 8010,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 376,
+    "cache_read_input_tokens": 11703,
+    "cache_creation_input_tokens": 1699,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1699
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 5,
+  "Read": 2,
+  "Edit": 3
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/indexes/multi.py | 24 +++++++++++++++++-------\n 1 file changed, 17 insertions(+), 7 deletions(-)",
+ "final": "I changed the sparsification in `pandas/core/indexes/multi.py` so a MultiIndex no longer merges first-level values that only print the same. I couldn't run anything, so this is untested, and I didn't add a test.\n\n**Cause:** `sparsify_labels` blanked a repeated label by comparing the formatted strings. The ten distinct floats all print as `2.015000e+11`, so every row after the first looked like a repeat and was blanked.\n\n**Fix:**\n- `sparsify_labels` takes a new optional `keys` argument. When it is given, the function compares those keys instead of the label text. It still outputs the formatted labels.\n- `MultiIndex._format_multi` now passes each level's integer codes as the keys. Two rows are treated as the same group only if their underlying level values are the same. The extra `None` placeholder for the header row keeps the keys lined up when `include_names` is true.\n- Calls that don't pass `keys` behave as before, for example `format.py` sparsifying column labels.\n\n**Not checked:** `html.py` calls `_format_multi` too, so I expect it to get the fix, but I didn't confirm that.",
+ "stderr": ""
+}
+

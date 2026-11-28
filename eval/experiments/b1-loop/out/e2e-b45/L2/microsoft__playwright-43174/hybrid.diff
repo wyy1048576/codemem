@@ -1,0 +1,33 @@
+diff --git a/packages/playwright-core/src/tools/mcp/watchdog.ts b/packages/playwright-core/src/tools/mcp/watchdog.ts
+index e2ee1af..8ffdef7 100644
+--- a/packages/playwright-core/src/tools/mcp/watchdog.ts
++++ b/packages/playwright-core/src/tools/mcp/watchdog.ts
+@@ -32,7 +32,8 @@ export function setupExitWatchdog() {
+     processExit(0);
+   };
+ 
+-  process.stdin.on('close', () => handleExit('close'));
++  // Give the graceful close started by the transport a chance before the watchdog takes over.
++  process.stdin.on('close', () => setImmediate(() => handleExit('close')));
+   process.on('SIGINT', () => handleExit('SIGINT'));
+   process.on('SIGTERM', () => handleExit('SIGTERM'));
+ }
+diff --git a/packages/playwright-core/src/tools/utils/mcp/server.ts b/packages/playwright-core/src/tools/utils/mcp/server.ts
+index 8be86c1..e387dd1 100644
+--- a/packages/playwright-core/src/tools/utils/mcp/server.ts
++++ b/packages/playwright-core/src/tools/utils/mcp/server.ts
+@@ -190,7 +190,13 @@ export async function start(serverBackendFactory: ServerBackendFactory, options:
+     const transport = new StdioServerTransport();
+     // The SDK's StdioServerTransport doesn't detect peer disconnect — it never listens for stdin
+     // end-of-stream. Wire it up so callTool requests can be cancelled when the client goes away.
+-    process.stdin.on('end', () => void transport.close());
++    let closing = false;
++    process.stdin.on('end', () => {
++      if (closing)
++        return;
++      closing = true;
++      void transport.close();
++    });
+     await connect(serverBackendFactory, transport, Promise.resolve(), false);
+     return;
+   }

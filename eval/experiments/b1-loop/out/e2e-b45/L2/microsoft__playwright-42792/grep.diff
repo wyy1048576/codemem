@@ -1,0 +1,39 @@
+diff --git a/packages/playwright/src/common/testType.ts b/packages/playwright/src/common/testType.ts
+index 748d48d..180fe28 100644
+--- a/packages/playwright/src/common/testType.ts
++++ b/packages/playwright/src/common/testType.ts
+@@ -189,12 +189,20 @@ export class TestTypeImpl {
+     suite._hooks.push({ type: name, fn: fn!, title, location });
+   }
+ 
+-  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number }) {
++  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number, lock?: string | string[] }) {
+     throwIfRunningInsideJest();
+     const suite = this._currentSuite(location, `test.describe.configure()`);
+     if (!suite)
+       return;
+ 
++    if (options.lock !== undefined) {
++      const lock = options.lock;
++      const locks = typeof lock === 'string' ? [lock] : lock;
++      if (!Array.isArray(locks) || locks.some(l => typeof l !== 'string'))
++        throw new Error(`"lock" option must be a string or an array of strings`);
++      suite._locks.push(...locks);
++    }
++
+     if (options.timeout !== undefined)
+       suite._timeout = options.timeout;
+ 
+diff --git a/packages/playwright/types/test.d.ts b/packages/playwright/types/test.d.ts
+index 9253f8e..d997085 100644
+--- a/packages/playwright/types/test.d.ts
++++ b/packages/playwright/types/test.d.ts
+@@ -4434,7 +4434,7 @@ export interface TestType<TestArgs extends {}, WorkerArgs extends {}> {
+      *
+      * @param options
+      */
+-    configure: (options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number }) => void;
++    configure: (options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number, lock?: string | string[] }) => void;
+   };
+ 
+   /**

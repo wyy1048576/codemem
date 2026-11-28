@@ -1,0 +1,196 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0079,
+ "task": "pandas-dev__pandas-70742",
+ "fixed": {
+  "round": 1,
+  "explanation": "In the single-block path, `fast_xs` returned a view of one row of the block and shared the block's refs. When `df.loc[row, [cols]]` first takes the columns, that creates a large temporary copy. The small row Series then kept the whole copy alive through its base. The fix copies the row, so the Series owns its own small buffer, and it no longer shares refs with the parent. Copy-on-write semantics are unchanged because the result is independent of the parent.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0753,
+ "seconds": 29,
+ "diff_stat": "pandas/core/internals/managers.py | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Row selection with a list of columns (e.g. df.loc[row, [cols]] or iloc) on a DataFrame returns a Series that is a view of a large temporary 2D block array rather than a copy, keeping the whole base array alive. The fix is in the fast path that builds a row Series from a block (fast_xs / _ixs / _get_value / loc getitem), which should copy or avoid referencing the big parent array.",
+    "symptom": "Selecting a single row with a list of columns returns a small Series whose base references a huge temporary array, so memory isn't freed and grows since pandas 3.0.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/apply.py",
+     1585,
+     1628
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     703,
+     721
+    ],
+    [
+     "pandas/core/apply.py",
+     1622,
+     1626
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2126,
+     2152
+    ],
+    [
+     "pandas/core/methods/select.py",
+     80,
+     85
+    ],
+    [
+     "pandas/core/indexing.py",
+     3545,
+     3562
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2325,
+     2330
+    ],
+    [
+     "pandas/core/frame.py",
+     4245,
+     4266
+    ],
+    [
+     "pandas/core/series.py",
+     1171,
+     1173
+    ],
+    [
+     "pandas/core/series.py",
+     1081,
+     1089
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2252,
+     2290
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1166,
+     1247
+    ],
+    [
+     "pandas/core/apply.py",
+     1604,
+     1607
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     746,
+     772
+    ],
+    [
+     "pandas/core/apply.py",
+     1616,
+     1618
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     1060,
+     1065
+    ],
+    [
+     "pandas/core/apply.py",
+     1532,
+     1583
+    ],
+    [
+     "pandas/core/apply.py",
+     1423,
+     1425
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2215,
+     2233
+    ],
+    [
+     "pandas/core/base.py",
+     220,
+     243
+    ],
+    [
+     "pandas/core/frame.py",
+     4268,
+     4276
+    ],
+    [
+     "pandas/core/series.py",
+     1066,
+     1079
+    ],
+    [
+     "pandas/core/base.py",
+     194,
+     199
+    ],
+    [
+     "pandas/core/frame.py",
+     6434,
+     6436
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     312,
+     323
+    ]
+   ],
+   "analysis": "For a single-block frame, BlockManager.fast_xs returns a view of the block row and shares the block's refs. `df.loc[row, [cols]]` first takes the columns, which makes a large temporary 2D copy. The row Series is then a view of that copy, so the whole copy stays alive. The fix is most likely in fast_xs, where the single-block path should copy the row, or at least not keep the parent alive. The caller in indexing.py could also be involved.",
+   "picked": [
+    "pandas/core/internals/managers.py:BlockManager.fast_xs"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/internals/managers.py lines 1166-1247 (BlockManager.fast_xs)"
+   ],
+   "fix_attempt": "applied: In the single-block path, `fast_xs` returned a view of one row of the block and shared the block's refs. When `df.loc[row, [cols]]` first takes the columns, that creates a large temporary copy. The small row Series then kept the whole copy alive through its base. The fix copies the row, so the Series owns its own small buffer, and it no longer shares refs with the parent. Copy-on-write semantics are unchanged because the result is independent of the parent."
+  }
+ ]
+}

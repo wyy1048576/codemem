@@ -1,0 +1,39 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41682",
+ "fixed": {
+  "step": 3,
+  "explanation": "resolveGlobBase replaces every path token, including the host:port, with a placeholder before calling new URL. So URL canonicalization (dropping default ports, encoding spaces, punycode for non-ASCII hosts) never runs on those parts. The fix leaves tokens that contain no glob or escape characters as they are, so new URL normalizes them. Tokens with glob characters are still replaced with placeholders.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "tools": {
+  "codemem": 1,
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0766,
+ "seconds": 46,
+ "diff_stat": "packages/isomorphic/urlMatch.ts | 3 +++\n 1 file changed, 3 insertions(+)"
+}
+step 1: codemem {"intent": "URL pattern matching for route/request interception: a function that normalizes glob/string URL patterns (e.g. via new URL canonicalization) before  -> action=grep picked=['packages/isomorphic/urlMatch.ts:resolveGlobBase'] 
+step 2: grep {"pattern": "resolveBaseURL", "path": "packages/isomorphic/urlMatch.ts", "ignore_case": false} -> action=read picked=['packages/isomorphic/urlMatch.ts:resolveBaseURL'] 
+step 3: read {} -> action=edit picked=[] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  14%|█▍        | 42/290 [00:00<00:00, 415.34it/s]
+Loading weights:  39%|███▉      | 113/290 [00:00<00:00, 566.18it/s]
+Loading weights:  59%|█████▊    | 170/290 [00:00<00:00, 414.74it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 602.58it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

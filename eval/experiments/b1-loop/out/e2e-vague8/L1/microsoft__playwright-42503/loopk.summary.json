@@ -1,0 +1,133 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 2,
+  "explanation": "runDaemonForContext calls browser.bind on every context creation, and the second bind throws because a server is already running. Track browsers already bound in a WeakSet and skip binding and the banner for subsequent contexts, returning false so those contexts proceed normally.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "ks": [
+  5,
+  5
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0565,
+ "seconds": 29,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The Playwright Test debug-controller / \"debug cli\" integration hooks into browser context creation (onDidCreateBrowserContext or similar) and calls a function to start a browser server / bind the browser for the CLI on every context. It should do this only once per browser (guard against repeated binding) so that additional contexts don't throw \"already running\".",
+    "symptom": "With the CLI-attached debug mode, creating a second browser context makes the browser bind/serve call throw an error that a browser server is already running.",
+    "anchors": [
+     "worker-scoped fixture",
+     "browser server is already running",
+     "new context"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     118,
+     126
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     376,
+     390
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/browserDispatcher.ts",
+     62,
+     78
+    ],
+    [
+     "tests/mcp/test-debug.spec.ts",
+     338,
+     486
+    ],
+    [
+     "tests/library/browsercontext-reuse.spec.ts",
+     30,
+     34
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "None of the results show the Playwright Test debug integration that binds the browser for the CLI on each context creation. It likely lives in the test runner's worker/debugger code, in a hook on context creation that calls a bind function.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Playwright Test runner code, when PWTEST_DEBUG/cli debug is on, that calls browser.bind with a session name on each context creation (onDidCreateBrowserContext / instrumentation) to expose the browser to the playwright-cli.",
+    "symptom": "Second browser context creation in the CLI-attached debug mode throws that a browser server is already running because bind is called per context.",
+    "anchors": [
+     "already running"
+    ],
+    "look_in": [
+     "packages/playwright/src/"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright/src/mcp/test/browserBackend.ts",
+     120,
+     137
+    ],
+    [
+     "packages/playwright/src/runner/dispatcher.ts",
+     683,
+     685
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     373,
+     375
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     361,
+     371
+    ],
+    [
+     "packages/playwright/src/plugins/webServerPlugin.ts",
+     92,
+     186
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "runDaemonForContext calls browser.bind on every context creation, and the second bind throws because a server is already running. Track browsers already bound in a WeakSet and skip binding and the banner for subsequent contexts, returning false so those contexts proceed normally.",
+   "picked": [
+    "packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "duckdb__duckdb-24163",
+ "fixed": {
+  "round": 1,
+  "explanation": "CREATE TRIGGER accepts any timing, but only BEFORE and AFTER triggers are expanded at DML bind time, so an INSTEAD OF trigger on a base table is stored and never fires. The edit makes BindCreateTriggerInfo reject any timing other than BEFORE or AFTER, so the trigger fails at creation instead of being silently ignored. I did not see the TriggerTiming enum, so the check uses BEFORE and AFTER only and doesn't name the INSTEAD OF value.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0845,
+ "seconds": 28,
+ "diff_stat": "src/planner/binder/statement/bind_create.cpp | 3 +++\n 1 file changed, 3 insertions(+)"
+}
+round 1: found=True picked=['src/planner/binder/query_node/bind_trigger_expansion.cpp:duckdb.Binder.TryExpandTriggers', 'src/planner/binder/statement/bind_create.cpp:duckdb.Binder.BindCreateTriggerInfo']
+  fix: applied: CREATE TRIGGER accepts any timing, but only BEFORE and AFTER triggers are expanded at DML bind time, so an INSTEAD OF trigger on a base table is stored and never fires. The edit makes BindCreateTriggerInfo reject any timing other than BEFORE or AFTER, so the trigger fails at creation instead of being silently ignored. I did not see the TriggerTiming enum, so the check uses BEFORE and AFTE
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   8%|▊         | 23/290 [00:00<00:01, 227.29it/s]
+Loading weights:  16%|█▌        | 46/290 [00:00<00:01, 208.89it/s]
+Loading weights:  23%|██▎       | 67/290 [00:00<00:01, 155.41it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 684.26it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

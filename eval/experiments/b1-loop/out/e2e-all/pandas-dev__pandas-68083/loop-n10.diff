@@ -1,0 +1,118 @@
+diff --git a/pandas/tests/extension/test_arrow.py b/pandas/tests/extension/test_arrow.py
+index 97c662c..fd64a27 100644
+--- a/pandas/tests/extension/test_arrow.py
++++ b/pandas/tests/extension/test_arrow.py
+@@ -5951,7 +5951,8 @@ def test_string_to_time_parsing_cast():
+ @pytest.mark.parametrize("dtype", ["time32[s][pyarrow]", "time64[us][pyarrow]"])
+ def test_string_to_time_parsing_cast_meridiem(dtype):
+     # GH#18793 the space before AM/PM used to make these coerce to null
+-    result = pd.Series(["3:25:00 PM"], dtype=dtype)
++    with td.english_lc_time():
++        result = pd.Series(["3:25:00 PM"], dtype=dtype)
+     expected = pd.Series(["15:25:00"], dtype=dtype)
+     tm.assert_series_equal(result, expected)
+ 
+diff --git a/pandas/tests/frame/methods/test_between_time.py b/pandas/tests/frame/methods/test_between_time.py
+index 578b357..5960fa4 100644
+--- a/pandas/tests/frame/methods/test_between_time.py
++++ b/pandas/tests/frame/methods/test_between_time.py
+@@ -231,6 +231,7 @@ def test_between_time_space_before_meridiem():
+     index = pd.date_range("2012-01-01", periods=48, freq="h")
+     df = pd.DataFrame({"A": range(len(index))}, index=index)
+ 
+-    result = df.between_time("3:00 PM", "5:00 PM")
++    with td.english_lc_time():
++        result = df.between_time("3:00 PM", "5:00 PM")
+     expected = df.between_time(time(15, 0), time(17, 0))
+     tm.assert_frame_equal(result, expected)
+diff --git a/pandas/tests/tools/test_to_datetime.py b/pandas/tests/tools/test_to_datetime.py
+index 8e6eabb..544d041 100644
+--- a/pandas/tests/tools/test_to_datetime.py
++++ b/pandas/tests/tools/test_to_datetime.py
+@@ -355,7 +355,8 @@ class TestTimeConversionFormats:
+         ],
+     )
+     def test_to_datetime_format_time(self, cache, value, format, dt):
+-        assert pd.to_datetime(value, format=format, cache=cache) == dt
++        with td.english_lc_time():
++            assert pd.to_datetime(value, format=format, cache=cache) == dt
+ 
+     @td.skip_if_not_english_lc_time
+     def test_to_datetime_with_non_exact(self, cache):
+diff --git a/pandas/tests/tools/test_to_time.py b/pandas/tests/tools/test_to_time.py
+index 04a77b8..ba17b4c 100644
+--- a/pandas/tests/tools/test_to_time.py
++++ b/pandas/tests/tools/test_to_time.py
+@@ -31,7 +31,8 @@ class TestToTime:
+     )
+     def test_parsers_time(self, time_string):
+         # GH#11818
+-        assert to_time(time_string) == time(14, 15)
++        with td.english_lc_time():
++            assert to_time(time_string) == time(14, 15)
+ 
+     @td.skip_if_not_english_lc_time
+     def test_parsers_time_space_before_meridiem(self):
+diff --git a/pandas/tests/tslibs/test_parsing.py b/pandas/tests/tslibs/test_parsing.py
+index 99592c9..d0d1c1e 100644
+--- a/pandas/tests/tslibs/test_parsing.py
++++ b/pandas/tests/tslibs/test_parsing.py
+@@ -369,7 +369,8 @@ def test_guess_datetime_format_with_dayfirst(dayfirst, expected):
+     ],
+ )
+ def test_guess_datetime_format_with_locale_specific_formats(string, fmt):
+-    result = parsing.guess_datetime_format(string)
++    with td.english_lc_time():
++        result = parsing.guess_datetime_format(string)
+     assert result == fmt
+ 
+ 
+diff --git a/pandas/util/_test_decorators.py b/pandas/util/_test_decorators.py
+index 6c41bde..73c85d1 100644
+--- a/pandas/util/_test_decorators.py
++++ b/pandas/util/_test_decorators.py
+@@ -127,6 +127,44 @@ def _has_english_lc_time() -> bool:
+     return stamp.strftime("%b|%B|%a|%A|%p") == "Jan|January|Wed|Wednesday|PM"
+ 
+ 
++def _english_lc_time_locale() -> str | None:
++    """
++    Name of an installed locale that gives English LC_TIME, or None.
++    """
++    import locale
++
++    from pandas._config.localization import can_set_locale
++
++    for loc in ("C", "en_US.UTF-8", "en_US"):
++        if can_set_locale(loc, locale.LC_TIME):
++            return loc
++    return None
++
++
++def _can_get_english_lc_time() -> bool:
++    return _has_english_lc_time() or _english_lc_time_locale() is not None
++
++
++@contextmanager
++def english_lc_time():
++    """
++    Ensure LC_TIME is English for the duration of the block, restoring it after.
++    """
++    import locale
++
++    from pandas._config.localization import set_locale
++
++    if _has_english_lc_time():
++        yield
++        return
++    loc = _english_lc_time_locale()
++    if loc is None:
++        yield
++        return
++    with set_locale(loc, locale.LC_TIME):
++        yield
++
++
+ skip_if_not_english_lc_time = pytest.mark.skipif(
+     not _has_english_lc_time(),
+     reason="LC_TIME does not use English month names and AM/PM markers",

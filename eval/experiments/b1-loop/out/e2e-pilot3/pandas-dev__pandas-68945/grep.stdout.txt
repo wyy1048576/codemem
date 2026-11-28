@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-68945",
+ "exit": 0,
+ "seconds": 21,
+ "cost_usd": 0.060809,
+ "turns": 10,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 7929,
+  "cache_read_input_tokens": 66250,
+  "output_tokens": 2244,
+  "output_tokens_details": {
+   "thinking_tokens": 387
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 7929,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 315,
+    "cache_read_input_tokens": 12385,
+    "cache_creation_input_tokens": 936,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 936
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 3,
+  "Read": 3,
+  "Edit": 3
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/tools/datetimes.py | 7 +++++++\n 1 file changed, 7 insertions(+)",
+ "final": "I changed `pd.to_datetime` so categorical input gives a datetime result whether or not the cache is used. I couldn't run anything here, so the fix is untested and I haven't added a test.\n\n**Cause:** `to_datetime` only builds its cache of unique dates when the input has more than 50 elements. That path calls `map` on a categorical Series, and `map` on categorical data returns a categorical, not datetimes. That is why the result flipped to `CategoricalIndex` above 50 rows.\n\n**Fix:** in `pandas/core/tools/datetimes.py`, categorical input is now converted to object dtype before it is mapped through the cache. This happens in two places:\n- `_convert_and_box_cache`, which handles list-like and Index input.\n- The Series branch of `to_datetime`.\n\nI also imported `CategoricalDtype` for the check.",
+ "stderr": ""
+}
+

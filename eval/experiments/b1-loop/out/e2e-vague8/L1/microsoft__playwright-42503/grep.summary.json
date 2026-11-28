@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42503",
+ "exit": 0,
+ "seconds": 15,
+ "cost_usd": 0.0452792,
+ "turns": 6,
+ "usage": {
+  "input_tokens": 10,
+  "cache_creation_input_tokens": 7174,
+  "cache_read_input_tokens": 43332,
+  "output_tokens": 1223,
+  "output_tokens_details": {
+   "thinking_tokens": 61
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 7174,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 262,
+    "cache_read_input_tokens": 11904,
+    "cache_creation_input_tokens": 662,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 662
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Read": 1,
+  "Edit": 2
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "final": "I changed `runDaemonForContext` in `packages/playwright/src/mcp/test/browserBackend.ts` so it exposes each browser to the CLI only once. I haven't built or run anything, so the fix is untested.\n\nThe function used to call `browser.bind(...)` every time a context was created. The second call threw the \"browser server already running\" error. It now keeps a `WeakSet` of browsers it has already bound. A context created on an already-bound browser returns `false` right away. It skips the bind, the session-name print and the pause request.\n\nOnly the first context on a browser prints the session name and pauses. Later contexts, such as the one from your worker-scoped fixture, just run.\n\nI didn't check whether `bind()` still works after the context that triggered it has closed. That could matter if the first context closes before a later one is created.",
+ "stderr": ""
+}

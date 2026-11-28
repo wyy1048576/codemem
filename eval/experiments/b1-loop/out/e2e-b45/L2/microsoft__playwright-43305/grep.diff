@@ -1,0 +1,66 @@
+diff --git a/packages/playwright/src/transform/esmLoader.ts b/packages/playwright/src/transform/esmLoader.ts
+index 9789320..cb80936 100644
+--- a/packages/playwright/src/transform/esmLoader.ts
++++ b/packages/playwright/src/transform/esmLoader.ts
+@@ -19,7 +19,7 @@ import url from 'url';
+ 
+ import { addToCompilationCache, currentFileDepsCollector, serializeCompilationCache, startCollectingFileDeps, stopCollectingFileDeps } from './compilationCache';
+ import { PortTransport } from './portTransport';
+-import { isStyleFile, resolveHook, setSingleTSConfig, setTransformConfig, shouldTransform, transformHook } from './transform';
++import { isStyleFile, isTransformableFile, resolveHook, setSingleTSConfig, setTransformConfig, shouldTransform, transformHook } from './transform';
+ import { fileIsModule } from '../util';
+ 
+ // Before each import of the ESM module, a preflight request with the .esm.preflight extension is issued.
+@@ -76,8 +76,8 @@ async function load(moduleUrl: string, context: { format?: string }, defaultLoad
+   if (isStyleFile(filename))
+     return { format: 'commonjs', source: '', shortCircuit: true };
+ 
+-  // Bail for node_modules.
+-  if (!shouldTransform(filename))
++  // Bail for node_modules and file types we do not transform.
++  if (!shouldTransform(filename) || !isTransformableFile(isPreflight ? filename.slice(0, -esmPreflightExtension.length) : filename))
+     return defaultLoad(moduleUrl, context, defaultLoad);
+ 
+   const originalModuleUrl = isPreflight ? moduleUrl.slice(0, -esmPreflightExtension.length) : moduleUrl;
+diff --git a/packages/playwright/src/transform/esmLoaderSync.ts b/packages/playwright/src/transform/esmLoaderSync.ts
+index 9de1fc7..5d5e655 100644
+--- a/packages/playwright/src/transform/esmLoaderSync.ts
++++ b/packages/playwright/src/transform/esmLoaderSync.ts
+@@ -18,7 +18,7 @@ import fs from 'fs';
+ import url from 'url';
+ 
+ import { currentFileDepsCollector } from './compilationCache';
+-import { isStyleFile, resolveHook, shouldTransform, transformHook } from './transform';
++import { isStyleFile, isTransformableFile, resolveHook, shouldTransform, transformHook } from './transform';
+ import { fileIsModule } from '../util';
+ 
+ export function resolve(specifier: string, context: { parentURL?: string, conditions?: string[] | Set<string> }, nextResolve: Function) {
+@@ -70,8 +70,8 @@ export function load(moduleUrl: string, context: { format?: string, conditions?:
+   if (isStyleFile(filename))
+     return { format: 'commonjs', source: '', shortCircuit: true };
+ 
+-  // Bail for node_modules.
+-  if (!shouldTransform(filename))
++  // Bail for node_modules and file types we do not transform.
++  if (!shouldTransform(filename) || !isTransformableFile(filename))
+     return nextLoad(moduleUrl, context);
+ 
+   // A file reached via `require` is loaded as CommonJS. Files reached via `import` keep real ESM semantics.
+diff --git a/packages/playwright/src/transform/transform.ts b/packages/playwright/src/transform/transform.ts
+index ae1d8a3..9a64107 100644
+--- a/packages/playwright/src/transform/transform.ts
++++ b/packages/playwright/src/transform/transform.ts
+@@ -223,6 +223,13 @@ export function isStyleFile(filename: string): boolean {
+   return kStyleExtensions.includes(path.extname(filename));
+ }
+ 
++const kTransformableExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cjs', '.cts'];
++
++// Other file types (e.g. .mdx) are left to the loaders registered by the user.
++export function isTransformableFile(filename: string): boolean {
++  return kTransformableExtensions.includes(path.extname(filename));
++}
++
+ export function shouldTransform(filename: string): boolean {
+   if (_externalMatcher(filename))
+     return false;

@@ -1,0 +1,21 @@
+{
+ "mcpServers": {
+  "codemem": {
+   "command": "C:\\Users\\user\\Desktop\\Stanford\\CS329M\\Claude\\Week 1 Task\\analysis\\xpu-venv\\Scripts\\python.exe",
+   "args": [
+    "C:\\Users\\user\\Desktop\\Stanford\\CS329M\\Claude\\Week 1 Task\\analysis\\b1-links\\llm_query\\mcp_codemem.py",
+    "C:\\Users\\user\\e2e-copies\\pandas"
+   ],
+   "env": {
+    "PYTHONPATH": "C:\\Users\\user\\Desktop\\Stanford\\CS329M\\Claude\\Week 1 Task\\analysis\\b1-links",
+    "PYTHONUTF8": "1",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "CODEMEM_HOME": "C:\\Users\\user\\.codemem-e2e",
+    "CODEMEM_CALL_LOG": "C:\\Users\\user\\Desktop\\Stanford\\CS329M\\Claude\\Week 1 Task\\analysis\\b1-links\\llm_query\\out\\e2e-b45\\L1\\pandas-dev__pandas-67025\\mcpmd.codemem.jsonl",
+    "MCP_PR26": "0"
+   },
+   "alwaysLoad": true
+  }
+ }
+}

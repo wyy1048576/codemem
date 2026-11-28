@@ -1,0 +1,18 @@
+diff --git a/packages/injected/src/injectedScript.ts b/packages/injected/src/injectedScript.ts
+index f9cd653..64e372f 100644
+--- a/packages/injected/src/injectedScript.ts
++++ b/packages/injected/src/injectedScript.ts
+@@ -926,7 +926,12 @@ export class InjectedScript {
+         input.focus();
+         input.value = value;
+         // The browser serializes range values in canonical form, e.g. "0.850" becomes "0.85".
+-        const accepted = type === 'range' ? Number(input.value) === Number(value) : input.value === value;
++        let accepted = type === 'range' ? Number(input.value) === Number(value) : input.value === value;
++        if (!accepted && type === 'datetime-local') {
++          // The browser drops zero seconds and zero fractional seconds, e.g. "T12:00:00" becomes "T12:00".
++          const normalized = value.replace(/(T\d\d:\d\d:\d\d)\.0+$/, '$1').replace(/(T\d\d:\d\d):00$/, '$1');
++          accepted = input.value !== '' && input.value === normalized;
++        }
+         if (!accepted)
+           throw this.createStacklessError('Malformed value');
+         element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));

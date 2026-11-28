@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43400",
+ "exit": 0,
+ "seconds": 14,
+ "cost_usd": 0.0271237,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 3305,
+  "cache_read_input_tokens": 27477,
+  "output_tokens": 1114,
+  "output_tokens_details": {
+   "thinking_tokens": 177
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 3305,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 375,
+    "cache_read_input_tokens": 8138,
+    "cache_creation_input_tokens": 559,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 559
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/injected/src/injectedScript.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)",
+ "final": "I changed the `fill()` check in `packages/injected/src/injectedScript.ts` so `datetime-local` inputs accept values with seconds, such as `2026-10-14T12:00:00`. I didn't build or run anything, and I didn't add a test.\n\nThe cause was the strict comparison after Playwright sets the value. The browser had normalized `2026-10-14T12:00:00` to `2026-10-14T12:00`, so the two strings no longer matched and Playwright threw \"Malformed value\".\n\nThe check now passes in three cases:\n- **Exact match:** the input holds exactly the text you gave.\n- **`range` inputs:** the numeric comparison is kept.\n- **`datetime-local` and `time` inputs:** the check passes when you gave a non-empty value and the input kept a non-empty value. Browsers reset an invalid value to an empty string, so a bad value still throws.\n\nI included `time` inputs because the browser normalizes them the same way (`12:00:00` becomes `12:00`). The check for these two types is looser than an exact comparison. It no longer confirms the stored value matches what you gave, only that the browser accepted something.",
+ "stderr": ""
+}
+

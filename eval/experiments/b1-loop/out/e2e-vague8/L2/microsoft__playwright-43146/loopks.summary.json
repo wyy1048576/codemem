@@ -1,0 +1,71 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  3
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0123,
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "Expires and Max-Age both wrote cookie.expires in header order, so a later past Expires overwrote an earlier Max-Age. Max-Age is now recorded in a local variable and applied after the loop, so it always wins. It is only accepted when it matches a strict integer regex, so values like '12abc' or '1.5' are ignored.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0562,
+ "seconds": 27,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 22 +++++++++++++---------\n 1 file changed, 13 insertions(+), 9 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie parsing and storage for APIRequestContext (Set-Cookie header handling) computes expiry from Expires and Max-Age attributes. Max-Age must always take precedence over Expires regardless of attribute order, and a Max-Age value that is not a plain integer must be ignored.",
+    "symptom": "A Set-Cookie with Max-Age before a past Expires is dropped as expired, and non-integer Max-Age values are not ignored.",
+    "anchors": [
+     "Max-Age",
+     "Expires",
+     "API request contexts"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     211
+    ],
+    [
+     "packages/playwright-core/src/server/har/harTracer.ts",
+     776,
+     818
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     287,
+     299
+    ]
+   ],
+   "analysis": "parseRawCookie in cookieStore.ts handles 'expires' and 'max-age' in order, so a later Expires overwrites an earlier Max-Age. It also uses parseInt, which accepts non-integer values like '12abc' or '1.5'. Fixing this means tracking Max-Age separately so it always wins, and validating it with a strict integer regex.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/cookieStore.ts lines 133-211 (parseRawCookie)"
+   ],
+   "fix_attempt": "applied: Expires and Max-Age both wrote cookie.expires in header order, so a later past Expires overwrote an earlier Max-Age. Max-Age is now recorded in a local variable and applied after the loop, so it always wins. It is only accepted when it matches a strict integer regex, so values like '12abc' or '1.5' are ignored."
+  }
+ ]
+}

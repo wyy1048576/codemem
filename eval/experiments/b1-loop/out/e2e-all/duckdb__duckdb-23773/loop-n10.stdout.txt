@@ -1,0 +1,57 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "duckdb__duckdb-23773",
+ "fixed": {
+  "round": 2,
+  "explanation": "In HandleExponent's negative-exponent loop, round_up is updated on each division and the loop breaks once the result reaches 0. If the result hits 0 before the final iteration, round_up keeps a stale value from an earlier digit, such as the leading mantissa digit 5. That digit is not the one just past the scale. The fix clears round_up when the loop exits early, because the remaining shifts make the rounding digit 0.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.1118,
+ "seconds": 48,
+ "diff_stat": "src/include/duckdb/common/operator/decimal_cast_operators.hpp | 4 ++++\n 1 file changed, 4 insertions(+)"
+}
+round 1: found=False picked=['src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.TruncateExcessiveDecimals']
+  fix: -
+round 2: found=True picked=['src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.HandleExponent', 'src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.Finalize']
+  fix: applied: In HandleExponent's negative-exponent loop, round_up is updated on each division and the loop breaks once the result reaches 0. If the result hits 0 before the final iteration, round_up keeps a stale value from an earlier digit, such as the leading mantissa digit 5. That digit is not the one just past the scale. The fix clears round_up when the loop exits early, because the remaining shif
+
+r recovered
+parse errors in src/include/duckdb/storage/external_file_cache/caching_file_system.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/storage/external_file_cache/caching_file_system_wrapper.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/storage/external_file_cache/external_file_cache.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/storage/statistics/string_stats.hpp; chunking what tree-sitter recovered
+parse errors in src/main/extension_callback_manager.cpp; chunking what tree-sitter recovered
+parse errors in src/storage/table_index_list.cpp; chunking what tree-sitter recovered
+parse errors in src/storage/table/row_group_collection.cpp; chunking what tree-sitter recovered
+parse errors in test/unittest.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_plan_serialization.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_progress_bar.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_read_ahead_abandon.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_reset.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_threads.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_tpcds_with_streaming.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_tpch_with_streaming.cpp; chunking what tree-sitter recovered
+parse errors in test/api/capi/test_capi_arrow.cpp; chunking what tree-sitter recovered
+parse errors in test/api/capi/test_capi_complex_types.cpp; chunking what tree-sitter recovered
+parse errors in test/catalog/test_catalog_version.cpp; chunking what tree-sitter recovered
+parse errors in test/common/test_external_file_cache.cpp; chunking what tree-sitter recovered
+parse errors in test/sql/function/table/table_bind_replace.cpp; chunking what tree-sitter recovered
+parse errors in test/sql/function/table/table_in_out.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/shell.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/shell_metadata_command.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  12%|█▏        | 34/290 [00:00<00:00, 313.26it/s]
+Loading weights:  23%|██▎       | 66/290 [00:00<00:00, 289.83it/s]
+Loading weights:  33%|███▎      | 96/290 [00:00<00:00, 202.90it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 664.35it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,301 @@
+{
+ "arm": "codemem-loop",
+ "task": "duckdb__duckdb-25101",
+ "fixed": {
+  "round": 10,
+  "explanation": "With LIMIT 0, TopNHeap has heap_size 0, so Sink still runs EntryShouldBeAdded, which reads heap.front() on an empty vector. AddEntryToHeap then calls pop_heap and pop_back on that empty vector, and the final boundary update reads heap.front() again. All three are undefined behavior and can corrupt memory. The edit returns early from Sink when heap_size is 0, so the heap is never touched. I haven't run this, and the diagnosis comes from reading the code.",
+  "edits": 1
+ },
+ "rounds": 10,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 2
+ },
+ "sonnet_calls": 12,
+ "cost_usd": 0.7748,
+ "seconds": 26,
+ "diff_stat": "src/execution/operator/order/physical_top_n.cpp | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Physical execution of LEFT_DELIM_JOIN with MARK join, DELIM_SCAN and hash group by under a TOP_N with limit 0 and multiple threads; likely a pipeline/operator state or finalize/scheduling bug (for example, unfinished or never-run pipelines when the limit is 0) causing invalid memory access on repeated execution.",
+    "symptom": "Repeatedly executing a query with a correlated NOT EXISTS subquery (LEFT_DELIM_JOIN, MARK join) and LIMIT 0 with 4 threads crashes the native layer with SIGSEGV after about 1000 iterations.",
+    "anchors": [
+     "LEFT_DELIM_JOIN",
+     "MARK",
+     "DELIM_SCAN",
+     "HASH_GROUP_BY",
+     "CROSS_PRODUCT",
+     "TOP_N",
+     "duckdb_jdbc_execute_pending",
+     "disabled_optimizers",
+     "filter_pushdown,join_order",
+     "LIMIT 0",
+     "SIGSEGV",
+     "threads"
+    ],
+    "look_in": []
+   },
+   "analysis": "Repeated execution of the same prepared query reuses sink states. PhysicalLeftDelimJoin supports reuse through LeftDelimJoinGlobalState::Reset and LeftDelimJoinLocalState::Reset. These rebind the delim scan collection and reset only the distinct aggregate state. The join's own sink state is not reset, and the delim scan pointer is only rebound. With LIMIT 0 and several threads, that can leave dangling or stale state.",
+   "picked": [
+    "src/execution/operator/join/physical_left_delim_join.cpp:duckdb.LeftDelimJoinGlobalState.Reset",
+    "src/execution/operator/join/physical_left_delim_join.cpp:duckdb.LeftDelimJoinLocalState.Reset",
+    "src/execution/operator/join/physical_left_delim_join.cpp:duckdb.LeftDelimJoinGlobalState",
+    "src/execution/operator/join/physical_left_delim_join.cpp:duckdb.LeftDelimResetLocalSinkState"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 78-86 (duckdb.LeftDelimJoinGlobalState.Reset)",
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 119-123 (duckdb.LeftDelimJoinLocalState.Reset)",
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 62-100 (duckdb.LeftDelimJoinGlobalState)",
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 27-34 (duckdb.LeftDelimResetLocalSinkState)"
+   ],
+   "fix_attempt": "could not fix: The shown code is only the reset logic of PhysicalLeftDelimJoin, and it looks plausible. Nothing shown proves it is the root cause. I would need to see LeftDelimBindScanCollection, LeftDelimResetSinkState, ColumnDataCollection::ResetForReuse/Swap, PhysicalHashAggregate::SetMultiScan, and the Reset/SupportsReuse implementations of the hash join (MARK), delim scan, top-N and the pipeline executor reuse path."
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Find the sink-state reuse (SupportsReuse/Reset) code for PhysicalHashJoin MARK joins, PhysicalDelimScan collection binding, PhysicalHashAggregate and PhysicalTopN, plus the executor code that reuses sink states across repeated executions of a prepared query.",
+    "symptom": "Repeatedly executing a query with LEFT_DELIM_JOIN and MARK JOIN under LIMIT 0 with multiple threads eventually causes a SIGSEGV in native execution.",
+    "anchors": [
+     "LeftDelimJoinGlobalState",
+     "LeftDelimJoinLocalState",
+     "LeftDelimBindScanCollection",
+     "LeftDelimResetSinkState",
+     "LeftDelimResetLocalSinkState",
+     "ResetForReuse",
+     "SupportsReuse",
+     "SetMultiScan",
+     "GlobalSinkState::Reset",
+     "PhysicalLeftDelimJoin",
+     "duckdb_jdbc_execute_pending",
+     "DELIM_SCAN"
+    ],
+    "look_in": [
+     "src/execution/operator/join/",
+     "src/execution/operator/aggregate/",
+     "src/parallel/"
+    ]
+   },
+   "analysis": "The results show reuse support (SupportsReuse/Reset) across hash join, hash aggregate and the delim joins. HashJoinGlobalSinkState::Reset switches to single-partition mode and rebuilds the perfect-hash executor on later iterations. That is the most suspicious reuse path for a MARK join that is reused about 1000 times. The body is truncated, so I can't confirm it is the cause.",
+   "picked": [
+    "src/execution/operator/join/physical_hash_join.cpp:duckdb.HashJoinGlobalSinkState.Reset"
+   ],
+   "found": false
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Hash join global sink state Reset on reuse: single-partition reset of the hash table, perfect hash join executor re-creation, and the state left over for MARK joins and empty build sides.",
+    "symptom": "Repeated execution of a query with LEFT_DELIM_JOIN and MARK join under LIMIT 0 and multiple threads crashes with SIGSEGV after about 1000 iterations.",
+    "anchors": [
+     "HashJoinGlobalSinkState",
+     "ResetForNewIterationSinglePartition",
+     "PerfectHashJoinExecutor",
+     "CanUsePerfectHashJoin",
+     "HashJoinLocalSinkState",
+     "LeftDelimJoinGlobalState",
+     "SupportsReuse"
+    ],
+    "look_in": [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "analysis": "The hash join reuse code resets the data collection, mark join info and layout state between iterations. ResetForNewIterationSinglePartition returns early when the layout was never published. ResetMarkJoinInfo rebuilds the correlated aggregates. With LIMIT 0 or an empty input, state such as the hash map, pointer table, finalized flag or mark_join_info can be left stale or dangling after many resets. I can't confirm this from the truncated bodies.",
+   "picked": [
+    "src/execution/join_hashtable.cpp:duckdb.JoinHashTable.ResetForNewIterationSinglePartition",
+    "src/execution/join_hashtable.cpp:duckdb.ResetMarkJoinInfo",
+    "src/execution/operator/join/physical_hash_join.cpp:duckdb.HashJoinLocalSinkState.Reset"
+   ],
+   "found": false
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "Find the bodies of JoinHashTable::ResetForNewIterationSinglePartition and ResetMarkJoinInfo. Check how the hash map, finalized flag and mark join correlated aggregates are reset on reuse when the build side is empty or no chunk was sunk.",
+    "symptom": "Repeated execution of a query with LEFT_DELIM_JOIN and a MARK join under LIMIT 0 crashes with SIGSEGV after about 1000 iterations.",
+    "anchors": [
+     "ResetForNewIterationSinglePartition",
+     "ResetMarkJoinInfo",
+     "mark_join_info",
+     "layout_ptr",
+     "HashJoinLocalSinkState",
+     "append_state_initialised",
+     "correlated_aggregates",
+     "PublishLayoutIfFirst"
+    ],
+    "look_in": [
+     "src/execution/join_hashtable.cpp"
+    ]
+   },
+   "analysis": "Results show JoinHashTable mark join code but not the reset bodies. The LayoutGate reset and the hash join Combine/Sink under deferred layout look suspicious: with LIMIT 0 and multiple threads, a thread may never receive a chunk, so the layout is never published and the sink_collection may be null. After reuse that could leave stale state. The next step is to read the hash join Reset and Finalize code in physical_hash_join.cpp for empty-build handling.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Hash join sink state Reset/Finalize/Combine with deferred layout when no thread sunk a chunk (empty input), including LayoutGate use and the sink_collection null case on reuse.",
+    "symptom": "Repeated execution of a LEFT_DELIM_JOIN/MARK join query with LIMIT 0 and multiple threads crashes with SIGSEGV.",
+    "anchors": [
+     "LayoutGate",
+     "HashJoinGlobalSinkState",
+     "HashJoinLocalSinkState",
+     "PublishLayoutIfFirst",
+     "sink_collection",
+     "IsLayoutFinalized",
+     "ResetForNewIterationSinglePartition",
+     "FinishInitWithLayout",
+     "layout_ptr"
+    ],
+    "look_in": [
+     "src/execution/operator/join/physical_hash_join.cpp"
+    ]
+   },
+   "analysis": "Results show hash join finalize/source code but nothing that explains a crash after about 1000 reuses. The Reset bodies for PhysicalHashJoin and HashJoinGlobalSinkState are not shown. PhysicalLeftDelimJoin::Finalize is only partly shown. The bug is probably in the reset or reuse path of the left delim join, the hash join or the delim scan, or in the executor's reuse of sink states. I'm guessing at this, because no result confirms it.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Find where the executor or pipeline reuses sink states across repeated executions, and the Reset implementations for PhysicalLeftDelimJoin, the delim scan and the hash join sink state. Look for state that is not reset, such as the delim scan collection pointer and the Finalize state.",
+    "symptom": "Repeated execution of a LEFT_DELIM_JOIN/MARK join query with LIMIT 0 and multiple threads crashes with SIGSEGV after about 1000 runs.",
+    "anchors": [
+     "PhysicalLeftDelimJoin",
+     "LeftDelimJoinGlobalState",
+     "SupportsReuse",
+     "ResetGlobalSinkState",
+     "HashJoinGlobalSinkState",
+     "LeftDelimBindScanCollection",
+     "LeftDelimResetSinkState"
+    ],
+    "look_in": [
+     "src/parallel/",
+     "src/execution/operator/scan/physical_column_data_scan.cpp",
+     "src/execution/operator/join/physical_left_delim_join.cpp"
+    ]
+   },
+   "analysis": "Results show the delim scan, the pipeline reset code and the left delim join Sink. They don't show the actual reset bodies or what goes wrong. Pipeline::ResetSink and ResetSource drive reuse. The crash may come from the delim scan's collection pointer, the delim join's lhs_data, or the hash join MARK state being reused across iterations. The left delim join Finalize and Reset code needs a closer look.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Find PhysicalLeftDelimJoin::Finalize and the Reset functions that bind the delim scan collection and reset the sink states, including how lhs_data is combined and handed to the delim scans.",
+    "symptom": "Repeated execution of a LEFT_DELIM_JOIN/MARK join query with LIMIT 0 and multiple threads crashes with SIGSEGV after about 1000 runs.",
+    "anchors": [
+     "PhysicalLeftDelimJoin",
+     "LeftDelimJoinGlobalState",
+     "LeftDelimJoinLocalState",
+     "LeftDelimBindScanCollection",
+     "LeftDelimResetSinkState",
+     "LeftDelimResetLocalSinkState",
+     "lhs_data",
+     "Pipeline::ResetSink",
+     "Pipeline::ResetSource",
+     "PhysicalColumnDataScan"
+    ],
+    "look_in": [
+     "src/execution/operator/join/physical_left_delim_join.cpp",
+     "src/execution/operator/join/physical_delim_join.cpp",
+     "src/parallel/pipeline.cpp"
+    ]
+   },
+   "analysis": "Results are mostly pipeline.cpp and the delim join base class, with no reset bodies. The crash after ~1000 iterations with LIMIT 0 suggests a state-reuse problem or the TopN limit-0 short-circuit leaving the delim join's pipelines in an odd state. The next step is the PhysicalLeftDelimJoin Finalize/Sink code and the TopN/limit-0 handling, since a limit of 0 may skip the sources that bind the delim scan collection.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Find PhysicalLeftDelimJoin::Finalize, Sink, Combine and the Reset functions, including how lhs_data and the delim scan collection get bound, and what happens when the pipeline is stopped early by TopN with limit 0.",
+    "symptom": "Repeated execution of a LEFT_DELIM_JOIN/MARK join query with LIMIT 0 and multiple threads crashes with SIGSEGV after about 1000 runs.",
+    "anchors": [
+     "PhysicalLeftDelimJoin",
+     "LeftDelimJoinGlobalState",
+     "LeftDelimJoinLocalState",
+     "LeftDelimBindScanCollection",
+     "LeftDelimResetSinkState",
+     "LeftDelimResetLocalSinkState",
+     "lhs_data",
+     "PhysicalDelimJoin",
+     "delim_idx"
+    ],
+    "look_in": [
+     "src/execution/operator/join/physical_left_delim_join.cpp"
+    ]
+   },
+   "analysis": "Round 8 returned mostly other join operators, the right delim join, and the delim join CTE rewriter and deliminator optimizers. It did not return the PhysicalLeftDelimJoin bodies. The crash may come from the left delim join reuse and Finalize path. It may also come from the plan the new delim_join_cte_rewriter produces, for example filters pushed into delim join inputs under a NOT filter on a MARK join.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "Find PhysicalLeftDelimJoin Finalize, Sink and Reset code, and the delim_join_cte_rewriter code that rewrites a delim join under a NOT filter on the mark marker, which could produce an invalid plan.",
+    "symptom": "Repeated execution of a LEFT_DELIM_JOIN/MARK join query with LIMIT 0 crashes with SIGSEGV after about 1000 runs.",
+    "anchors": [
+     "PhysicalLeftDelimJoin",
+     "LeftDelimJoinGlobalState",
+     "FilterNegatesDelimJoinMarker",
+     "PushEligibleFiltersIntoDelimJoinInputs",
+     "PushEligibleFilterExpressionsIntoDelimJoinInputs",
+     "LeftDelimBindScanCollection",
+     "LeftDelimResetSinkState",
+     "delim_join_cte_rewriter.cpp"
+    ],
+    "look_in": [
+     "src/execution/operator/join/physical_left_delim_join.cpp",
+     "src/planner/subquery/delim_join_cte_rewriter.cpp"
+    ]
+   },
+   "analysis": "This round returned only the logical delim_join_cte_rewriter, which rewrites delim joins at plan time. A native SIGSEGV after about 1000 repeated runs points to physical execution or state reuse, not to plan rewriting. The reported plan still contains LEFT_DELIM_JOIN, so the crash is probably in the physical left delim join, the delim scan, or the TopN with limit 0 and its early-termination path. The physical operator bodies have not been shown yet.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "Find the physical TopN code that handles limit 0 (early termination, Sink, Finalize and Reset), and the PhysicalLeftDelimJoin and PhysicalDelimScan source and sink code that runs when the pipeline is finished early.",
+    "symptom": "Repeatedly executing a LEFT_DELIM_JOIN/MARK join query with LIMIT 0 and multiple threads crashes with SIGSEGV after about 1000 runs.",
+    "anchors": [
+     "PhysicalLeftDelimJoin",
+     "LeftDelimJoinGlobalState",
+     "PhysicalDelimJoin",
+     "PhysicalColumnDataScan",
+     "lhs_data",
+     "duckdb_jdbc_execute_pending"
+    ],
+    "look_in": [
+     "src/execution/operator/order/physical_top_n.cpp",
+     "src/execution/operator/join/physical_left_delim_join.cpp",
+     "src/execution/operator/join/physical_delim_join.cpp"
+    ]
+   },
+   "analysis": "With LIMIT 0, TopNHeap has heap_size 0. EntryShouldBeAdded then skips the `heap.size() < heap_size` check and reads `heap.front()` on an empty vector. AddEntryToHeap does `pop_heap` and `pop_back` on an empty vector. Both are undefined behavior. The only guard is in GetDataInternal, which returns early when limit == 0, so Sink still feeds the heap. That would explain a crash that shows up only after many runs and only in the TopN-over-subquery plan. I did not confirm this by running the query.",
+   "picked": [
+    "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.EntryShouldBeAdded",
+    "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddEntryToHeap",
+    "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.Sink",
+    "src/execution/operator/order/physical_top_n.cpp:duckdb.TopNHeap.AddSmallHeap"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/execution/operator/order/physical_top_n.cpp lines 140-151 (duckdb.TopNHeap.EntryShouldBeAdded)",
+    "src/execution/operator/order/physical_top_n.cpp lines 153-160 (duckdb.TopNHeap.AddEntryToHeap)",
+    "src/execution/operator/order/physical_top_n.cpp lines 347-378 (duckdb.TopNHeap.Sink)",
+    "src/execution/operator/order/physical_top_n.cpp lines 201-241 (duckdb.TopNHeap.AddSmallHeap)",
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 78-86 (duckdb.LeftDelimJoinGlobalState.Reset)",
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 119-123 (duckdb.LeftDelimJoinLocalState.Reset)",
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 62-100 (duckdb.LeftDelimJoinGlobalState)",
+    "src/execution/operator/join/physical_left_delim_join.cpp lines 27-34 (duckdb.LeftDelimResetLocalSinkState)"
+   ],
+   "fix_attempt": "applied: With LIMIT 0, TopNHeap has heap_size 0, so Sink still runs EntryShouldBeAdded, which reads heap.front() on an empty vector. AddEntryToHeap then calls pop_heap and pop_back on that empty vector, and the final boundary update reads heap.front() again. All three are undefined behavior and can corrupt memory. The edit returns early from Sink when heap_size is 0, so the heap is never touched. I haven't run this, and the diagnosis comes from reading the code."
+  }
+ ]
+}

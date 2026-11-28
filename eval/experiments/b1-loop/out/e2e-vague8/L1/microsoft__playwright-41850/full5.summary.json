@@ -1,0 +1,81 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 5,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0089,
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 1,
+  "explanation": "The redirect branch checked and set only the lowercase 'host' key, so a header named 'Host' or 'HOST' kept the old value. The fix loops over the header keys and updates every key whose lowercase form is 'host'. This keeps the original casing and doesn't depend on helper functions that aren't visible in the shown code.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0878,
+ "seconds": 16,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The APIRequestContext fetch logic that follows HTTP redirects rewrites the request headers for the new URL. It sets the 'host' header only when the key is exactly lowercase 'host'. It should find the Host header with a case-insensitive lookup and update it, as the other header helpers do.",
+    "symptom": "After a redirect, the Host header keeps the original host if it was set with non-lowercase casing such as \"Host\", so the redirected request goes out with the wrong host.",
+    "anchors": [
+     "Host",
+     "host",
+     "headers",
+     "redirect"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     278,
+     290
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     862,
+     870
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     590,
+     789
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     320,
+     639
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     177,
+     187
+    ]
+   ],
+   "analysis": "In _sendRequest of fetch.ts, the redirect branch does `if (headers['host']) headers['host'] = locationURL.host;`, which only matches a lowercase key. The other header operations in the same function use getHeader, setHeader and removeHeader, which compare names case-insensitively. The fix is to use getHeader/setHeader for 'host' there.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 320-639 (APIRequestContext._sendRequest)"
+   ],
+   "fix_attempt": "applied: The redirect branch checked and set only the lowercase 'host' key, so a header named 'Host' or 'HOST' kept the old value. The fix loops over the header keys and updates every key whose lowercase form is 'host'. This keeps the original casing and doesn't depend on helper functions that aren't visible in the shown code."
+  }
+ ]
+}

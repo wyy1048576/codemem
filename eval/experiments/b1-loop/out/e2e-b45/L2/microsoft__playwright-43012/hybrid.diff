@@ -1,0 +1,15 @@
+diff --git a/packages/playwright-core/src/server/dom.ts b/packages/playwright-core/src/server/dom.ts
+index b0f370d..75d6b1e 100644
+--- a/packages/playwright-core/src/server/dom.ts
++++ b/packages/playwright-core/src/server/dom.ts
+@@ -336,9 +336,7 @@ export class ElementHandle<T extends Node = Node> extends js.JSHandle<T> {
+         const timeout = waitTime[Math.min(retry - 1, waitTime.length - 1)];
+         if (timeout) {
+           progress.log(`  waiting ${timeout}ms`);
+-          const result = await progress.race(this.evaluateInUtility(([injected, node, timeout]) => new Promise<void>(f => setTimeout(f, timeout)), timeout));
+-          if (result === 'error:notconnected')
+-            return result;
++          await progress.race(new Promise<void>(f => setTimeout(f, timeout)));
+         }
+       } else {
+         progress.log(`attempting ${actionName} action${options.trial ? ' (trial run)' : ''}`);

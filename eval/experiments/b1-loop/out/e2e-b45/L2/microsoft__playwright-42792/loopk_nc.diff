@@ -1,0 +1,29 @@
+diff --git a/packages/playwright/src/common/testType.ts b/packages/playwright/src/common/testType.ts
+index 748d48d..2763774 100644
+--- a/packages/playwright/src/common/testType.ts
++++ b/packages/playwright/src/common/testType.ts
+@@ -189,7 +189,7 @@ export class TestTypeImpl {
+     suite._hooks.push({ type: name, fn: fn!, title, location });
+   }
+ 
+-  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number }) {
++  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number, lock?: string | string[] }) {
+     throwIfRunningInsideJest();
+     const suite = this._currentSuite(location, `test.describe.configure()`);
+     if (!suite)
+@@ -201,6 +201,15 @@ export class TestTypeImpl {
+     if (options.retries !== undefined)
+       suite._retries = options.retries;
+ 
++    if (options.lock !== undefined) {
++      const locks = Array.isArray(options.lock) ? options.lock : [options.lock];
++      for (const lock of locks) {
++        if (typeof lock !== 'string' || !lock)
++          throw new Error(`test.describe.configure() "lock" must be a non-empty string or an array of non-empty strings`);
++      }
++      suite._locks.push(...locks);
++    }
++
+     if (options.mode !== undefined) {
+       if (suite._parallelMode !== 'none')
+         throw new Error(`"${suite._parallelMode}" mode is already assigned for the enclosing scope.`);

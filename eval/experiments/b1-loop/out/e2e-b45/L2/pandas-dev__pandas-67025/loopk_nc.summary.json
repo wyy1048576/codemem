@@ -1,0 +1,77 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-67025",
+ "fixed": {
+  "round": 1,
+  "explanation": "ArrowExtensionArray._str_extract raises when no named groups exist, and pc.extract_regex needs named groups. It also keys the result only by group names, so unnamed groups are dropped. The fix labels groups the same way as _get_group_names (the name, or the 0-based position). It also uses the Python regex fallback whenever any group is unnamed.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "ks": [
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0335,
+ "seconds": 39,
+ "diff_stat": "pandas/core/arrays/arrow/array.py | 12 +++++++-----\n 1 file changed, 7 insertions(+), 5 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The extractall/extract method of the Arrow-backed string extension array (ArrowExtensionArray / ArrowStringArray) builds a result DataFrame from regex capture groups. It must name columns for unnamed groups by their positional index (0, 1, ...) as the object-dtype implementation does, instead of failing or dropping them.",
+    "symptom": "str.extract with unnamed regex capture groups on an Arrow-backed string Series raises an error or drops columns instead of labeling the columns by group position.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "pandas/core/strings/accessor.py",
+     3408,
+     3534
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     4924,
+     4959
+    ],
+    [
+     "pandas/core/arrays/arrow/array.py",
+     4177,
+     4210
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     3536,
+     3612
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     4899,
+     4921
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "ArrowExtensionArray._str_extract raises when no named groups exist, and pc.extract_regex needs named groups. It also keys the result only by group names, so unnamed groups are dropped. The fix labels groups the same way as _get_group_names (the name, or the 0-based position). It also uses the Python regex fallback whenever any group is unnamed.",
+   "picked": [
+    "pandas/core/arrays/arrow/array.py:ArrowExtensionArray._str_extract"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

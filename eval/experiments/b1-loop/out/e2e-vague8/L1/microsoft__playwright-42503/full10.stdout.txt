@@ -1,0 +1,34 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0089,
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 2,
+  "explanation": "runDaemonForContext called browser.bind() on every context creation, and the second bind throws because a browser server is already running. I added a WeakSet of already-bound browsers. The browser is now bound and the pause message printed only once, and later contexts on the same browser return false without binding. The false return for later contexts is an assumption about how the caller uses the result.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.1172,
+ "seconds": 29,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)"
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=True picked=['packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext']
+  fix: applied: runDaemonForContext called browser.bind() on every context creation, and the second bind throws because a browser server is already running. I added a WeakSet of already-bound browsers. The browser is now bound and the pause message printed only once, and later contexts on the same browser return false without binding. The false return for later contexts is an assumption about how the cal
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   2%|▏         | 6/290 [00:00<00:06, 44.05it/s]
+Loading weights:   9%|▊         | 25/290 [00:00<00:02, 93.98it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 799.76it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,27 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 8542ef2..8c0f8e0 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -449,10 +449,21 @@ class WrappedCythonOp:
+ 
+         out_shape = self._get_output_shape(ngroups, values)
+         func = self._get_cython_function(self.kind, self.how, values.dtype, is_numeric)
+-        values = self._get_cython_vals(values, uses_mask=mask is not None)
++        if is_datetimelike and self.kind == "transform" and self.has_dropped_na:
++            # avoid casting to float64, which loses NaT and precision
++            pass
++        else:
++            values = self._get_cython_vals(values, uses_mask=mask is not None)
+         out_dtype = self._get_out_dtype(values.dtype)
+ 
+         result = maybe_fill(np.empty(out_shape, dtype=out_dtype))
++        if (
++            is_datetimelike
++            and self.kind == "transform"
++            and self.has_dropped_na
++            and result.dtype == np.int64
++        ):
++            result.fill(np.iinfo(np.int64).min)
+         if self.kind == "aggregate":
+             counts = np.zeros(ngroups, dtype=np.int64)
+             if self.how in [

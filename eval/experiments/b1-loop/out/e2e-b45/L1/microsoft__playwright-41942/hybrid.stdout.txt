@@ -1,0 +1,28 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41942",
+ "fixed": {
+  "step": 3,
+  "explanation": "defaultCacheDirectory and defaultRegistryDirectory are computed at module load and throw on unsupported platforms like Android, even when PLAYWRIGHT_BROWSERS_PATH is set. I turned defaultCacheDirectory into a function and only call it when the env variable doesn't decide the location. I also updated its caller in browserFactory.ts.",
+  "edits": 3
+ },
+ "rounds": 3,
+ "tools": {
+  "grep": 2,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0602,
+ "seconds": 21,
+ "diff_stat": "packages/playwright-core/src/server/registry/index.ts    | 10 ++++++----\n packages/playwright-core/src/tools/mcp/browserFactory.ts |  2 +-\n 2 files changed, 7 insertions(+), 5 deletions(-)"
+}
+step 1: grep {"pattern": "PLAYWRIGHT_BROWSERS_PATH|cacheDirectory|does not support platform|not supported", "path": "packages/playwright-core/src/server", "ignore_case": fal -> action=read picked=['packages/playwright-core/src/server/registry/index.ts:<block>'] 
+step 2: read {} -> action=grep picked=[] 
+step 3: grep {"pattern": "defaultCacheDirectory|defaultRegistryDirectory", "path": "packages", "ignore_case": false} -> action=edit picked=['packages/playwright-core/src/server/registry/index.ts:<block>'] applied
+

@@ -1,0 +1,54 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42864",
+ "fixed": {
+  "round": 2,
+  "explanation": "HighlightController._resolve always evaluates setHighlights in the 'utility' world, even when the selector's engine must run in the main world (info.world). Custom engines that aren't content scripts therefore can't see page globals. The fix groups highlights by frame and by info.world, and calls setHighlights in each world's injected script. It sets an empty list in the other world, so stale highlights are cleared. hideHighlights now clears both worlds.",
+  "edits": 4
+ },
+ "rounds": 2,
+ "ks": [
+  5,
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0587,
+ "seconds": 34,
+ "diff_stat": ".../src/server/highlightController.ts              | 25 ++++++++++++----------\n 1 file changed, 14 insertions(+), 11 deletions(-)"
+}
+round 1: k=5 action=search picked=[] 
+round 2: k=5 action=edit picked=['packages/playwright-core/src/server/highlightController.ts:HighlightController'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   6%|▌         | 17/290 [00:00<00:01, 148.40it/s]
+Loading weights:  12%|█▏        | 36/290 [00:00<00:01, 166.17it/s]
+Loading weights:  19%|█▉        | 56/290 [00:00<00:01, 170.53it/s]
+Loading weights:  34%|███▍      | 99/290 [00:00<00:00, 258.34it/s]
+Loading weights:  43%|████▎     | 126/290 [00:00<00:00, 186.29it/s]
+Loading weights:  51%|█████     | 148/290 [00:00<00:00, 184.93it/s]
+Loading weights:  58%|█████▊    | 169/290 [00:00<00:00, 189.77it/s]
+Loading weights:  66%|██████▌   | 190/290 [00:00<00:00, 192.93it/s]
+Loading weights:  73%|███████▎  | 211/290 [00:01<00:00, 191.62it/s]
+Loading weights: 100%|██████████| 290/290 [00:01<00:00, 261.49it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   8%|▊         | 24/290 [00:00<00:01, 224.83it/s]
+Loading weights:  23%|██▎       | 66/290 [00:00<00:00, 304.48it/s]
+Loading weights:  33%|███▎      | 97/290 [00:00<00:00, 288.01it/s]
+Loading weights:  48%|████▊     | 139/290 [00:00<00:00, 323.19it/s]
+Loading weights:  59%|█████▉    | 172/290 [00:00<00:00, 268.05it/s]
+Loading weights:  74%|███████▍  | 214/290 [00:00<00:00, 286.43it/s]
+Loading weights:  84%|████████▍ | 244/290 [00:00<00:00, 266.39it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 309.42it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

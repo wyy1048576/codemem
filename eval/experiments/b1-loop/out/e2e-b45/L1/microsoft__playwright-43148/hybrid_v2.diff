@@ -1,0 +1,39 @@
+diff --git a/packages/playwright-core/src/server/cookieStore.ts b/packages/playwright-core/src/server/cookieStore.ts
+index 2d13ecb..742c6a4 100644
+--- a/packages/playwright-core/src/server/cookieStore.ts
++++ b/packages/playwright-core/src/server/cookieStore.ts
+@@ -229,9 +229,7 @@ export function domainMatches(value: string, domain: string): boolean {
+ function pathMatches(value: string, path: string): boolean {
+   if (value === path)
+     return true;
+-  if (!value.endsWith('/'))
+-    value = value + '/';
+-  if (!path.endsWith('/'))
+-    path = path + '/';
+-  return value.startsWith(path);
++  if (!value.startsWith(path))
++    return false;
++  return path.endsWith('/') || value[path.length] === '/';
+ }
+diff --git a/packages/playwright-core/src/server/network.ts b/packages/playwright-core/src/server/network.ts
+index 7c7cad6..9f996a4 100644
+--- a/packages/playwright-core/src/server/network.ts
++++ b/packages/playwright-core/src/server/network.ts
+@@ -39,12 +39,12 @@ export function filterCookies(cookies: channels.NetworkCookie[], urls: string[])
+     if (!parsedURLs.length)
+       return true;
+     for (const parsedURL of parsedURLs) {
+-      let domain = c.domain;
+-      if (!domain.startsWith('.'))
+-        domain = '.' + domain;
+-      if (!('.' + parsedURL.hostname).endsWith(domain))
++      const domain = c.domain;
++      const host = parsedURL.hostname;
++      if (host !== domain && !(domain.startsWith('.') && ('.' + host).endsWith(domain)))
+         continue;
+-      if (!parsedURL.pathname.startsWith(c.path))
++      const pathname = parsedURL.pathname;
++      if (pathname !== c.path && !(pathname.startsWith(c.path) && (c.path.endsWith('/') || pathname[c.path.length] === '/')))
+         continue;
+       if (parsedURL.protocol !== 'https:' && !isLocalHostname(parsedURL.hostname) && c.secure)
+         continue;

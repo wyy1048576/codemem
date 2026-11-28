@@ -1,0 +1,61 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "_AsOfMerge._validate_tolerance rejects only negative tolerances, but all three branches say \"tolerance must be positive\", which implies zero is invalid. I changed each message to \"tolerance must be non-negative\" and left the checks as they were.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0253,
+ "seconds": 18,
+ "diff_stat": "pandas/core/reshape/merge.py | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The as-of merge validation of the tolerance argument (in the merge operation's tolerance checking for timedelta, integer and float keys) raises a MergeError saying tolerance must be positive; the message should say non-negative while still only rejecting values below zero.",
+    "symptom": "The MergeError raised for a negative as-of merge tolerance says it must be positive, wrongly implying that zero is invalid.",
+    "anchors": [
+     "positive",
+     "non-negative"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "pandas/core/reshape/merge.py",
+     2599,
+     2634
+    ],
+    [
+     "pandas/core/reshape/merge.py",
+     1072,
+     1074
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "_AsOfMerge._validate_tolerance rejects only negative tolerances, but all three branches say \"tolerance must be positive\", which implies zero is invalid. I changed each message to \"tolerance must be non-negative\" and left the checks as they were.",
+   "picked": [
+    "pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

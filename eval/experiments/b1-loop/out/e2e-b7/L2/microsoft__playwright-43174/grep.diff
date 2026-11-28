@@ -1,0 +1,20 @@
+diff --git a/packages/playwright-core/src/tools/mcp/watchdog.ts b/packages/playwright-core/src/tools/mcp/watchdog.ts
+index e2ee1af..1fe60ac 100644
+--- a/packages/playwright-core/src/tools/mcp/watchdog.ts
++++ b/packages/playwright-core/src/tools/mcp/watchdog.ts
+@@ -27,7 +27,14 @@ export function setupExitWatchdog() {
+     // eslint-disable-next-line no-restricted-syntax
+     setTimeout(() => processExit(0), 15000);
+     testDebug('gracefully closing ' + gracefullyCloseSet.size);
+-    await gracefullyCloseAll();
++    if (signal === 'close') {
++      // The MCP server already disposes the backend (closing the browser gracefully) when stdin
++      // ends. Closing a second time would force-kill the browser, so just wait for it to finish.
++      while (gracefullyCloseSet.size)
++        await new Promise(f => setTimeout(f, 50));
++    } else {
++      await gracefullyCloseAll();
++    }
+     // eslint-disable-next-line no-restricted-syntax
+     processExit(0);
+   };

@@ -1,0 +1,30 @@
+diff --git a/src/common/types/date.cpp b/src/common/types/date.cpp
+index 4520ad4a..3f0ab429 100644
+--- a/src/common/types/date.cpp
++++ b/src/common/types/date.cpp
+@@ -323,6 +323,25 @@ DateCastResult Date::TryConvertDate(const char *buf, idx_t len, idx_t &pos, date
+ 		if (pos < len && StringUtil::CharacterIsDigit(buf[pos])) {
+ 			return DateCastResult::ERROR_INCORRECT_FORMAT;
+ 		}
++		// anything following must look like the start of a time portion (or be only spaces)
++		if (pos < len) {
++			idx_t check = pos;
++			if (buf[check] == 'T' || buf[check] == 't') {
++				check++;
++				if (check >= len || !StringUtil::CharacterIsDigit(buf[check])) {
++					return DateCastResult::ERROR_INCORRECT_FORMAT;
++				}
++			} else if (StringUtil::CharacterIsSpace(buf[check])) {
++				while (check < len && StringUtil::CharacterIsSpace(buf[check])) {
++					check++;
++				}
++				if (check < len && !StringUtil::CharacterIsDigit(buf[check])) {
++					return DateCastResult::ERROR_INCORRECT_FORMAT;
++				}
++			} else {
++				return DateCastResult::ERROR_INCORRECT_FORMAT;
++			}
++		}
+ 	}
+ 
+ 	return Date::TryFromDate(year, month, day, result) ? DateCastResult::SUCCESS : DateCastResult::ERROR_RANGE;

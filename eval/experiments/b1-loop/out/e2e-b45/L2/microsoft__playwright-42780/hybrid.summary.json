@@ -1,0 +1,88 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42780",
+ "fixed": {
+  "step": 1,
+  "explanation": "In innerAsLocators for internal:role, name and description each set options.exact from attr.caseSensitive and throw when they differ. A regex value has no meaningful case-sensitivity flag, so mixing a regex with a string produces a bogus conflict. The exception is caught in asLocatorDescription, which returns the raw selector. The fix checks and sets exactness only for string values.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.041,
+ "seconds": 38,
+ "diff_stat": "packages/isomorphic/locatorGenerators.ts | 16 ++++++++++------\n 1 file changed, 10 insertions(+), 6 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Locator/selector to-string conversion: converts internal selector (internal:role=... with name and description attributes) into a readable locator string like getByRole('button', { name: /x/, description: 'y' }). The conversion fails to handle mixed regex/string name and description, falling back to raw selector.",
+    "symptom": "Role locators with regex name and string description (or vice versa) print as raw internal:role selector instead of readable getByRole locator.",
+    "anchors": [
+     "description",
+     "name"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/isomorphic/locatorUtils.ts",
+     69,
+     90
+    ],
+    [
+     "packages/isomorphic/locatorParser.ts",
+     25,
+     101
+    ],
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     41,
+     52
+    ],
+    [
+     "packages/isomorphic/locatorGenerators.ts",
+     86,
+     271
+    ],
+    [
+     "tests/page/locator-convenience.spec.ts",
+     202,
+     236
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.03102,
+   "action": "edit",
+   "analysis": "In innerAsLocators for internal:role, name and description each set options.exact from attr.caseSensitive and throw when they differ. A regex value has no meaningful case-sensitivity flag, so mixing a regex with a string produces a bogus conflict. The exception is caught in asLocatorDescription, which returns the raw selector. The fix checks and sets exactness only for string values.",
+   "picked": [
+    "packages/isomorphic/locatorGenerators.ts:innerAsLocators"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

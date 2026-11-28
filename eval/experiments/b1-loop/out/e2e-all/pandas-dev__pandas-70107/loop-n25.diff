@@ -1,0 +1,23 @@
+diff --git a/pandas/core/arrays/datetimelike.py b/pandas/core/arrays/datetimelike.py
+index 0ee8d9c..d9efc7d 100644
+--- a/pandas/core/arrays/datetimelike.py
++++ b/pandas/core/arrays/datetimelike.py
+@@ -794,6 +794,18 @@ class DatetimeLikeArrayMixin(OpsMixin, NDArrayBackedExtensionArray):
+                 if values.dtype != object:
+                     return self.isin(values)
+                 else:
++                    from pandas.core.dtypes.dtypes import PeriodDtype
++
++                    if isinstance(self.dtype, PeriodDtype):
++                        # e.g. strings; parse them using our own freq
++                        try:
++                            period_values = type(self)._from_sequence(
++                                values, dtype=self.dtype
++                            )
++                        except (TypeError, ValueError):
++                            pass
++                        else:
++                            return self.isin(period_values)
+                     # TODO: Deprecate this case
+                     # https://github.com/pandas-dev/pandas/pull/58645/files#r1604055791
+                     return isin(self.astype(object), values)

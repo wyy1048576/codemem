@@ -1,0 +1,39 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 5,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0077,
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 3,
+  "explanation": "runDaemonForContext called browser.bind for every new context. A second context on the same browser, such as one from a worker-scoped fixture, therefore bound an already bound browser and crashed. The edit tracks bound browsers in a WeakSet. The first context binds, prints the instructions and pauses. Later contexts on that browser return early without rebinding. They are not paused at start, which I chose so the extra context doesn't stall the fixture. If you want them paused too, call `requestPause` before the early return.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "calls": {
+  "codemem_rounds": 3,
+  "judge": 3,
+  "fix": 1
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0969,
+ "seconds": 42,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 7 +++++++\n 1 file changed, 7 insertions(+)"
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=False picked=[]
+  fix: -
+round 3: found=True picked=['packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext']
+  fix: applied: runDaemonForContext called browser.bind for every new context. A second context on the same browser, such as one from a worker-scoped fixture, therefore bound an already bound browser and crashed. The edit tracks bound browsers in a WeakSet. The first context binds, prints the instructions and pauses. Later contexts on that browser return early without rebinding. They are not paused at st
+
+parse errors in browser_patches/firefox/juggler/screencast/nsScreencastService.cpp; chunking what tree-sitter recovered
+parse errors in browser_patches/webkit/embedder/Playwright/win/WinMain.cpp; chunking what tree-sitter recovered
+parse errors in packages/isomorphic/trace/trace.ts; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   5%|▍         | 14/290 [00:00<00:02, 122.67it/s]
+Loading weights:   9%|▉         | 27/290 [00:00<00:02, 91.80it/s] 
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 1008.06it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

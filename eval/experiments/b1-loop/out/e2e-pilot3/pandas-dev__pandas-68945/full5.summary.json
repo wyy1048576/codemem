@@ -1,0 +1,139 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 5,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0124,
+ "task": "pandas-dev__pandas-68945",
+ "fixed": {
+  "round": 2,
+  "explanation": "For categorical input, `unique` returned a Categorical, so the cache Series had a categorical index. `_convert_and_box_cache` then mapped through it with categorical dtype and returned a CategoricalIndex. The fix converts categorical input to a plain object ndarray before computing the unique values, so the cache index is object dtype. The map result is then datetime64 and is boxed as a DatetimeIndex, consistent with the uncached path.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.145,
+ "seconds": 41,
+ "diff_stat": "pandas/core/tools/datetimes.py | 6 ++++++\n 1 file changed, 6 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The to_datetime conversion function handles array-like inputs by type. Categorical input is not handled consistently: a cache-based path (used when length exceeds a threshold, with unique values converted via _maybe_cache / _convert_listlike) maps results back, returning a CategoricalIndex instead of DatetimeIndex. Fix so the listlike conversion always yields a DatetimeIndex for categorical input.",
+    "symptom": "pd.to_datetime on a Categorical returns a DatetimeIndex for 50 or fewer elements but a CategoricalIndex for more than 50.",
+    "anchors": [
+     "pd.to_datetime",
+     "to_datetime",
+     "CategoricalIndex",
+     "DatetimeIndex",
+     "pd.Categorical",
+     "tz_localize"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    false
+   ],
+   "shown": [
+    [
+     "pandas/core/tools/datetimes.py",
+     831,
+     1276
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     310,
+     336
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     816,
+     828
+    ],
+    [
+     "pandas/tests/indexes/datetimes/test_constructors.py",
+     82,
+     97
+    ],
+    [
+     "pandas/core/indexes/datetimes.py",
+     116,
+     1528
+    ]
+   ],
+   "analysis": "The to_datetime body shows that list-like input goes through _maybe_cache and then _convert_and_box_cache(argc, cache_array) when the cache is non-empty. That helper isn't shown yet. It probably maps the Categorical through the cache and returns a CategoricalIndex instead of a DatetimeIndex. The fix is likely in _convert_and_box_cache, or in _maybe_cache, in the same file.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Helper that applies the cache of unique converted dates back onto the input and wraps the result into an Index (_convert_and_box_cache), and the _maybe_cache function that builds the cache. Look for how a Categorical input is mapped.",
+    "symptom": "pd.to_datetime on a Categorical returns a CategoricalIndex instead of a DatetimeIndex when there are more than 50 elements.",
+    "anchors": [
+     "_convert_and_box_cache",
+     "_maybe_cache",
+     "cache_array",
+     "_box_as_indexlike",
+     "convert_listlike"
+    ],
+    "look_in": [
+     "pandas/core/tools/datetimes.py"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/tools/datetimes.py",
+     339,
+     362
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     257,
+     307
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     365,
+     501
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     801,
+     813
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     170,
+     254
+    ]
+   ],
+   "analysis": "Caching is only used above 50 elements. In `_maybe_cache`, `unique(arg)` on a Categorical returns a Categorical, so the cache Series gets a categorical index. `_convert_and_box_cache` then builds `Series(arg, dtype=cache_array.index.dtype).map(cache_array)`. That keeps the categorical dtype, so `_box_as_indexlike` returns a CategoricalIndex. The fix belongs in these two helpers, for example by converting categorical input to its underlying values or by mapping to datetime.",
+   "picked": [
+    "pandas/core/tools/datetimes.py:_convert_and_box_cache",
+    "pandas/core/tools/datetimes.py:_maybe_cache"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/tools/datetimes.py lines 339-362 (_convert_and_box_cache)",
+    "pandas/core/tools/datetimes.py lines 257-307 (_maybe_cache)"
+   ],
+   "fix_attempt": "applied: For categorical input, `unique` returned a Categorical, so the cache Series had a categorical index. `_convert_and_box_cache` then mapped through it with categorical dtype and returned a CategoricalIndex. The fix converts categorical input to a plain object ndarray before computing the unique values, so the cache index is object dtype. The map result is then datetime64 and is boxed as a DatetimeIndex, consistent with the uncached path."
+  }
+ ]
+}

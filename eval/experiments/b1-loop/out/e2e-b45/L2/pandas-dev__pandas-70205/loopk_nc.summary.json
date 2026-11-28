@@ -1,0 +1,126 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-70205",
+ "fixed": {
+  "round": 2,
+  "explanation": "With only header rows, the parser returns empty columns whose number of levels differs from header_names. The unconditional set_names call then raises a ValueError. I guard the call so that names are applied only when the level count matches. This lets the empty DataFrame be returned, as read_csv does. I did not see the parser code that builds those columns, so this is a best guess.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  5,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0569,
+ "seconds": 35,
+ "diff_stat": "pandas/io/excel/_base.py | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Excel reader's parsing of header rows with multiple header lines and index_col (TextParser/_parse_sheet in read_excel) fails when the data has only header rows and no data rows; it should return an empty DataFrame with a MultiIndex columns like read_csv does.",
+    "symptom": "read_excel with header=[0,1] and index_col=0 raises an error on a sheet with only header rows, whereas read_csv returns an empty DataFrame.",
+    "anchors": [
+     "header"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "pandas/io/excel/_base.py",
+     840,
+     992
+    ],
+    [
+     "pandas/errors/__init__.py",
+     391,
+     413
+    ],
+    [
+     "pandas/io/excel/_util.py",
+     271,
+     303
+    ],
+    [
+     "pandas/tests/io/excel/test_readers.py",
+     1804,
+     1818
+    ],
+    [
+     "pandas/io/common.py",
+     204,
+     230
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "_parse_sheet builds header_names and has_index_names before TextParser runs. The error with header-only data may come from PythonParser, which handles multi-row headers with index_col and empty data, rather than from this function. I need to see that code.",
+   "picked": [
+    "pandas/io/excel/_base.py:BaseExcelReader._parse_sheet"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "PythonParser multi-row header with index_col handling when there are no data rows (_extract_multi_indexer_columns, _infer_columns, _get_index_name)",
+    "symptom": "read_excel with header=[0,1] and index_col=0 on a sheet with only header rows raises an error instead of returning an empty DataFrame.",
+    "anchors": [
+     "has_index_names",
+     "header_names",
+     "index_col"
+    ],
+    "look_in": [
+     "pandas/io/parsers/python_parser.py",
+     "pandas/io/parsers/base_parser.py"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/io/parsers/base_parser.py",
+     204,
+     273
+    ],
+    [
+     "pandas/io/parsers/base_parser.py",
+     684,
+     722
+    ],
+    [
+     "pandas/io/parsers/python_parser.py",
+     1116,
+     1200
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "pandas/io/excel/_base.py lines 840-992 (BaseExcelReader._parse_sheet)"
+   ],
+   "action": "edit",
+   "analysis": "With only header rows, the parser returns empty columns whose number of levels differs from header_names. The unconditional set_names call then raises a ValueError. I guard the call so that names are applied only when the level count matches. This lets the empty DataFrame be returned, as read_csv does. I did not see the parser code that builds those columns, so this is a best guess.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

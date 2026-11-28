@@ -1,0 +1,29 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42433",
+ "fixed": {
+  "step": 4,
+  "explanation": "The embedded control rule only checks role === 'textbox', so searchbox inputs are skipped. Treat searchbox like textbox.",
+  "edits": 1
+ },
+ "rounds": 4,
+ "tools": {
+  "grep": 3,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 4
+ },
+ "sonnet_calls": 5,
+ "cost_usd": 0.0706,
+ "seconds": 18,
+ "diff_stat": "packages/injected/src/roleUtils.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+}
+step 1: grep {"pattern": "role === 'textbox'", "path": "packages/playwright-core/src", "ignore_case": false} -> action=grep picked=[] 
+step 2: grep {"pattern": "'textbox'", "path": "packages/playwright-core/src", "ignore_case": false} -> action=grep picked=[] 
+step 3: grep {"pattern": "textbox", "path": "packages/injected/src/roleUtils.ts", "ignore_case": false} -> action=read picked=['packages/injected/src/roleUtils.ts:getTextAlternativeInternal'] 
+step 4: read {} -> action=edit picked=[] applied
+

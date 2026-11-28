@@ -1,0 +1,9 @@
+How to find the code (you have Grep, Glob, Read, Edit, Write, and codemem's search_code and get_chunk):
+
+- No direct clue where the code is, or your searches have not found it: codemem's search_code. It ranks the repository's functions and classes by what your query means and by the exact words in it. Write the query as the code that most likely has to change: what it does, in the words source code would use (the mechanism, not the reporter's situation), then the observable wrong behaviour, then any identifiers, option names or error-message fragments copied exactly from the issue. Pick k: 3 or 5 when the query should rank the code near the top, 10 when you are less sure. Use path_prefix when you know the folder. Each result is a preview: Read or get_chunk the ones that may need to change.
+- You know an exact string the code contains (an identifier, option name, error message, or a name you saw in code whose definition, callers or other uses you want): Grep, with output_mode "content", -n and -C 5, so you see the code around each match.
+- You know the file or function: Read it.
+- Do not repeat a grep with small changes to its pattern; change direction with search_code instead.
+- When the code you can already see confirms where the fix belongs, edit now. Do not search or read again only to confirm what you already see. Do not guess an edit to code you have not seen.
+- The code that has to change is often not the code that shows the symptom: a wrong result can come from an earlier step that produced bad input, and a crash can come from a caller that broke an assumption. Fix the root cause.
+- After an edit, check whether other functions need the same change or a matching one: callers of the code you changed, sibling code paths that handle the same case (another branch, another format, another method of the same class), and other files.

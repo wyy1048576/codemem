@@ -1,0 +1,42 @@
+diff --git a/packages/utils/processLauncher.ts b/packages/utils/processLauncher.ts
+index 14a982d..3673c92 100644
+--- a/packages/utils/processLauncher.ts
++++ b/packages/utils/processLauncher.ts
+@@ -206,23 +206,22 @@ export async function launchProcess(options: LaunchProcessOptions): Promise<Laun
+   gracefullyCloseSet.add(gracefullyClose);
+   killSet.add(killProcessAndCleanup);
+ 
+-  let gracefullyClosing = false;
+-  async function gracefullyClose(): Promise<void> {
++  let gracefullyClosePromise: Promise<void> | undefined;
++  function gracefullyClose(): Promise<void> {
+     // We keep listeners until we are done, to handle 'exit' and 'SIGINT' while
+-    // asynchronously closing to prevent zombie processes. This might introduce
+-    // reentrancy to this function, for example user sends SIGINT second time.
+-    // In this case, let's forcefully kill the process.
+-    if (gracefullyClosing) {
+-      options.log(`[pid=${spawnedProcess.pid}] <forcefully close>`);
+-      killProcess();
+-      await waitForCleanup;  // Ensure the process is dead and we have cleaned up.
+-      return;
++    // asynchronously closing to prevent zombie processes. Reentrant calls (for example
++    // from a stdin-end handler racing with the transport close) wait for the close
++    // that is already in progress. Forced kill is handled by the 'exit' handler and
++    // the second SIGINT through killSet, or when the graceful attempt fails.
++    if (!gracefullyClosePromise) {
++      gracefullyClosePromise = (async () => {
++        options.log(`[pid=${spawnedProcess.pid}] <gracefully close start>`);
++        await options.attemptToGracefullyClose().catch(() => killProcess());
++        await waitForCleanup;  // Ensure the process is dead and we have cleaned up.
++        options.log(`[pid=${spawnedProcess.pid}] <gracefully close end>`);
++      })();
+     }
+-    gracefullyClosing = true;
+-    options.log(`[pid=${spawnedProcess.pid}] <gracefully close start>`);
+-    await options.attemptToGracefullyClose().catch(() => killProcess());
+-    await waitForCleanup;  // Ensure the process is dead and we have cleaned up.
+-    options.log(`[pid=${spawnedProcess.pid}] <gracefully close end>`);
++    return gracefullyClosePromise;
+   }
+ 
+   // This method has to be sync to be used in the 'exit' event handler.

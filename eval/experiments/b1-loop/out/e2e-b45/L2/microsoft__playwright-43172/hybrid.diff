@@ -1,0 +1,63 @@
+diff --git a/packages/isomorphic/locatorParser.ts b/packages/isomorphic/locatorParser.ts
+index 5267207..00cc4ee 100644
+--- a/packages/isomorphic/locatorParser.ts
++++ b/packages/isomorphic/locatorParser.ts
+@@ -163,7 +163,13 @@ abstract class LocatorParser {
+         parts.push(selectorPart('internal:control', 'enter-frame'));
+         inFrameLocator = false;
+       }
+-      parts.push(...handler(call, this._testIdAttributeName));
++      if (handler === withinParts) {
++        const outer = handler(call, this._testIdAttributeName);
++        const inner: ParsedSelector = { parts: parts.splice(0, parts.length) };
++        parts.push(...outer, nestedSelectorPart('internal:chain', inner));
++      } else {
++        parts.push(...handler(call, this._testIdAttributeName));
++      }
+       if (handler === contentFrameParts || (handler === frameLocatorParts && call.args.length))
+         inFrameLocator = true;
+     } while (this.eat('.'));
+@@ -468,6 +474,16 @@ function textParts(toSelector: (text: string | RegExp, options: { exact?: boolea
+   };
+ }
+ 
++function withinParts(call: CallArguments): ParsedSelectorPart[] {
++  checkArguments(call, 1, []);
++  return [...arg(call, 0, isSelector).parts];
++}
++
++function getByRefParts(call: CallArguments): ParsedSelectorPart[] {
++  checkArguments(call, 1, []);
++  return [selectorPart('aria-ref', arg(call, 0, isString))];
++}
++
+ const andParts = nestedParts('internal:and');
+ const orParts = nestedParts('internal:or');
+ const firstParts = fixedNthParts('0');
+@@ -492,6 +508,8 @@ const kJavaScriptMethods = new Map<string, CallHandler>([
+   ['last', lastParts],
+   ['nth', nthParts],
+   ['visible', visibleParts],
++  ['within', withinParts],
++  ['getByRef', getByRefParts],
+   ['getByRole', getByRoleParts],
+   ['getByText', getByTextParts],
+   ['getByLabel', getByLabelParts],
+@@ -512,6 +530,8 @@ const kPythonMethods = new Map<string, CallHandler>([
+   ['last', lastParts],
+   ['nth', nthParts],
+   ['visible', visibleParts],
++  ['within', withinParts],
++  ['get_by_ref', getByRefParts],
+   ['get_by_role', getByRoleParts],
+   ['get_by_text', getByTextParts],
+   ['get_by_label', getByLabelParts],
+@@ -532,6 +552,8 @@ const kCSharpMethods = new Map<string, CallHandler>([
+   ['Last', lastParts],
+   ['Nth', nthParts],
+   ['Visible', visibleParts],
++  ['Within', withinParts],
++  ['GetByRef', getByRefParts],
+   ['GetByRole', getByRoleParts],
+   ['GetByText', getByTextParts],
+   ['GetByLabel', getByLabelParts],

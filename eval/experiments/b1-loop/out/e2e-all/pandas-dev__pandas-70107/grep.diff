@@ -1,0 +1,20 @@
+diff --git a/pandas/core/arrays/datetimelike.py b/pandas/core/arrays/datetimelike.py
+index 4ecf051..855aa62 100644
+--- a/pandas/core/arrays/datetimelike.py
++++ b/pandas/core/arrays/datetimelike.py
+@@ -786,6 +786,15 @@ class DatetimeLikeArrayMixin(OpsMixin, NDArrayBackedExtensionArray):
+ 
+         if not isinstance(values, type(self)):
+             if values.dtype == object:
++                if isinstance(self.dtype, PeriodDtype) and lib.is_string_array(
++                    np.asarray(values), skipna=True
++                ):
++                    # parse strings using our own freq
++                    try:
++                        values = type(self)._from_sequence(values, dtype=self.dtype)
++                    except (ValueError, TypeError):
++                        return np.zeros(self.shape, dtype=bool)
++                    return self.isin(values)
+                 values = lib.maybe_convert_objects(
+                     values,  # type: ignore[arg-type]
+                     convert_non_numeric=True,

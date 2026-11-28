@@ -1,0 +1,29 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43488",
+ "fixed": {
+  "step": 4,
+  "explanation": "Dedicated worker sessions in _onAttachedToTarget never receive Emulation.setUserAgentOverride, so accept-language/navigator.languages stay default. Send the override with the context options (userAgent, locale, metadata) to the worker session, as service workers do.",
+  "edits": 1
+ },
+ "rounds": 4,
+ "tools": {
+  "grep": 2,
+  "read": 2
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 4
+ },
+ "sonnet_calls": 5,
+ "cost_usd": 0.0685,
+ "seconds": 22,
+ "diff_stat": "packages/playwright-core/src/server/chromium/crPage.ts | 8 ++++++++\n 1 file changed, 8 insertions(+)"
+}
+step 1: grep {"pattern": "setUserAgentOverride", "path": "packages/playwright-core/src/server/chromium", "ignore_case": false} -> action=read picked=['packages/playwright-core/src/server/chromium/crServiceWorker.ts:CRServiceWorker.updateUserAgent', 'packages/playwright-core/src/server/chromium/crPage.ts:FrameSession._updateUserAgent'] 
+step 2: read {} -> action=grep picked=[] 
+step 3: grep {"pattern": "new CRWorker|CRWorker|Network.setUserAgentOverride|isolatedWorld|_workerSessions", "path": "packages/playwright-core/src/server/chromium/crPage.ts" -> action=read picked=['packages/playwright-core/src/server/chromium/crPage.ts:FrameSession._onAttachedToTarget'] 
+step 4: read {} -> action=edit picked=[] applied
+

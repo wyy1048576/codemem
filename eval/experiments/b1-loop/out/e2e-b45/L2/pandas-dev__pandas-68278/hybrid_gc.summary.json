@@ -1,0 +1,87 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": true,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68278",
+ "fixed": {
+  "step": 1,
+  "explanation": "In online_ewma, the decay exponent is deltas[j - 1], which indexes by column j rather than by row i. The deltas array is per row, so for a single column the wrong element is used, or it is out of range. The decay is lost and the result is a plain cumulative mean. The fix is to index with the row, deltas[i - 1].",
+  "edits": 1
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0358,
+ "seconds": 16,
+ "diff_stat": "pandas/core/window/online.py | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Online/incremental exponentially weighted moving mean (EWM online, ExponentialMovingWindow.online, EWMMeanState) update path that, for single-column inputs, computes a plain cumulative mean and ignores the decay/alpha weights; should apply the same weighting as the regular ewm mean.",
+    "symptom": "Online EWM mean for single-column DataFrames ignores decay and returns a plain cumulative mean instead of matching the regular ewm mean.",
+    "anchors": [
+     "mean"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/window/ewm.py",
+     126,
+     1012
+    ],
+    [
+     "pandas/core/generic.py",
+     12477,
+     12692
+    ],
+    [
+     "pandas/core/window/online.py",
+     92,
+     135
+    ],
+    [
+     "pandas/core/window/online.py",
+     13,
+     89
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     3906,
+     4013
+    ]
+   ],
+   "shown_whole": [
+    false,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.025748,
+   "action": "edit",
+   "analysis": "In online_ewma, the decay exponent is deltas[j - 1], which indexes by column j rather than by row i. The deltas array is per row, so for a single column the wrong element is used, or it is out of range. The decay is lost and the result is a plain cumulative mean. The fix is to index with the row, deltas[i - 1].",
+   "picked": [
+    "pandas/core/window/online.py:generate_online_numba_ewma_func"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

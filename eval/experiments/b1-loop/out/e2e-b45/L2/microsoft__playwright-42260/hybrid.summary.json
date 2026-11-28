@@ -1,0 +1,87 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42260",
+ "fixed": {
+  "step": 1,
+  "explanation": "_collectDB opens an IDBDatabase connection and never closes it, which blocks later deletes or upgrades (restore) while a page is open. The fix closes the connection after collection. I did the same in _restoreDB.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0356,
+ "seconds": 41,
+ "diff_stat": "packages/injected/src/storageScript.ts | 9 +++++++--\n 1 file changed, 7 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Code that collects IndexedDB databases for the browser context storageState (indexedDB: true) via a page-side script, opening databases and reading all records. It likely doesn't close the opened IDBDatabase connection, so a later restore (setStorageState/addInitScript that opens/deletes databases) blocks.",
+    "symptom": "Saving storage state with IndexedDB leaves database connections open, so restoring storage later hangs when a page is open.",
+    "anchors": [
+     "IndexedDB"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     149,
+     177
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     136,
+     147
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     72,
+     134
+    ],
+    [
+     "tests/library/browsercontext-storage-state.spec.ts",
+     415,
+     589
+    ],
+    [
+     "packages/playwright-core/src/client/browserContext.ts",
+     479,
+     486
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.025494000000000003,
+   "action": "edit",
+   "analysis": "_collectDB opens an IDBDatabase connection and never closes it, which blocks later deletes or upgrades (restore) while a page is open. The fix closes the connection after collection. I did the same in _restoreDB.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._collectDB"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

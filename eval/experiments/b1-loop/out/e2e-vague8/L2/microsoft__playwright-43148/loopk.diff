@@ -1,0 +1,19 @@
+diff --git a/packages/playwright-core/src/server/cookieStore.ts b/packages/playwright-core/src/server/cookieStore.ts
+index 2d13ecb..fae1622 100644
+--- a/packages/playwright-core/src/server/cookieStore.ts
++++ b/packages/playwright-core/src/server/cookieStore.ts
+@@ -229,9 +229,9 @@ export function domainMatches(value: string, domain: string): boolean {
+ function pathMatches(value: string, path: string): boolean {
+   if (value === path)
+     return true;
+-  if (!value.endsWith('/'))
+-    value = value + '/';
+-  if (!path.endsWith('/'))
+-    path = path + '/';
+-  return value.startsWith(path);
++  if (!value.startsWith(path))
++    return false;
++  if (path.endsWith('/'))
++    return true;
++  return value[path.length] === '/';
+ }

@@ -1,0 +1,84 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43174",
+ "fixed": {
+  "step": 1,
+  "explanation": "On stdin end, two paths call gracefullyClose for the same process. The second call hits the reentrancy branch, which force-kills the browser right away. I changed that branch so a re-entrant call waits for the first close to finish. The force kill still happens if the graceful close fails or times out, because closeOrKill and the attemptToGracefullyClose catch both call kill. I haven't run this.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0307,
+ "seconds": 22,
+ "diff_stat": "packages/utils/processLauncher.ts | 5 ++---\n 1 file changed, 2 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "The MCP server's stdin 'close' handling and the process exit handler that calls gracefullyCloseAll on all browsers, plus the browser process gracefullyClose that force-kills if a close is already in progress. Make a second graceful close wait for the first, or give stdin-end shutdown a single owner.",
+    "symptom": "On stdin end, the browser's graceful close is invoked twice, so the second call force-kills the browser immediately via taskkill, risking loss of persistent profile data.",
+    "anchors": [
+     "taskkill",
+     "kill",
+     "transport",
+     "close"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/playwright-core/src/server/browserType.ts",
+     245,
+     257
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/chromium.ts",
+     245,
+     249
+    ],
+    [
+     "packages/utils/processLauncher.ts",
+     210,
+     226
+    ],
+    [
+     "packages/utils/processLauncher.ts",
+     229,
+     249
+    ],
+    [
+     "packages/playwright-core/src/server/firefox/firefox.ts",
+     81,
+     85
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "On stdin end, two paths call gracefullyClose for the same process. The second call hits the reentrancy branch, which force-kills the browser right away. I changed that branch so a re-entrant call waits for the first close to finish. The force kill still happens if the graceful close fails or times out, because closeOrKill and the attemptToGracefullyClose catch both call kill. I haven't run this.",
+   "picked": [
+    "packages/utils/processLauncher.ts:launchProcess.gracefullyClose"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

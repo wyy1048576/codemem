@@ -1,0 +1,53 @@
+diff --git a/docs/src/test-api/class-test.md b/docs/src/test-api/class-test.md
+index 53b5afa..f497e3b 100644
+--- a/docs/src/test-api/class-test.md
++++ b/docs/src/test-api/class-test.md
+@@ -577,6 +577,12 @@ The number of retries for each test.
+ 
+ Timeout for each test in milliseconds. Overrides [`property: TestProject.timeout`] and [`property: TestConfig.timeout`].
+ 
++### option: Test.describe.configure.lock
++* since: v1.63
++- `lock` ?<[string]|[Array]<[string]>>
++
++Lock name or names taken by all tests in the enclosing file or group, including nested groups. Tests holding the same lock do not run at the same time.
++
+ 
+ ## method: Test.describe.fixme
+ * since: v1.25
+diff --git a/packages/playwright/src/common/testType.ts b/packages/playwright/src/common/testType.ts
+index 748d48d..1842d00 100644
+--- a/packages/playwright/src/common/testType.ts
++++ b/packages/playwright/src/common/testType.ts
+@@ -189,12 +189,17 @@ export class TestTypeImpl {
+     suite._hooks.push({ type: name, fn: fn!, title, location });
+   }
+ 
+-  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number }) {
++  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number, lock?: string | string[] }) {
+     throwIfRunningInsideJest();
+     const suite = this._currentSuite(location, `test.describe.configure()`);
+     if (!suite)
+       return;
+ 
++    if (options.lock !== undefined) {
++      const { locks } = validateTestDetails({ lock: options.lock }, location);
++      suite._locks.push(...locks);
++    }
++
+     if (options.timeout !== undefined)
+       suite._timeout = options.timeout;
+ 
+diff --git a/packages/playwright/types/test.d.ts b/packages/playwright/types/test.d.ts
+index 9253f8e..d997085 100644
+--- a/packages/playwright/types/test.d.ts
++++ b/packages/playwright/types/test.d.ts
+@@ -4434,7 +4434,7 @@ export interface TestType<TestArgs extends {}, WorkerArgs extends {}> {
+      *
+      * @param options
+      */
+-    configure: (options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number }) => void;
++    configure: (options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number, lock?: string | string[] }) => void;
+   };
+ 
+   /**

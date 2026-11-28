@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-70742",
+ "exit": 0,
+ "seconds": 23,
+ "cost_usd": 0.045099600000000004,
+ "turns": 6,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 5019,
+  "cache_read_input_tokens": 47096,
+  "output_tokens": 2029,
+  "output_tokens_details": {
+   "thinking_tokens": 730
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 5019,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 342,
+    "cache_read_input_tokens": 9817,
+    "cache_creation_input_tokens": 594,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 594
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 3,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/internals/managers.py | 19 ++++++++++++-------\n 1 file changed, 12 insertions(+), 7 deletions(-)",
+ "final": "I changed `BlockManager.fast_xs` in `pandas/core/internals/managers.py`. It now copies the row when the single block's data is shared with nothing else. I haven't run or tested it.\n\n**Cause:** selecting a row and a non-adjacent list of columns first copies the columns into a temporary 3 by N block. The row was then taken as a view of that block, so the 3-value result kept the whole temporary alive.\n\n**Fix:** if `refs.has_reference()` is false, the block has no other users, so it is either a temporary or data nobody else holds. In that case `fast_xs` now builds the row from `result.copy()` and gives it no shared refs. When the data is shared, it still returns a view tracked by the refs, as before.\n\n**Side effect:** `df.iloc[0]` on a single-block DataFrame that has no other references to its data now also returns a copy. That copy is only one value per column. Copy-on-write already makes a later write to either side trigger a copy, so the visible behaviour shouldn't change.\n\nI didn't add a test.",
+ "stderr": ""
+}
+

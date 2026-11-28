@@ -1,0 +1,36 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 2,
+  "explanation": "pathMatches appends '/' to both the request path and the cookie path before comparing. That makes a cookie with path /foo/ match the request path /foo. It also makes /api match /apiv2 through a prefix check on strings that were not normalised. The edit follows RFC 6265 section 5.1.4: the paths are equal, or the cookie path is a prefix of the request path and either ends with '/' or is followed by '/' in the request path. I did not see the browser-level cookie filter, so the host-only subdomain part of the issue may still need a change elsewhere.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0391,
+ "seconds": 25,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)"
+}
+round 1: k=3 action=search picked=['packages/playwright-core/src/server/fetch.ts:APIRequestContext._updateRequestCookieHeader'] 
+round 2: k=2 action=edit picked=['packages/playwright-core/src/server/cookieStore.ts:pathMatches'] applied
+
+parse errors in browser_patches/webkit/embedder/Playwright/win/WinMain.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   2%|▏         | 7/290 [00:00<00:04, 61.95it/s]
+Loading weights:   7%|▋         | 20/290 [00:00<00:02, 92.49it/s]
+Loading weights:  10%|█         | 30/290 [00:00<00:02, 88.63it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 786.93it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

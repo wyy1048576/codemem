@@ -1,0 +1,13 @@
+diff --git a/packages/isomorphic/urlMatch.ts b/packages/isomorphic/urlMatch.ts
+index 30cd9a9..88cb2ca 100644
+--- a/packages/isomorphic/urlMatch.ts
++++ b/packages/isomorphic/urlMatch.ts
+@@ -241,7 +241,7 @@ function resolveGlobBase(baseURL: string | undefined, match: string): string {
+       }
+       const questionIndex = token.indexOf('?');
+       if (questionIndex === -1)
+-        return mapToken(token, `$_${index}_$`);
++        return token;
+       const newPrefix = mapToken(token.substring(0, questionIndex), `$_${index}_$`);
+       const newSuffix = mapToken(token.substring(questionIndex), `?$_${index}_$`);
+       return newPrefix + newSuffix;

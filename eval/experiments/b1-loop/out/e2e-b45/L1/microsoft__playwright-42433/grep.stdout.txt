@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42433",
+ "exit": 0,
+ "seconds": 10,
+ "cost_usd": 0.0214061,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 3067,
+  "cache_read_input_tokens": 27821,
+  "output_tokens": 634,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 3067,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 197,
+    "cache_read_input_tokens": 8203,
+    "cache_creation_input_tokens": 256,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 256
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/injected/src/roleUtils.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "final": "I fixed this in `packages/injected/src/roleUtils.ts` (around line 749). I haven't built or run anything, and I didn't add a test.\n\nThe embedded-control branch of the accessible name computation only contributed a value when the role was `textbox`. An `<input type=\"search\">` has the `searchbox` role, so it skipped that branch and its value was dropped. The condition now reads `role === 'textbox' || role === 'searchbox'`.\n\nA search input now contributes its value to the name the same way a text input does. That covers both a button named through `aria-labelledby` and a search input inside a `<label>`.",
+ "stderr": ""
+}
+

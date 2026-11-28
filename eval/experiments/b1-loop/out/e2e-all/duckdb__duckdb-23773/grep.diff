@@ -1,0 +1,15 @@
+diff --git a/src/include/duckdb/common/operator/decimal_cast_operators.hpp b/src/include/duckdb/common/operator/decimal_cast_operators.hpp
+index 3df1b43..32b9e8e 100644
+--- a/src/include/duckdb/common/operator/decimal_cast_operators.hpp
++++ b/src/include/duckdb/common/operator/decimal_cast_operators.hpp
+@@ -569,6 +569,10 @@ struct DecimalCastOperation {
+ 				auto mod = state.result % 10;
+ 				round_up = NEGATIVE ? mod <= -5 : mod >= 5;
+ 				state.result /= 10;
++					if (state.result == 0 && i + 1 < idx_t(-int64_t(exponent))) {
++						// remaining removed digits are all zero, so nothing to round up
++						round_up = false;
++					}
+ 				if (state.result == 0) {
+ 					break;
+ 				}

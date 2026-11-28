@@ -1,0 +1,110 @@
+{
+ "arm": "codemem-loop-merged",
+ "fixed_k": 10,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "parseRawCookie processes attributes in order, so a later Expires overrides an earlier Max-Age. Also parseInt accepts values like \"12abc\". Fix: collect expires and max-age separately, validate Max-Age with /^-?\\d+$/, and apply Max-Age after the loop so it wins.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  10
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0688,
+ "seconds": 15,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 13 +++++++------\n 1 file changed, 7 insertions(+), 6 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie parsing/storage in the cookie jar used by API request contexts: when handling Set-Cookie attributes, Max-Age must take precedence over Expires regardless of attribute order, and a Max-Age value that is not a plain integer must be ignored.",
+    "symptom": "A Set-Cookie with Max-Age listed before a past Expires is dropped by API request contexts, instead of Max-Age taking precedence, and non-integer Max-Age values are not ignored.",
+    "anchors": [
+     "Max-Age",
+     "Expires"
+    ],
+    "look_in": []
+   },
+   "k": 10,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     211
+    ],
+    [
+     "packages/playwright-core/src/server/har/harTracer.ts",
+     776,
+     818
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     56,
+     60
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     21,
+     61
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     392,
+     591
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     238,
+     413
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     287,
+     299
+    ],
+    [
+     "tests/library/browsercontext-cookies.spec.ts",
+     363,
+     469
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     118,
+     123
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     114,
+     119
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "parseRawCookie processes attributes in order, so a later Expires overrides an earlier Max-Age. Also parseInt accepts values like \"12abc\". Fix: collect expires and max-age separately, validate Max-Age with /^-?\\d+$/, and apply Max-Age after the loop so it wins.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

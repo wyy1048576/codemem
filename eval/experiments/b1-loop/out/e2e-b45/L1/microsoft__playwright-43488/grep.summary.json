@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43488",
+ "exit": 0,
+ "seconds": 16,
+ "cost_usd": 0.0502006,
+ "turns": 7,
+ "usage": {
+  "input_tokens": 10,
+  "cache_creation_input_tokens": 7119,
+  "cache_read_input_tokens": 42746,
+  "output_tokens": 1743,
+  "output_tokens_details": {
+   "thinking_tokens": 101
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 7119,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 256,
+    "cache_read_input_tokens": 11652,
+    "cache_creation_input_tokens": 859,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 859
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Read": 3,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/server/chromium/crPage.ts | 8 ++++++++\n 1 file changed, 8 insertions(+)",
+ "final": "Dedicated workers in Chromium now get the context's locale. I couldn't build or run anything, so this is untested.\n\nThe change is in `packages/playwright-core/src/server/chromium/crPage.ts`, in the code that attaches to a new worker. If the context has a `userAgent` or `locale`, it now sends `Emulation.setUserAgentOverride` to the worker's session. The call carries the user agent, `acceptLanguage` set to the locale, and the user agent metadata. It goes out just before `Runtime.runIfWaitingForDebugger`, so the override should be in place before the worker script starts running. This is the same override the service worker code already sends.\n\nThat should fix both the `Accept-Language` header on requests made from inside the worker and `navigator.languages` in the worker.",
+ "stderr": ""
+}

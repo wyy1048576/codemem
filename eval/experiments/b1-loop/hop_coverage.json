@@ -1,0 +1,2002 @@
+[
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-23604",
+  "top_files": 28,
+  "hop_files": 335,
+  "hop_chunks": 9629,
+  "repo_files": 5194,
+  "repo_chunks": 82811
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-23604",
+  "top_files": 20,
+  "hop_files": 507,
+  "hop_chunks": 12827,
+  "repo_files": 5194,
+  "repo_chunks": 82811
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-23604",
+  "top_files": 17,
+  "hop_files": 274,
+  "hop_chunks": 6455,
+  "repo_files": 5194,
+  "repo_chunks": 82811
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-23604",
+  "top_files": 20,
+  "hop_files": 507,
+  "hop_chunks": 12827,
+  "repo_files": 5194,
+  "repo_chunks": 82811
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-23773",
+  "top_files": 17,
+  "hop_files": 232,
+  "hop_chunks": 8680,
+  "repo_files": 5242,
+  "repo_chunks": 83356
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-23773",
+  "top_files": 20,
+  "hop_files": 293,
+  "hop_chunks": 9317,
+  "repo_files": 5242,
+  "repo_chunks": 83356
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-23773",
+  "top_files": 11,
+  "hop_files": 198,
+  "hop_chunks": 7878,
+  "repo_files": 5242,
+  "repo_chunks": 83356
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-23773",
+  "top_files": 20,
+  "hop_files": 293,
+  "hop_chunks": 9317,
+  "repo_files": 5242,
+  "repo_chunks": 83356
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-23825",
+  "top_files": 38,
+  "hop_files": 729,
+  "hop_chunks": 17541,
+  "repo_files": 5249,
+  "repo_chunks": 83433
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-23825",
+  "top_files": 35,
+  "hop_files": 727,
+  "hop_chunks": 14867,
+  "repo_files": 5249,
+  "repo_chunks": 83433
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-23825",
+  "top_files": 32,
+  "hop_files": 623,
+  "hop_chunks": 14940,
+  "repo_files": 5249,
+  "repo_chunks": 83433
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-23825",
+  "top_files": 28,
+  "hop_files": 528,
+  "hop_chunks": 10209,
+  "repo_files": 5249,
+  "repo_chunks": 83433
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-23876",
+  "top_files": 27,
+  "hop_files": 499,
+  "hop_chunks": 12768,
+  "repo_files": 5250,
+  "repo_chunks": 83500
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-23876",
+  "top_files": 22,
+  "hop_files": 424,
+  "hop_chunks": 9367,
+  "repo_files": 5250,
+  "repo_chunks": 83500
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-23876",
+  "top_files": 21,
+  "hop_files": 448,
+  "hop_chunks": 9324,
+  "repo_files": 5250,
+  "repo_chunks": 83500
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-23876",
+  "top_files": 22,
+  "hop_files": 424,
+  "hop_chunks": 9367,
+  "repo_files": 5250,
+  "repo_chunks": 83500
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-23939",
+  "top_files": 20,
+  "hop_files": 251,
+  "hop_chunks": 10984,
+  "repo_files": 5266,
+  "repo_chunks": 83938
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-23939",
+  "top_files": 22,
+  "hop_files": 312,
+  "hop_chunks": 12347,
+  "repo_files": 5266,
+  "repo_chunks": 83938
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-23939",
+  "top_files": 16,
+  "hop_files": 256,
+  "hop_chunks": 11399,
+  "repo_files": 5266,
+  "repo_chunks": 83938
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-23939",
+  "top_files": 22,
+  "hop_files": 312,
+  "hop_chunks": 12347,
+  "repo_files": 5266,
+  "repo_chunks": 83938
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-23952",
+  "top_files": 20,
+  "hop_files": 255,
+  "hop_chunks": 6924,
+  "repo_files": 5258,
+  "repo_chunks": 83795
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-23952",
+  "top_files": 18,
+  "hop_files": 264,
+  "hop_chunks": 4843,
+  "repo_files": 5258,
+  "repo_chunks": 83795
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-23952",
+  "top_files": 14,
+  "hop_files": 254,
+  "hop_chunks": 4911,
+  "repo_files": 5258,
+  "repo_chunks": 83795
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-23952",
+  "top_files": 6,
+  "hop_files": 109,
+  "hop_chunks": 1840,
+  "repo_files": 5258,
+  "repo_chunks": 83795
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24101",
+  "top_files": 29,
+  "hop_files": 485,
+  "hop_chunks": 12937,
+  "repo_files": 5273,
+  "repo_chunks": 84024
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24101",
+  "top_files": 26,
+  "hop_files": 399,
+  "hop_chunks": 7967,
+  "repo_files": 5273,
+  "repo_chunks": 84024
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24101",
+  "top_files": 25,
+  "hop_files": 421,
+  "hop_chunks": 8602,
+  "repo_files": 5273,
+  "repo_chunks": 84024
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24101",
+  "top_files": 26,
+  "hop_files": 399,
+  "hop_chunks": 7967,
+  "repo_files": 5273,
+  "repo_chunks": 84024
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24163",
+  "top_files": 25,
+  "hop_files": 360,
+  "hop_chunks": 10386,
+  "repo_files": 5271,
+  "repo_chunks": 84003
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24163",
+  "top_files": 22,
+  "hop_files": 323,
+  "hop_chunks": 8596,
+  "repo_files": 5271,
+  "repo_chunks": 84003
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24163",
+  "top_files": 18,
+  "hop_files": 307,
+  "hop_chunks": 8340,
+  "repo_files": 5271,
+  "repo_chunks": 84003
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24163",
+  "top_files": 22,
+  "hop_files": 323,
+  "hop_chunks": 8596,
+  "repo_files": 5271,
+  "repo_chunks": 84003
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24266",
+  "top_files": 22,
+  "hop_files": 331,
+  "hop_chunks": 9243,
+  "repo_files": 5299,
+  "repo_chunks": 84410
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24266",
+  "top_files": 20,
+  "hop_files": 311,
+  "hop_chunks": 5962,
+  "repo_files": 5299,
+  "repo_chunks": 84410
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24266",
+  "top_files": 16,
+  "hop_files": 243,
+  "hop_chunks": 4026,
+  "repo_files": 5299,
+  "repo_chunks": 84410
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24266",
+  "top_files": 20,
+  "hop_files": 311,
+  "hop_chunks": 5962,
+  "repo_files": 5299,
+  "repo_chunks": 84410
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24382",
+  "top_files": 31,
+  "hop_files": 767,
+  "hop_chunks": 18370,
+  "repo_files": 5311,
+  "repo_chunks": 84703
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24382",
+  "top_files": 30,
+  "hop_files": 919,
+  "hop_chunks": 20813,
+  "repo_files": 5311,
+  "repo_chunks": 84703
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24382",
+  "top_files": 21,
+  "hop_files": 888,
+  "hop_chunks": 18182,
+  "repo_files": 5311,
+  "repo_chunks": 84703
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24382",
+  "top_files": 30,
+  "hop_files": 919,
+  "hop_chunks": 20813,
+  "repo_files": 5311,
+  "repo_chunks": 84703
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24505",
+  "top_files": 25,
+  "hop_files": 556,
+  "hop_chunks": 13623,
+  "repo_files": 4573,
+  "repo_chunks": 72135
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24505",
+  "top_files": 24,
+  "hop_files": 392,
+  "hop_chunks": 7943,
+  "repo_files": 4573,
+  "repo_chunks": 72135
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24505",
+  "top_files": 25,
+  "hop_files": 414,
+  "hop_chunks": 9193,
+  "repo_files": 4573,
+  "repo_chunks": 72135
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24505",
+  "top_files": 8,
+  "hop_files": 229,
+  "hop_chunks": 5546,
+  "repo_files": 4573,
+  "repo_chunks": 72135
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24548",
+  "top_files": 29,
+  "hop_files": 492,
+  "hop_chunks": 13042,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24548",
+  "top_files": 26,
+  "hop_files": 504,
+  "hop_chunks": 12580,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24548",
+  "top_files": 24,
+  "hop_files": 577,
+  "hop_chunks": 14205,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24548",
+  "top_files": 26,
+  "hop_files": 504,
+  "hop_chunks": 12580,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24557",
+  "top_files": 34,
+  "hop_files": 675,
+  "hop_chunks": 13819,
+  "repo_files": 4612,
+  "repo_chunks": 72872
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24557",
+  "top_files": 25,
+  "hop_files": 324,
+  "hop_chunks": 6546,
+  "repo_files": 4612,
+  "repo_chunks": 72872
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24557",
+  "top_files": 23,
+  "hop_files": 354,
+  "hop_chunks": 7605,
+  "repo_files": 4612,
+  "repo_chunks": 72872
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24557",
+  "top_files": 25,
+  "hop_files": 324,
+  "hop_chunks": 6546,
+  "repo_files": 4612,
+  "repo_chunks": 72872
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24582",
+  "top_files": 27,
+  "hop_files": 567,
+  "hop_chunks": 14942,
+  "repo_files": 4585,
+  "repo_chunks": 72276
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24582",
+  "top_files": 19,
+  "hop_files": 327,
+  "hop_chunks": 9194,
+  "repo_files": 4585,
+  "repo_chunks": 72276
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24582",
+  "top_files": 20,
+  "hop_files": 462,
+  "hop_chunks": 10094,
+  "repo_files": 4585,
+  "repo_chunks": 72276
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24582",
+  "top_files": 19,
+  "hop_files": 327,
+  "hop_chunks": 9194,
+  "repo_files": 4585,
+  "repo_chunks": 72276
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24693",
+  "top_files": 32,
+  "hop_files": 382,
+  "hop_chunks": 9858,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24693",
+  "top_files": 22,
+  "hop_files": 273,
+  "hop_chunks": 7917,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24693",
+  "top_files": 18,
+  "hop_files": 229,
+  "hop_chunks": 7571,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24693",
+  "top_files": 10,
+  "hop_files": 101,
+  "hop_chunks": 3206,
+  "repo_files": 4587,
+  "repo_chunks": 72371
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24752",
+  "top_files": 29,
+  "hop_files": 405,
+  "hop_chunks": 10870,
+  "repo_files": 4610,
+  "repo_chunks": 72838
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24752",
+  "top_files": 24,
+  "hop_files": 343,
+  "hop_chunks": 7174,
+  "repo_files": 4610,
+  "repo_chunks": 72838
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24752",
+  "top_files": 21,
+  "hop_files": 341,
+  "hop_chunks": 7029,
+  "repo_files": 4610,
+  "repo_chunks": 72838
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24752",
+  "top_files": 17,
+  "hop_files": 288,
+  "hop_chunks": 5313,
+  "repo_files": 4610,
+  "repo_chunks": 72838
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24821",
+  "top_files": 25,
+  "hop_files": 376,
+  "hop_chunks": 12828,
+  "repo_files": 4612,
+  "repo_chunks": 72864
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24821",
+  "top_files": 19,
+  "hop_files": 402,
+  "hop_chunks": 10170,
+  "repo_files": 4612,
+  "repo_chunks": 72864
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24821",
+  "top_files": 17,
+  "hop_files": 374,
+  "hop_chunks": 9818,
+  "repo_files": 4612,
+  "repo_chunks": 72864
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24821",
+  "top_files": 19,
+  "hop_files": 402,
+  "hop_chunks": 10170,
+  "repo_files": 4612,
+  "repo_chunks": 72864
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24875",
+  "top_files": 32,
+  "hop_files": 420,
+  "hop_chunks": 10624,
+  "repo_files": 4711,
+  "repo_chunks": 74714
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24875",
+  "top_files": 20,
+  "hop_files": 266,
+  "hop_chunks": 8377,
+  "repo_files": 4711,
+  "repo_chunks": 74714
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24875",
+  "top_files": 18,
+  "hop_files": 212,
+  "hop_chunks": 4962,
+  "repo_files": 4711,
+  "repo_chunks": 74714
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24875",
+  "top_files": 20,
+  "hop_files": 266,
+  "hop_chunks": 8377,
+  "repo_files": 4711,
+  "repo_chunks": 74714
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24933",
+  "top_files": 34,
+  "hop_files": 502,
+  "hop_chunks": 14158,
+  "repo_files": 4740,
+  "repo_chunks": 76026
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24933",
+  "top_files": 27,
+  "hop_files": 290,
+  "hop_chunks": 9073,
+  "repo_files": 4740,
+  "repo_chunks": 76026
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24933",
+  "top_files": 24,
+  "hop_files": 217,
+  "hop_chunks": 7428,
+  "repo_files": 4740,
+  "repo_chunks": 76026
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24933",
+  "top_files": 27,
+  "hop_files": 290,
+  "hop_chunks": 9073,
+  "repo_files": 4740,
+  "repo_chunks": 76026
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-24957",
+  "top_files": 20,
+  "hop_files": 236,
+  "hop_chunks": 4000,
+  "repo_files": 4650,
+  "repo_chunks": 73223
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-24957",
+  "top_files": 20,
+  "hop_files": 232,
+  "hop_chunks": 3868,
+  "repo_files": 4650,
+  "repo_chunks": 73223
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-24957",
+  "top_files": 15,
+  "hop_files": 215,
+  "hop_chunks": 3681,
+  "repo_files": 4650,
+  "repo_chunks": 73223
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-24957",
+  "top_files": 20,
+  "hop_files": 232,
+  "hop_chunks": 3868,
+  "repo_files": 4650,
+  "repo_chunks": 73223
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-25031",
+  "top_files": 29,
+  "hop_files": 431,
+  "hop_chunks": 11437,
+  "repo_files": 4731,
+  "repo_chunks": 75908
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-25031",
+  "top_files": 20,
+  "hop_files": 283,
+  "hop_chunks": 9839,
+  "repo_files": 4731,
+  "repo_chunks": 75908
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-25031",
+  "top_files": 23,
+  "hop_files": 394,
+  "hop_chunks": 11829,
+  "repo_files": 4731,
+  "repo_chunks": 75908
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-25031",
+  "top_files": 20,
+  "hop_files": 283,
+  "hop_chunks": 9839,
+  "repo_files": 4731,
+  "repo_chunks": 75908
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-25042",
+  "top_files": 20,
+  "hop_files": 410,
+  "hop_chunks": 9564,
+  "repo_files": 4713,
+  "repo_chunks": 74736
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-25042",
+  "top_files": 10,
+  "hop_files": 194,
+  "hop_chunks": 4352,
+  "repo_files": 4713,
+  "repo_chunks": 74736
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-25042",
+  "top_files": 8,
+  "hop_files": 47,
+  "hop_chunks": 3035,
+  "repo_files": 4713,
+  "repo_chunks": 74736
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-25042",
+  "top_files": 22,
+  "hop_files": 708,
+  "hop_chunks": 19043,
+  "repo_files": 4713,
+  "repo_chunks": 74736
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-25055",
+  "top_files": 21,
+  "hop_files": 335,
+  "hop_chunks": 11246,
+  "repo_files": 4713,
+  "repo_chunks": 74776
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-25055",
+  "top_files": 20,
+  "hop_files": 367,
+  "hop_chunks": 9213,
+  "repo_files": 4713,
+  "repo_chunks": 74776
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-25055",
+  "top_files": 19,
+  "hop_files": 401,
+  "hop_chunks": 10104,
+  "repo_files": 4713,
+  "repo_chunks": 74776
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-25055",
+  "top_files": 20,
+  "hop_files": 367,
+  "hop_chunks": 9213,
+  "repo_files": 4713,
+  "repo_chunks": 74776
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-25101",
+  "top_files": 27,
+  "hop_files": 359,
+  "hop_chunks": 8862,
+  "repo_files": 4721,
+  "repo_chunks": 74971
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-25101",
+  "top_files": 20,
+  "hop_files": 585,
+  "hop_chunks": 10304,
+  "repo_files": 4721,
+  "repo_chunks": 74971
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-25101",
+  "top_files": 16,
+  "hop_files": 267,
+  "hop_chunks": 5390,
+  "repo_files": 4721,
+  "repo_chunks": 74971
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-25101",
+  "top_files": 20,
+  "hop_files": 585,
+  "hop_chunks": 10304,
+  "repo_files": 4721,
+  "repo_chunks": 74971
+ },
+ {
+  "repo": "duckdb",
+  "arm": "whole",
+  "task": "duckdb__duckdb-25153",
+  "top_files": 37,
+  "hop_files": 667,
+  "hop_chunks": 13349,
+  "repo_files": 4721,
+  "repo_chunks": 74955
+ },
+ {
+  "repo": "duckdb",
+  "arm": "oneshot",
+  "task": "duckdb__duckdb-25153",
+  "top_files": 28,
+  "hop_files": 810,
+  "hop_chunks": 15262,
+  "repo_files": 4721,
+  "repo_chunks": 74955
+ },
+ {
+  "repo": "duckdb",
+  "arm": "diagnose",
+  "task": "duckdb__duckdb-25153",
+  "top_files": 29,
+  "hop_files": 860,
+  "hop_chunks": 15438,
+  "repo_files": 4721,
+  "repo_chunks": 74955
+ },
+ {
+  "repo": "duckdb",
+  "arm": "loop",
+  "task": "duckdb__duckdb-25153",
+  "top_files": 28,
+  "hop_files": 810,
+  "hop_chunks": 15262,
+  "repo_files": 4721,
+  "repo_chunks": 74955
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-66145",
+  "top_files": 17,
+  "hop_files": 204,
+  "hop_chunks": 8044,
+  "repo_files": 1584,
+  "repo_chunks": 37091
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-66145",
+  "top_files": 12,
+  "hop_files": 108,
+  "hop_chunks": 4840,
+  "repo_files": 1584,
+  "repo_chunks": 37091
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-66145",
+  "top_files": 17,
+  "hop_files": 240,
+  "hop_chunks": 10145,
+  "repo_files": 1584,
+  "repo_chunks": 37091
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-66145",
+  "top_files": 12,
+  "hop_files": 108,
+  "hop_chunks": 4840,
+  "repo_files": 1584,
+  "repo_chunks": 37091
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-66234",
+  "top_files": 14,
+  "hop_files": 188,
+  "hop_chunks": 7485,
+  "repo_files": 1595,
+  "repo_chunks": 38670
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-66234",
+  "top_files": 9,
+  "hop_files": 129,
+  "hop_chunks": 5804,
+  "repo_files": 1595,
+  "repo_chunks": 38670
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-66234",
+  "top_files": 8,
+  "hop_files": 123,
+  "hop_chunks": 5430,
+  "repo_files": 1595,
+  "repo_chunks": 38670
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-66234",
+  "top_files": 9,
+  "hop_files": 129,
+  "hop_chunks": 5804,
+  "repo_files": 1595,
+  "repo_chunks": 38670
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-66270",
+  "top_files": 16,
+  "hop_files": 121,
+  "hop_chunks": 5592,
+  "repo_files": 1590,
+  "repo_chunks": 38187
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-66270",
+  "top_files": 18,
+  "hop_files": 170,
+  "hop_chunks": 7647,
+  "repo_files": 1590,
+  "repo_chunks": 38187
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-66270",
+  "top_files": 14,
+  "hop_files": 171,
+  "hop_chunks": 8385,
+  "repo_files": 1590,
+  "repo_chunks": 38187
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-66270",
+  "top_files": 13,
+  "hop_files": 165,
+  "hop_chunks": 7110,
+  "repo_files": 1590,
+  "repo_chunks": 38187
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-66530",
+  "top_files": 17,
+  "hop_files": 341,
+  "hop_chunks": 15007,
+  "repo_files": 1583,
+  "repo_chunks": 37520
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-66530",
+  "top_files": 16,
+  "hop_files": 286,
+  "hop_chunks": 13250,
+  "repo_files": 1583,
+  "repo_chunks": 37520
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-66530",
+  "top_files": 18,
+  "hop_files": 327,
+  "hop_chunks": 14462,
+  "repo_files": 1583,
+  "repo_chunks": 37520
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-66530",
+  "top_files": 16,
+  "hop_files": 286,
+  "hop_chunks": 13250,
+  "repo_files": 1583,
+  "repo_chunks": 37520
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-67004",
+  "top_files": 24,
+  "hop_files": 276,
+  "hop_chunks": 11956,
+  "repo_files": 1599,
+  "repo_chunks": 39465
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-67004",
+  "top_files": 15,
+  "hop_files": 206,
+  "hop_chunks": 9526,
+  "repo_files": 1599,
+  "repo_chunks": 39465
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-67004",
+  "top_files": 11,
+  "hop_files": 185,
+  "hop_chunks": 8962,
+  "repo_files": 1599,
+  "repo_chunks": 39465
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-67004",
+  "top_files": 8,
+  "hop_files": 179,
+  "hop_chunks": 8875,
+  "repo_files": 1599,
+  "repo_chunks": 39465
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-67944",
+  "top_files": 19,
+  "hop_files": 151,
+  "hop_chunks": 6493,
+  "repo_files": 1595,
+  "repo_chunks": 38421
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-67944",
+  "top_files": 16,
+  "hop_files": 138,
+  "hop_chunks": 6047,
+  "repo_files": 1595,
+  "repo_chunks": 38421
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-67944",
+  "top_files": 17,
+  "hop_files": 140,
+  "hop_chunks": 6075,
+  "repo_files": 1595,
+  "repo_chunks": 38421
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-67944",
+  "top_files": 16,
+  "hop_files": 138,
+  "hop_chunks": 6047,
+  "repo_files": 1595,
+  "repo_chunks": 38421
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-68081",
+  "top_files": 28,
+  "hop_files": 404,
+  "hop_chunks": 18144,
+  "repo_files": 1595,
+  "repo_chunks": 38665
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-68081",
+  "top_files": 22,
+  "hop_files": 381,
+  "hop_chunks": 17298,
+  "repo_files": 1595,
+  "repo_chunks": 38665
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-68081",
+  "top_files": 23,
+  "hop_files": 400,
+  "hop_chunks": 18141,
+  "repo_files": 1595,
+  "repo_chunks": 38665
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-68081",
+  "top_files": 22,
+  "hop_files": 381,
+  "hop_chunks": 17298,
+  "repo_files": 1595,
+  "repo_chunks": 38665
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-68083",
+  "top_files": 21,
+  "hop_files": 242,
+  "hop_chunks": 12417,
+  "repo_files": 1601,
+  "repo_chunks": 39754
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-68083",
+  "top_files": 19,
+  "hop_files": 229,
+  "hop_chunks": 11977,
+  "repo_files": 1601,
+  "repo_chunks": 39754
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-68083",
+  "top_files": 21,
+  "hop_files": 230,
+  "hop_chunks": 11988,
+  "repo_files": 1601,
+  "repo_chunks": 39754
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-68083",
+  "top_files": 19,
+  "hop_files": 229,
+  "hop_chunks": 11977,
+  "repo_files": 1601,
+  "repo_chunks": 39754
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-68358",
+  "top_files": 22,
+  "hop_files": 219,
+  "hop_chunks": 8748,
+  "repo_files": 1601,
+  "repo_chunks": 39616
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-68358",
+  "top_files": 11,
+  "hop_files": 190,
+  "hop_chunks": 9563,
+  "repo_files": 1601,
+  "repo_chunks": 39616
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-68358",
+  "top_files": 11,
+  "hop_files": 114,
+  "hop_chunks": 5216,
+  "repo_files": 1601,
+  "repo_chunks": 39616
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-68358",
+  "top_files": 11,
+  "hop_files": 190,
+  "hop_chunks": 9563,
+  "repo_files": 1601,
+  "repo_chunks": 39616
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-68575",
+  "top_files": 25,
+  "hop_files": 274,
+  "hop_chunks": 12224,
+  "repo_files": 1598,
+  "repo_chunks": 39118
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-68575",
+  "top_files": 15,
+  "hop_files": 228,
+  "hop_chunks": 10872,
+  "repo_files": 1598,
+  "repo_chunks": 39118
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-68575",
+  "top_files": 11,
+  "hop_files": 121,
+  "hop_chunks": 5644,
+  "repo_files": 1598,
+  "repo_chunks": 39118
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-68575",
+  "top_files": 10,
+  "hop_files": 208,
+  "hop_chunks": 10091,
+  "repo_files": 1598,
+  "repo_chunks": 39118
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-68947",
+  "top_files": 22,
+  "hop_files": 537,
+  "hop_chunks": 22288,
+  "repo_files": 1598,
+  "repo_chunks": 39223
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-68947",
+  "top_files": 16,
+  "hop_files": 505,
+  "hop_chunks": 21756,
+  "repo_files": 1598,
+  "repo_chunks": 39223
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-68947",
+  "top_files": 15,
+  "hop_files": 497,
+  "hop_chunks": 21512,
+  "repo_files": 1598,
+  "repo_chunks": 39223
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-68947",
+  "top_files": 15,
+  "hop_files": 497,
+  "hop_chunks": 21512,
+  "repo_files": 1598,
+  "repo_chunks": 39223
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-69113",
+  "top_files": 35,
+  "hop_files": 283,
+  "hop_chunks": 11606,
+  "repo_files": 1615,
+  "repo_chunks": 39855
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-69113",
+  "top_files": 25,
+  "hop_files": 222,
+  "hop_chunks": 9929,
+  "repo_files": 1615,
+  "repo_chunks": 39855
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-69113",
+  "top_files": 25,
+  "hop_files": 188,
+  "hop_chunks": 8503,
+  "repo_files": 1615,
+  "repo_chunks": 39855
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-69113",
+  "top_files": 25,
+  "hop_files": 222,
+  "hop_chunks": 9929,
+  "repo_files": 1615,
+  "repo_chunks": 39855
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-69447",
+  "top_files": 23,
+  "hop_files": 305,
+  "hop_chunks": 13967,
+  "repo_files": 1601,
+  "repo_chunks": 39591
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-69447",
+  "top_files": 21,
+  "hop_files": 294,
+  "hop_chunks": 13361,
+  "repo_files": 1601,
+  "repo_chunks": 39591
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-69447",
+  "top_files": 24,
+  "hop_files": 300,
+  "hop_chunks": 13454,
+  "repo_files": 1601,
+  "repo_chunks": 39591
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-69447",
+  "top_files": 21,
+  "hop_files": 294,
+  "hop_chunks": 13361,
+  "repo_files": 1601,
+  "repo_chunks": 39591
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-69478",
+  "top_files": 23,
+  "hop_files": 193,
+  "hop_chunks": 8250,
+  "repo_files": 1601,
+  "repo_chunks": 39678
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-69478",
+  "top_files": 22,
+  "hop_files": 204,
+  "hop_chunks": 8682,
+  "repo_files": 1601,
+  "repo_chunks": 39678
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-69478",
+  "top_files": 15,
+  "hop_files": 185,
+  "hop_chunks": 7263,
+  "repo_files": 1601,
+  "repo_chunks": 39678
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-69478",
+  "top_files": 22,
+  "hop_files": 204,
+  "hop_chunks": 8682,
+  "repo_files": 1601,
+  "repo_chunks": 39678
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-69960",
+  "top_files": 23,
+  "hop_files": 227,
+  "hop_chunks": 9915,
+  "repo_files": 1617,
+  "repo_chunks": 40270
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-69960",
+  "top_files": 23,
+  "hop_files": 197,
+  "hop_chunks": 8549,
+  "repo_files": 1617,
+  "repo_chunks": 40270
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-69960",
+  "top_files": 20,
+  "hop_files": 171,
+  "hop_chunks": 7836,
+  "repo_files": 1617,
+  "repo_chunks": 40270
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-69960",
+  "top_files": 18,
+  "hop_files": 161,
+  "hop_chunks": 7308,
+  "repo_files": 1617,
+  "repo_chunks": 40270
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-70102",
+  "top_files": 27,
+  "hop_files": 351,
+  "hop_chunks": 14689,
+  "repo_files": 1615,
+  "repo_chunks": 39904
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-70102",
+  "top_files": 27,
+  "hop_files": 415,
+  "hop_chunks": 19201,
+  "repo_files": 1615,
+  "repo_chunks": 39904
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-70102",
+  "top_files": 21,
+  "hop_files": 380,
+  "hop_chunks": 17811,
+  "repo_files": 1615,
+  "repo_chunks": 39904
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-70102",
+  "top_files": 20,
+  "hop_files": 183,
+  "hop_chunks": 8267,
+  "repo_files": 1615,
+  "repo_chunks": 39904
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-70107",
+  "top_files": 24,
+  "hop_files": 236,
+  "hop_chunks": 10119,
+  "repo_files": 1615,
+  "repo_chunks": 39827
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-70107",
+  "top_files": 24,
+  "hop_files": 492,
+  "hop_chunks": 21940,
+  "repo_files": 1615,
+  "repo_chunks": 39827
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-70107",
+  "top_files": 24,
+  "hop_files": 484,
+  "hop_chunks": 21778,
+  "repo_files": 1615,
+  "repo_chunks": 39827
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-70107",
+  "top_files": 24,
+  "hop_files": 492,
+  "hop_chunks": 21940,
+  "repo_files": 1615,
+  "repo_chunks": 39827
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-70221",
+  "top_files": 29,
+  "hop_files": 411,
+  "hop_chunks": 15958,
+  "repo_files": 1615,
+  "repo_chunks": 39882
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-70221",
+  "top_files": 22,
+  "hop_files": 1148,
+  "hop_chunks": 34614,
+  "repo_files": 1615,
+  "repo_chunks": 39882
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-70221",
+  "top_files": 21,
+  "hop_files": 1146,
+  "hop_chunks": 34612,
+  "repo_files": 1615,
+  "repo_chunks": 39882
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-70221",
+  "top_files": 29,
+  "hop_files": 331,
+  "hop_chunks": 12053,
+  "repo_files": 1615,
+  "repo_chunks": 39882
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-70530",
+  "top_files": 20,
+  "hop_files": 255,
+  "hop_chunks": 10982,
+  "repo_files": 1615,
+  "repo_chunks": 39958
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-70530",
+  "top_files": 13,
+  "hop_files": 208,
+  "hop_chunks": 10291,
+  "repo_files": 1615,
+  "repo_chunks": 39958
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-70530",
+  "top_files": 15,
+  "hop_files": 212,
+  "hop_chunks": 10316,
+  "repo_files": 1615,
+  "repo_chunks": 39958
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-70530",
+  "top_files": 13,
+  "hop_files": 208,
+  "hop_chunks": 10291,
+  "repo_files": 1615,
+  "repo_chunks": 39958
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-70631",
+  "top_files": 20,
+  "hop_files": 327,
+  "hop_chunks": 14995,
+  "repo_files": 1615,
+  "repo_chunks": 39961
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-70631",
+  "top_files": 16,
+  "hop_files": 338,
+  "hop_chunks": 15369,
+  "repo_files": 1615,
+  "repo_chunks": 39961
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-70631",
+  "top_files": 15,
+  "hop_files": 304,
+  "hop_chunks": 14232,
+  "repo_files": 1615,
+  "repo_chunks": 39961
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-70631",
+  "top_files": 16,
+  "hop_files": 338,
+  "hop_chunks": 15369,
+  "repo_files": 1615,
+  "repo_chunks": 39961
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-70742",
+  "top_files": 20,
+  "hop_files": 1048,
+  "hop_chunks": 32651,
+  "repo_files": 1617,
+  "repo_chunks": 40412
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-70742",
+  "top_files": 19,
+  "hop_files": 1073,
+  "hop_chunks": 33741,
+  "repo_files": 1617,
+  "repo_chunks": 40412
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-70742",
+  "top_files": 12,
+  "hop_files": 161,
+  "hop_chunks": 7177,
+  "repo_files": 1617,
+  "repo_chunks": 40412
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-70742",
+  "top_files": 19,
+  "hop_files": 1073,
+  "hop_chunks": 33741,
+  "repo_files": 1617,
+  "repo_chunks": 40412
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-71171",
+  "top_files": 8,
+  "hop_files": 114,
+  "hop_chunks": 5368,
+  "repo_files": 1617,
+  "repo_chunks": 40495
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-71171",
+  "top_files": 7,
+  "hop_files": 100,
+  "hop_chunks": 4767,
+  "repo_files": 1617,
+  "repo_chunks": 40495
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-71171",
+  "top_files": 7,
+  "hop_files": 100,
+  "hop_chunks": 4767,
+  "repo_files": 1617,
+  "repo_chunks": 40495
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-71171",
+  "top_files": 7,
+  "hop_files": 100,
+  "hop_chunks": 4767,
+  "repo_files": 1617,
+  "repo_chunks": 40495
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-71222",
+  "top_files": 22,
+  "hop_files": 223,
+  "hop_chunks": 8586,
+  "repo_files": 1617,
+  "repo_chunks": 40352
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-71222",
+  "top_files": 17,
+  "hop_files": 152,
+  "hop_chunks": 6500,
+  "repo_files": 1617,
+  "repo_chunks": 40352
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-71222",
+  "top_files": 18,
+  "hop_files": 283,
+  "hop_chunks": 10152,
+  "repo_files": 1617,
+  "repo_chunks": 40352
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-71222",
+  "top_files": 17,
+  "hop_files": 152,
+  "hop_chunks": 6500,
+  "repo_files": 1617,
+  "repo_chunks": 40352
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-71334",
+  "top_files": 23,
+  "hop_files": 332,
+  "hop_chunks": 14699,
+  "repo_files": 1617,
+  "repo_chunks": 40592
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-71334",
+  "top_files": 28,
+  "hop_files": 371,
+  "hop_chunks": 16301,
+  "repo_files": 1617,
+  "repo_chunks": 40592
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-71334",
+  "top_files": 29,
+  "hop_files": 292,
+  "hop_chunks": 12808,
+  "repo_files": 1617,
+  "repo_chunks": 40592
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-71334",
+  "top_files": 12,
+  "hop_files": 179,
+  "hop_chunks": 7927,
+  "repo_files": 1617,
+  "repo_chunks": 40592
+ },
+ {
+  "repo": "pandas",
+  "arm": "whole",
+  "task": "pandas-dev__pandas-71442",
+  "top_files": 34,
+  "hop_files": 991,
+  "hop_chunks": 31356,
+  "repo_files": 1617,
+  "repo_chunks": 40626
+ },
+ {
+  "repo": "pandas",
+  "arm": "oneshot",
+  "task": "pandas-dev__pandas-71442",
+  "top_files": 30,
+  "hop_files": 998,
+  "hop_chunks": 31489,
+  "repo_files": 1617,
+  "repo_chunks": 40626
+ },
+ {
+  "repo": "pandas",
+  "arm": "diagnose",
+  "task": "pandas-dev__pandas-71442",
+  "top_files": 33,
+  "hop_files": 998,
+  "hop_chunks": 31593,
+  "repo_files": 1617,
+  "repo_chunks": 40626
+ },
+ {
+  "repo": "pandas",
+  "arm": "loop",
+  "task": "pandas-dev__pandas-71442",
+  "top_files": 27,
+  "hop_files": 170,
+  "hop_chunks": 6967,
+  "repo_files": 1617,
+  "repo_chunks": 40626
+ }
+]

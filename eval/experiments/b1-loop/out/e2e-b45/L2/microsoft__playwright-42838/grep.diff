@@ -1,0 +1,53 @@
+diff --git a/packages/injected/src/clock.ts b/packages/injected/src/clock.ts
+index 69fe461..6117635 100644
+--- a/packages/injected/src/clock.ts
++++ b/packages/injected/src/clock.ts
+@@ -802,6 +802,7 @@ export function install(globalObject: WindowOrWorkerGlobalScope, config: Install
+   for (const method of toFake) {
+     if (method === 'Date') {
+       (globalObject as any).Date = mirrorDateProperties(api.Date, (globalObject as any).Date);
++      fakeTemporalNow(globalObject, clock);
+     } else if (method === 'Intl') {
+       (globalObject as any).Intl = api[method]!;
+     } else if (method === 'AbortSignal') {
+@@ -829,6 +830,40 @@ export function install(globalObject: WindowOrWorkerGlobalScope, config: Install
+   return { clock, api, originals };
+ }
+ 
++function fakeTemporalNow(globalObject: any, clock: ClockController) {
++  const Temporal = globalObject.Temporal;
++  const now = Temporal?.Now;
++  if (!now || typeof BigInt === 'undefined')
++    return;
++  const originals: Record<string, any> = {};
++  const override = (name: string, fn: Function) => {
++    if (typeof now[name] !== 'function')
++      return;
++    originals[name] = now[name];
++    try {
++      now[name] = fn;
++    } catch {
++    }
++  };
++  const zoned = (tz?: any) => {
++    const instant = new Temporal.Instant(BigInt(Math.floor(clock.now())) * BigInt(1000000));
++    return instant.toZonedDateTimeISO(tz ?? originals.timeZoneId.call(now));
++  };
++  override('instant', () => new Temporal.Instant(BigInt(Math.floor(clock.now())) * BigInt(1000000)));
++  override('zonedDateTimeISO', (tz?: any) => zoned(tz));
++  override('plainDateTimeISO', (tz?: any) => zoned(tz).toPlainDateTime());
++  override('plainDateISO', (tz?: any) => zoned(tz).toPlainDate());
++  override('plainTimeISO', (tz?: any) => zoned(tz).toPlainTime());
++  clock.disposables.push(() => {
++    for (const name of Object.keys(originals)) {
++      try {
++        now[name] = originals[name];
++      } catch {
++      }
++    }
++  });
++}
++
+ export function inject(globalObject: WindowOrWorkerGlobalScope, browserName?: string) {
+   const builtins = platformOriginals(globalObject).bound;
+   const { clock: controller } = install(globalObject, { browserName });

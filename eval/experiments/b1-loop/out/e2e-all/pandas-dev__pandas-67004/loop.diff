@@ -1,0 +1,36 @@
+diff --git a/pandas/core/arrays/arrow/accessors.py b/pandas/core/arrays/arrow/accessors.py
+index 8f166a3..34e233f 100644
+--- a/pandas/core/arrays/arrow/accessors.py
++++ b/pandas/core/arrays/arrow/accessors.py
+@@ -162,11 +162,26 @@ class ListAccessor(ArrowAccessor):
+         from pandas import Series
+ 
+         if isinstance(key, int):
+-            # TODO: Support negative key but pyarrow does not allow
+-            # element index to be an array.
+-            # if key < 0:
+-            #     key = pc.add(key, pc.list_value_length(self._pa_array))
+-            element = pc.list_element(self._pa_array, key)
++            if key < 0:
++                # pyarrow list_element does not accept negative indices, so
++                # compute absolute positions into each chunk's flat values.
++                value_type = self._pa_array.type.value_type
++                pieces = []
++                for chunk in self._pa_array.chunks:
++                    offsets = chunk.offsets
++                    start = offsets[:-1]
++                    idx = pc.add(offsets[1:], key)
++                    is_null = pc.is_null(chunk)
++                    valid = pc.greater_equal(idx, start)
++                    bad = pc.and_(pc.invert(valid), pc.invert(is_null))
++                    if pc.any(bad).as_py():
++                        raise IndexError("list index out of range")
++                    keep = pc.and_(valid, pc.invert(is_null))
++                    idx = pc.if_else(keep, idx, pa.scalar(None, type=idx.type))
++                    pieces.append(chunk.values.take(idx))
++                element = pa.chunked_array(pieces, type=value_type)
++            else:
++                element = pc.list_element(self._pa_array, key)
+             return Series(
+                 element,
+                 dtype=ArrowDtype(element.type),

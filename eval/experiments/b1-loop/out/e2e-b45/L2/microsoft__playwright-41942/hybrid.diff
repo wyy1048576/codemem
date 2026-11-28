@@ -1,0 +1,14 @@
+diff --git a/packages/playwright-core/src/server/registry/index.ts b/packages/playwright-core/src/server/registry/index.ts
+index 2b6e014..e587f58 100644
+--- a/packages/playwright-core/src/server/registry/index.ts
++++ b/packages/playwright-core/src/server/registry/index.ts
+@@ -502,7 +502,8 @@ export const defaultCacheDirectory = (() => {
+     return path.join(os.homedir(), 'Library', 'Caches');
+   if (process.platform === 'win32')
+     return process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+-  throw new Error('Unsupported platform: ' + process.platform);
++  // Unknown platform (e.g. android/Termux): do not throw, so that PLAYWRIGHT_BROWSERS_PATH override keeps working.
++  return process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache');
+ })();
+ 
+ export const defaultRegistryDirectory = path.join(defaultCacheDirectory, 'ms-playwright');

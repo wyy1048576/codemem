@@ -1,0 +1,65 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43400",
+ "fixed": {
+  "round": 1,
+  "explanation": "fill() compares input.value to the given value by strict equality. For datetime-local the browser normalizes the value by dropping zero seconds and zero fractional seconds, so the check fails. The edit also accepts the normalized form of the given value for datetime-local.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0339,
+ "seconds": 19,
+ "diff_stat": "packages/injected/src/injectedScript.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The injected script's fill logic in the selector/injected code sets an input's value, then verifies by strict equality that input.value equals the given value, throwing 'Malformed value' otherwise. Special-case datetime-local (like range) so the normalized value is accepted, e.g. skip the check or compare normalized forms.",
+    "symptom": "Filling a datetime-local input with a value including zero seconds throws a 'Malformed value' error because the browser normalizes the value and strict comparison fails.",
+    "anchors": [
+     "datetime-local",
+     "range",
+     "fill",
+     "2026-10-14T12:00:00"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "tests/page/page-fill.spec.ts",
+     23,
+     218
+    ],
+    [
+     "packages/injected/src/injectedScript.ts",
+     906,
+     943
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "fill() compares input.value to the given value by strict equality. For datetime-local the browser normalizes the value by dropping zero seconds and zero fractional seconds, so the check fails. The edit also accepts the normalized form of the given value for datetime-local.",
+   "picked": [
+    "packages/injected/src/injectedScript.ts:InjectedScript.fill"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

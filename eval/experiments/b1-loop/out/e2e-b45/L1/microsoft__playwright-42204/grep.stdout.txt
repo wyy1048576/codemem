@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42204",
+ "exit": 0,
+ "seconds": 11,
+ "cost_usd": 0.026668400000000002,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 3712,
+  "cache_read_input_tokens": 27944,
+  "output_tokens": 901,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 3712,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 209,
+    "cache_read_input_tokens": 8588,
+    "cache_creation_input_tokens": 516,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 516
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 5 ++++-\n 1 file changed, 4 insertions(+), 1 deletion(-)",
+ "final": "I changed `gitDiff` in `packages/playwright/src/plugins/gitCommitInfoPlugin.ts` so it no longer turns a full clone into a shallow one. I haven't built or run it.\n\nThe PR-base fetch now runs `git rev-parse --is-shallow-repository` first. It adds `--depth=1` only when the repository is already shallow. In a complete clone, the fetch runs without a depth limit, so history stays intact. The diff against the base is still captured as before.\n\nA full clone fetching the base commit without a depth limit may download more objects than before. I didn't use a separate object store, which the reporter also suggested.",
+ "stderr": ""
+}
+

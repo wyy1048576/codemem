@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "duckdb__duckdb-23604",
+ "exit": 0,
+ "seconds": 43,
+ "cost_usd": 0.11546029999999999,
+ "turns": 17,
+ "usage": {
+  "input_tokens": 24,
+  "cache_creation_input_tokens": 17189,
+  "cache_read_input_tokens": 161163,
+  "output_tokens": 3054,
+  "output_tokens_details": {
+   "thinking_tokens": 554
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 17189,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 297,
+    "cache_read_input_tokens": 20598,
+    "cache_creation_input_tokens": 398,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 398
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 7,
+  "Read": 8,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "src/optimizer/filter_combiner.cpp | 3 ++-\n 1 file changed, 2 insertions(+), 1 deletion(-)",
+ "final": "`starts_with(s, '\u2026')` and `s ^@ '\u2026'` should now prune row groups the way `LIKE 'prefix%'` does. I couldn't build or run anything, so this is untested.\n\n**Cause:** `FilterCombiner::TryPushdownPrefixFilter` in `src/optimizer/filter_combiner.cpp` only recognised functions named `prefix`. In the `core_functions` extension, `starts_with` and `^@` come from `StartsWithOperatorFun`, whose scalar function is named `^@` (`starts_with` is an alias). Neither name matched, so the rewrite to `s >= 'p' AND s < next('p')` never happened and no zonemap pruning was possible.\n\n**Change:** the check now accepts `prefix`, `starts_with` and `^@`. I didn't touch the rest of the pushdown logic.\n\nI didn't add a regression test.",
+ "stderr": ""
+}
+

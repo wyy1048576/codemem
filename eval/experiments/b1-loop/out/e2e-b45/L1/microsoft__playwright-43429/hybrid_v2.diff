@@ -1,0 +1,51 @@
+diff --git a/packages/injected/src/storageScript.ts b/packages/injected/src/storageScript.ts
+index efb3054..a310227 100644
+--- a/packages/injected/src/storageScript.ts
++++ b/packages/injected/src/storageScript.ts
+@@ -69,7 +69,7 @@ export class StorageScript {
+         this._isPlainObject(v)
+         || Array.isArray(v)
+         || typeof v === 'string'
+-        || typeof v === 'number'
++        || (typeof v === 'number' && Number.isFinite(v) && !Object.is(v, -0))
+         || typeof v === 'boolean'
+         || Object.is(v, null)
+       );
+@@ -80,7 +80,7 @@ export class StorageScript {
+       return { fallThrough: v };
+     }, { extendedSerialization: true });
+     if (trivial)
+-      return { trivial: value };
++      return { trivial: { value } };
+     return { encoded };
+   }
+ 
+@@ -106,7 +106,7 @@ export class StorageScript {
+           if (objectStore.keyPath === null) {
+             const { encoded, trivial } = this._trySerialize(key);
+             if (trivial)
+-              record.key = trivial;
++              record.key = trivial.value;
+             else
+               record.keyEncoded = encoded;
+           }
+@@ -114,7 +114,7 @@ export class StorageScript {
+           const value = await this._idbRequestToPromise(objectStore.get(key));
+           const { encoded, trivial } = this._trySerialize(value);
+           if (trivial)
+-            record.value = trivial;
++            record.value = trivial.value;
+           else
+             record.valueEncoded = encoded;
+ 
+@@ -215,8 +215,8 @@ export class StorageScript {
+         await Promise.all(store.records.map(async record => {
+           await this._idbRequestToPromise(
+               objectStore.add(
+-                  record.value ?? parseEvaluationResultValue(record.valueEncoded),
+-                  record.key ?? parseEvaluationResultValue(record.keyEncoded),
++                  'value' in record ? record.value : parseEvaluationResultValue(record.valueEncoded),
++                  'key' in record ? record.key : parseEvaluationResultValue(record.keyEncoded),
+               )
+           );
+         }));

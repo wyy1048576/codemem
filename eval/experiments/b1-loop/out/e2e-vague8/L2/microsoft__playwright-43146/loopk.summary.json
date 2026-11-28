@@ -1,0 +1,68 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "parseRawCookie overwrites cookie.expires in attribute order, so an Expires after Max-Age wins. Also parseInt accepts non-integer values like '10abc'. Fix: record Max-Age expiry separately (only if value matches /^-?\\d+$/) and apply it after the loop, overriding Expires.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0434,
+ "seconds": 22,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 11 +++++++----\n 1 file changed, 7 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie parsing and storage for APIRequestContext (Set-Cookie header handling) computes expiry from Expires and Max-Age attributes. Max-Age must always take precedence over Expires regardless of attribute order, and a Max-Age value that is not a plain integer must be ignored.",
+    "symptom": "A Set-Cookie with Max-Age before a past Expires is dropped as expired, and non-integer Max-Age values are not ignored.",
+    "anchors": [
+     "Max-Age",
+     "Expires",
+     "API request contexts"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     211
+    ],
+    [
+     "packages/playwright-core/src/server/har/harTracer.ts",
+     776,
+     818
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     287,
+     299
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "parseRawCookie overwrites cookie.expires in attribute order, so an Expires after Max-Age wins. Also parseInt accepts non-integer values like '10abc'. Fix: record Max-Age expiry separately (only if value matches /^-?\\d+$/) and apply it after the loop, overriding Expires.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

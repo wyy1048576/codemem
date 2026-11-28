@@ -1,0 +1,346 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0096,
+ "task": "pandas-dev__pandas-70742",
+ "fixed": {
+  "round": 1,
+  "explanation": "The single-block path of fast_xs returned a strided view of the block's values and shared the block's refs. When the block was a temporary from a column take, the small row Series kept the whole temporary array alive. The fix copies the row, so the result owns its few values and holds no reference to the parent block. Under copy-on-write the row never needed to be a view.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1851,
+ "seconds": 29,
+ "diff_stat": "pandas/core/internals/managers.py | 5 +++--\n 1 file changed, 3 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The row-selection path of DataFrame indexing (fast xs / _ixs for a single row on a multi-block or non-contiguous column selection) builds a Series from a row of a temporary 2D array created by taking columns (e.g. take/reindex of blocks, interleaved values). The Series is a view of that temporary array, so it keeps the whole array alive; the result should be copied or otherwise not reference the base temporary.",
+    "symptom": "Selecting a single row with a list of non-adjacent columns (via loc or iloc) returns a small Series whose data is a view on a large temporary (n_columns by n_rows) array, keeping lots of memory alive.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/apply.py",
+     1585,
+     1628
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2126,
+     2152
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     297,
+     310
+    ],
+    [
+     "pandas/core/base.py",
+     260,
+     273
+    ],
+    [
+     "pandas/core/indexing.py",
+     3545,
+     3562
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2252,
+     2290
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     1060,
+     1065
+    ],
+    [
+     "pandas/core/frame.py",
+     4245,
+     4266
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     746,
+     772
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     703,
+     721
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     312,
+     323
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     1051,
+     1058
+    ],
+    [
+     "pandas/core/indexing.py",
+     2100,
+     3283
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2325,
+     2330
+    ],
+    [
+     "pandas/io/pytables.py",
+     6768,
+     6798
+    ],
+    [
+     "pandas/io/pytables.py",
+     275,
+     286
+    ],
+    [
+     "pandas/core/methods/select.py",
+     80,
+     85
+    ],
+    [
+     "pandas/core/series.py",
+     1066,
+     1079
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     500,
+     514
+    ],
+    [
+     "pandas/core/apply.py",
+     1604,
+     1607
+    ],
+    [
+     "pandas/core/apply.py",
+     1616,
+     1618
+    ],
+    [
+     "pandas/tests/indexing/test_iloc.py",
+     71,
+     1783
+    ],
+    [
+     "pandas/core/apply.py",
+     1622,
+     1626
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     91,
+     112
+    ],
+    [
+     "pandas/io/pytables.py",
+     5360,
+     5384
+    ],
+    [
+     "pandas/core/generic.py",
+     4371,
+     4384
+    ],
+    [
+     "pandas/core/base.py",
+     220,
+     243
+    ],
+    [
+     "pandas/io/pytables.py",
+     5334,
+     5358
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     1166,
+     1247
+    ],
+    [
+     "pandas/io/pytables.py",
+     1187,
+     1343
+    ],
+    [
+     "pandas/tests/indexing/test_iloc.py",
+     2420,
+     2430
+    ],
+    [
+     "pandas/core/indexing.py",
+     1170,
+     1196
+    ],
+    [
+     "pandas/core/indexing.py",
+     1198,
+     1263
+    ],
+    [
+     "pandas/core/apply.py",
+     1532,
+     1583
+    ],
+    [
+     "pandas/errors/__init__.py",
+     687,
+     711
+    ],
+    [
+     "pandas/core/frame.py",
+     4268,
+     4276
+    ],
+    [
+     "pandas/core/frame.py",
+     9722,
+     9859
+    ],
+    [
+     "pandas/_testing/__init__.py",
+     517,
+     567
+    ],
+    [
+     "pandas/tests/indexing/test_loc.py",
+     4256,
+     4271
+    ],
+    [
+     "pandas/core/generic.py",
+     5648,
+     5909
+    ],
+    [
+     "pandas/core/indexing.py",
+     1790,
+     1812
+    ],
+    [
+     "pandas/tests/copy_view/test_indexing.py",
+     724,
+     743
+    ],
+    [
+     "pandas/tests/indexing/test_iloc.py",
+     2394,
+     2404
+    ],
+    [
+     "pandas/core/frame.py",
+     9861,
+     9990
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2530,
+     2544
+    ],
+    [
+     "pandas/core/_numba/extensions.py",
+     573,
+     574
+    ],
+    [
+     "pandas/core/interchange/dataframe_protocol.py",
+     176,
+     356
+    ],
+    [
+     "pandas/io/pytables.py",
+     6679,
+     6707
+    ],
+    [
+     "pandas/core/groupby/indexing.py",
+     250,
+     366
+    ],
+    [
+     "pandas/core/methods/select.py",
+     60,
+     170
+    ]
+   ],
+   "analysis": "BlockManager.fast_xs has a single-block fast path that returns a view of the block's values for the row, sharing the block's refs. When the columns were first selected with a take, the single block is a temporary copy, so the row Series keeps that whole array alive. Selecting the row first and then the columns avoids this because the row is built from the DataFrame's own data. The fix probably belongs in this path: copy the row when the block is not referenced elsewhere, or otherwise avoid the view.",
+   "picked": [
+    "pandas/core/internals/managers.py:BlockManager.fast_xs"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/internals/managers.py lines 1166-1247 (BlockManager.fast_xs)"
+   ],
+   "fix_attempt": "applied: The single-block path of fast_xs returned a strided view of the block's values and shared the block's refs. When the block was a temporary from a column take, the small row Series kept the whole temporary array alive. The fix copies the row, so the result owns its few values and holds no reference to the parent block. Under copy-on-write the row never needed to be a view."
+  }
+ ]
+}

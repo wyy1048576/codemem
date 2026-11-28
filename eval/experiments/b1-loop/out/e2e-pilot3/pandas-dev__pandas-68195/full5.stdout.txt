@@ -1,0 +1,33 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 5,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.015,
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "The three guards in _AsOfMerge._validate_tolerance reject only negative tolerances, so 0 is valid, but the error message said \"must be positive\". I changed the message to \"tolerance must be non-negative\" in all three branches (datetime-like, integer and float keys), so it matches what the guards accept.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0919,
+ "seconds": 23,
+ "diff_stat": "pandas/core/reshape/merge.py | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)"
+}
+round 1: found=True picked=['pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance']
+  fix: applied: The three guards in _AsOfMerge._validate_tolerance reject only negative tolerances, so 0 is valid, but the error message said "must be positive". I changed the message to "tolerance must be non-negative" in all three branches (datetime-like, integer and float keys), so it matches what the guards accept.
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   4%|▍         | 12/290 [00:00<00:02, 113.00it/s]
+Loading weights:  10%|█         | 29/290 [00:00<00:01, 139.53it/s]
+Loading weights:  15%|█▍        | 43/290 [00:00<00:01, 134.71it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 761.00it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

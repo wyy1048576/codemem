@@ -1,0 +1,27 @@
+diff --git a/packages/playwright/src/common/testType.ts b/packages/playwright/src/common/testType.ts
+index 748d48d..74a2f28 100644
+--- a/packages/playwright/src/common/testType.ts
++++ b/packages/playwright/src/common/testType.ts
+@@ -189,12 +189,21 @@ export class TestTypeImpl {
+     suite._hooks.push({ type: name, fn: fn!, title, location });
+   }
+ 
+-  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number }) {
++  private _configure(location: Location, options: { mode?: 'default' | 'parallel' | 'serial', retries?: number, timeout?: number, lock?: string | string[] }) {
+     throwIfRunningInsideJest();
+     const suite = this._currentSuite(location, `test.describe.configure()`);
+     if (!suite)
+       return;
+ 
++    if (options.lock !== undefined) {
++      const locks = Array.isArray(options.lock) ? options.lock : [options.lock];
++      for (const lock of locks) {
++        if (typeof lock !== 'string')
++          throw new Error(`test.describe.configure() 'lock' option must be a string or an array of strings`);
++      }
++      suite._locks.push(...locks);
++    }
++
+     if (options.timeout !== undefined)
+       suite._timeout = options.timeout;
+ 

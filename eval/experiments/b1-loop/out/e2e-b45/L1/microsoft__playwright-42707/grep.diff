@@ -1,0 +1,113 @@
+diff --git a/packages/injected/src/storageScript.ts b/packages/injected/src/storageScript.ts
+index aae4653..0b87cb4 100644
+--- a/packages/injected/src/storageScript.ts
++++ b/packages/injected/src/storageScript.ts
+@@ -77,7 +77,7 @@ export class StorageScript {
+         trivial = false;
+ 
+       return { fallThrough: v };
+-    });
++    }, { mapsAndSets: true });
+     if (trivial)
+       return { trivial: value };
+     return { encoded };
+diff --git a/packages/isomorphic/utilityScriptSerializers.ts b/packages/isomorphic/utilityScriptSerializers.ts
+index 7e5264e..512e342 100644
+--- a/packages/isomorphic/utilityScriptSerializers.ts
++++ b/packages/isomorphic/utilityScriptSerializers.ts
+@@ -37,15 +37,34 @@ export type SerializedValue =
+     { h: number } |
+     { fn: string } |
+     { ta: { b: string, k: TypedArrayKind } } |
+-    { ab: { b: string } };
++    { ab: { b: string } } |
++    { m: { k: SerializedValue, v: SerializedValue }[], id: number } |
++    { se: SerializedValue[], id: number };
+ 
+ type HandleOrValue = { h: number } | { fn: string } | { fallThrough: any };
+ 
+ type VisitorInfo = {
+   visited: Map<object, number>;
+   lastId: number;
++  mapsAndSets: boolean;
+ };
+ 
++function isMap(obj: any): obj is Map<any, any> {
++  try {
++    return obj instanceof Map || Object.prototype.toString.call(obj) === '[object Map]';
++  } catch (error) {
++    return false;
++  }
++}
++
++function isSet(obj: any): obj is Set<any> {
++  try {
++    return obj instanceof Set || Object.prototype.toString.call(obj) === '[object Set]';
++  } catch (error) {
++    return false;
++  }
++}
++
+ function isRegExp(obj: any): obj is RegExp {
+   try {
+     return obj instanceof RegExp || Object.prototype.toString.call(obj) === '[object RegExp]';
+@@ -183,6 +202,20 @@ export function parseEvaluationResultValue(value: SerializedValue, handles: any[
+       }
+       return result;
+     }
++    if ('m' in value) {
++      const result = new Map<any, any>();
++      refs.set(value.id, result);
++      for (const { k, v } of value.m)
++        result.set(parseEvaluationResultValue(k, handles, refs), parseEvaluationResultValue(v, handles, refs));
++      return result;
++    }
++    if ('se' in value) {
++      const result = new Set<any>();
++      refs.set(value.id, result);
++      for (const v of value.se)
++        result.add(parseEvaluationResultValue(v, handles, refs));
++      return result;
++    }
+     if ('h' in value)
+       return handles[value.h];
+     if ('fn' in value) {
+@@ -198,8 +231,8 @@ export function parseEvaluationResultValue(value: SerializedValue, handles: any[
+   return value;
+ }
+ 
+-export function serializeAsCallArgument(value: any, handleSerializer: (value: any) => HandleOrValue): SerializedValue {
+-  return serialize(value, handleSerializer, { visited: new Map(), lastId: 0 });
++export function serializeAsCallArgument(value: any, handleSerializer: (value: any) => HandleOrValue, options?: { mapsAndSets?: boolean }): SerializedValue {
++  return serialize(value, handleSerializer, { visited: new Map(), lastId: 0, mapsAndSets: !!options?.mapsAndSets });
+ }
+ 
+ function serialize(value: any, handleSerializer: (value: any) => HandleOrValue, visitorInfo: VisitorInfo): SerializedValue {
+@@ -284,8 +317,26 @@ function innerSerialize(value: any, handleSerializer: (value: any) => HandleOrVa
+     return { a, id };
+   }
+ 
++  if (visitorInfo.mapsAndSets && isMap(value)) {
++    const id = ++visitorInfo.lastId;
++    visitorInfo.visited.set(value, id);
++    const m: { k: SerializedValue, v: SerializedValue }[] = [];
++    for (const [k, v] of value.entries())
++      m.push({ k: serialize(k, handleSerializer, visitorInfo), v: serialize(v, handleSerializer, visitorInfo) });
++    return { m, id };
++  }
++
++  if (visitorInfo.mapsAndSets && isSet(value)) {
++    const id = ++visitorInfo.lastId;
++    visitorInfo.visited.set(value, id);
++    const se: SerializedValue[] = [];
++    for (const v of value.values())
++      se.push(serialize(v, handleSerializer, visitorInfo));
++    return { se, id };
++  }
++
+   if (typeof value === 'object') {
+-    const o: { k: string, v: SerializedValue }[] = [];
++    const o:{ k: string, v: SerializedValue }[] = [];
+     const id = ++visitorInfo.lastId;
+     visitorInfo.visited.set(value, id);
+     for (const name of Object.keys(value)) {

@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42204",
+ "exit": 0,
+ "seconds": 14,
+ "cost_usd": 0.023853100000000002,
+ "turns": 4,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 3037,
+  "cache_read_input_tokens": 26591,
+  "output_tokens": 903,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 3037,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 209,
+    "cache_read_input_tokens": 7911,
+    "cache_creation_input_tokens": 518,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 518
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 1,
+  "Read": 1,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 5 ++++-\n 1 file changed, 4 insertions(+), 1 deletion(-)",
+ "final": "I changed `gitDiff` in `packages/playwright/src/plugins/gitCommitInfoPlugin.ts` so it no longer turns a full clone into a shallow one on CI pull request builds. I couldn't build or run anything, so the change is untested.\n\nThe cause was that the base-commit fetch always passed `--depth=1`. That flag shallows a full clone.\n\nBefore fetching, the code now runs `git rev-parse --is-shallow-repository`. It adds `--depth=1` only if the repo is already shallow. A full clone gets a normal fetch of the base commit, so the diff is still captured and the clone stays complete.",
+ "stderr": ""
+}

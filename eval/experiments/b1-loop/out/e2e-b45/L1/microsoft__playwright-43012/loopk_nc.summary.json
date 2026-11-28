@@ -1,0 +1,84 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43012",
+ "fixed": {
+  "round": 1,
+  "explanation": "_retryAction waits between retries using a page-side setTimeout via evaluateInUtility, which hangs when JS is disabled. Replace it with a server-side timer raced through progress.race, so the wait doesn't depend on page timers.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0247,
+ "seconds": 12,
+ "diff_stat": "packages/playwright-core/src/server/dom.ts | 4 +---\n 1 file changed, 1 insertion(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The injected-script retry loop waits between action retries using a page-side setTimeout (a promise resolved by a timer in the isolated world). This should be replaced with a wait performed on the server/Playwright side, for example in the frame's retry-with-progress logic that waits between polling attempts.",
+    "symptom": "With JavaScript disabled in a browser context, actions that retry (such as clicking a covered element) hang on the between-retry wait because page timers don't run, taking 30s or timing out, and then wrongly report the element was removed.",
+    "anchors": [
+     "JavaScript disabled",
+     "isolated world",
+     "retry",
+     "timer",
+     "click"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/dom.ts",
+     328,
+     380
+    ],
+    [
+     "packages/playwright-core/src/server/frames.ts",
+     1156,
+     1182
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     754,
+     756
+    ],
+    [
+     "packages/playwright-core/src/client/page.ts",
+     468,
+     470
+    ],
+    [
+     "packages/playwright-core/src/cli/browserActions.ts",
+     318,
+     327
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "_retryAction waits between retries using a page-side setTimeout via evaluateInUtility, which hangs when JS is disabled. Replace it with a server-side timer raced through progress.race, so the wait doesn't depend on page timers.",
+   "picked": [
+    "packages/playwright-core/src/server/dom.ts:ElementHandle._retryAction"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

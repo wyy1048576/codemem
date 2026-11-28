@@ -1,0 +1,29 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43071",
+ "fixed": {
+  "step": 3,
+  "explanation": "configFromCLIOptions passes the proxy URL as the server and drops any credentials in it. The fix parses the URL. If it has a username or password, it moves them into proxy.username and proxy.password, percent-decoded, and removes them from the server string.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "tools": {
+  "grep": 2,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.052,
+ "seconds": 16,
+ "diff_stat": "packages/playwright-core/src/tools/mcp/config.ts | 12 ++++++++++++\n 1 file changed, 12 insertions(+)"
+}
+step 1: grep {"pattern": "proxy", "path": "packages/playwright/src/mcp", "ignore_case": true} -> action=grep picked=[] 
+step 2: grep {"pattern": "proxy-server|proxyServer|proxy.server", "path": "packages", "ignore_case": true} -> action=read picked=['packages/playwright-core/src/tools/mcp/config.ts:configFromCLIOptions'] 
+step 3: read {} -> action=edit picked=[] applied
+

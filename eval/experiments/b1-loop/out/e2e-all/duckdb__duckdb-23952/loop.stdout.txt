@@ -1,0 +1,68 @@
+{
+ "arm": "codemem-loop",
+ "task": "duckdb__duckdb-23952",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10
+ },
+ "sonnet_calls": 10,
+ "cost_usd": 0.6486,
+ "seconds": 72,
+ "diff_stat": ""
+}
+round 1: found=False picked=['src/execution/join_hashtable.cpp:duckdb.ScanStructure.ScanKeyMatches', 'src/execution/join_hashtable.cpp:duckdb.ScanStructure.ApplyResidualPredicate', 'src/execution/join_hashtable.cpp:duckdb.ScanStructure.ResolvePredicates']
+  fix: -
+round 2: found=False picked=[]
+  fix: -
+round 3: found=False picked=[]
+  fix: -
+round 4: found=False picked=[]
+  fix: -
+round 5: found=False picked=[]
+  fix: -
+round 6: found=False picked=[]
+  fix: -
+round 7: found=False picked=[]
+  fix: -
+round 8: found=False picked=[]
+  fix: -
+round 9: found=False picked=[]
+  fix: -
+round 10: found=False picked=[]
+  fix: -
+round 11: found=None picked=None
+  fix: -
+
+errors in src/include/duckdb/common/http_util.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/execution/join_hashtable.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/execution/operator/csv_scanner/string_value_scanner.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/main/secret/secret_manager.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/parallel/pipeline.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/parallel/pipeline_broadcast_exchange.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/planner/binder.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/storage/external_file_cache/caching_file_system.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/storage/statistics/base_statistics.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/storage/statistics/numeric_stats_union.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/transaction/meta_transaction.hpp; chunking what tree-sitter recovered
+parse errors in src/storage/external_file_cache/caching_file_system.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_api.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_get_table_names.cpp; chunking what tree-sitter recovered
+parse errors in test/api/test_table_info.cpp; chunking what tree-sitter recovered
+parse errors in test/api/capi/test_capi_profiling.cpp; chunking what tree-sitter recovered
+parse errors in test/appender/test_appender.cpp; chunking what tree-sitter recovered
+parse errors in test/common/test_logical_type_is_complete.cpp; chunking what tree-sitter recovered
+parse errors in test/secrets/test_custom_secret_storage.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/shell.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  15%|█▍        | 43/290 [00:00<00:00, 383.10it/s]
+Loading weights:  28%|██▊       | 82/290 [00:00<00:00, 354.38it/s]
+Loading weights:  41%|████      | 118/290 [00:00<00:00, 354.75it/s]
+Loading weights:  53%|█████▎    | 154/290 [00:00<00:00, 265.09it/s]
+Loading weights:  67%|██████▋   | 193/290 [00:00<00:00, 297.47it/s]
+Loading weights:  78%|███████▊  | 226/290 [00:00<00:00, 294.44it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 388.69it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

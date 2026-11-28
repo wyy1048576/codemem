@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intent", "symptom", "anchors", "stated_location", "guessed_location"],
+  "properties": {
+    "intent": {"type": "string"},
+    "symptom": {"type": "string"},
+    "anchors": {"type": "array", "items": {"type": "string"}},
+    "stated_location": {"type": "array", "items": {"type": "string"}},
+    "guessed_location": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,24 @@
+diff --git a/pandas/core/base.py b/pandas/core/base.py
+index 88b910b..289406e 100644
+--- a/pandas/core/base.py
++++ b/pandas/core/base.py
+@@ -213,6 +213,19 @@ class SelectionMixin(Generic[NDFrameT]):
+         if self._selection is not None:
+             raise IndexError(f"Column(s) {self._selection} already selected")
+ 
++        if isinstance(key, tuple):
++            import warnings
++
++            from pandas.util._exceptions import find_stack_level
++
++            warnings.warn(
++                "Passing a tuple to __getitem__ is deprecated and will in a "
++                "future version be treated as a single key (e.g. for a "
++                "MultiIndex) instead of a list of columns. Use a list instead.",
++                FutureWarning,
++                stacklevel=find_stack_level(),
++            )
++
+         if isinstance(key, (list, tuple, ABCSeries, ABCIndex, np.ndarray)):
+             if len(self.obj.columns.intersection(key)) != len(set(key)):
+                 bad_keys = list(set(key).difference(self.obj.columns))

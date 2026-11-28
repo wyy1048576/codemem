@@ -1,0 +1,53 @@
+diff --git a/packages/injected/src/clock.ts b/packages/injected/src/clock.ts
+index 69fe461..a32e47c 100644
+--- a/packages/injected/src/clock.ts
++++ b/packages/injected/src/clock.ts
+@@ -622,8 +622,9 @@ function platformOriginals(globalObject: WindowOrWorkerGlobalScope): { raw: Buil
+     Date: (globalObject as any).Date,
+     performance: globalObject.performance,
+     Intl: (globalObject as any).Intl,
++    Temporal: (globalObject as any).Temporal,
+     AbortSignal: (globalObject as any).AbortSignal,
+-  };
++  } as Builtins;
+   const bound = { ...raw };
+   for (const key of Object.keys(bound) as (keyof Builtins)[]) {
+     if (key !== 'Date' && key !== 'AbortSignal' && typeof bound[key] === 'function')
+@@ -642,6 +643,25 @@ function getScheduleHandler(type: TimerType) {
+   return `set${type}`;
+ }
+ 
++function createTemporal(clock: ClockController, NativeTemporal: any): any {
++  const ClockTemporal: any = {};
++  for (const key of Object.getOwnPropertyNames(NativeTemporal))
++    ClockTemporal[key] = NativeTemporal[key];
++  const NativeNow = NativeTemporal.Now;
++  const ClockNow: any = {};
++  for (const key of Object.getOwnPropertyNames(NativeNow))
++    ClockNow[key] = NativeNow[key];
++  const instant = () => NativeTemporal.Instant.fromEpochMilliseconds(Math.floor(Number(clock.now())));
++  const zoned = (tz?: any) => instant().toZonedDateTimeISO(tz === undefined ? NativeNow.timeZoneId() : tz);
++  ClockNow.instant = instant;
++  ClockNow.zonedDateTimeISO = zoned;
++  ClockNow.plainDateTimeISO = (tz?: any) => zoned(tz).toPlainDateTime();
++  ClockNow.plainDateISO = (tz?: any) => zoned(tz).toPlainDate();
++  ClockNow.plainTimeISO = (tz?: any) => zoned(tz).toPlainTime();
++  ClockTemporal.Now = ClockNow;
++  return ClockTemporal;
++}
++
+ function createApi(clock: ClockController, originals: Builtins, browserName?: string): Builtins {
+   return {
+     setTimeout: (func: TimerHandler, timeout?: number | undefined, ...args: any[]) => {
+@@ -698,9 +718,10 @@ function createApi(clock: ClockController, originals: Builtins, browserName?: st
+     },
+     Intl: originals.Intl ? createIntl(clock, originals.Intl) : (undefined as unknown as Builtins['Intl']),
+     Date: createDate(clock, originals.Date),
++    Temporal: (originals as any).Temporal ? createTemporal(clock, (originals as any).Temporal) : undefined,
+     performance: originals.performance ? fakePerformance(clock, originals.performance) : (undefined as unknown as Builtins['performance']),
+     AbortSignal: originals.AbortSignal ? fakeAbortSignal(clock, originals.AbortSignal, browserName) : (undefined as unknown as Builtins['AbortSignal']),
+-  };
++  } as Builtins;
+ }
+ 
+ function getClearHandler(type: TimerType) {

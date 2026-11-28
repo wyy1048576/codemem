@@ -1,0 +1,35 @@
+{
+ "arm": "codemem-loop-merged",
+ "fixed_k": 10,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "_AsOfMerge._validate_tolerance raises \"tolerance must be positive\" only for negative values, so zero is allowed. I changed all three messages to \"tolerance must be non-negative\" and updated the two tests that match the old text.",
+  "edits": 5
+ },
+ "rounds": 1,
+ "ks": [
+  10
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0343,
+ "seconds": 23,
+ "diff_stat": "pandas/core/reshape/merge.py                  | 6 +++---\n pandas/tests/reshape/merge/test_merge_asof.py | 4 ++--\n 2 files changed, 5 insertions(+), 5 deletions(-)"
+}
+round 1: k=10 action=edit picked=['pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance', 'pandas/tests/reshape/merge/test_merge_asof.py:TestAsOfMerge.test_tolerance_negative_one_nanosecond', 'pandas/tests/reshape/merge/test_merge_asof.py:TestAsOfMerge.test_valid_tolerance'] applied
+
+parse errors in pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  22%|██▏       | 65/290 [00:00<00:00, 576.60it/s]
+Loading weights:  42%|████▏     | 123/290 [00:00<00:00, 383.12it/s]
+Loading weights:  57%|█████▋    | 165/290 [00:00<00:00, 386.73it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 581.24it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

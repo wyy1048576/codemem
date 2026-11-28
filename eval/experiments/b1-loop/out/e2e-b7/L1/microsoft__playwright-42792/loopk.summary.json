@@ -1,0 +1,111 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 2,
+  "explanation": "test.describe.configure ignores a lock option. Suites already hold _locks, which describe() fills from validated details. The fix validates the lock option the same way and pushes it onto the current suite. The public types file was not seen, so it is not updated.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0673,
+ "seconds": 19,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The test.describe.configure implementation (TestTypeImpl._configure in testType.ts) sets mode, retries and timeout on the current suite being loaded. It should also accept a `lock` option (string or string[]) and store it on the current suite like test-details locks, so all tests in the file/group, including nested groups, inherit it. Types for the configure options need updating.",
+    "symptom": "test.describe.configure() does not accept a `lock` option, so a suite-level named lock can't be declared for a file or group.",
+    "anchors": [
+     "lock",
+     "mode",
+     "timeout"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/utils/third_party/lockfile.ts",
+     184,
+     261
+    ],
+    [
+     "tests/playwright-test/test-locks.spec.ts",
+     39,
+     45
+    ],
+    [
+     "packages/utils/third_party/lockfile.ts",
+     105,
+     107
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The results were unrelated (a lockfile utility and a test helper). The code to change is TestTypeImpl._configure in packages/playwright/src/common/testType.ts, plus how the suite stores locks and how tests inherit them from parent suites.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "TestTypeImpl._configure for test.describe.configure, which sets _executionMode, _retries and _timeout on the current suite from options. Also how a test's details lock is stored and how suites hold it.",
+    "symptom": "test.describe.configure() does not accept a `lock` option, so a suite-level named lock cannot be declared for a file or group.",
+    "anchors": [
+     "lock",
+     "details"
+    ],
+    "look_in": [
+     "packages/playwright/src/common/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/common/testType.ts",
+     94,
+     124
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     34,
+     316
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     126,
+     178
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "test.describe.configure ignores a lock option. Suites already hold _locks, which describe() fills from validated details. The fix validates the lock option the same way and pushes it onto the current suite. The public types file was not seen, so it is not updated.",
+   "picked": [
+    "packages/playwright/src/common/testType.ts:TestTypeImpl"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

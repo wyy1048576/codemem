@@ -1,0 +1,451 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41988",
+ "fixed": {
+  "round": 8,
+  "explanation": "removeRedundantNames clears the name when all contributor refs were cleared on enter. A wrapper span (cleared on enter) is later removed by removeNameRepeatingChild since its text equals the parent name, so both the text and the name are lost. Only drop the name when the node still has children that represent the content.",
+  "edits": 1
+ },
+ "rounds": 8,
+ "ks": [
+  5,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 8,
+  "loopk": 8
+ },
+ "sonnet_calls": 9,
+ "cost_usd": 0.2879,
+ "seconds": 104,
+ "diff_stat": "packages/injected/src/ariaSnapshotDistiller.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The AI aria snapshot generator builds the YAML tree from DOM nodes and computes accessible names for roles like button. It likely skips or drops name text when a child subtree contains an aria-hidden element next to text in nested spans, or the name is computed differently from getByRole's accessible name computation (roleUtils getElementAccessibleName).",
+    "symptom": "Aria snapshot for AI shows a button without its accessible name \"Add New Item\" when its nested spans include an aria-hidden SVG icon sibling, although getByRole with that name works.",
+    "anchors": [
+     "aria-hidden",
+     "focusable",
+     "tabindex",
+     "button",
+     "snapshot",
+     "ref",
+     "cursor"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     220,
+     409
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     411,
+     584
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     85,
+     220
+    ],
+    [
+     "tests/library/role-utils.spec.ts",
+     407,
+     597
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     586,
+     757
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "generateAriaTree calls distillAriaSnapshot after building the tree, and it tracks nameSourceElements and nameFromContentRefs. The button name is probably dropped as \"redundant\" by the distill step, because the leaf generic span holding the text counts as a name contributor. The distill code is not visible yet.",
+   "picked": [
+    "packages/injected/src/ariaSnapshot.ts:generateAriaTree"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "distillAriaSnapshot function that removes redundant names and generic nodes whose text repeats an ancestor's accessible name, using nameFromContentRefs and nameSourceElements.",
+    "symptom": "Button name is missing from the AI snapshot when its nested spans contain an aria-hidden icon next to the text.",
+    "anchors": [
+     "distillAriaSnapshot",
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "generateAriaTree",
+     "toAriaNode"
+    ],
+    "look_in": [
+     "packages/injected/src/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     50,
+     52
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     237,
+     308
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     166,
+     209
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshot.ts lines 85-220 (generateAriaTree)"
+   ],
+   "action": "search",
+   "analysis": "distillAriaSnapshot runs aiPlugins, which likely strip names that duplicate content from nameFromContentRefs. The plugin implementation isn't visible; it probably removes the button's name when the contributing generic span is visible, but the span gets dropped, losing the name.",
+   "picked": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:distillAriaSnapshot"
+   ]
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "aiPlugins in the aria snapshot distiller: plugins that drop names or generic nodes using nameFromContentRefs, and runPlugins.",
+    "symptom": "Button name \"Add New Item\" missing from AI snapshot when nested spans contain an aria-hidden icon.",
+    "anchors": [
+     "aiPlugins",
+     "runPlugins",
+     "normalizePlugins",
+     "nameFromContentRefs",
+     "distillAriaSnapshot"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     54,
+     98
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     56,
+     90
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     58,
+     85
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshot.ts lines 85-220 (generateAriaTree)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 50-52 (distillAriaSnapshot)"
+   ],
+   "action": "search",
+   "analysis": "runPlugins is only the generic runner. The actual name-dropping logic must be in the aiPlugins definitions, which I haven't seen. They use pendingContentRefs and nameFromContentRefs to remove names or generic nodes.",
+   "picked": []
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "Definition of aiPlugins and the plugin objects (enter/exit hooks) in the aria snapshot distiller that remove names or nodes using pendingContentRefs and nameFromContentRefs.",
+    "symptom": "Button name \"Add New Item\" missing from AI snapshot when nested spans contain an aria-hidden icon.",
+    "anchors": [
+     "aiPlugins",
+     "pendingContentRefs",
+     "nameFromContentRefs",
+     "DistillerPlugin",
+     "DistillerContext",
+     "normalizePlugins"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     105,
+     248
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     1,
+     48
+    ],
+    [
+     "packages/injected/src/ariaSnapshotDistiller.ts",
+     101,
+     103
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshot.ts lines 85-220 (generateAriaTree)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 50-52 (distillAriaSnapshot)"
+   ],
+   "action": "search",
+   "analysis": "The distiller's removeRedundantNames drops a node's name when every nameFromContentRefs entry is no longer pending. The result depends on which elements nameSourceElements records as name contributors. That is filled in toAriaNode, which I haven't seen. A contributor like the empty or aria-hidden-icon span may be recorded wrongly, or the text span may be missed.",
+   "picked": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:<block>"
+   ]
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "toAriaNode in ariaSnapshot.ts, which computes the accessible name and fills nameSourceElements with the elements that contributed to the name (via getElementAccessibleName).",
+    "symptom": "Button name \"Add New Item\" is missing from the AI snapshot when its nested spans contain an aria-hidden icon next to the text.",
+    "anchors": [
+     "toAriaNode",
+     "nameSourceElements",
+     "nameFromContentRefs",
+     "pendingContentRefs",
+     "isLeafGeneric",
+     "removeRedundantNames",
+     "getElementAccessibleName"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     99,
+     164
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     222,
+     235
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     469,
+     584
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshot.ts lines 85-220 (generateAriaTree)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 50-52 (distillAriaSnapshot)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "action": "search",
+   "analysis": "removeRedundantNames drops the button's name when every contributor ref is cleared on enter. Refs are only recorded for contributors that have one, so a text-bearing span that lacks a ref is missed. Then the outer span and the icon span clear the pending set, and the name is dropped. toAriaNode, which fills nameSourceElements and decides refs, has not been seen yet.",
+   "picked": []
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "toAriaNode function in ariaSnapshot.ts and isLeafGeneric: how nameSourceElements is filled and when generic nodes get refs.",
+    "symptom": "Button name \"Add New Item\" is missing from the AI snapshot when nested spans contain an aria-hidden icon.",
+    "anchors": [
+     "toAriaNode",
+     "nameSourceElements",
+     "isLeafGeneric",
+     "computeAriaRef",
+     "getElementAccessibleName",
+     "nameFromContentRefs"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts",
+     "packages/injected/src/ariaSnapshotDistiller.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     487,
+     533
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     59,
+     83
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     649,
+     651
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshot.ts lines 85-220 (generateAriaTree)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 50-52 (distillAriaSnapshot)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "action": "search",
+   "analysis": "The distiller drops a button's name when every contributor ref in nameFromContentRefs is no longer pending. Which elements count as contributors is decided by toAriaNode and nameSourceElements, which I haven't seen yet. The likely cause is that the outer span is recorded as the contributor, gets cleared on enter, and then removeRedundantNames drops the name. The code to find is in ariaSnapshot.ts.",
+   "picked": []
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Find the toAriaNode function, which creates an AriaNode for an element. It computes the role and accessible name, fills the nameSourceElements map, and assigns refs with computeAriaRef. Also find isLeafGeneric.",
+    "symptom": "The button's name \"Add New Item\" is missing from the AI snapshot when nested spans hold an aria-hidden icon next to the text.",
+    "anchors": [
+     "toAriaNode",
+     "nameSourceElements",
+     "isLeafGeneric",
+     "getElementAccessibleName",
+     "computeAriaRef",
+     "nameFromContentRefs",
+     "pendingContentRefs",
+     "removeRedundantNames"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     645,
+     647
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     1,
+     57
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     372,
+     376
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshot.ts lines 85-220 (generateAriaTree)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 50-52 (distillAriaSnapshot)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "action": "search",
+   "analysis": "The distiller drops a button's name when every contributor ref in nameFromContentRefs is no longer pending. The contributors are filled by toAriaNode, which has not appeared in any search yet. It probably sits near the ariaNodeElement helper and the setAriaNodeElement function in ariaSnapshot.ts, after line 220. I need that code to see how nameSourceElements is filled and how isLeafGeneric works.",
+   "picked": []
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Function toAriaNode(element, options, nameSourceElements) that builds an AriaNode, computes the role and name with getElementAccessibleName, records the name source elements, and computes the ref. Also the isLeafGeneric helper.",
+    "symptom": "The button's name \"Add New Item\" is missing from the AI snapshot when nested spans hold an aria-hidden icon next to the text.",
+    "anchors": [
+     "toAriaNode",
+     "nameSourceElements",
+     "isLeafGeneric",
+     "setAriaNodeElement",
+     "computeAriaRef",
+     "getElementAccessibleName",
+     "elementSymbol",
+     "nameFromContentRefs"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     535,
+     537
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     539,
+     575
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     532,
+     540
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     513,
+     530
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     643,
+     643
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/ariaSnapshot.ts lines 85-220 (generateAriaTree)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 50-52 (distillAriaSnapshot)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "action": "edit",
+   "analysis": "removeRedundantNames clears the name when all contributor refs were cleared on enter. A wrapper span (cleared on enter) is later removed by removeNameRepeatingChild since its text equals the parent name, so both the text and the name are lost. Only drop the name when the node still has children that represent the content.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

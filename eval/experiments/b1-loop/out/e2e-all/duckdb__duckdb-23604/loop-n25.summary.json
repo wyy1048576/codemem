@@ -1,0 +1,175 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "duckdb__duckdb-23604",
+ "fixed": {
+  "round": 1,
+  "explanation": "TryPushdownPrefixFilter only recognized a function named \"prefix\". The starts_with function and the ^@ operator are most likely registered under the name \"starts_with\", so they never reached the range-pushdown path. The edit accepts all three names, so the existing code emits s >= prefix AND s < next_prefix and zone maps can prune. It also adds a NULL constant guard. I couldn't see the function registration, so the \"starts_with\" name is inferred from the issue's plans and not checked.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1106,
+ "seconds": 42,
+ "diff_stat": "src/optimizer/filter_combiner.cpp | 6 +++++-\n 1 file changed, 5 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Optimizer rule that rewrites LIKE 'prefix%' into range comparisons (s >= 'prefix' AND s < 'prefix+1') for filter pushdown and row group pruning should also handle starts_with(s, 'prefix') and the prefix operator ^@, which are currently left as opaque filters.",
+    "symptom": "starts_with(s, 'x') and s ^@ 'x' filters are not converted into range filters so zone-map pruning scans all row groups, unlike LIKE 'x%'.",
+    "anchors": [
+     "starts_with",
+     "^@",
+     "LIKE",
+     "Row Groups Scanned",
+     "prefix"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/optimizer/rule/like_optimizations.cpp",
+     33,
+     53
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     370,
+     386
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     163,
+     202
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     409,
+     423
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     528,
+     532
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     307,
+     320
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     212,
+     214
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     454,
+     515
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     418,
+     452
+    ],
+    [
+     "extension/core_functions/scalar/string/starts_with.cpp",
+     31,
+     36
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     487,
+     509
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     249,
+     262
+    ],
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     1339,
+     1354
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     425,
+     454
+    ],
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     1383,
+     1399
+    ],
+    [
+     "src/planner/filter/prefix_range_filter.cpp",
+     1,
+     6
+    ],
+    [
+     "src/optimizer/rule/like_optimizations.cpp",
+     55,
+     75
+    ],
+    [
+     "src/include/duckdb/planner/filter/prefix_range_filter.hpp",
+     1,
+     14
+    ],
+    [
+     "src/planner/table_filter_state.cpp",
+     360,
+     430
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     396,
+     407
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     579,
+     581
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     10,
+     53
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     330,
+     394
+    ],
+    [
+     "src/include/duckdb/planner/filter/table_filter_functions.hpp",
+     246,
+     252
+    ],
+    [
+     "src/include/duckdb/planner/filter/prefix_range_filter.hpp",
+     18,
+     18
+    ]
+   ],
+   "analysis": "FilterCombiner::TryPushdownPrefixFilter handles starts_with and prefix (^@). It pushes an opaque expression filter and gives no range bounds, so zone maps can't prune. TryPushdownLikeFilter produces the (s >= x AND s < x+1) range filters that do prune. The fix is probably to make the prefix pushdown also emit range comparisons, as the LIKE path does. I did not see the full bodies of these functions.",
+   "picked": [
+    "src/optimizer/filter_combiner.cpp:duckdb.FilterCombiner.TryPushdownPrefixFilter",
+    "src/optimizer/filter_combiner.cpp:duckdb.FilterCombiner.TryPushdownLikeFilter"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/optimizer/filter_combiner.cpp lines 418-452 (duckdb.FilterCombiner.TryPushdownPrefixFilter)",
+    "src/optimizer/filter_combiner.cpp lines 454-515 (duckdb.FilterCombiner.TryPushdownLikeFilter)"
+   ],
+   "fix_attempt": "applied: TryPushdownPrefixFilter only recognized a function named \"prefix\". The starts_with function and the ^@ operator are most likely registered under the name \"starts_with\", so they never reached the range-pushdown path. The edit accepts all three names, so the existing code emits s >= prefix AND s < next_prefix and zone maps can prune. It also adds a NULL constant guard. I couldn't see the function registration, so the \"starts_with\" name is inferred from the issue's plans and not checked."
+  }
+ ]
+}

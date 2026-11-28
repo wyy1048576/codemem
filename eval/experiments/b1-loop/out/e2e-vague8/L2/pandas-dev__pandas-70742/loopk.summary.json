@@ -1,0 +1,120 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-70742",
+ "fixed": {
+  "round": 2,
+  "explanation": "In the single-block case, fast_xs returns a strided view of the whole 2D block and shares its refs. When the block is a temporary (for example from selecting a list of columns), the small row Series keeps the whole array alive. Copying the row removes the reference to the large base and means the refs no longer need to be shared.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  5,
+  3
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0497,
+ "seconds": 27,
+ "diff_stat": "pandas/core/internals/managers.py | 5 +++--\n 1 file changed, 3 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Row selection with a list of columns (DataFrame.loc/iloc/_getitem_tuple, _ixs, fast_xs in BlockManager) returns a Series that is a view of a large intermediate 2D array or consolidated block, keeping it alive. The row extraction (fast_xs / _get_row / take) should copy or avoid referencing the large temporary array.",
+    "symptom": "Selecting a single row and a list of columns returns a small Series whose base is a huge temporary array, so memory is not freed and grows.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "pandas/core/apply.py",
+     1585,
+     1628
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2215,
+     2233
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     2126,
+     2152
+    ],
+    [
+     "pandas/core/apply.py",
+     1622,
+     1626
+    ],
+    [
+     "pandas/core/internals/blocks.py",
+     312,
+     323
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Results shown are not the row-extraction path. The likely culprit is BlockManager.fast_xs, which builds a result array and returns a Series viewing it, or the DataFrame._ixs/_getitem_tuple path, which takes columns first and then a row.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "BlockManager.fast_xs implementation that builds a result array for a single row across blocks, and DataFrame._ixs which wraps it into a Series.",
+    "symptom": "Selecting one row and a list of columns returns a small Series that holds a reference to a large temporary array.",
+    "anchors": [
+     "fast_xs",
+     "iget",
+     "BlockManager"
+    ],
+    "look_in": [
+     "pandas/core/internals/managers.py",
+     "pandas/core/frame.py"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/internals/managers.py",
+     1166,
+     1247
+    ],
+    [
+     "pandas/core/internals/managers.py",
+     2325,
+     2330
+    ],
+    [
+     "pandas/core/frame.py",
+     4245,
+     4266
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In the single-block case, fast_xs returns a strided view of the whole 2D block and shares its refs. When the block is a temporary (for example from selecting a list of columns), the small row Series keeps the whole array alive. Copying the row removes the reference to the large base and means the refs no longer need to be shared.",
+   "picked": [
+    "pandas/core/internals/managers.py:BlockManager.fast_xs"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

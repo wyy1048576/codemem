@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42919",
+ "exit": 0,
+ "seconds": 13,
+ "cost_usd": 0.035190000000000006,
+ "turns": 6,
+ "usage": {
+  "input_tokens": 8,
+  "cache_creation_input_tokens": 5180,
+  "cache_read_input_tokens": 30040,
+  "output_tokens": 1145,
+  "output_tokens_details": {
+   "thinking_tokens": 0
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 5180,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 303,
+    "cache_read_input_tokens": 10209,
+    "cache_creation_input_tokens": 363,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 363
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Read": 2,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/server/trace/recorder/tracing.ts | 5 ++++-\n 1 file changed, 4 insertions(+), 1 deletion(-)",
+ "final": "I changed `_captureSnapshot` in `packages/playwright-core/src/server/trace/recorder/tracing.ts` so the DOM snapshot capture is tied to the progress budget. The old code awaited `captureSnapshot` directly. When the page's main thread was busy, that wait never finished, so the 3-second budget couldn't cut it off and the call never got a response.\n\nThe capture is now wrapped in `progress.race(...)` inside a `try/catch`, the same way `_captureCoverage` already does it. If the budget runs out, the snapshot is skipped and the call carries on. Failed snapshots were already ignored, so that part behaves as before.\n\nI couldn't build or run anything, so this is untested, including your repro.\n\nI didn't touch the lint check that misses this spot because of the optional chaining. I removed the `?.` on this call, since the `started()` check just above already guarantees `_snapshotter` is set.",
+ "stderr": ""
+}
+

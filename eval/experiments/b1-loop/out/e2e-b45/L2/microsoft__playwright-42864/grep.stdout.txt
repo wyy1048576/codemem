@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42864",
+ "exit": 0,
+ "seconds": 38,
+ "cost_usd": 0.10202930000000002,
+ "turns": 15,
+ "usage": {
+  "input_tokens": 24,
+  "cache_creation_input_tokens": 11303,
+  "cache_read_input_tokens": 117293,
+  "output_tokens": 4504,
+  "output_tokens_details": {
+   "thinking_tokens": 466
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 11303,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 344,
+    "cache_read_input_tokens": 15250,
+    "cache_creation_input_tokens": 1445,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1445
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 6,
+  "Read": 4,
+  "Edit": 4
+ },
+ "subtype": "success",
+ "diff_stat": ".../src/server/highlightController.ts              | 27 +++++++++++++---------\n 1 file changed, 16 insertions(+), 11 deletions(-)",
+ "final": "I changed `packages/playwright-core/src/server/highlightController.ts` so highlighting works for custom selector engines that rely on page globals. I couldn't build or run anything, so it's untested.\n\n**Cause:** `_resolve()` always ran `setHighlights` in the utility world. Custom engines that need page globals are registered for the main world, so querying them from the utility world failed and nothing was highlighted. Clicking worked because it already uses the world the selector asks for (`info.world`).\n\n**Fix:**\n- `_resolve()` now keeps each selector's `info.world`. It calls `setHighlights` once per world, passing only the selectors that belong to that world. A world with none gets an empty list, which clears any stale highlight there.\n- `hideHighlights()` now hides the highlight in both the utility and main worlds.\n\n**Side effect:** a highlight for a main-world selector is drawn by an overlay created in the page's main world, so page scripts could in principle see it. I chose this because elements found in the main world can't be passed to the utility-world overlay.",
+ "stderr": ""
+}
+

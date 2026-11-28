@@ -1,0 +1,18 @@
+diff --git a/packages/injected/src/ariaSnapshotDistiller.ts b/packages/injected/src/ariaSnapshotDistiller.ts
+index 3481b06..e656a72 100644
+--- a/packages/injected/src/ariaSnapshotDistiller.ts
++++ b/packages/injected/src/ariaSnapshotDistiller.ts
+@@ -205,8 +205,12 @@ const removeNameRepeatingChild: DistillerPlugin = {
+       return;
+     const singleTextChild = node.children.length === 1 && typeof node.children[0] === 'string' ? node.children[0] : undefined;
+     const text = node.name ? (node.children.length ? undefined : node.name) : singleTextChild;
+-    if (text && text === parent.name)
++    if (text && text === parent.name) {
++      // The node is going away, so it no longer represents its content: the ancestor must keep the name.
++      if (node.ref)
++        ctx.pendingContentRefs.add(node.ref);
+       return 'remove';
++    }
+   },
+ };
+ 

@@ -1,0 +1,30 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 94c092a..0e632db 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -676,6 +676,25 @@ class BaseGrouper:
+         if len(self.groupings) == 1 and isinstance(self.result_index, CategoricalIndex):
+             # This shows unused categories in indices GH#38642
+             result = self.groupings[0].indices
++        elif (
++            len(self.groupings) > 1
++            and self.dropna
++            and any(ping._passed_categorical for ping in self.groupings)
++            and not all(ping._sort for ping in self.groupings)
++            and isinstance(self.result_index, MultiIndex)
++        ):
++            # Per-grouping codes may not align with result_index levels;
++            # derive row codes from result_index and ids instead.
++            ids = self.ids
++            mask = ids < 0
++            codes_list = []
++            for lvl_codes in self.result_index.codes:
++                arr = np.asarray(lvl_codes).take(np.where(mask, 0, ids)).astype(
++                    np.intp
++                )
++                arr[mask] = -1
++                codes_list.append(arr)
++            result = get_indexer_dict(codes_list, self.result_index.levels)
+         else:
+             codes_list = [ping.codes for ping in self.groupings]
+             result = get_indexer_dict(codes_list, self.levels)

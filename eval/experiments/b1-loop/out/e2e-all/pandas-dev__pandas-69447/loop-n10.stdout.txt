@@ -1,0 +1,47 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "pandas-dev__pandas-69447",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 1
+ },
+ "sonnet_calls": 11,
+ "cost_usd": 0.3151,
+ "seconds": 85,
+ "diff_stat": ""
+}
+round 1: found=True picked=['pandas/core/internals/blocks.py:external_values', 'pandas/core/series.py:Series.values']
+  fix: could not fix: The warning is correctly emitted by external_values, but pyarrow's Cython code calls Series.values internally, so no Python frame identifies pyarrow and stacklevel/find_stack_level cannot avoid it. A pandas-side fix would likely be a Series.__arrow_array__ (or similar hook) so pyarrow doesn't touch .values. Doing that safely requires seeing the existing __arrow_array__ implementatio
+round 2: found=False picked=[]
+  fix: -
+round 3: found=False picked=[]
+  fix: -
+round 4: found=False picked=[]
+  fix: -
+round 5: found=False picked=[]
+  fix: -
+round 6: found=False picked=[]
+  fix: -
+round 7: found=False picked=[]
+  fix: -
+round 8: found=False picked=[]
+  fix: -
+round 9: found=False picked=[]
+  fix: -
+round 10: found=False picked=[]
+  fix: -
+round 11: found=None picked=None
+  fix: -
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   9%|▉         | 27/290 [00:00<00:01, 237.69it/s]
+Loading weights:  18%|█▊        | 51/290 [00:00<00:01, 204.44it/s]
+Loading weights:  26%|██▌       | 76/290 [00:00<00:00, 220.75it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 688.00it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

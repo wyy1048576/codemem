@@ -1,0 +1,42 @@
+diff --git a/pandas/core/arraylike.py b/pandas/core/arraylike.py
+index 1a0c907..d9f0238 100644
+--- a/pandas/core/arraylike.py
++++ b/pandas/core/arraylike.py
+@@ -339,18 +339,31 @@ def array_ufunc(self, ufunc: np.ufunc, method: str, *inputs: Any, **kwargs: Any)
+             raise NotImplementedError(
+                 f"Cannot apply ufunc {ufunc} to mixed DataFrame and Series inputs."
+             )
+-        axes = self.axes
++        axes = list(self.axes)
++        skip_align = False
+         for obj in alignable[1:]:
+             # this relies on the fact that we aren't handling mixed
+             # series / frame ufuncs.
+             for i, (ax1, ax2) in enumerate(zip(axes, obj.axes, strict=True)):
++                if ax1.equals(ax2):
++                    continue
++                if (not ax1.is_unique or not ax2.is_unique) and len(ax1) == len(ax2):
++                    # cannot reindex with duplicate labels; operate positionally
++                    skip_align = True
++                    continue
+                 axes[i] = ax1.union(ax2)
+ 
+-        reconstruct_axes = dict(zip(self._AXIS_ORDERS, axes, strict=True))
+-        inputs = tuple(
+-            x.reindex(**reconstruct_axes) if issubclass(t, NDFrame) else x
+-            for x, t in zip(inputs, types, strict=True)
+-        )
++        if skip_align:
++            # Same shape but non-unique, differing labels: operate
++            # positionally, keeping self's labels.
++            axes = list(self.axes)
++            reconstruct_axes = dict(zip(self._AXIS_ORDERS, axes, strict=True))
++        else:
++            reconstruct_axes = dict(zip(self._AXIS_ORDERS, axes, strict=True))
++            inputs = tuple(
++                x.reindex(**reconstruct_axes) if issubclass(t, NDFrame) else x
++                for x, t in zip(inputs, types, strict=True)
++            )
+     else:
+         reconstruct_axes = dict(zip(self._AXIS_ORDERS, self.axes, strict=True))
+ 

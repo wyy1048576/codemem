@@ -1,0 +1,22 @@
+diff --git a/pandas/_libs/groupby.pyx b/pandas/_libs/groupby.pyx
+index 8e606f0..dcdbde3 100644
+--- a/pandas/_libs/groupby.pyx
++++ b/pandas/_libs/groupby.pyx
+@@ -427,6 +427,8 @@ def group_cumsum(
+                 out[i, :] = 0
+                 continue
+             elif lab < 0:
++                if is_datetimelike:
++                    out[i, :] = na_val
+                 continue
+ 
+             for j in range(K):
+@@ -2363,6 +2365,8 @@ cdef group_cummin_max(
+                 out[i, :] = 0
+                 continue
+             elif lab < 0:
++                if is_datetimelike:
++                    out[i, :] = na_val
+                 continue
+             for j in range(K):
+ 

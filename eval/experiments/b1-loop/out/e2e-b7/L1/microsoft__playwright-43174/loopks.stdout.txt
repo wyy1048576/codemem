@@ -1,0 +1,40 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  3,
+  3
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0101,
+ "task": "microsoft__playwright-43174",
+ "fixed": {
+  "round": 2,
+  "explanation": "gracefullyClose force-killed the process whenever a graceful close was already running, so the second shutdown path (stdin end) killed the browser 1 ms after the first began. The fix stores the in-progress close promise and makes later calls await it. The kill still happens when the graceful close fails, via the existing catch. Caveat: a second SIGINT no longer force-kills during a hung close, which the old comment described. The unchanged comment above the function still says it does.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0694,
+ "seconds": 36,
+ "diff_stat": "packages/utils/processLauncher.ts | 23 +++++++++++++----------\n 1 file changed, 13 insertions(+), 10 deletions(-)"
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=True picked=['packages/utils/processLauncher.ts:launchProcess.gracefullyClose']
+  fix: applied: gracefullyClose force-killed the process whenever a graceful close was already running, so the second shutdown path (stdin end) killed the browser 1 ms after the first began. The fix stores the in-progress close promise and makes later calls await it. The kill still happens when the graceful close fails, via the existing catch. Caveat: a second SIGINT no longer force-kills during a hung c
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  21%|██        | 61/290 [00:00<00:00, 522.61it/s]
+Loading weights:  39%|███▉      | 114/290 [00:00<00:00, 496.80it/s]
+Loading weights:  58%|█████▊    | 168/290 [00:00<00:00, 499.49it/s]
+Loading weights:  75%|███████▌  | 218/290 [00:00<00:00, 487.22it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 577.83it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

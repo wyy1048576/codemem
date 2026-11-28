@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-43488",
+ "exit": 0,
+ "seconds": 20,
+ "cost_usd": 0.0562276,
+ "turns": 9,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 7101,
+  "cache_read_input_tokens": 50396,
+  "output_tokens": 2276,
+  "output_tokens_details": {
+   "thinking_tokens": 170
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 7101,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 355,
+    "cache_read_input_tokens": 11617,
+    "cache_creation_input_tokens": 876,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 876
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 4,
+  "Read": 3,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright-core/src/server/chromium/crPage.ts | 9 +++++++++\n 1 file changed, 9 insertions(+)",
+ "final": "I've edited the dedicated worker setup in Chromium so workers pick up the context locale. I haven't built or run anything.\n\nThe change is in `packages/playwright-core/src/server/chromium/crPage.ts`, in the worker branch of `_onAttachedToTarget`. When the context has a `locale`, the worker's session now does two things before `Runtime.runIfWaitingForDebugger` resumes it:\n- **Accept-Language:** it sends `Emulation.setUserAgentOverride` with `acceptLanguage` set to the locale. It also passes the context's user agent and UA metadata, so the worker's user agent matches the page's. This should cover the request headers.\n- **Language list:** it calls the existing `emulateLocale` helper, which sends `Emulation.setLocaleOverride`. This should cover `navigator.language(s)` inside the worker.\n\nBoth calls are best-effort. If the worker target closes first, the failure is swallowed.\n\nI didn't confirm that Chromium accepts these two Emulation commands on worker sessions. I also haven't added a test.",
+ "stderr": ""
+}

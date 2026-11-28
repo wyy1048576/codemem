@@ -1,0 +1,12 @@
+diff --git a/pandas/core/groupby/ops.py b/pandas/core/groupby/ops.py
+index 94c092a..adb063a 100644
+--- a/pandas/core/groupby/ops.py
++++ b/pandas/core/groupby/ops.py
+@@ -907,6 +907,7 @@ class BaseGrouper:
+             else:
+                 # Recode ids and reorder result_index with observed groups up front,
+                 # unobserved at the end
++                ids = np.where((ob_ids < 0) | (unob_ids < 0), -1, ids)
+                 ids, uniques = compress_group_index(ids, sort=False)
+                 ids = ensure_platform_int(ids)
+                 taker = np.concatenate(

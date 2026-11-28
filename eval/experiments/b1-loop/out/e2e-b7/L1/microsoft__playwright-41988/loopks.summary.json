@@ -1,0 +1,609 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  5,
+  5,
+  5,
+  5,
+  3,
+  5,
+  5,
+  5,
+  5,
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0098,
+ "task": "microsoft__playwright-41988",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10
+ },
+ "sonnet_calls": 10,
+ "cost_usd": 0.3788,
+ "seconds": 86,
+ "diff_stat": "",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The AI/aria snapshot generator computes accessible names for elements, probably by a separate simplified name computation that mishandles nested spans containing an aria-hidden SVG sibling. It should use the same accessible name computation (getElementAccessibleName) as role selectors, including name-from-content traversal of children.",
+    "symptom": "Aria snapshot lists a button with no name when its content is nested spans with an aria-hidden SVG icon span and a text span, though getByRole with the name works.",
+    "anchors": [
+     "aria-hidden=\"true\"",
+     "focusable=\"false\"",
+     "tabindex=\"-1\"",
+     "Add New Item",
+     "snapshot"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     668,
+     991
+    ],
+    [
+     "tests/library/role-utils.spec.ts",
+     407,
+     597
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     314,
+     335
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     85,
+     220
+    ],
+    [
+     "tests/page/selectors-role.spec.ts",
+     348,
+     536
+    ]
+   ],
+   "analysis": "The results show getTextAlternativeInternal (shared name computation) and generateAriaTree, which calls toAriaNode with nameSourceElements. The snapshot-specific name tracking (collectElements/nameSourceElements) and the name handling in toAriaNode have not been seen yet. The bug is likely in toAriaNode or in how collectElements/composite strings are handled for nested spans with hidden siblings.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "toAriaNode in the aria snapshot computes the node name through getElementAccessibleName with collectElements and records nameSourceElements; look for name being dropped or cleared.",
+    "symptom": "Aria snapshot shows button without name when content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "toAriaNode",
+     "nameSourceElements",
+     "collectElements",
+     "compositeString",
+     "joinCompositeString",
+     "innerAccumulatedElementText",
+     "emptyCompositeString"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts",
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     237,
+     308
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     513,
+     530
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     532,
+     540
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     542,
+     554
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     993,
+     1043
+    ]
+   ],
+   "analysis": "toAriaNode and the shared name computation look correct. The name is stored in result.name and the contributing elements in nameSourceElements. Something later in generateAriaTree probably uses nameSourceElements to strip the name or its child text. It may also clear the name when the children repeat it. The hidden SVG span next to the text span may trigger that path. getTextAlternativeInternal may also drop elements when collectElements is true.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Code in generateAriaTree or visit that post-processes the aria node tree, using nameSourceElements to remove or clear a name or its child text nodes, and the step where a node name is dropped.",
+    "symptom": "Aria snapshot shows a button with no name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "nameSourceElements",
+     "generateAriaTree",
+     "toAriaNode",
+     "collectElements",
+     "visitedElements",
+     "getTextAlternativeInternal",
+     "computeAriaRef"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     166,
+     209
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     222,
+     235
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     535,
+     537
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     469,
+     584
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     487,
+     533
+    ]
+   ],
+   "analysis": "The results show processElement and the rendering code (createKey), and these look fine. createKey prints the name whenever ariaNode.name is set. So the name is lost earlier, in the visit or toAriaNode path that sets ariaNode.name. I haven't seen the body of visit or toAriaNode. They probably skip the name computation for elements, or the generic-span flattening and aria-hidden handling drop it.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "The visit function and toAriaNode in generateAriaTree, which decide each element's role and name, handle aria-hidden children and nested generic spans, and set ariaNode.name.",
+    "symptom": "Aria snapshot shows a button with no name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "toAriaNode",
+     "visit",
+     "generateAriaTree",
+     "getElementAccessibleName",
+     "nameSourceElements",
+     "processElement",
+     "isElementHiddenForAria",
+     "ariaNode.name"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     649,
+     651
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     645,
+     647
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     99,
+     164
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     360,
+     370
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     539,
+     575
+    ]
+   ],
+   "analysis": "Round 4 shows visit, which pushes toAriaNode results and records nameFromContentRefs. The body of toAriaNode, where the name is computed, has still not been shown. The name may be lost there, for example when the name-source collection fails with an aria-hidden sibling. It may also be lost in the shared text-alternative traversal in roleUtils.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Body of toAriaNode, which computes role and name via getElementAccessibleName with collectElements for nameSourceElements, and sets result.name.",
+    "symptom": "Aria snapshot shows a button with no name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "toAriaNode",
+     "nameSourceElements",
+     "getElementAccessibleName",
+     "elementSymbol",
+     "setAriaNodeElement",
+     "processElement",
+     "nameFromContentRefs"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     372,
+     376
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     1,
+     57
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     643,
+     643
+    ]
+   ],
+   "analysis": "Round 5 returned only imports and the elementSymbol constant, not the body of toAriaNode. The name might be dropped in the snapshot post-processing, such as the step that removes a name or child text when it duplicates content. It might also be dropped in the shared text alternative code in roleUtils when an aria-hidden child sits next to the text.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Find the code in the aria snapshot that decides whether to keep a node's name, for example when the name comes from content and the child text is deduplicated. Also check how the name computation in roleUtils handles aria-hidden children in nested spans.",
+    "symptom": "Aria snapshot shows a button with no name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "nameFromContentRefs",
+     "toAriaNode",
+     "getElementAccessibleName",
+     "nameSourceElements",
+     "collectElements",
+     "elementSymbol",
+     "visit",
+     "getTextAlternativeInternal"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts",
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     1200,
+     1209
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     556,
+     586
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     23,
+     25
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     337,
+     363
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     489,
+     498
+    ]
+   ],
+   "analysis": "Results so far show only helper functions in roleUtils. The name computation and the snapshot code have not shown the bug. The snapshot likely computes the name in a different way, for example by skipping the name when the button has a single generic child, or by using a cheaper name-from-content path. The toAriaNode body and the name-from-content handling in ariaSnapshot.ts have not been seen.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Code in the aria snapshot that handles a node whose name comes from content, by flattening or removing child generic nodes and text. It may drop the name when the only child is a generic span containing text next to a hidden element.",
+    "symptom": "Aria snapshot lists a button without its name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "nameFromContentRefs",
+     "toAriaNode",
+     "getElementAccessibleName",
+     "nameSourceElements",
+     "collectElements",
+     "visit",
+     "getTextAlternativeInternal",
+     "generateAriaTree",
+     "computeAriaRef"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     479,
+     485
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     444,
+     463
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     378,
+     414
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     59,
+     83
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     446,
+     460
+    ]
+   ],
+   "analysis": "Results so far show only matching and rendering code in ariaSnapshot.ts, which is not the cause. The name is probably lost in the shared name computation in roleUtils.ts. A likely cause is a cache or visited-elements state, or the collectElements path in getTextAlternativeInternal. Such a path could mishandle a nested span next to an aria-hidden sibling. Another possibility is that the snapshot treats the generic child text as a duplicate of the name.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Find getTextAlternativeInternal in roleUtils and the name-from-content child traversal. Look at how aria-hidden children, the cache and the visited set are handled when computing the name for a nested generic span.",
+    "symptom": "Aria snapshot lists a button without its name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "getTextAlternativeInternal",
+     "getElementAccessibleName",
+     "collectElements",
+     "visitedElements",
+     "nameSourceElements",
+     "embeddedInLabel",
+     "innerAccumulatedElementText",
+     "isElementHiddenForAria",
+     "cacheAccessibleName"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     1245,
+     1259
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     657,
+     666
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     500,
+     511
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     627,
+     655
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     996,
+     1016
+    ]
+   ],
+   "analysis": "Round 8 showed only cache declarations, option types, allowsNameFromContent and innerAccumulatedElementText.visit. These look fine. The body of getTextAlternativeInternal and getElementAccessibleName, which handle the cache, collectElements and hidden children, has not been shown. The name is probably lost in how the cache or the collected elements is handled, or in the step after getTextAlternativeInternal that runs on children.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "Body of getTextAlternativeInternal and getElementAccessibleName in roleUtils: the cache lookup, hidden element check, name-from-content step 2F, and how the collected elements are returned for nested spans.",
+    "symptom": "Aria snapshot lists a button without its name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "getTextAlternativeInternal",
+     "getElementAccessibleName",
+     "innerAccumulatedElementText",
+     "allowsNameFromContent",
+     "embeddedInTargetElement",
+     "cacheAccessibleName",
+     "cacheAccessibleNameHidden",
+     "collectElements",
+     "visitedElements",
+     "isElementHiddenForAria",
+     "asFlatString"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     408,
+     439
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1320,
+     1323
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     281,
+     288
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     306,
+     308
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     441,
+     487
+    ]
+   ],
+   "analysis": "Round 9 returned only helper functions (getCSSContent, compositeString, getAriaRole). The body of getTextAlternativeInternal has not been shown. compositeString only records elements when text is non-empty. The name may be lost in how the composite elements are joined across nested spans, or in the snapshot's handling of nameSourceElements.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "Find the function that joins composite strings of child results in name-from-content (joinCompositeString or innerAccumulatedElementText) and the snapshot code that uses the collected name elements to decide whether the name is kept.",
+    "symptom": "Aria snapshot lists a button without its name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "compositeString",
+     "CompositeString",
+     "joinCompositeString",
+     "emptyCompositeString",
+     "collectElements",
+     "nameSourceElements",
+     "innerAccumulatedElementText",
+     "getTextAlternativeInternal"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     1325,
+     1335
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1316,
+     1318
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1300,
+     1314
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     87,
+     217
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1119,
+     1133
+    ]
+   ],
+   "analysis": "Round 10 only showed the composite string helpers: joinCompositeString unions the elements of its parts, and emptyCompositeString has no elements. These look fine. The code that handles name-from-content for child elements, and the code in the snapshot that uses the collected elements, have still not been seen. The bug is likely in how the text alternative of a child element collects its elements. A nested span that has a hidden sibling may lose the elements, or the name may be skipped when a child has no recorded elements.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 11,
+   "query": {
+    "intent": "Step 2F name from content in getTextAlternativeInternal: it iterates child nodes, calls the recursive text alternative for each, joins the results, and returns a composite string with the elements that contributed to the name.",
+    "symptom": "Aria snapshot lists a button without its name when its content is nested spans with an aria-hidden svg span and a text span.",
+    "anchors": [
+     "getTextAlternativeInternal",
+     "compositeString",
+     "joinCompositeString",
+     "emptyCompositeString",
+     "collectElements",
+     "innerAccumulatedElementText",
+     "allowsNameFromContent",
+     "getElementAccessibleName",
+     "nameSourceElements"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   }
+  }
+ ]
+}

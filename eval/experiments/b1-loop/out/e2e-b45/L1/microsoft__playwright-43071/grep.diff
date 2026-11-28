@@ -1,0 +1,24 @@
+diff --git a/packages/playwright-core/src/tools/mcp/config.ts b/packages/playwright-core/src/tools/mcp/config.ts
+index 2806201..320e397 100644
+--- a/packages/playwright-core/src/tools/mcp/config.ts
++++ b/packages/playwright-core/src/tools/mcp/config.ts
+@@ -329,6 +329,19 @@ function configFromCLIOptions(cliOptions: CLIOptions): Config & { configFile?: s
+ 
+   if (cliOptions.proxyServer) {
+     const proxy: playwrightTypes.LaunchOptions['proxy'] = { server: cliOptions.proxyServer };
++    try {
++      const url = new URL(cliOptions.proxyServer);
++      if (url.username || url.password) {
++        proxy.username = decodeURIComponent(url.username);
++        proxy.password = decodeURIComponent(url.password);
++        url.username = '';
++        url.password = '';
++        // Drop the trailing slash that URL serialization adds to an empty path.
++        proxy.server = url.pathname === '/' && !url.search && !url.hash ? url.origin : url.toString();
++      }
++    } catch {
++      // Not a parseable URL, pass through as is.
++    }
+     if (cliOptions.proxyBypass)
+       proxy.bypass = cliOptions.proxyBypass;
+     // Set on both to ensure CLI takes precedence over any proxy set in the config file

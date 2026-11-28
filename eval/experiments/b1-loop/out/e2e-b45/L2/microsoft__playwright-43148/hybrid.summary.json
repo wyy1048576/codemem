@@ -1,0 +1,86 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "step": 1,
+  "explanation": "filterCookies treats host-only cookies as domain cookies by prefixing '.', and uses a plain startsWith for paths. I changed it to do an exact host match for host-only cookies and an RFC 6265 path match. I also fixed pathMatches in cookieStore, which appended '/' to the request path, so a /foo/ cookie matched /foo.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0427,
+ "seconds": 30,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 13 ++++++++-----\n 2 files changed, 11 insertions(+), 10 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Cookie filtering by URL in the browser context cookie store: domain matching (host-only vs domain cookies) and path matching (prefix must align at a '/' boundary, per RFC 6265) when returning cookies for given URLs.",
+    "symptom": "Cookie URL matching wrongly returns host-only cookies for subdomains, /api cookies for /apiv2, and sends a /foo/ cookie to /foo.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/playwright-core/src/server/network.ts",
+     142,
+     160
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     260,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     35,
+     55
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     219,
+     227
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     229,
+     237
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.02221,
+   "action": "edit",
+   "analysis": "filterCookies treats host-only cookies as domain cookies by prefixing '.', and uses a plain startsWith for paths. I changed it to do an exact host match for host-only cookies and an RFC 6265 path match. I also fixed pathMatches in cookieStore, which appended '/' to the request path, so a /foo/ cookie matched /foo.",
+   "picked": [
+    "packages/playwright-core/src/server/network.ts:filterCookies",
+    "packages/playwright-core/src/server/cookieStore.ts:pathMatches"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

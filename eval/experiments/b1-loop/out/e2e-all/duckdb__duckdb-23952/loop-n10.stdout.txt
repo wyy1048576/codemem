@@ -1,0 +1,67 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "duckdb__duckdb-23952",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10
+ },
+ "sonnet_calls": 10,
+ "cost_usd": 0.337,
+ "seconds": 81,
+ "diff_stat": ""
+}
+round 1: found=False picked=[]
+  fix: -
+round 2: found=False picked=['src/execution/join_hashtable.cpp:duckdb.ScanStructure.ScanKeyMatches', 'src/execution/join_hashtable.cpp:duckdb.ScanStructure.ResolvePredicates']
+  fix: -
+round 3: found=False picked=['src/execution/join_hashtable.cpp:duckdb.ScanStructure.ApplyResidualPredicate', 'src/execution/join_hashtable.cpp:duckdb.MarkChainsAsFoundLoop']
+  fix: -
+round 4: found=False picked=[]
+  fix: -
+round 5: found=False picked=[]
+  fix: -
+round 6: found=False picked=['src/execution/join_hashtable.cpp:duckdb.ScanStructure.AdvancePointers', 'src/execution/join_hashtable.cpp:duckdb.AdvancePointersLoop']
+  fix: -
+round 7: found=False picked=['src/include/duckdb/execution/join_hashtable.hpp:duckdb.JoinHashTable.GetNextPointer']
+  fix: -
+round 8: found=False picked=['src/execution/join_hashtable.cpp:duckdb.JoinHashTable.CanUseDictionaryEmission']
+  fix: -
+round 9: found=False picked=[]
+  fix: -
+round 10: found=False picked=[]
+  fix: -
+round 11: found=None picked=None
+  fix: -
+
+parse errors in extension/icu/icu-datepart.cpp; chunking what tree-sitter recovered
+parse errors in extension/json/json_common.cpp; chunking what tree-sitter recovered
+parse errors in extension/json/json_functions.cpp; chunking what tree-sitter recovered
+parse errors in extension/parquet/serialize_parquet.cpp; chunking what tree-sitter recovered
+parse errors in extension/parquet/include/parquet_reader.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/common/enum_util.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/common/multi_file/base_file_reader.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/execution/expression_executor.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/execution/operator/csv_scanner/string_value_scanner.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/function/aggregate_function.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/function/function.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/function/scalar_function.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/function/window_function.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/function/scalar/variant_utils.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/main/database.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/planner/binder.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/planner/operator/logical_update.hpp; chunking what tree-sitter recovered
+parse errors in src/include/duckdb/storage/statistics/variant_stats.hpp; chunking what tree-sitter recovered
+parse errors in src/logging/log_manager.cpp; chunking what tree-sitter recovered
+parse errors in src/storage/storage_lock.cpp; chunking what tree-sitter recovered
+parse errors in tools/shell/shell_renderer.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  14%|█▍        | 40/290 [00:00<00:00, 383.28it/s]
+Loading weights:  27%|██▋       | 79/290 [00:00<00:00, 280.75it/s]
+Loading weights:  38%|███▊      | 109/290 [00:00<00:00, 269.43it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 703.58it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

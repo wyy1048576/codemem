@@ -1,0 +1,67 @@
+diff --git a/pandas/core/arrays/arrow/extension_types.py b/pandas/core/arrays/arrow/extension_types.py
+index 7814a77..e0e91ec 100644
+--- a/pandas/core/arrays/arrow/extension_types.py
++++ b/pandas/core/arrays/arrow/extension_types.py
+@@ -57,6 +57,18 @@ _period_type = ArrowPeriodType("D")
+ pyarrow.register_extension_type(_period_type)
+ 
+ 
++def _parse_subtype(subtype: str) -> pyarrow.DataType:
++    """
++    Convert a string representation of a pyarrow type to the type, handling
++    timezone-aware timestamps (e.g. "timestamp[ns, tz=Europe/Brussels]"), which
++    have no alias in ``pyarrow.type_for_alias``.
++    """
++    if subtype.startswith("timestamp[") and ", tz=" in subtype:
++        unit, tz = subtype[len("timestamp[") : -1].split(", tz=", 1)
++        return pyarrow.timestamp(unit, tz)
++    return pyarrow.type_for_alias(subtype)
++
++
+ class ArrowIntervalType(pyarrow.ExtensionType):
+     def __init__(self, subtype, closed: IntervalClosedType) -> None:
+         # attributes need to be set first before calling
+@@ -64,7 +76,7 @@ class ArrowIntervalType(pyarrow.ExtensionType):
+         assert closed in VALID_CLOSED
+         self._closed: IntervalClosedType = closed
+         if not isinstance(subtype, pyarrow.DataType):
+-            subtype = pyarrow.type_for_alias(str(subtype))
++            subtype = _parse_subtype(str(subtype))
+         self._subtype = subtype
+ 
+         storage_type = pyarrow.struct([("left", subtype), ("right", subtype)])
+@@ -85,7 +97,7 @@ class ArrowIntervalType(pyarrow.ExtensionType):
+     @classmethod
+     def __arrow_ext_deserialize__(cls, storage_type, serialized) -> ArrowIntervalType:
+         metadata = json.loads(serialized.decode())
+-        subtype = pyarrow.type_for_alias(metadata["subtype"])
++        subtype = _parse_subtype(metadata["subtype"])
+         closed = metadata["closed"]
+         return ArrowIntervalType(subtype, closed)
+ 
+diff --git a/pandas/core/arrays/interval.py b/pandas/core/arrays/interval.py
+index fe8c7d9..a421c99 100644
+--- a/pandas/core/arrays/interval.py
++++ b/pandas/core/arrays/interval.py
+@@ -58,6 +58,7 @@ from pandas.core.dtypes.common import (
+ )
+ from pandas.core.dtypes.dtypes import (
+     CategoricalDtype,
++    DatetimeTZDtype,
+     IntervalDtype,
+ )
+ from pandas.core.dtypes.generic import (
+@@ -1614,7 +1615,12 @@ class IntervalArray(IntervalMixin, ExtensionArray):
+         from pandas.core.arrays.arrow.extension_types import ArrowIntervalType
+ 
+         try:
+-            subtype = pyarrow.from_numpy_dtype(self.dtype.subtype)
++            if isinstance(self.dtype.subtype, DatetimeTZDtype):
++                subtype = pyarrow.timestamp(
++                    self.dtype.subtype.unit, str(self.dtype.subtype.tz)
++                )
++            else:
++                subtype = pyarrow.from_numpy_dtype(self.dtype.subtype)
+         except TypeError as err:
+             raise TypeError(
+                 f"Conversion to arrow with subtype '{self.dtype.subtype}' "

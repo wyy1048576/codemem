@@ -1,0 +1,77 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68278",
+ "fixed": {
+  "round": 1,
+  "explanation": "In online_ewma the decay exponent is indexed with the column index j (deltas[j - 1]) instead of the row index i. For a single column, j is 0, so deltas[-1] is always used. The decay therefore doesn't follow the time step and the result is wrong. Indexing with i - 1 fixes it.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0333,
+ "seconds": 21,
+ "diff_stat": "pandas/core/window/online.py | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The expanding/online exponentially weighted mean implementation (EWMMean in pandas/core/window/online.py, used by ewm(...).online().mean()) computes the update with the decay/alpha weights. For single-column DataFrames the code path appears to skip the decay weighting and returns a cumulative mean; the weight update logic must apply the decay factor consistently with the non-online ewm mean.",
+    "symptom": "Online ewm mean on a single-column DataFrame ignores the decay (alpha/com/span) and returns a plain cumulative mean, differing from the regular ewm mean.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "pandas/core/window/ewm.py",
+     126,
+     1012
+    ],
+    [
+     "pandas/core/generic.py",
+     12477,
+     12692
+    ],
+    [
+     "pandas/core/window/online.py",
+     13,
+     89
+    ],
+    [
+     "pandas/core/groupby/groupby.py",
+     3906,
+     4013
+    ],
+    [
+     "pandas/core/window/online.py",
+     109,
+     131
+    ]
+   ],
+   "shown_whole": [
+    false,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In online_ewma the decay exponent is indexed with the column index j (deltas[j - 1]) instead of the row index i. For a single column, j is 0, so deltas[-1] is always used. The decay therefore doesn't follow the time step and the result is wrong. Indexing with i - 1 fixes it.",
+   "picked": [
+    "pandas/core/window/online.py:generate_online_numba_ewma_func"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

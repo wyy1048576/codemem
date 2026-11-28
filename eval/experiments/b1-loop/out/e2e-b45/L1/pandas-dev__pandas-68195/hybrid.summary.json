@@ -1,0 +1,59 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "step": 2,
+  "explanation": "The three raise statements say \"tolerance must be positive\" though zero is accepted. I'll change each to \"non-negative\", using unique surrounding context for each edit.",
+  "edits": 3
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0353,
+ "seconds": 12,
+ "diff_stat": "pandas/core/reshape/merge.py | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "tolerance must be positive|must be positive",
+    "path": "pandas/core/reshape/merge.py",
+    "ignore_case": true
+   },
+   "matches": 3,
+   "grep_shown": [
+    "pandas/core/reshape/merge.py:2618",
+    "pandas/core/reshape/merge.py:2624",
+    "pandas/core/reshape/merge.py:2631"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "The three raise lines in _validate_tolerance are identical; I need to view the function to craft unique edits.",
+   "picked": [
+    "pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance"
+   ]
+  },
+  {
+   "step": 2,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "pandas/core/reshape/merge.py lines 2599-2634 (_AsOfMerge._validate_tolerance)"
+   ],
+   "action": "edit",
+   "analysis": "The three raise statements say \"tolerance must be positive\" though zero is accepted. I'll change each to \"non-negative\", using unique surrounding context for each edit.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+diff --git a/packages/playwright/src/transform/esmLoaderSync.ts b/packages/playwright/src/transform/esmLoaderSync.ts
+index 9de1fc7..619352a 100644
+--- a/packages/playwright/src/transform/esmLoaderSync.ts
++++ b/packages/playwright/src/transform/esmLoaderSync.ts
+@@ -70,6 +70,11 @@ export function load(moduleUrl: string, context: { format?: string, conditions?:
+   if (isStyleFile(filename))
+     return { format: 'commonjs', source: '', shortCircuit: true };
+ 
++  // Let other registered loaders handle file types we do not transform (e.g. .mdx).
++  const extMatch = /\.[^./\\]+$/.exec(filename);
++  if (extMatch && !['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'].includes(extMatch[0].toLowerCase()))
++    return nextLoad(moduleUrl, context);
++
+   // Bail for node_modules.
+   if (!shouldTransform(filename))
+     return nextLoad(moduleUrl, context);

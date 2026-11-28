@@ -1,0 +1,35 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 2,
+  "explanation": "filterCookies dots every domain, so host-only cookies match subdomains, and it compares paths with plain startsWith. pathMatches appends a slash to the cookie path, so /foo/ matches /foo. Both are rewritten to follow RFC 6265 domain-match and path-match.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  1
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0508,
+ "seconds": 29,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 12 +++++++-----\n 2 files changed, 10 insertions(+), 10 deletions(-)"
+}
+round 1: k=3 action=search picked=['packages/playwright-core/src/server/cookieStore.ts:domainMatches', 'packages/playwright-core/src/server/network.ts:filterCookies'] 
+round 2: k=1 action=edit picked=['packages/playwright-core/src/server/cookieStore.ts:pathMatches'] applied
+
+parse errors in browser_patches/webkit/embedder/Playwright/win/WinMain.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   5%|▌         | 15/290 [00:00<00:01, 143.60it/s]
+Loading weights:  10%|█         | 30/290 [00:00<00:01, 133.73it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 927.38it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

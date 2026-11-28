@@ -1,0 +1,79 @@
+diff --git a/packages/playwright-core/src/server/highlightController.ts b/packages/playwright-core/src/server/highlightController.ts
+index 966d2f1..e1f03b5 100644
+--- a/packages/playwright-core/src/server/highlightController.ts
++++ b/packages/playwright-core/src/server/highlightController.ts
+@@ -23,7 +23,9 @@ export type HighlightOptions = {
+   anyFrame?: boolean; // Highlight in all the frames the selector could resolve to, instead of a single one.
+ };
+ 
+-type HighlightEntry = HighlightOptions & {
++type World = 'main' | 'utility';
++
++type HighlightEntry =HighlightOptions & {
+   selector: string;
+ };
+ 
+@@ -59,9 +61,11 @@ export class HighlightController {
+   async hideHighlights() {
+     this._entries.clear();
+     await Promise.all(this._page.frames().map(frame => frame.raceAgainstEvaluationStallingEvents(async () => {
+-      const context = frame.existingContext('utility');
+-      const injectedScript = await context?.injectedScript();
+-      await injectedScript?.evaluate(injected => injected.hideHighlight());
++      for (const world of ['main', 'utility'] as const) {
++        const context = frame.existingContext(world);
++        const injectedScript = await context?.injectedScript();
++        await injectedScript?.evaluate(injected => injected.hideHighlight());
++      }
+     }).catch(() => {})));
+   }
+ 
+@@ -78,25 +82,38 @@ export class HighlightController {
+     if (this._page.isClosed())
+       return;
+ 
+-    const perFrame = new Map<Frame, { selector: ParsedSelector, cssStyle?: string }[]>();
++    type Highlight = { selector: ParsedSelector, cssStyle?: string };
++    const perFrame = new Map<Frame, Record<World, Highlight[]>>();
+     for (const entry of this._entries.values()) {
+       const results = await this._page.mainFrame().selectors.resolveFramesForSelector(entry.selector, { strict: false, anyFrame: entry.anyFrame }).catch(() => []);
+       for (const { frame, info } of results) {
+-        let list = perFrame.get(frame);
+-        if (!list) {
+-          list = [];
+-          perFrame.set(frame, list);
++        let lists = perFrame.get(frame);
++        if (!lists) {
++          lists = { main: [], utility: [] };
++          perFrame.set(frame, lists);
+         }
+-        list.push({ selector: info.parsed, cssStyle: entry.style });
++        lists[info.world].push({ selector: info.parsed, cssStyle: entry.style });
+       }
+     }
+ 
+     await Promise.all(this._page.frames().map(async frame => {
+-      const highlights = perFrame.get(frame) || [];
++      const lists = perFrame.get(frame);
+       await frame.raceAgainstEvaluationStallingEvents(async () => {
+-        const context = frame.existingContext('utility');
+-        const injectedScript = await context?.injectedScript();
+-        await injectedScript?.evaluate((injected, highlights) => injected.setHighlights(highlights), highlights);
++        // Selectors are evaluated in the world they require, e.g. custom engines
++        // without contentScript need the main world.
++        const byContext = new Map<NonNullable<ReturnType<Frame['existingContext']>>, Highlight[]>();
++        for (const world of ['main', 'utility'] as const) {
++          const context = frame.existingContext(world);
++          if (!context)
++            continue;
++          const list = byContext.get(context) || [];
++          list.push(...(lists?.[world] || []));
++          byContext.set(context, list);
++        }
++        await Promise.all([...byContext].map(async ([context, highlights]) => {
++          const injectedScript = await context.injectedScript();
++          await injectedScript.evaluate((injected, highlights) => injected.setHighlights(highlights), highlights);
++        }));
+       }).catch(() => {});
+     }));
+ 

@@ -1,0 +1,52 @@
+diff --git a/packages/injected/src/storageScript.ts b/packages/injected/src/storageScript.ts
+index 2583b2c..b5ee66a 100644
+--- a/packages/injected/src/storageScript.ts
++++ b/packages/injected/src/storageScript.ts
+@@ -76,8 +76,16 @@ export class StorageScript {
+       throw new Error('Database version is unset');
+ 
+     const db = await this._idbRequestToPromise(indexedDB.open(dbInfo.name));
++    try {
++      return await this._collectOpenDB(db, dbInfo);
++    } finally {
++      db.close();
++    }
++  }
++
++  private async _collectOpenDB(db: IDBDatabase, dbInfo: IDBDatabaseInfo) {
+     if (db.objectStoreNames.length === 0)
+-      return { name: dbInfo.name, version: dbInfo.version, stores: [] };
++      return { name: dbInfo.name!, version: dbInfo.version!, stores: [] };
+ 
+     const transaction = db.transaction(db.objectStoreNames, 'readonly');
+     const stores = await Promise.all([...db.objectStoreNames].map(async storeName => {
+@@ -127,8 +135,8 @@ export class StorageScript {
+     }));
+ 
+     return {
+-      name: dbInfo.name,
+-      version: dbInfo.version,
++      name: dbInfo.name!,
++      version: dbInfo.version!,
+       stores,
+     };
+   }
+@@ -160,8 +168,16 @@ export class StorageScript {
+     // after `upgradeneeded` finishes, `success` event is fired.
+     const db = await this._idbRequestToPromise(openRequest);
+ 
+-    if (db.objectStoreNames.length === 0)
+-      return;
++    try {
++      if (db.objectStoreNames.length === 0)
++        return;
++      await this._restoreRecords(db, dbInfo);
++    } finally {
++      db.close();
++    }
++  }
++
++  private async _restoreRecords(db: IDBDatabase, dbInfo: IndexedDBDatabase) {
+     const transaction = db.transaction(db.objectStoreNames, 'readwrite');
+     await Promise.all(dbInfo.stores.map(async store => {
+       const objectStore = transaction.objectStore(store.name);

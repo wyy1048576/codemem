@@ -1,0 +1,19 @@
+diff --git a/pandas/core/indexing.py b/pandas/core/indexing.py
+index d4f15f3..34de67c 100644
+--- a/pandas/core/indexing.py
++++ b/pandas/core/indexing.py
+@@ -1258,7 +1258,13 @@ class _LocationIndexer(_NDFrameIndexerBase):
+                 if com.is_null_slice(new_key):
+                     return section
+                 # This is an elided recursive call to iloc/loc
+-                return getattr(section, self.name)[new_key]
++                result = getattr(section, self.name)[new_key]
++                if is_list_like(key) and getattr(result, "ndim", 0) == 1:
++                    # section is a temporary copy created by the list-like
++                    #  key; the result may be a view into it, which would keep
++                    #  the whole temporary alive. Copy to detach.
++                    result = result.copy()
++                return result
+ 
+         raise IndexingError("not applicable")
+ 

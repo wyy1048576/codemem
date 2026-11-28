@@ -1,0 +1,129 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": "chosen",
+ "ks": [
+  3,
+  5
+ ],
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0082,
+ "task": "microsoft__playwright-42792",
+ "fixed": {
+  "round": 2,
+  "explanation": "_configure only handled mode, retries and timeout. It now accepts a `lock` option (string or array of strings), validates it, and appends the names to suite._locks. Suite already carries and serializes _locks. I didn't edit the public type declarations in types/test.d.ts because I wasn't shown them. They should also gain `lock?: string | string[]`.",
+  "edits": 2
+ },
+ "rounds": 2,
+ "calls": {
+  "codemem_rounds": 2,
+  "judge": 2,
+  "fix": 1
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0752,
+ "seconds": 31,
+ "diff_stat": "packages/playwright/src/common/testType.ts | 11 ++++++++++-\n 1 file changed, 10 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "test.describe.configure implementation accepts options mode, retries, timeout; add a new lock option (string or string[]) that is stored on the describe's FileSuite/Suite and applied to the group's tests. Update the type definitions and the validation in the test type.",
+    "symptom": "test.describe.configure does not accept a lock option for declaring one or more lock names for the enclosing test group.",
+    "anchors": [
+     "configure",
+     "mode",
+     "timeout"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright/src/runner/testGroups.ts",
+     28,
+     142
+    ],
+    [
+     "tests/playwright-test/test-locks.spec.ts",
+     39,
+     45
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     192,
+     215
+    ]
+   ],
+   "analysis": "_configure in testType.ts is the place to accept a lock option. The results don't show how test._locks is set or how a suite would carry locks. createTestGroups already aggregates test._locks. I still need to see the Suite/TestCase lock storage and the type definitions.",
+   "picked": [
+    "packages/playwright/src/common/testType.ts:TestTypeImpl._configure"
+   ],
+   "found": false
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Find where test._locks is assigned from the test details lock option, and the Suite class fields. A suite-level _locks needs to be added and inherited by its tests. Also find the configure type declarations.",
+    "symptom": "test.describe.configure does not accept a lock option for declaring lock names for the enclosing group.",
+    "anchors": [
+     "_locks",
+     "_configure",
+     "lock",
+     "_parallelMode",
+     "_retries",
+     "_timeout"
+    ],
+    "look_in": [
+     "packages/playwright/src/common/"
+    ]
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright/src/common/test.ts",
+     44,
+     266
+    ],
+    [
+     "packages/playwright/src/common/testType.ts",
+     34,
+     316
+    ],
+    [
+     "packages/playwright/src/common/validators.ts",
+     63,
+     84
+    ],
+    [
+     "packages/playwright/src/common/test.ts",
+     236,
+     251
+    ],
+    [
+     "packages/playwright/src/common/test.ts",
+     216,
+     234
+    ]
+   ],
+   "analysis": "Suite already has _locks and serializes it. The _configure method in TestTypeImpl accepts only mode, retries and timeout, so it needs a lock option. It should normalize a string or array into suite._locks. The type declaration of describe.configure in types/test.d.ts (and its source in packages/playwright/types/test.d.ts) should also gain the option.",
+   "picked": [
+    "packages/playwright/src/common/testType.ts:TestTypeImpl"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright/src/common/testType.ts lines 34-316 (TestTypeImpl)"
+   ],
+   "fix_attempt": "applied: _configure only handled mode, retries and timeout. It now accepts a `lock` option (string or array of strings), validates it, and appends the names to suite._locks. Suite already carries and serializes _locks. I didn't edit the public type declarations in types/test.d.ts because I wasn't shown them. They should also gain `lock?: string | string[]`."
+  }
+ ]
+}

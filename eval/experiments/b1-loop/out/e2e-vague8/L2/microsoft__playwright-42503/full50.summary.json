@@ -1,0 +1,346 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0077,
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 1,
+  "explanation": "runDaemonForContext called browser.bind for every context. A second context, for example from a worker-scoped fixture, shares the already bound browser, so the second bind fails. The fix keeps a WeakSet of bound browsers. A later context on the same browser returns early without rebinding, printing a second session, or pausing again. This assumes `bind` throws on an already bound browser, and I didn't open its implementation.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1827,
+ "seconds": 23,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that handles debug mode / debug controller / recorder when a browser context is created. It likely assumes a single browser context and fails when a second context is created, such as for a worker-scoped fixture. It should support multiple contexts under the debugger or CLI debug flow.",
+    "symptom": "Running a test under the Playwright CLI debugger crashes when the test creates a second browser context, for example in a worker-scoped fixture.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     376,
+     390
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     118,
+     126
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     369,
+     374
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     63,
+     65
+    ],
+    [
+     "packages/playwright-core/src/server/browser.ts",
+     105,
+     128
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     750,
+     753
+    ],
+    [
+     "packages/playwright-core/types/types.d.ts",
+     21001,
+     21083
+    ],
+    [
+     "packages/playwright-client/types/types.d.ts",
+     21001,
+     21083
+    ],
+    [
+     "packages/playwright-core/src/client/playwright.ts",
+     77,
+     79
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/browserDispatcher.ts",
+     62,
+     78
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     98,
+     419
+    ],
+    [
+     "tests/library/browsercontext-reuse.spec.ts",
+     30,
+     34
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     67,
+     69
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     108,
+     116
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     150,
+     180
+    ],
+    [
+     "packages/playwright-core/src/client/browserContext.ts",
+     303,
+     305
+    ],
+    [
+     "packages/playwright-core/src/server/browser.ts",
+     130,
+     140
+    ],
+    [
+     "packages/playwright/src/mcp/test/browserBackend.ts",
+     120,
+     137
+    ],
+    [
+     "packages/playwright-core/src/server/debugController.ts",
+     36,
+     178
+    ],
+    [
+     "tests/config/browserTest.ts",
+     49,
+     218
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     124,
+     131
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     182,
+     184
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     155,
+     157
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/browserDispatcher.ts",
+     80,
+     85
+    ],
+    [
+     "packages/playwright-core/src/server/playwright.ts",
+     69,
+     71
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     446,
+     501
+    ],
+    [
+     "packages/playwright-core/src/server/browserType.ts",
+     1,
+     47
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     389,
+     445
+    ],
+    [
+     "packages/playwright-core/src/server/debugController.ts",
+     168,
+     177
+    ],
+    [
+     "tests/playwright-test/playwright.reuse.browser.spec.ts",
+     1,
+     154
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     738,
+     748
+    ],
+    [
+     "packages/playwright-core/src/client/playwright.ts",
+     67,
+     69
+    ],
+    [
+     "packages/playwright-core/src/server/debugger.ts",
+     59,
+     263
+    ],
+    [
+     "packages/playwright-core/src/client/fetch.ts",
+     73,
+     93
+    ],
+    [
+     "tests/library/browsercontext-reuse.spec.ts",
+     1,
+     19
+    ],
+    [
+     "tests/mcp/test-debug.spec.ts",
+     338,
+     486
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     339,
+     388
+    ],
+    [
+     "tests/library/browsercontext-basic.spec.ts",
+     1,
+     199
+    ],
+    [
+     "packages/playwright-core/src/cli/browserActions.ts",
+     190,
+     201
+    ],
+    [
+     "packages/playwright-core/src/client/debugger.ts",
+     44,
+     46
+    ],
+    [
+     "tests/playwright-test/playwright.spec.ts",
+     181,
+     363
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     82,
+     95
+    ],
+    [
+     "packages/playwright-core/src/client/playwright.ts",
+     71,
+     75
+    ],
+    [
+     "browser_patches/firefox/juggler/TargetRegistry.js",
+     1008,
+     1038
+    ],
+    [
+     "packages/playwright-core/src/client/browserContext.ts",
+     572,
+     593
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/browserContextDispatcher.ts",
+     357,
+     359
+    ],
+    [
+     "tests/playwright-test/playwright-test-fixtures.ts",
+     122,
+     132
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     595,
+     613
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     755,
+     759
+    ],
+    [
+     "tests/playwright-test/playwright.spec.ts",
+     1059,
+     1076
+    ]
+   ],
+   "analysis": "runDaemonForContext is the debug=cli entry point. It calls context.browser()!.bind(sessionName, ...) for each context, so a second context (for example from a worker-scoped fixture) tries to bind an already bound browser. This likely throws, and it also prints a second attach session. The fix is probably to bind the browser only once, or to handle already bound browsers. I haven't opened the bind implementation, so that part is a guess.",
+   "picked": [
+    "packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright/src/mcp/test/browserBackend.ts lines 120-137 (runDaemonForContext)"
+   ],
+   "fix_attempt": "applied: runDaemonForContext called browser.bind for every context. A second context, for example from a worker-scoped fixture, shares the already bound browser, so the second bind fails. The fix keeps a WeakSet of bound browsers. A later context on the same browser returns early without rebinding, printing a second session, or pausing again. This assumes `bind` throws on an already bound browser, and I didn't open its implementation."
+  }
+ ]
+}

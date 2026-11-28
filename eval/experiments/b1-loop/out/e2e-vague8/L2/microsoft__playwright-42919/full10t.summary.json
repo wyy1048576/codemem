@@ -1,0 +1,110 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0087,
+ "task": "microsoft__playwright-42919",
+ "fixed": {
+  "round": 1,
+  "explanation": "`_captureSnapshot` awaited the snapshotter, screenshot, aria and coverage captures directly. When the page main thread is blocked those evaluations never settle, so the action never reached its timeout. Each await is now wrapped in `progress.race`, so the progress abort or timeout rejects the wait and the action fails with the timeout error instead of hanging. The snapshotter's `.catch(() => {})` stays inside the race, so ordinary snapshot failures are still swallowed but an abort is not.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0462,
+ "seconds": 39,
+ "diff_stat": "packages/playwright-core/src/server/trace/recorder/tracing.ts | 8 ++++----\n 1 file changed, 4 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The tracing snapshotter captures DOM snapshots before/after actions by evaluating a script in the page (e.g. in Snapshotter/Tracing's onBeforeCall/onBeforeInputAction). That snapshot evaluation is awaited without honoring the action's progress/timeout, so a blocked main thread makes it hang. The snapshot capture should be raced against the progress abort/timeout or made non-blocking.",
+    "symptom": "When tracing snapshots are enabled and the page's main thread is blocked, Playwright actions hang indefinitely and ignore their timeout.",
+    "anchors": [
+     "tracing",
+     "snapshots",
+     "timeout"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    false,
+    false,
+    true,
+    false,
+    false,
+    false,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "tests/library/tracing.spec.ts",
+     395,
+     592
+    ],
+    [
+     "tests/library/tracing.spec.ts",
+     594,
+     760
+    ],
+    [
+     "packages/playwright-core/src/client/tracing.ts",
+     45,
+     62
+    ],
+    [
+     "tests/library/tracing.spec.ts",
+     762,
+     961
+    ],
+    [
+     "tests/playwright-test/playwright.trace.spec.ts",
+     1323,
+     1513
+    ],
+    [
+     "tests/library/tracing.spec.ts",
+     1,
+     192
+    ],
+    [
+     "packages/playwright-core/src/server/trace/recorder/tracing.ts",
+     763,
+     766
+    ],
+    [
+     "packages/playwright/src/index.ts",
+     698,
+     714
+    ],
+    [
+     "packages/playwright-core/src/server/trace/recorder/tracing.ts",
+     508,
+     528
+    ],
+    [
+     "packages/playwright-core/src/client/browser.ts",
+     163,
+     166
+    ]
+   ],
+   "analysis": "Tracing._captureSnapshot awaits snapshotter.captureSnapshot(...) without racing it against the progress abort or timeout. If the page main thread is blocked, that evaluation never returns, so the action hangs and ignores its timeout. Wrapping the snapshot, screenshot and aria capture calls in progress.race would fix it.",
+   "picked": [
+    "packages/playwright-core/src/server/trace/recorder/tracing.ts:Tracing._captureSnapshot"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/trace/recorder/tracing.ts lines 508-528 (Tracing._captureSnapshot)"
+   ],
+   "fix_attempt": "applied: `_captureSnapshot` awaited the snapshotter, screenshot, aria and coverage captures directly. When the page main thread is blocked those evaluations never settle, so the action never reached its timeout. Each await is now wrapped in `progress.race`, so the progress abort or timeout rejects the wait and the action fails with the timeout error instead of hanging. The snapshotter's `.catch(() => {})` stays inside the race, so ordinary snapshot failures are still swallowed but an abort is not."
+  }
+ ]
+}

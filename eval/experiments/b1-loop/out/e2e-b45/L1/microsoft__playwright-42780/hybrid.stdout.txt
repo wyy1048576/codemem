@@ -1,0 +1,38 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42780",
+ "fixed": {
+  "step": 3,
+  "explanation": "In innerAsLocators, name and description share one exact flag. A regex is parsed as caseSensitive=true, so next to a non-exact string it counts as a conflict and throws, which falls back to the raw selector. Exactness only matters for string values. The fix checks conflicts only between string values. A regex sets exact only when no string has set it.",
+  "edits": 2
+ },
+ "rounds": 3,
+ "tools": {
+  "codemem": 1,
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.1062,
+ "seconds": 32,
+ "diff_stat": "packages/isomorphic/locatorGenerators.ts | 25 +++++++++++++++----------\n 1 file changed, 15 insertions(+), 10 deletions(-)"
+}
+step 1: codemem {"intent": "Converting an internal role selector (role=button[name=... ][description=...]) back into a readable getByRole locator call; a check that name and de -> action=grep picked=[] 
+step 2: grep {"pattern": "descriptionExact|nameExact|description", "path": "packages/isomorphic/locatorGenerators.ts", "ignore_case": false} -> action=read picked=['packages/isomorphic/locatorGenerators.ts:innerAsLocators'] 
+step 3: read {} -> action=edit picked=[] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  12%|█▏        | 34/290 [00:00<00:00, 319.89it/s]
+Loading weights:  23%|██▎       | 66/290 [00:00<00:01, 145.30it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 655.47it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

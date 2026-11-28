@@ -1,0 +1,20 @@
+{
+ "mcpServers": {
+  "codemem": {
+   "command": "C:\\Users\\user\\Desktop\\Stanford\\CS329M\\Claude\\Week 1 Task\\analysis\\xpu-venv\\Scripts\\python.exe",
+   "args": [
+    "-m",
+    "codemem",
+    "mcp",
+    "C:\\Users\\user\\AppData\\Local\\Temp\\claude\\1dd1fa61f18d3602\\38c95f0c-bc3a-4dab-925c-3f580f6b37da\\scratchpad\\e2e\\codemem"
+   ],
+   "env": {
+    "PYTHONPATH": "C:\\Users\\user\\Desktop\\Stanford\\CS329M\\Claude\\Week 1 Task\\analysis\\b1-links",
+    "PYTHONUTF8": "1",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "CODEMEM_HOME": "C:\\Users\\user\\.codemem-e2e"
+   }
+  }
+ }
+}

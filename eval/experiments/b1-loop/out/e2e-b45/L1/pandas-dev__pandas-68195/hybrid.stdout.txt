@@ -1,0 +1,28 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "step": 2,
+  "explanation": "The three raise statements say \"tolerance must be positive\" though zero is accepted. I'll change each to \"non-negative\", using unique surrounding context for each edit.",
+  "edits": 3
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0353,
+ "seconds": 12,
+ "diff_stat": "pandas/core/reshape/merge.py | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)"
+}
+step 1: grep {"pattern": "tolerance must be positive|must be positive", "path": "pandas/core/reshape/merge.py", "ignore_case": true} -> action=read picked=['pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance'] 
+step 2: read {} -> action=edit picked=[] applied
+
+parse errors in pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c; chunking what tree-sitter recovered

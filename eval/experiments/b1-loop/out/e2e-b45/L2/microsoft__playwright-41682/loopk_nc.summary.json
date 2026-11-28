@@ -1,0 +1,111 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41682",
+ "fixed": {
+  "round": 2,
+  "explanation": "resolveGlobBase replaces every path token, including the host, with placeholders before calling new URL(). So the URL normalization never applies to them: default ports, spaces and punycode hosts stay as written. The fix leaves tokens with no glob characters as they are, so new URL() normalizes them as it did in 1.50.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0441,
+ "seconds": 45,
+ "diff_stat": "packages/isomorphic/urlMatch.ts | 4 ++++\n 1 file changed, 4 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "URL pattern matching for request routing (page.route/context.route glob and URL matching) must normalize URLs and patterns, including stripping explicit default ports, percent-encoding spaces, and punicode-converting non-ASCII hosts, before comparing. Restore the earlier normalization in the URL matcher helper (urlMatches / constructURLBasedOnBaseURL / globToRegex).",
+    "symptom": "Route URL patterns containing an explicit default port such as :80, a space, or a non-ASCII host no longer match requests since version 1.51.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/utils/socksProxy.ts",
+     334,
+     375
+    ],
+    [
+     "packages/isomorphic/urlMatch.ts",
+     212,
+     261
+    ],
+    [
+     "packages/isomorphic/urlMatch.ts",
+     117,
+     128
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "resolveGlobBase in urlMatch.ts resolves glob patterns against baseURL, but the code shown doesn't normalize the pattern URL (default port, spaces, punycode). The normalization likely belongs in resolveBaseURL or the code that builds the matcher (urlMatches/globToRegexPattern) in the same file.",
+   "picked": [
+    "packages/isomorphic/urlMatch.ts:resolveGlobBase"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "resolveBaseURL and urlMatches in urlMatch.ts: how a pattern and request URL are normalized with new URL() before glob regex matching.",
+    "symptom": "Route URL patterns with explicit :80 port, spaces, or non-ASCII hosts never match since 1.51.",
+    "anchors": [
+     "resolveBaseURL",
+     "resolveGlobBase",
+     "caseInsensitivePart"
+    ],
+    "look_in": [
+     "packages/isomorphic/urlMatch.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/isomorphic/urlMatch.ts",
+     279,
+     289
+    ],
+    [
+     "packages/isomorphic/urlMatch.ts",
+     197,
+     202
+    ],
+    [
+     "packages/isomorphic/urlMatch.ts",
+     271,
+     277
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/isomorphic/urlMatch.ts lines 212-261 (resolveGlobBase)"
+   ],
+   "action": "edit",
+   "analysis": "resolveGlobBase replaces every path token, including the host, with placeholders before calling new URL(). So the URL normalization never applies to them: default ports, spaces and punycode hosts stay as written. The fix leaves tokens with no glob characters as they are, so new URL() normalizes them as it did in 1.50.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

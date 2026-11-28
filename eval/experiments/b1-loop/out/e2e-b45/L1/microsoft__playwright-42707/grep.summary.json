@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42707",
+ "exit": 0,
+ "seconds": 36,
+ "cost_usd": 0.12474769999999999,
+ "turns": 14,
+ "usage": {
+  "input_tokens": 14,
+  "cache_creation_input_tokens": 18694,
+  "cache_read_input_tokens": 87637,
+  "output_tokens": 4118,
+  "output_tokens_details": {
+   "thinking_tokens": 516
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 18694,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 547,
+    "cache_read_input_tokens": 21530,
+    "cache_creation_input_tokens": 2556,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 2556
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 6,
+  "Read": 2,
+  "Edit": 5
+ },
+ "subtype": "success",
+ "diff_stat": "packages/injected/src/storageScript.ts          |  2 +-\n packages/isomorphic/utilityScriptSerializers.ts | 59 +++++++++++++++++++++++--\n 2 files changed, 56 insertions(+), 5 deletions(-)",
+ "final": "IndexedDB snapshots now keep `Map` and `Set` values through save and restore. I couldn't build or run anything, so this is untested.\n\n**Cause:** the shared serializer in `packages/isomorphic/utilityScriptSerializers.ts` had no `Map` or `Set` case. Both fell through to the generic object case, which only walks own enumerable properties, so they came out as `{}`.\n\n**Changes:**\n- **Serializer:** `serializeAsCallArgument` takes a new opt-in option, `mapsAndSets`. When it's on, a `Map` encodes as `{ m: [{k, v}...], id }` and a `Set` as `{ se: [...], id }`. The encoding goes through the same visited-ID tracking as arrays and objects, so cycles and shared references still work.\n- **Parser:** `parseEvaluationResultValue` rebuilds a real `Map` or `Set` from those two encodings. Nothing else produces them, so the parser change has no effect on existing data.\n- **IndexedDB snapshot:** `_trySerialize` in `packages/injected/src/storageScript.ts` passes `{ mapsAndSets: true }`. A `Map` or `Set` isn't a plain object, so it takes the encoded path and is stored in `valueEncoded` or `keyEncoded`.\n\nPage evaluation doesn't pass the option, so a `Map` or `Set` returned from `evaluate` still becomes `{}`, as the issue requires. The `valueEncoded` and `keyEncoded` fields are typed `any` in the protocol validator, so the protocol needs no changes.\n\nI didn't add a test.",
+ "stderr": ""
+}

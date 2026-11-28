@@ -1,0 +1,587 @@
+{
+ "prompt_sha": "a3f1fb713b3d82fd8ec659a3d122707b123a34e6b46a49f8a5c68555fc20144d",
+ "prompt_sha_v2": "91a33faed09ffa19979ed7209d52dd5f5408f32f5b76c12a23daca0c0899d276",
+ "prompt_sha_loop": "be4c130c1fdf8bd5239728584d86aa9fd335de2b4c4d87d4b675fd5e07a5fc40",
+ "base": "oneshot",
+ "levels": {
+  "function": {
+   "n": 24,
+   "whole": {
+    "mrr": 0.2539,
+    "recall@10": 0.2604,
+    "success@10": 0.1667,
+    "recall@50": 0.5451,
+    "success@50": 0.5,
+    "found": 0.625
+   },
+   "oneshot": {
+    "mrr": 0.2977,
+    "recall@10": 0.4271,
+    "success@10": 0.3333,
+    "recall@50": 0.7604,
+    "success@50": 0.7083,
+    "found": 0.8333
+   },
+   "loop-full": {
+    "mrr": 0.7113,
+    "recall@10": 0.7083,
+    "success@10": 0.6667,
+    "recall@50": 0.7708,
+    "success@50": 0.7083,
+    "found": 0.8333
+   }
+  },
+  "file": {
+   "n": 25,
+   "whole": {
+    "mrr": 0.4142,
+    "recall@10": 0.576,
+    "success@10": 0.56,
+    "recall@50": 0.712,
+    "success@50": 0.68,
+    "found": 0.76
+   },
+   "oneshot": {
+    "mrr": 0.5241,
+    "recall@10": 0.7707,
+    "success@10": 0.72,
+    "recall@50": 0.8267,
+    "success@50": 0.76,
+    "found": 0.88
+   },
+   "loop-full": {
+    "mrr": 0.7683,
+    "recall@10": 0.8027,
+    "success@10": 0.76,
+    "recall@50": 0.8187,
+    "success@50": 0.76,
+    "found": 0.88
+   }
+  }
+ },
+ "primary": {
+  "loop-full": {
+   "mrr_diff": 0.4136,
+   "ci95": [
+    0.2101,
+    0.6149
+   ],
+   "p": 0.0016341069790478412,
+   "wins": 14,
+   "losses": 3,
+   "ties": 7,
+   "p_holm": 0.0016341069790478412
+  }
+ },
+ "buckets": {
+  "whole": {
+   "all_top10": 4,
+   "all_top50": 8,
+   "some_top50": 3,
+   "none_top50": 9
+  },
+  "oneshot": {
+   "all_top10": 8,
+   "all_top50": 9,
+   "some_top50": 3,
+   "none_top50": 4
+  },
+  "loop-full": {
+   "all_top10": 16,
+   "all_top50": 1,
+   "some_top50": 3,
+   "none_top50": 4
+  }
+ },
+ "per_task": [
+  {
+   "task": "duckdb__duckdb-23604",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 20,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 9,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-23773",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 25,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 18,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-23825",
+   "gold_functions": 2,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "loop-full": {
+    "first_rank": 48,
+    "recall@10": 0.0,
+    "recall@50": 0.5
+   }
+  },
+  {
+   "task": "duckdb__duckdb-23876",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 7,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-23939",
+   "gold_functions": 3,
+   "whole": {
+    "first_rank": 12,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 20,
+    "recall@10": 0.0,
+    "recall@50": 0.667
+   },
+   "loop-full": {
+    "first_rank": 20,
+    "recall@10": 0.0,
+    "recall@50": 0.667
+   }
+  },
+  {
+   "task": "duckdb__duckdb-23952",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 23,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24101",
+   "gold_functions": 2,
+   "whole": {
+    "first_rank": 4,
+    "recall@10": 0.5,
+    "recall@50": 0.5
+   },
+   "oneshot": {
+    "first_rank": 2,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24163",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 17,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24266",
+   "gold_functions": 2,
+   "whole": {
+    "first_rank": 5,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 3,
+    "recall@10": 0.5,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24382",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 50,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24505",
+   "gold_functions": 4,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 0.25,
+    "recall@50": 0.25
+   },
+   "oneshot": {
+    "first_rank": 4,
+    "recall@10": 0.25,
+    "recall@50": 0.25
+   },
+   "loop-full": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24548",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 25,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 11,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24557",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24582",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24693",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 8,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 6,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24752",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "loop-full": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24821",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 15,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 10,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24875",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": 47,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24933",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 14,
+    "recall@10": 0.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 5,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-24957",
+   "gold_functions": 3,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 0.667,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 0.667,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 0.667,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-25031",
+   "gold_functions": 1,
+   "whole": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   },
+   "loop-full": {
+    "first_rank": 2,
+    "recall@10": 1.0,
+    "recall@50": 1.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-25042",
+   "gold_functions": 2,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "loop-full": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-25101",
+   "gold_functions": 3,
+   "whole": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "oneshot": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   },
+   "loop-full": {
+    "first_rank": null,
+    "recall@10": 0.0,
+    "recall@50": 0.0
+   }
+  },
+  {
+   "task": "duckdb__duckdb-25153",
+   "gold_functions": 3,
+   "whole": {
+    "first_rank": 6,
+    "recall@10": 0.333,
+    "recall@50": 0.333
+   },
+   "oneshot": {
+    "first_rank": 1,
+    "recall@10": 0.333,
+    "recall@50": 0.333
+   },
+   "loop-full": {
+    "first_rank": 1,
+    "recall@10": 0.333,
+    "recall@50": 0.333
+   }
+  }
+ ],
+ "leak_check": {},
+ "missed_by_whole": {
+  "tasks": [
+   "duckdb__duckdb-23825",
+   "duckdb__duckdb-24752",
+   "duckdb__duckdb-25042",
+   "duckdb__duckdb-25101"
+  ],
+  "loop-full": 1
+ },
+ "lost_by_arm": {
+  "loop-full": [
+   "duckdb__duckdb-24505"
+  ]
+ },
+ "sonnet": {
+  "v1": {
+   "cached_calls": 126,
+   "list_price_usd": 2.18
+  },
+  "v2": {
+   "cached_calls": 50,
+   "list_price_usd": 0.71
+  },
+  "loop": {
+   "cached_calls": 97,
+   "list_price_usd": 5.43
+  },
+  "loop_full": {
+   "cached_calls": 88,
+   "list_price_usd": 10.3
+  }
+ }
+}

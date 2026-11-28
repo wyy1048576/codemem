@@ -1,0 +1,36 @@
+{
+ "hooks": {
+  "PreToolUse": [
+   {
+    "matcher": "Grep",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "\"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/xpu-venv/Scripts/python.exe\" \"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/b1-links/llm_query/mcp_hooks.py\" \"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/b1-links/llm_query/out/e2e-b45/L1/microsoft__playwright-41682/mcp.hooks\""
+     }
+    ]
+   }
+  ],
+  "PostToolUse": [
+   {
+    "matcher": "Grep|Edit|Write|MultiEdit|mcp__codemem__search_code",
+    "hooks": [
+     {
+      "type": "command",
+      "command": "\"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/xpu-venv/Scripts/python.exe\" \"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/b1-links/llm_query/mcp_hooks.py\" \"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/b1-links/llm_query/out/e2e-b45/L1/microsoft__playwright-41682/mcp.hooks\""
+     }
+    ]
+   }
+  ],
+  "Stop": [
+   {
+    "hooks": [
+     {
+      "type": "command",
+      "command": "\"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/xpu-venv/Scripts/python.exe\" \"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/b1-links/llm_query/mcp_hooks.py\" \"C:/Users/user/Desktop/Stanford/CS329M/Claude/Week 1 Task/analysis/b1-links/llm_query/out/e2e-b45/L1/microsoft__playwright-41682/mcp.hooks\""
+     }
+    ]
+   }
+  ]
+ }
+}

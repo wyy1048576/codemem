@@ -1,0 +1,39 @@
+{
+ "arm": "codemem-loop-merged",
+ "fixed_k": 10,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 2,
+  "explanation": "On redirect, the code checks headers['host'] with a case-sensitive key lookup, so a header named 'Host' is not updated. Using the case-insensitive getHeader/setHeader helpers fixes this.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  10,
+  10
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0868,
+ "seconds": 18,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 4 ++--\n 1 file changed, 2 insertions(+), 2 deletions(-)"
+}
+round 1: k=10 action=search picked=[] 
+round 2: k=10 action=edit picked=['packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest'] applied
+
+parse errors in browser_patches/firefox/juggler/screencast/HeadlessWindowCapturer.cpp; chunking what tree-sitter recovered
+parse errors in browser_patches/firefox/juggler/screencast/nsScreencastService.cpp; chunking what tree-sitter recovered
+parse errors in browser_patches/webkit/embedder/Playwright/win/WinMain.cpp; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  11%|█         | 31/290 [00:00<00:00, 280.03it/s]
+Loading weights:  34%|███▍      | 98/290 [00:00<00:00, 461.09it/s]
+Loading weights:  50%|████▉     | 144/290 [00:00<00:00, 331.76it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 685.21it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

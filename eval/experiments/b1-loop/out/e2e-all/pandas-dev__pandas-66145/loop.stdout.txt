@@ -1,0 +1,52 @@
+{
+ "arm": "codemem-loop",
+ "task": "pandas-dev__pandas-66145",
+ "fixed": {
+  "round": 1,
+  "explanation": "`read_json` accepted `convert_dates` and `keep_default_dates` with real defaults, so it couldn't tell whether the caller passed them. The edit changes both defaults to `lib.no_default` and emits a `FutureWarning` when either is passed explicitly. It then resolves them to the old defaults (`True`) before the pyarrow validation and `JsonReader` construction, so behavior is otherwise unchanged. The docstring now marks both parameters as deprecated.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1023,
+ "seconds": 24,
+ "diff_stat": "pandas/io/json/_json.py | 29 +++++++++++++++++++++++++++--\n 1 file changed, 27 insertions(+), 2 deletions(-)"
+}
+round 1: found=True picked=['pandas/io/json/_json.py:read_json', 'pandas/io/json/_json.py:Parser._try_convert_data', 'pandas/io/json/_json.py:_should_convert_dates']
+  fix: applied: `read_json` accepted `convert_dates` and `keep_default_dates` with real defaults, so it couldn't tell whether the caller passed them. The edit changes both defaults to `lib.no_default` and emits a `FutureWarning` when either is passed explicitly. It then resolves them to the old defaults (`True`) before the pyarrow validation and `JsonReader` construction, so behavior is otherwise unchang
+
+parse errors in pandas/_libs/include/pandas/moments.h; chunking what tree-sitter recovered
+parse errors in pandas/_libs/include/pandas/datetime/pd_datetime.h; chunking what tree-sitter recovered
+parse errors in pandas/_libs/include/pandas/parser/pd_parser.h; chunking what tree-sitter recovered
+parse errors in pandas/_libs/include/pandas/parser/pd_strtoi.h; chunking what tree-sitter recovered
+parse errors in pandas/_libs/include/pandas/vendored/klib/khash.h; chunking what tree-sitter recovered
+parse errors in pandas/_libs/include/pandas/vendored/klib/khash_python.h; chunking what tree-sitter recovered
+parse errors in pandas/_libs/include/pandas/vendored/ujson/lib/ultrajson.h; chunking what tree-sitter recovered
+parse errors in pandas/_libs/src/datetime/pd_datetime.c; chunking what tree-sitter recovered
+parse errors in pandas/_libs/src/parser/pd_parser.c; chunking what tree-sitter recovered
+parse errors in pandas/_libs/src/vendored/ujson/lib/ultrajsondec.c; chunking what tree-sitter recovered
+parse errors in pandas/_libs/src/vendored/ujson/lib/ultrajsonenc.c; chunking what tree-sitter recovered
+parse errors in pandas/_libs/src/vendored/ujson/python/ujson.c; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   7%|▋         | 20/290 [00:00<00:01, 197.05it/s]
+Loading weights:  25%|██▌       | 73/290 [00:00<00:00, 362.58it/s]
+Loading weights:  38%|███▊      | 109/290 [00:00<00:00, 282.94it/s]
+Loading weights:  48%|████▊     | 139/290 [00:00<00:00, 266.70it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 572.07it/s]
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   6%|▌         | 17/290 [00:00<00:01, 159.14it/s]
+Loading weights:  24%|██▍       | 70/290 [00:00<00:00, 292.18it/s]
+Loading weights:  41%|████      | 119/290 [00:00<00:00, 332.11it/s]
+Loading weights:  53%|█████▎    | 153/290 [00:00<00:00, 248.08it/s]
+Loading weights:  62%|██████▏   | 180/290 [00:00<00:00, 193.92it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 336.94it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

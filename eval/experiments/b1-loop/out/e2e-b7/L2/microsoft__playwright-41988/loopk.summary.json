@@ -1,0 +1,551 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41988",
+ "fixed": null,
+ "rounds": 11,
+ "ks": [
+  5,
+  3,
+  5,
+  3,
+  3,
+  5,
+  3,
+  5,
+  5,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 10,
+  "loopk": 10
+ },
+ "sonnet_calls": 11,
+ "cost_usd": 0.2905,
+ "seconds": 78,
+ "diff_stat": "",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Accessible name computation (role/name calculation) used by the AI aria snapshot; when computing name from content, it handles nested child elements and skips hidden elements such as SVG icons. The traversal of children likely drops the name of nested spans when a sibling is hidden.",
+    "symptom": "Buttons with label text in nested spans beside a hidden SVG icon have an empty name in the AI accessibility snapshot.",
+    "anchors": [
+     "AI accessibility snapshot"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     668,
+     991
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1200,
+     1209
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     489,
+     498
+    ],
+    [
+     "tests/page/page-aria-snapshot-ai.spec.ts",
+     220,
+     409
+    ],
+    [
+     "packages/injected/src/selectorUtils.ts",
+     115,
+     131
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The accessible name computation in roleUtils looks correct for nested spans. The AI snapshot has logic that drops names that merely repeat printed descendants, using the set of contributing elements. That logic likely wrongly treats a name as redundant when a hidden SVG sibling is involved. It probably lives in the aria snapshot generator.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Aria snapshot generation that omits a node's name when it is redundant with printed descendant nodes, using the contributing elements set from the name computation.",
+    "symptom": "Button with label in nested spans next to a hidden SVG has no name in the AI snapshot.",
+    "anchors": [
+     "collectElements",
+     "CompositeString",
+     "snapshotForAI"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     85,
+     220
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     237,
+     308
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     59,
+     83
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "generateAriaTree records nameFromContentRefs from the elements that contributed to the name. Something later, probably the renderer or the name computation that collects those elements, drops the name when its content is printed in descendants. A hidden SVG sibling may confuse that logic. I need to see where nameFromContentRefs is consumed.",
+   "picked": []
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Code that uses nameFromContentRefs to omit a node's name in the AI snapshot rendering, or the accessible name computation that returns the contributing elements.",
+    "symptom": "Button with nested span label next to hidden SVG shows no name in AI snapshot.",
+    "anchors": [
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "getElementAccessibleName",
+     "snapshotForAI",
+     "distillAriaSnapshot"
+    ],
+    "look_in": [
+     "packages/injected/src/"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     532,
+     540
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     513,
+     530
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     542,
+     554
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     993,
+     1043
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     99,
+     164
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "innerAccumulatedElementText merges child contributor elements correctly. The bug may be in getTextAlternativeInternal, which decides which elements are recorded for hidden or nested children, or in the code that consumes nameFromContentRefs. I need to see getTextAlternativeInternal and the consumer.",
+   "picked": []
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "getTextAlternativeInternal in roleUtils: handling of hidden elements and collecting elements for the name; and the consumer of nameFromContentRefs that drops the name.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "getTextAlternativeInternal",
+     "nameFromContentRefs",
+     "nameSourceElements",
+     "collectElements",
+     "innerAccumulatedElementText",
+     "emptyCompositeString"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     556,
+     586
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1320,
+     1323
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     627,
+     655
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The results shown are only description and error-message helpers plus compositeString, which don't hold the bug. The name-from-content traversal that merges child CompositeStrings (elements sets) is where a hidden SVG sibling probably breaks the collected elements. I need to see innerAccumulatedElementText and the child-concatenation code.",
+   "picked": []
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Function that accumulates child text for name from content, concatenating CompositeString results of child nodes and merging their elements sets, including handling of hidden children.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "innerAccumulatedElementText",
+     "getTextAlternativeInternal",
+     "compositeString",
+     "CompositeString",
+     "emptyCompositeString",
+     "collectElements",
+     "asFlatString"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     1325,
+     1335
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     996,
+     1016
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1316,
+     1318
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The child-accumulation helpers merge elements correctly. The bug is likely in the code that decides to drop a name in the AI snapshot when it duplicates printed children, or in getTextAlternativeInternal's handling of hidden elements. I have not seen either yet.",
+   "picked": []
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Aria snapshot code that computes a node's name and removes it when it matches the text of child nodes, including its handling of the set of elements that contributed to the name.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "getElementAccessibleName",
+     "getElementAccessibleDescription",
+     "generateAriaTree",
+     "visit",
+     "includeHidden"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     166,
+     209
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     487,
+     533
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     535,
+     537
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     469,
+     584
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     649,
+     651
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "processElement only clears children when they equal the name. The code that sets or drops a node's name lives in generateAriaTree's visit, or in the later normalization step. I have not seen either yet.",
+   "picked": []
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "generateAriaTree visit function that creates the aria node, computes the name with getElementAccessibleName, and any normalizeStringChildren step that removes the name or children.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "generateAriaTree",
+     "processElement",
+     "toAriaNode",
+     "getElementAccessibleName",
+     "visit",
+     "ariaNode.name"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     645,
+     647
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     222,
+     235
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     372,
+     376
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The results shown are helpers (ariaNodeElement, computeAriaRef) and not the bug. The name is dropped probably in the visit/processElement logic in generateAriaTree or in the normalization step that removes names/children that duplicate each other. I need to see where the name is compared to children in ariaSnapshot.ts.",
+   "picked": []
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Code in ariaSnapshot.ts that visits an element, computes its name, and handles children text equal to name, plus normalizeStringChildren and name-from-content handling.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "processElement",
+     "visit",
+     "getElementAccessibleName",
+     "ariaNode.name",
+     "generateAriaTree",
+     "toAriaNode",
+     "hasPointerCursor"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     539,
+     575
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     360,
+     370
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     444,
+     463
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     479,
+     485
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     1,
+     57
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "renderAriaTree.visit uses includeText and createKey, but the code that sets or drops the name is not visible yet. The nameFromContentRefs handling and the includeText definition probably decide that the name is redundant. I need to see them.",
+   "picked": []
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "includeText helper and createKey in renderAriaTree, and the code that fills nameFromContentRefs, in ariaSnapshot.ts. It decides whether a node's name or text is omitted when it is already contained in the name.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "includeText",
+     "createKey",
+     "getSingleTextChild",
+     "nameFromContentRefs",
+     "renderAriaTree",
+     "computeAriaRef"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     378,
+     414
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     628,
+     641
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     320,
+     335
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     465,
+     467
+    ],
+    [
+     "packages/injected/src/injectedScript.ts",
+     321,
+     329
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Results so far are matching and rendering helpers. The code that builds the aria node and drops its name when it is redundant with children (generateAriaTree visit, toAriaNode) has not been shown. It is probably in the top part of ariaSnapshot.ts.",
+   "picked": []
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "generateAriaTree function that walks DOM children, visits elements, skips hidden ones, computes the node's name and trims children or name when the name comes from content.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "generateAriaTree",
+     "visit",
+     "toAriaNode",
+     "getElementAccessibleName",
+     "ariaNode.name",
+     "isElementVisible",
+     "processElement"
+    ],
+    "look_in": [
+     "packages/injected/src/ariaSnapshot.ts"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     446,
+     460
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     314,
+     335
+    ],
+    [
+     "packages/injected/src/ariaSnapshot.ts",
+     653,
+     656
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "Still haven't seen the code that drops the name. Likely in roleUtils getTextAlternativeInternal / innerAccumulatedElementText, where hidden children (SVG) are handled, or in ariaSnapshot's generateAriaTree. Search for the name-from-content child traversal with hidden handling.",
+   "picked": []
+  },
+  {
+   "round": 11,
+   "query": {
+    "intent": "Name-from-content traversal in getTextAlternativeInternal that iterates child nodes, handles hidden elements (display none / aria-hidden svg), and uses a visited set or elements set.",
+    "symptom": "Button with nested span label next to hidden SVG has no name in AI snapshot.",
+    "anchors": [
+     "getTextAlternativeInternal",
+     "innerAccumulatedElementText",
+     "isElementHiddenForAria",
+     "visited",
+     "includeHidden",
+     "getElementAccessibleName"
+    ],
+    "look_in": [
+     "packages/injected/src/roleUtils.ts"
+    ]
+   },
+   "k": 5
+  }
+ ]
+}

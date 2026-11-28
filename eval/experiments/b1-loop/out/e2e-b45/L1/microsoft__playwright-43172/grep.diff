@@ -1,0 +1,65 @@
+diff --git a/packages/isomorphic/locatorParser.ts b/packages/isomorphic/locatorParser.ts
+index 5267207..46a32a9 100644
+--- a/packages/isomorphic/locatorParser.ts
++++ b/packages/isomorphic/locatorParser.ts
+@@ -163,7 +163,15 @@ abstract class LocatorParser {
+         parts.push(selectorPart('internal:control', 'enter-frame'));
+         inFrameLocator = false;
+       }
+-      parts.push(...handler(call, this._testIdAttributeName));
++      if (handler === withinParts) {
++        // `inner.within(outer)` is `outer.locator(inner)`: outer parts first, then the chained inner.
++        checkArguments(call, 1, []);
++        const outer = arg(call, 0, isSelector);
++        const inner = { parts: parts.splice(0, parts.length) };
++        parts.push(...outer.parts, nestedSelectorPart('internal:chain', inner));
++      } else {
++        parts.push(...handler(call, this._testIdAttributeName));
++      }
+       if (handler === contentFrameParts || (handler === frameLocatorParts && call.args.length))
+         inFrameLocator = true;
+     } while (this.eat('.'));
+@@ -456,6 +464,16 @@ function visibleParts(call: CallArguments): ParsedSelectorPart[] {
+   return [selectorPart('visible', 'true')];
+ }
+ 
++// Handled by the parser, because it needs the parts parsed so far.
++function withinParts(call: CallArguments): ParsedSelectorPart[] {
++  throw new Error(`Unexpected ${call.method}`);
++}
++
++function getByRefParts(call: CallArguments): ParsedSelectorPart[] {
++  checkArguments(call, 1, []);
++  return parseSelector(`aria-ref=${arg(call, 0, isString)}`).parts;
++}
++
+ function getByTestIdParts(call: CallArguments, testIdAttributeName: string): ParsedSelectorPart[] {
+   checkArguments(call, 1, []);
+   return parseSelector(getByTestIdSelector(testIdAttributeName, arg(call, 0, isText))).parts;
+@@ -499,6 +517,8 @@ const kJavaScriptMethods = new Map<string, CallHandler>([
+   ['getByAltText', getByAltTextParts],
+   ['getByPlaceholder', getByPlaceholderParts],
+   ['getByTitle', getByTitleParts],
++  ['within', withinParts],
++  ['getByRef', getByRefParts],
+ ]);
+ 
+ const kPythonMethods = new Map<string, CallHandler>([
+@@ -519,6 +539,8 @@ const kPythonMethods = new Map<string, CallHandler>([
+   ['get_by_alt_text', getByAltTextParts],
+   ['get_by_placeholder', getByPlaceholderParts],
+   ['get_by_title', getByTitleParts],
++  ['within', withinParts],
++  ['get_by_ref', getByRefParts],
+ ]);
+ 
+ const kCSharpMethods = new Map<string, CallHandler>([
+@@ -539,6 +561,8 @@ const kCSharpMethods = new Map<string, CallHandler>([
+   ['GetByAltText', getByAltTextParts],
+   ['GetByPlaceholder', getByPlaceholderParts],
+   ['GetByTitle', getByTitleParts],
++  ['Within', withinParts],
++  ['GetByRef', getByRefParts],
+ ]);
+ 
+ function filterSelectorParts(call: CallArguments): ParsedSelectorPart[] {

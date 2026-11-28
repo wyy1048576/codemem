@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-68195",
+ "exit": 0,
+ "seconds": 19,
+ "cost_usd": 0.0351132,
+ "turns": 9,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 3799,
+  "cache_read_input_tokens": 44032,
+  "output_tokens": 1549,
+  "output_tokens_details": {
+   "thinking_tokens": 95
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 3799,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 193,
+    "cache_read_input_tokens": 8879,
+    "cache_creation_input_tokens": 312,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 312
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 2,
+  "Read": 1,
+  "Edit": 5
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/reshape/merge.py                  | 6 +++---\n pandas/tests/reshape/merge/test_merge_asof.py | 4 ++--\n 2 files changed, 5 insertions(+), 5 deletions(-)",
+ "final": "I changed the error text in `pandas/core/reshape/merge.py` so a negative as-of merge tolerance now says \"tolerance must be non-negative\". I haven't run anything, including the tests.\n\nThe message was the same for time-delta, integer and float keys, so I updated all three checks. The checks themselves are unchanged, so zero is still accepted as before.\n\nI also updated the two existing assertions in `pandas/tests/reshape/merge/test_merge_asof.py` that matched the old \"tolerance must be positive\" text. I didn't add a test for the zero-tolerance case from the issue.",
+ "stderr": ""
+}

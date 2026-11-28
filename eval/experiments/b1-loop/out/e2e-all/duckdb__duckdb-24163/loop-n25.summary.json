@@ -1,0 +1,174 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "duckdb__duckdb-24163",
+ "fixed": {
+  "round": 1,
+  "explanation": "CREATE TRIGGER accepts any timing, but only BEFORE and AFTER triggers are expanded at DML bind time, so an INSTEAD OF trigger on a base table is stored and never fires. The edit makes BindCreateTriggerInfo reject any timing other than BEFORE or AFTER, so the trigger fails at creation instead of being silently ignored. I did not see the TriggerTiming enum, so the check uses BEFORE and AFTER only and doesn't name the INSTEAD OF value.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0845,
+ "seconds": 28,
+ "diff_stat": "src/planner/binder/statement/bind_create.cpp | 3 +++\n 1 file changed, 3 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Trigger support: CREATE TRIGGER binding/creation accepts INSTEAD OF timing on a base table, and INSERT/UPDATE/DELETE planning never fires triggers for it. Either triggers should execute in the DML binder/planner (replacing the operation for INSTEAD OF) or CREATE TRIGGER should reject INSTEAD OF on base tables.",
+    "symptom": "An INSTEAD OF INSERT trigger on a regular table is created without error but never fires: the insert goes into the table and the trigger body (insert into audit) does not run.",
+    "anchors": [
+     "CREATE TRIGGER tr INSTEAD OF INSERT ON t",
+     "INSTEAD OF",
+     "CREATE TRIGGER",
+     "INSERT INTO audit VALUES (1)"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     66,
+     68
+    ],
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     70,
+     74
+    ],
+    [
+     "src/catalog/catalog_entry/table_catalog_entry.cpp",
+     384,
+     386
+    ],
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     58,
+     60
+    ],
+    [
+     "src/catalog/catalog_entry/duck_table_entry.cpp",
+     1427,
+     1446
+    ],
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     29,
+     52
+    ],
+    [
+     "src/storage/write_ahead_log.cpp",
+     453,
+     457
+    ],
+    [
+     "src/planner/binder/query_node/bind_trigger_expansion.cpp",
+     327,
+     359
+    ],
+    [
+     "src/planner/binder/query_node/bind_trigger_expansion.cpp",
+     565,
+     575
+    ],
+    [
+     "src/execution/physical_plan/plan_insert.cpp",
+     56,
+     58
+    ],
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     108,
+     113
+    ],
+    [
+     "src/parser/peg/transformer/transform_insert.cpp",
+     60,
+     62
+    ],
+    [
+     "src/include/duckdb/common/enums/trigger_type.hpp",
+     15,
+     15
+    ],
+    [
+     "src/planner/binder/query_node/bind_trigger_expansion.cpp",
+     45,
+     104
+    ],
+    [
+     "src/parser/peg/transformer/transform_insert.cpp",
+     56,
+     58
+    ],
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     62,
+     64
+    ],
+    [
+     "src/planner/binder/statement/bind_create.cpp",
+     616,
+     766
+    ],
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     14,
+     27
+    ],
+    [
+     "src/planner/binder/query_node/bind_trigger_expansion.cpp",
+     110,
+     126
+    ],
+    [
+     "src/parser/peg/transformer/transform_generated.cpp",
+     3451,
+     3455
+    ],
+    [
+     "src/include/duckdb/execution/index/art/art_operator.hpp",
+     339,
+     377
+    ],
+    [
+     "src/parser/peg/transformer/transform_create_trigger.cpp",
+     82,
+     86
+    ],
+    [
+     "src/execution/physical_plan/plan_insert.cpp",
+     38,
+     54
+    ],
+    [
+     "src/include/duckdb/common/enums/trigger_type.hpp",
+     17,
+     17
+    ],
+    [
+     "test/api/test_results.cpp",
+     1,
+     196
+    ]
+   ],
+   "analysis": "Binder::TryExpandTriggers expands BEFORE and AFTER triggers into the DML bind, and AddAfterTriggerCTEs handles only the AFTER ones. INSTEAD OF triggers are never expanded for a base table, so they never fire. BindCreateTriggerInfo is where CREATE TRIGGER is accepted, so it is the place to reject INSTEAD OF on a base table if that is the chosen fix. I have not opened either function body, so the exact edit is a guess.",
+   "picked": [
+    "src/planner/binder/query_node/bind_trigger_expansion.cpp:duckdb.Binder.TryExpandTriggers",
+    "src/planner/binder/statement/bind_create.cpp:duckdb.Binder.BindCreateTriggerInfo"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/planner/binder/query_node/bind_trigger_expansion.cpp lines 45-104 (duckdb.Binder.TryExpandTriggers)",
+    "src/planner/binder/statement/bind_create.cpp lines 616-766 (duckdb.Binder.BindCreateTriggerInfo)"
+   ],
+   "fix_attempt": "applied: CREATE TRIGGER accepts any timing, but only BEFORE and AFTER triggers are expanded at DML bind time, so an INSTEAD OF trigger on a base table is stored and never fires. The edit makes BindCreateTriggerInfo reject any timing other than BEFORE or AFTER, so the trigger fails at creation instead of being silently ignored. I did not see the TriggerTiming enum, so the check uses BEFORE and AFTER only and doesn't name the INSTEAD OF value."
+  }
+ ]
+}

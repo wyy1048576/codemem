@@ -1,0 +1,149 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43071",
+ "fixed": {
+  "round": 3,
+  "explanation": "configFromCLIOptions passes the proxy URL as server without extracting credentials. The fix parses the URL, moves percent-decoded username and password into the proxy fields, and strips them from the server string.",
+  "edits": 1
+ },
+ "rounds": 3,
+ "ks": [
+  3,
+  3,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 3,
+  "loopk": 3
+ },
+ "sonnet_calls": 4,
+ "cost_usd": 0.0557,
+ "seconds": 32,
+ "diff_stat": "packages/playwright-core/src/tools/mcp/config.ts | 11 +++++++++++\n 1 file changed, 11 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The MCP command-line config parser builds the browser proxy settings from the --proxy-server option. It must parse the proxy URL and pass the username and password, percent-decoded, as the proxy credentials in the launch options.",
+    "symptom": "Credentials embedded in the proxy URL passed on the command line are ignored, so authenticated proxies fail.",
+    "anchors": [
+     "proxy",
+     "proxy URL",
+     "user name",
+     "password"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     811,
+     832
+    ],
+    [
+     "packages/utils/network.ts",
+     132,
+     162
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     477,
+     484
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The server-side proxy code handles username/password only when given separately. The MCP CLI config parser, which builds launch options from --proxy-server, is not yet seen. It should parse the URL and set username and password, percent-decoded.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "MCP command-line config that converts the proxyServer CLI option into browser launchOptions.proxy settings.",
+    "symptom": "Credentials in the proxy URL passed via MCP command-line are ignored, so authenticated proxies fail.",
+    "anchors": [],
+    "look_in": [
+     "packages/playwright/src/mcp/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright/src/mcp/test/testBackend.ts",
+     51,
+     55
+    ],
+    [
+     "packages/playwright/src/mcp/test/testBackend.ts",
+     44,
+     75
+    ],
+    [
+     "packages/playwright/src/mcp/test/browserBackend.ts",
+     1,
+     36
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The results shown are test backend code, not the CLI config parser. The config that maps proxyServer to launchOptions.proxy is probably in the core package's mcp/browser config (config.ts), where the CLI options are resolved.",
+   "picked": []
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Function converting CLI options (proxyServer, proxyBypass) into launchOptions.proxy with server and bypass in the MCP browser config.",
+    "symptom": "Credentials in the proxy URL passed via --proxy-server are ignored, so authenticated proxies fail.",
+    "anchors": [],
+    "look_in": [
+     "packages/playwright-core/src/tools/"
+    ]
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/tools/mcp/config.ts",
+     300,
+     415
+    ],
+    [
+     "packages/playwright-core/src/tools/mcp/config.ts",
+     417,
+     473
+    ],
+    [
+     "packages/playwright-core/src/tools/mcp/config.ts",
+     130,
+     149
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "configFromCLIOptions passes the proxy URL as server without extracting credentials. The fix parses the URL, moves percent-decoded username and password into the proxy fields, and strips them from the server string.",
+   "picked": [
+    "packages/playwright-core/src/tools/mcp/config.ts:configFromCLIOptions"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

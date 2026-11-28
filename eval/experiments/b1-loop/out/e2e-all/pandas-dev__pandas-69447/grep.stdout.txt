@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-69447",
+ "exit": 0,
+ "seconds": 41,
+ "cost_usd": 0.1321766,
+ "turns": 12,
+ "usage": {
+  "input_tokens": 20,
+  "cache_creation_input_tokens": 19542,
+  "cache_read_input_tokens": 166886,
+  "output_tokens": 3728,
+  "output_tokens_details": {
+   "thinking_tokens": 1068
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 19542,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 510,
+    "cache_read_input_tokens": 24670,
+    "cache_creation_input_tokens": 264,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 264
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 6,
+  "Read": 2,
+  "Edit": 3
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/series.py | 23 +++++++++++++++++++++++\n 1 file changed, 23 insertions(+)",
+ "final": "I added a `Series.__arrow_array__` method in `pandas/core/series.py`, so `pa.array(ser)` no longer triggers the `.values` deprecation warning. I couldn't run or build anything, so this is untested.\n\npyarrow's `pa.array` reads `Series.values` directly. pandas' own code paths already suppress that warning, but a direct call from user code didn't. The new method gives pyarrow a hook to call, and pyarrow checks `__arrow_array__` before it falls back to `.values`.\n\n- **Timezone-aware datetimes:** the method builds the Arrow array straight from the underlying UTC `datetime64` data. It uses a `pa.timestamp(unit, tz)` type and casts to `type` if one was passed. `.values` is never called.\n- **Other dtypes:** it calls `pa.array(self._values, type=type, from_pandas=True)` inside the existing `suppress_pyarrow_values_warning()`.\n- **Import:** I added the `DatetimeTZDtype` import that the new code needs.\n\nI didn't add a test, such as asserting that `pa.array(tz_series)` emits no warning.\n\nI built the timezone-aware array from the raw data rather than passing it to pyarrow as a `DatetimeArray`. I wasn't sure what pyarrow does with a `DatetimeArray`. It might convert it to an object array of Timestamps. I'm also assuming `str(values.tz)` gives a timezone name pyarrow accepts, which I haven't checked for every timezone object.",
+ "stderr": ""
+}
+

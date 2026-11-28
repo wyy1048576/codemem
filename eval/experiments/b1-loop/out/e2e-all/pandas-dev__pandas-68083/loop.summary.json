@@ -1,0 +1,316 @@
+{
+ "arm": "codemem-loop",
+ "task": "pandas-dev__pandas-68083",
+ "fixed": {
+  "round": 1,
+  "explanation": "The tests were skipped whenever the ambient LC_TIME wasn't English. I removed the skipif mark and added `td.english_lc_time()` in `pandas/util/_test_decorators.py`. It is a context manager that switches LC_TIME to English (C or en_US) for the test body and restores the previous value on exit, including on failure. It skips only when no English LC_TIME can be set. Every decorated test now wraps the parsing or formatting call in it. I used `locale.setlocale` directly instead of `set_locale`/`can_set_locale`, because I couldn't see those functions' source to check how they restore LC_TIME.",
+  "edits": 12
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1067,
+ "seconds": 35,
+ "diff_stat": "pandas/tests/extension/test_arrow.py            |  4 +--\n pandas/tests/frame/methods/test_between_time.py |  4 +--\n pandas/tests/tools/test_to_datetime.py          |  6 ++---\n pandas/tests/tools/test_to_time.py              | 19 ++++++-------\n pandas/tests/tslibs/test_parsing.py             |  4 +--\n pandas/util/_test_decorators.py                 | 36 ++++++++++++++++++++++---\n 6 files changed, 50 insertions(+), 23 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Test helper decorator skip_if_not_english_lc_time in pandas._testing._test_decorators should be changed so tests set an English LC_TIME via set_locale/can_set_locale during the test body, skipping only if an English locale cannot be set. Update the decorated tests to use the context manager.",
+    "symptom": "Around 20 tests are skipped whenever the ambient LC_TIME is not English, instead of setting an English LC_TIME for the test's duration.",
+    "anchors": [
+     "skip_if_not_english_lc_time",
+     "td.skip_if_not_english_lc_time",
+     "_has_english_lc_time",
+     "pandas._config.localization.set_locale",
+     "pandas._config.localization.can_set_locale",
+     "set_locale",
+     "can_set_locale",
+     "LC_TIME",
+     "LC_CTYPE",
+     "setlocale",
+     "skip_if_not_us_locale",
+     "locale.getlocale()"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/tests/extension/test_arrow.py",
+     5950,
+     5956
+    ],
+    [
+     "pandas/tests/extension/test_arrow.py",
+     4257,
+     4290
+    ],
+    [
+     "pandas/tests/extension/test_arrow.py",
+     4304,
+     4313
+    ],
+    [
+     "pandas/tests/frame/methods/test_between_time.py",
+     228,
+     236
+    ],
+    [
+     "pandas/tests/frame/methods/test_between_time.py",
+     17,
+     39
+    ],
+    [
+     "pandas/tests/frame/methods/test_between_time.py",
+     1,
+     13
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     327,
+     358
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     3106,
+     3114
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1106,
+     1133
+    ],
+    [
+     "pandas/tests/tools/test_to_time.py",
+     14,
+     34
+    ],
+    [
+     "pandas/util/_test_decorators.py",
+     116,
+     127
+    ],
+    [
+     "pandas/_config/localization.py",
+     26,
+     59
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     28,
+     30
+    ],
+    [
+     "pandas/_config/localization.py",
+     62,
+     86
+    ],
+    [
+     "pandas/_config/localization.py",
+     164,
+     195
+    ],
+    [
+     "pandas/_config/localization.py",
+     89,
+     113
+    ],
+    [
+     "pandas/_config/localization.py",
+     127,
+     161
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     73,
+     88
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     51,
+     70
+    ],
+    [
+     "pandas/util/_test_decorators.py",
+     130,
+     142
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     33,
+     39
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     42,
+     48
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     122,
+     154
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     1,
+     25
+    ],
+    [
+     "pandas/_testing/contexts.py",
+     54,
+     95
+    ],
+    [
+     "pandas/_testing/contexts.py",
+     77,
+     88
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     91,
+     101
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     104,
+     113
+    ],
+    [
+     "pandas/tests/tslibs/test_parsing.py",
+     362,
+     373
+    ],
+    [
+     "pandas/tests/io/test_clipboard.py",
+     184,
+     196
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     96,
+     97
+    ],
+    [
+     "pandas/_config/localization.py",
+     1,
+     23
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     157,
+     164
+    ],
+    [
+     "pandas/tests/scalar/period/test_period.py",
+     976,
+     998
+    ],
+    [
+     "pandas/_config/localization.py",
+     116,
+     124
+    ],
+    [
+     "pandas/tests/config/test_localization.py",
+     116,
+     119
+    ],
+    [
+     "pandas/tests/indexes/datetimes/test_scalar_compat.py",
+     128,
+     209
+    ],
+    [
+     "pandas/core/arrays/datetimes.py",
+     3100,
+     3130
+    ],
+    [
+     "pandas/tests/io/test_clipboard.py",
+     178,
+     181
+    ],
+    [
+     "pandas/tests/io/test_clipboard.py",
+     206,
+     241
+    ],
+    [
+     "pandas/tests/extension/test_arrow.py",
+     84,
+     93
+    ],
+    [
+     "pandas/_libs/tslibs/conversion.pyi",
+     12,
+     12
+    ],
+    [
+     "pandas/core/generic.py",
+     11524,
+     11534
+    ],
+    [
+     "pandas/core/generic.py",
+     11338,
+     11549
+    ],
+    [
+     "pandas/util/_test_decorators.py",
+     145,
+     170
+    ],
+    [
+     "pandas/_libs/tslibs/timestamps.pyi",
+     204,
+     209
+    ],
+    [
+     "pandas/tests/tslibs/test_conversion.py",
+     34,
+     52
+    ],
+    [
+     "pandas/tests/tslibs/test_conversion.py",
+     24,
+     31
+    ],
+    [
+     "pandas/tests/frame/methods/test_at_time.py",
+     17,
+     150
+    ],
+    [
+     "pandas/tests/tslibs/test_parsing.py",
+     328,
+     352
+    ]
+   ],
+   "analysis": "The decorator and helper in pandas/util/_test_decorators.py (_has_english_lc_time, skip_if_not_english_lc_time) are shown. The decorated tests are in test_arrow.py, test_between_time.py, test_to_datetime.py, test_to_time.py and test_parsing.py. The tests need set_locale/can_set_locale from pandas._config.localization in their bodies, and the decorator needs to change to skip only when an English LC_TIME can't be set.",
+   "picked": [
+    "pandas/util/_test_decorators.py:_has_english_lc_time",
+    "pandas/util/_test_decorators.py:<block>",
+    "pandas/tests/extension/test_arrow.py:test_string_to_time_parsing_cast_meridiem",
+    "pandas/tests/frame/methods/test_between_time.py:test_between_time_space_before_meridiem",
+    "pandas/tests/tools/test_to_time.py:TestToTime.test_parsers_time",
+    "pandas/tests/tools/test_to_datetime.py:TestTimeConversionFormats.test_to_datetime_format_time",
+    "pandas/tests/tslibs/test_parsing.py:test_guess_datetime_format_with_locale_specific_formats"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/util/_test_decorators.py lines 116-127 (_has_english_lc_time)",
+    "pandas/util/_test_decorators.py lines 130-142 (<block>)",
+    "pandas/tests/extension/test_arrow.py lines 5950-5956 (test_string_to_time_parsing_cast_meridiem)",
+    "pandas/tests/frame/methods/test_between_time.py lines 228-236 (test_between_time_space_before_meridiem)",
+    "pandas/tests/tools/test_to_time.py lines 14-34 (TestToTime.test_parsers_time)",
+    "pandas/tests/tools/test_to_datetime.py lines 327-358 (TestTimeConversionFormats.test_to_datetime_format_time)",
+    "pandas/tests/tslibs/test_parsing.py lines 362-373 (test_guess_datetime_format_with_locale_specific_formats)"
+   ],
+   "fix_attempt": "applied: The tests were skipped whenever the ambient LC_TIME wasn't English. I removed the skipif mark and added `td.english_lc_time()` in `pandas/util/_test_decorators.py`. It is a context manager that switches LC_TIME to English (C or en_US) for the test body and restores the previous value on exit, including on failure. It skips only when no English LC_TIME can be set. Every decorated test now wraps the parsing or formatting call in it. I used `locale.setlocale` directly instead of `set_locale`/`can_set_locale`, because I couldn't see those functions' source to check how they restore LC_TIME."
+  }
+ ]
+}

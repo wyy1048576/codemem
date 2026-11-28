@@ -1,0 +1,298 @@
+{
+ "arm": "codemem-loop",
+ "task": "pandas-dev__pandas-68945",
+ "fixed": {
+  "round": 1,
+  "explanation": "With categorical input, Series.map on a categorical Series maps the categories and returns a categorical result. That result was boxed as a CategoricalIndex, but only on the cache path (more than 50 elements). The edit casts a categorical result back to the cache's datetime dtype, so a DatetimeIndex is returned.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0792,
+ "seconds": 29,
+ "diff_stat": "pandas/core/tools/datetimes.py | 3 +++\n 1 file changed, 3 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The to_datetime conversion function handles array-like inputs by type. Categorical input is not handled consistently: a cache-based path (used when length exceeds a threshold, with unique values converted via _maybe_cache / _convert_listlike) maps results back, returning a CategoricalIndex instead of DatetimeIndex. Fix so the listlike conversion always yields a DatetimeIndex for categorical input.",
+    "symptom": "pd.to_datetime on a Categorical returns a DatetimeIndex for 50 or fewer elements but a CategoricalIndex for more than 50.",
+    "anchors": [
+     "pd.to_datetime",
+     "to_datetime",
+     "CategoricalIndex",
+     "DatetimeIndex",
+     "pd.Categorical",
+     "tz_localize"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/tools/datetimes.py",
+     831,
+     1276
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     310,
+     336
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     816,
+     828
+    ],
+    [
+     "pandas/tests/indexes/datetimes/test_constructors.py",
+     82,
+     97
+    ],
+    [
+     "pandas/core/indexes/datetimes.py",
+     116,
+     1528
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     339,
+     362
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     365,
+     501
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     786,
+     798
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     3085,
+     3090
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1535,
+     1546
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     801,
+     813
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1554,
+     1562
+    ],
+    [
+     "pandas/core/indexes/datetimes.py",
+     518,
+     593
+    ],
+    [
+     "pandas/core/indexes/datetimes.py",
+     595,
+     763
+    ],
+    [
+     "pandas/_libs/tslib.pyi",
+     15,
+     24
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1570,
+     1608
+    ],
+    [
+     "pandas/core/arrays/datetimes.py",
+     952,
+     1127
+    ],
+    [
+     "pandas/core/arrays/datetimes.py",
+     603,
+     646
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1239,
+     1250
+    ],
+    [
+     "pandas/core/arrays/datetimes.py",
+     2790,
+     2847
+    ],
+    [
+     "pandas/tests/indexes/datetimes/methods/test_astype.py",
+     234,
+     249
+    ],
+    [
+     "pandas/core/arrays/datetimes.py",
+     866,
+     950
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     3175,
+     3184
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1418,
+     1440
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1214,
+     1237
+    ],
+    [
+     "pandas/core/indexes/accessors.py",
+     320,
+     374
+    ],
+    [
+     "pandas/tests/indexes/datetimes/test_constructors.py",
+     981,
+     985
+    ],
+    [
+     "pandas/core/generic.py",
+     11180,
+     11391
+    ],
+    [
+     "pandas/_testing/asserters.py",
+     721,
+     728
+    ],
+    [
+     "pandas/_libs/tslib.pyi",
+     25,
+     32
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     532,
+     668
+    ],
+    [
+     "pandas/_libs/tslibs/np_datetime.pyi",
+     37,
+     37
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     3370,
+     3380
+    ],
+    [
+     "pandas/_libs/tslibs/timestamps.pyi",
+     197,
+     197
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     2026,
+     2048
+    ],
+    [
+     "pandas/core/indexes/category.py",
+     474,
+     487
+    ],
+    [
+     "pandas/core/arrays/datetimes.py",
+     552,
+     559
+    ],
+    [
+     "pandas/core/arrays/categorical.py",
+     658,
+     768
+    ],
+    [
+     "pandas/core/dtypes/dtypes.py",
+     164,
+     719
+    ],
+    [
+     "pandas/tests/indexes/datetimes/methods/test_astype.py",
+     235,
+     241
+    ],
+    [
+     "pandas/tests/arrays/categorical/test_astype.py",
+     37,
+     55
+    ],
+    [
+     "pandas/tests/indexes/datetimes/methods/test_astype.py",
+     254,
+     260
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1080,
+     1082
+    ],
+    [
+     "pandas/_libs/tslibs/vectorized.pyi",
+     31,
+     36
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     4345,
+     4363
+    ],
+    [
+     "pandas/core/arrays/datetimelike.py",
+     268,
+     286
+    ],
+    [
+     "pandas/tests/indexes/datetimes/methods/test_astype.py",
+     251,
+     270
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     2425,
+     2437
+    ],
+    [
+     "pandas/core/arrays/datetimes.py",
+     564,
+     567
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     2609,
+     2618
+    ]
+   ],
+   "analysis": "The cache path (used when the input has more than 50 elements) goes through _convert_and_box_cache. It maps the input Categorical onto the cache Series, and for categorical input that mapping keeps the categorical type. The result is then boxed as a CategoricalIndex instead of a DatetimeIndex. The fix most likely belongs in _convert_and_box_cache. For example, it could convert the input to a plain Series or its categories' dtype before mapping. I have not seen the function body, only its signature and docstring.",
+   "picked": [
+    "pandas/core/tools/datetimes.py:_convert_and_box_cache"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/tools/datetimes.py lines 339-362 (_convert_and_box_cache)"
+   ],
+   "fix_attempt": "applied: With categorical input, Series.map on a categorical Series maps the categories and returns a categorical result. That result was boxed as a CategoricalIndex, but only on the cache path (more than 50 elements). The edit casts a categorical result back to the cache's datetime dtype, so a DatetimeIndex is returned."
+  }
+ ]
+}

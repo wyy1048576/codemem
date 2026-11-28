@@ -1,0 +1,24 @@
+diff --git a/src/optimizer/filter_combiner.cpp b/src/optimizer/filter_combiner.cpp
+index be6f41c..cc3dae6 100644
+--- a/src/optimizer/filter_combiner.cpp
++++ b/src/optimizer/filter_combiner.cpp
+@@ -421,7 +421,8 @@ FilterPushdownResult FilterCombiner::TryPushdownPrefixFilter(TableFilterSet &tab
+ 		return FilterPushdownResult::NO_PUSHDOWN;
+ 	}
+ 	auto &func = expr.Cast<BoundFunctionExpression>();
+-	if (func.Function().GetName() != "prefix") {
++	auto &func_name = func.Function().GetName();
++	if (func_name != "prefix" && func_name != "starts_with" && func_name != "^@") {
+ 		return FilterPushdownResult::NO_PUSHDOWN;
+ 	}
+ 	if (func.GetChildren()[0]->GetExpressionClass() != ExpressionClass::BOUND_COLUMN_REF ||
+@@ -431,6 +432,9 @@ FilterPushdownResult FilterCombiner::TryPushdownPrefixFilter(TableFilterSet &tab
+ 	}
+ 	auto &column_ref = func.GetChildren()[0]->Cast<BoundColumnRefExpression>();
+ 	auto &constant_value_expr = func.GetChildren()[1]->Cast<BoundConstantExpression>();
++	if (constant_value_expr.GetValue().IsNull()) {
++		return FilterPushdownResult::NO_PUSHDOWN;
++	}
+ 	auto prefix_string = StringValue::Get(constant_value_expr.GetValue());
+ 	if (prefix_string.empty()) {
+ 		// empty prefix - skip

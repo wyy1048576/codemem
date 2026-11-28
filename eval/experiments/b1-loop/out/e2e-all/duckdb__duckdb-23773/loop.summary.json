@@ -1,0 +1,301 @@
+{
+ "arm": "codemem-loop",
+ "task": "duckdb__duckdb-23773",
+ "fixed": {
+  "round": 1,
+  "explanation": "In HandleExponent's negative-exponent loop, the loop breaks as soon as the result reaches 0. That leaves round_up set from the leading digit, even though more shifts remained. That digit is more than one place past the rounding position, so it must not round up. The fix clears round_up when the loop ends early, so only the digit just below the last kept digit can round up.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0989,
+ "seconds": 26,
+ "diff_stat": "src/include/duckdb/common/operator/decimal_cast_operators.hpp | 7 ++++++-\n 1 file changed, 6 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The VARCHAR to DECIMAL text cast parser handles scientific notation by processing the exponent and mantissa digits; when the negative exponent shifts all digits beyond the decimal scale, the rounding logic wrongly rounds up (using the leading mantissa digit >= 5) instead of yielding zero. Fix the exponent/rounding handling in the decimal cast's TryDecimalStringCast.",
+    "symptom": "Casting a scientific-notation string with a large negative exponent and leading mantissa digit >= 5 to DECIMAL returns 0.0001 instead of 0.0000.",
+    "anchors": [
+     "CAST('5.8207660913467407e-11' AS DECIMAL(18,4))",
+     "CAST('5.5e-11' AS DECIMAL(18,4))",
+     "DECIMAL(18,4)",
+     "VARCHAR",
+     "DECIMAL"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     501,
+     524
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     618,
+     634
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     668,
+     692
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     694,
+     713
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1938,
+     1957
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/decNumber.cpp",
+     5265,
+     5535
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     662,
+     666
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2558,
+     2569
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     751,
+     952
+    ],
+    [
+     "extension/core_functions/scalar/math/numeric.cpp",
+     845,
+     864
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     954,
+     958
+    ],
+    [
+     "src/common/types/bignum.cpp",
+     103,
+     127
+    ],
+    [
+     "src/common/types/cast_helpers.cpp",
+     277,
+     311
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     298,
+     300
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     591,
+     616
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     465,
+     465
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     536,
+     543
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     545,
+     589
+    ],
+    [
+     "src/include/duckdb/common/operator/integer_cast_operator.hpp",
+     166,
+     176
+    ],
+    [
+     "src/function/cast/decimal_cast.cpp",
+     117,
+     130
+    ],
+    [
+     "src/include/duckdb/common/operator/integer_cast_operator.hpp",
+     99,
+     164
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     1961,
+     1983
+    ],
+    [
+     "src/include/duckdb/common/operator/integer_cast_operator.hpp",
+     68,
+     72
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     636,
+     659
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2064,
+     2077
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     3002,
+     3013
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2518,
+     2529
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2598,
+     2611
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     379,
+     381
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/plurrule.cpp",
+     1920,
+     1922
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     302,
+     304
+    ],
+    [
+     "src/include/duckdb/common/operator/integer_cast_operator.hpp",
+     98,
+     204
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/double-conversion-string-to-double.cpp",
+     276,
+     437
+    ],
+    [
+     "tools/shell/tests/test_rendering_mode_regression.py",
+     1301,
+     1325
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.h",
+     175,
+     225
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2680,
+     2692
+    ],
+    [
+     "src/common/types/decimal.cpp",
+     6,
+     6
+    ],
+    [
+     "src/function/cast/decimal_cast.cpp",
+     238,
+     243
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     467,
+     470
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/double-conversion-double-to-string.h",
+     310,
+     379
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/unicode/numberformatter.h",
+     203,
+     254
+    ],
+    [
+     "src/include/duckdb/common/types/cast_helpers.hpp",
+     130,
+     162
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_rounding.cpp",
+     186,
+     192
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     566,
+     614
+    ],
+    [
+     "src/include/duckdb/main/capi/cast/to_decimal.hpp",
+     136,
+     139
+    ],
+    [
+     "src/include/duckdb/main/capi/cast/to_decimal.hpp",
+     122,
+     134
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_utils.cpp",
+     241,
+     243
+    ],
+    [
+     "extension/icu/third_party/icu/i18n/number_decimalquantity.cpp",
+     1062,
+     1103
+    ],
+    [
+     "src/common/operator/cast_operators.cpp",
+     2297,
+     2309
+    ],
+    [
+     "src/include/duckdb/common/operator/decimal_cast_operators.hpp",
+     500,
+     660
+    ]
+   ],
+   "analysis": "The VARCHAR to DECIMAL path is DecimalCastOperation in decimal_cast_operators.hpp. HandleExponent computes excessive_decimals for negative exponents, and TruncateExcessiveDecimals decides round_up from the last dropped digit. When the exponent shifts every digit past the scale, the leading mantissa digit (5 or more) is probably treated as the rounding digit, or the loop stops early, and the result ends up as 1 ulp. I only saw the first lines of each function, so this is an inference.",
+   "picked": [
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.HandleExponent",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.TruncateExcessiveDecimals",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp:duckdb.DecimalCastOperation.Finalize"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 545-589 (duckdb.DecimalCastOperation.HandleExponent)",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 618-634 (duckdb.DecimalCastOperation.TruncateExcessiveDecimals)",
+    "src/include/duckdb/common/operator/decimal_cast_operators.hpp lines 636-659 (duckdb.DecimalCastOperation.Finalize)"
+   ],
+   "fix_attempt": "applied: In HandleExponent's negative-exponent loop, the loop breaks as soon as the result reaches 0. That leaves round_up set from the leading digit, even though more shifts remained. That digit is more than one place past the rounding position, so it must not round up. The fix clears round_up when the loop ends early, so only the digit just below the last kept digit can round up."
+  }
+ ]
+}

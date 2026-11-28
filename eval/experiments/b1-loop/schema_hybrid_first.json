@@ -1,0 +1,66 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tool",
+    "intent",
+    "symptom",
+    "anchors",
+    "stated_location",
+    "guessed_location",
+    "k",
+    "grep_pattern",
+    "grep_path",
+    "grep_ignore_case"
+  ],
+  "properties": {
+    "tool": {
+      "type": "string",
+      "enum": [
+        "codemem",
+        "grep"
+      ]
+    },
+    "intent": {
+      "type": "string"
+    },
+    "symptom": {
+      "type": "string"
+    },
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stated_location": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "guessed_location": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "k": {
+      "type": "integer",
+      "enum": [
+        3,
+        5,
+        10
+      ]
+    },
+    "grep_pattern": {
+      "type": "string"
+    },
+    "grep_path": {
+      "type": "string"
+    },
+    "grep_ignore_case": {
+      "type": "boolean"
+    }
+  }
+}

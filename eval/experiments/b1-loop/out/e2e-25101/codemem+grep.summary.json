@@ -1,0 +1,55 @@
+{
+ "arm": "codemem+grep",
+ "task": "duckdb__duckdb-25101",
+ "exit": 0,
+ "seconds": 62,
+ "cost_usd": 0.2616843,
+ "turns": 17,
+ "usage": {
+  "input_tokens": 24,
+  "cache_creation_input_tokens": 44256,
+  "cache_read_input_tokens": 310823,
+  "output_tokens": 5353,
+  "output_tokens_details": {
+   "thinking_tokens": 1879
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 44256,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 414,
+    "cache_read_input_tokens": 43645,
+    "cache_creation_input_tokens": 611,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 611
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "mcp__codemem__search_code": 1,
+  "Read": 8,
+  "Grep": 6,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "src/execution/operator/order/physical_top_n.cpp | 5 +++++\n 1 file changed, 5 insertions(+)",
+ "final": "I fixed a likely cause of the crash in `TopNHeap::Sink` (`src/execution/operator/order/physical_top_n.cpp`). I couldn't build or run anything, so the fix is untested.\n\nWith `LIMIT 0` the heap size is 0. `EntryShouldBeAdded` then skips its \"heap isn't full\" check and reads `heap.front()` on an empty heap. That is undefined behaviour. The same empty-heap read happens in the global boundary update after the sink. Whether it crashes depends on what memory happens to sit there, which would explain why it only failed after about 1000 runs. The plan in the issue has a `TOP_N Top: 0` sitting on top of the delim join, and this is the path it takes. The source query doesn't reach this code, because the optimizer plans it differently.\n\nThe change is an early return at the top of `TopNHeap::Sink` when `heap_size == 0`. Nothing can enter a zero-size heap, and `PhysicalTopN::GetDataInternal` already returns no rows for `limit == 0`.\n\nI didn't find a defect in the delim join code itself (`physical_left_delim_join.cpp` and the delim scan). If the crash still reproduces after this change, that code is where I'd look next.",
+ "stderr": ""
+}

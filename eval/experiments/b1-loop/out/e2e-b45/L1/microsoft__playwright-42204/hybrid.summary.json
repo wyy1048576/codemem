@@ -1,0 +1,57 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42204",
+ "fixed": {
+  "step": 2,
+  "explanation": "gitDiff always runs `git fetch --depth=1`. In a full clone this turns the repo shallow and cuts history. The fix checks `git rev-parse --is-shallow-repository` first and adds the depth limit only when the repo is already shallow. A full clone then stays complete, and the diff is still captured.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0369,
+ "seconds": 14,
+ "diff_stat": "packages/playwright/src/plugins/gitCommitInfoPlugin.ts | 8 +++++++-\n 1 file changed, 7 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "--depth[= ]?1|fetch.*depth",
+    "path": "packages/playwright/src",
+    "ignore_case": false
+   },
+   "matches": 1,
+   "grep_shown": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts:157"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "The fetch with --depth=1 in gitDiff makes a full clone shallow. I need to see the function to write a safe fix.",
+   "picked": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts:gitDiff"
+   ]
+  },
+  {
+   "step": 2,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright/src/plugins/gitCommitInfoPlugin.ts lines 153-179 (gitDiff)"
+   ],
+   "action": "edit",
+   "analysis": "gitDiff always runs `git fetch --depth=1`. In a full clone this turns the repo shallow and cuts history. The fix checks `git rev-parse --is-shallow-repository` first and adds the depth limit only when the repo is already shallow. A full clone then stays complete, and the diff is still captured.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

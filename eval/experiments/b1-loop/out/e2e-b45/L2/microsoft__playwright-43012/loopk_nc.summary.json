@@ -1,0 +1,80 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43012",
+ "fixed": {
+  "round": 1,
+  "explanation": "_retryAction waits between retries by evaluating a setTimeout promise in the page utility context. With JavaScript disabled, that evaluation never resolves, so the retry hangs. Replace it with a server-side setTimeout raced via progress.race.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0248,
+ "seconds": 23,
+ "diff_stat": "packages/playwright-core/src/server/dom.ts | 4 +---\n 1 file changed, 1 insertion(+), 3 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The action retry loop in the injected-script based click/action code waits between retries using a page-evaluated script (e.g. evaluating a requestAnimationFrame or setTimeout-based wait inside the page). That wait must be done without relying on page JavaScript, e.g. with a server-side timeout, so it works when JavaScript is disabled.",
+    "symptom": "With JavaScript disabled in the browser context, a click that needs to retry hangs forever between retries.",
+    "anchors": [
+     "JavaScript disabled"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/frames.ts",
+     1184,
+     1198
+    ],
+    [
+     "packages/playwright-core/src/server/dom.ts",
+     328,
+     380
+    ],
+    [
+     "packages/playwright-core/src/server/frames.ts",
+     1156,
+     1182
+    ],
+    [
+     "packages/playwright-core/src/server/frames.ts",
+     1200,
+     1250
+    ],
+    [
+     "packages/playwright-core/src/server/frames.ts",
+     1146,
+     1154
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "_retryAction waits between retries by evaluating a setTimeout promise in the page utility context. With JavaScript disabled, that evaluation never resolves, so the retry hangs. Replace it with a server-side setTimeout raced via progress.race.",
+   "picked": [
+    "packages/playwright-core/src/server/dom.ts:ElementHandle._retryAction"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

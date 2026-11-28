@@ -1,0 +1,108 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0079,
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 1,
+  "explanation": "filterCookies prepended '.' to every cookie domain, so host-only cookies matched subdomains. It now requires an exact hostname match for host-only cookies and keeps the suffix match for dot-prefixed domains. Path matching in both places now follows RFC 6265. A path matches if it is equal, or if the cookie path is a prefix that either ends in '/' or is followed by '/' in the request path. So /api no longer matches /apiv2, and a /foo/ cookie no longer matches /foo.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0495,
+ "seconds": 23,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 19 +++++++++++++------\n 2 files changed, 16 insertions(+), 11 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie filtering by URL in the browser context cookie store: the domain match, path match, and secure checks used when returning cookies for URLs or when deciding which cookies to send. Domain matching must treat host-only cookies as exact host matches, and path matching must follow RFC 6265 path-match rules (prefix must end at a '/' boundary).",
+    "symptom": "Cookie URL matching is wrong: host-only cookies are returned for subdomains, a /api cookie matches /apiv2, and a /foo/ cookie is sent to /foo.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/network.ts",
+     142,
+     160
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     219,
+     227
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     260,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     35,
+     55
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     229,
+     237
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     42,
+     46
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     129,
+     140
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     21,
+     61
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/crBrowser.ts",
+     385,
+     408
+    ],
+    [
+     "packages/playwright-core/src/server/webkit/webview/wvBrowser.ts",
+     314,
+     332
+    ]
+   ],
+   "analysis": "filterCookies in network.ts treats host-only cookies as domain suffix matches (it prepends '.' to every domain) and uses a plain startsWith for paths, so /api matches /apiv2. pathMatches in cookieStore.ts appends '/' to both value and path, so a /foo/ cookie matches /foo. Both need RFC 6265 compliant matching.",
+   "picked": [
+    "packages/playwright-core/src/server/network.ts:filterCookies",
+    "packages/playwright-core/src/server/cookieStore.ts:pathMatches"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/network.ts lines 35-55 (filterCookies)",
+    "packages/playwright-core/src/server/cookieStore.ts lines 229-237 (pathMatches)"
+   ],
+   "fix_attempt": "applied: filterCookies prepended '.' to every cookie domain, so host-only cookies matched subdomains. It now requires an exact hostname match for host-only cookies and keeps the suffix match for dot-prefixed domains. Path matching in both places now follows RFC 6265. A path matches if it is equal, or if the cookie path is a prefix that either ends in '/' or is followed by '/' in the request path. So /api no longer matches /apiv2, and a /foo/ cookie no longer matches /foo."
+  }
+ ]
+}

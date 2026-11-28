@@ -1,0 +1,7 @@
+{
+ "prompt_sha": "be4c130c1fdf8bd5239728584d86aa9fd335de2b4c4d87d4b675fd5e07a5fc40",
+ "model": "claude-sonnet-5-5",
+ "effort": "medium",
+ "settings": {"max_rounds": 5, "shown_per_round": 50, "card_chars": 500, "pool_per_list": 100, "max_look_in": 3},
+ "status": "dev: designed after seeing DuckDB and pandas results, so these two repos are not a clean test"
+}

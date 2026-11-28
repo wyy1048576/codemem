@@ -1,0 +1,200 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0079,
+ "task": "microsoft__playwright-43148",
+ "fixed": {
+  "round": 1,
+  "explanation": "`filterCookies` forced a leading '.' onto host-only cookie domains, so they matched subdomains. It also used a plain `startsWith` for paths, so `/api` matched `/apiv2`. I replaced both with RFC 6265 matching: host-only cookies need an exact host match, and a path matches only on equality, or when the cookie path ends with '/', or when the next request-path character is '/'. `pathMatches` in `cookieStore.ts` appended '/' to both sides, so a `/foo/` cookie matched `/foo`. It now uses the same path rule. I inlined the matching in `network.ts` because I couldn't see its imports and wanted to avoid a possible circular import with `cookieStore.ts`.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1402,
+ "seconds": 26,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts |  8 +++-----\n packages/playwright-core/src/server/network.ts     | 14 +++++++++-----\n 2 files changed, 12 insertions(+), 10 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Cookie filtering by URL in the browser context cookie store: the domain match, path match, and secure checks used when returning cookies for URLs or when deciding which cookies to send. Domain matching must treat host-only cookies as exact host matches, and path matching must follow RFC 6265 path-match rules (prefix must end at a '/' boundary).",
+    "symptom": "Cookie URL matching is wrong: host-only cookies are returned for subdomains, a /api cookie matches /apiv2, and a /foo/ cookie is sent to /foo.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/network.ts",
+     142,
+     160
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     219,
+     227
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     260,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     35,
+     55
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     229,
+     237
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     42,
+     46
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     129,
+     140
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     21,
+     61
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/crBrowser.ts",
+     385,
+     408
+    ],
+    [
+     "packages/playwright-core/src/server/webkit/webview/wvBrowser.ts",
+     314,
+     332
+    ],
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     307,
+     311
+    ],
+    [
+     "packages/playwright-core/src/server/dispatchers/networkDispatchers.ts",
+     253,
+     262
+    ],
+    [
+     "packages/playwright-core/src/server/bidi/bidiBrowser.ts",
+     284,
+     300
+    ],
+    [
+     "packages/playwright-core/src/server/webkit/wkBrowser.ts",
+     252,
+     270
+    ],
+    [
+     "tests/library/browsercontext-cookies.spec.ts",
+     177,
+     361
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     835,
+     851
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/protocol.d.ts",
+     13041,
+     13240
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     238,
+     426
+    ],
+    [
+     "packages/playwright-core/types/protocol.d.ts",
+     13041,
+     13240
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     46,
+     236
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     63,
+     120
+    ],
+    [
+     "tests/library/browsercontext-add-cookies.spec.ts",
+     181,
+     373
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     27,
+     29
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     287,
+     299
+    ],
+    [
+     "tests/library/browsercontext-clearcookies.spec.ts",
+     1,
+     166
+    ]
+   ],
+   "analysis": "filterCookies in network.ts does the URL matching for listing cookies. It treats host-only cookies as domain cookies by prepending '.', and it uses a plain startsWith for paths, so /api matches /apiv2. pathMatches in cookieStore.ts appends '/' to both sides, so a /foo/ cookie matches /foo. domainMatches already handles host-only cookies correctly.",
+   "picked": [
+    "packages/playwright-core/src/server/network.ts:filterCookies",
+    "packages/playwright-core/src/server/cookieStore.ts:pathMatches",
+    "packages/playwright-core/src/server/cookieStore.ts:domainMatches"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/network.ts lines 35-55 (filterCookies)",
+    "packages/playwright-core/src/server/cookieStore.ts lines 229-237 (pathMatches)",
+    "packages/playwright-core/src/server/cookieStore.ts lines 219-227 (domainMatches)"
+   ],
+   "fix_attempt": "applied: `filterCookies` forced a leading '.' onto host-only cookie domains, so they matched subdomains. It also used a plain `startsWith` for paths, so `/api` matched `/apiv2`. I replaced both with RFC 6265 matching: host-only cookies need an exact host match, and a path matches only on equality, or when the cookie path ends with '/', or when the next request-path character is '/'. `pathMatches` in `cookieStore.ts` appended '/' to both sides, so a `/foo/` cookie matched `/foo`. It now uses the same path rule. I inlined the matching in `network.ts` because I couldn't see its imports and wanted to avoid a possible circular import with `cookieStore.ts`."
+  }
+ ]
+}

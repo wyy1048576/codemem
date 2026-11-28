@@ -1,0 +1,78 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-69779",
+ "fixed": {
+  "round": 1,
+  "explanation": "sparsify_labels compares the formatted strings, so distinct level values that print identically (e.g. large floats shown as 2.015e+11) are treated as repeats and blanked. The fix passes the integer level codes as comparison keys, so sparsification depends on the real values and not on their text.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "ks": [
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0358,
+ "seconds": 31,
+ "diff_stat": "pandas/core/indexes/multi.py | 30 +++++++++++++++++++++++-------\n 1 file changed, 23 insertions(+), 7 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "MultiIndex string formatting for display sparsifies repeated labels by comparing formatted strings of level values rather than the underlying codes. It should sparsify based on the actual label codes/values so distinct values with identical formatted text are not collapsed.",
+    "symptom": "With a MultiIndex whose first level has distinct floats that format identically, the display shows the first-level label once with blanks below, merging distinct groups.",
+    "anchors": [],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "pandas/core/indexes/multi.py",
+     1607,
+     1614
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     1591,
+     1610
+    ],
+    [
+     "pandas/core/groupby/grouper.py",
+     709,
+     720
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     1654,
+     1713
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     5062,
+     5087
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "sparsify_labels compares the formatted strings, so distinct level values that print identically (e.g. large floats shown as 2.015e+11) are treated as repeats and blanked. The fix passes the integer level codes as comparison keys, so sparsification depends on the real values and not on their text.",
+   "picked": [
+    "pandas/core/indexes/multi.py:MultiIndex._format_multi",
+    "pandas/core/indexes/multi.py:sparsify_labels"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

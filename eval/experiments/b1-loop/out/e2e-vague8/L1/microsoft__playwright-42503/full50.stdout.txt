@@ -1,0 +1,32 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0089,
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 1,
+  "explanation": "runDaemonForContext called browser.bind for every context, and the second call throws because a server is already running. The fix tracks bound browsers in a WeakSet. It binds and pauses only for the first context of each browser, and later contexts return false and are left alone.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.2161,
+ "seconds": 22,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)"
+}
+round 1: found=True picked=['packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext']
+  fix: applied: runDaemonForContext called browser.bind for every context, and the second call throws because a server is already running. The fix tracks bound browsers in a WeakSet. It binds and pauses only for the first context of each browser, and later contexts return false and are left alone.
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   8%|▊         | 23/290 [00:00<00:01, 139.07it/s]
+Loading weights:  19%|█▊        | 54/290 [00:00<00:01, 208.06it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 892.83it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

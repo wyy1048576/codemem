@@ -1,0 +1,74 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "step": 2,
+  "explanation": "In parseRawCookie, Expires and Max-Age both write cookie.expires in attribute order, so a later past Expires overrides an earlier Max-Age. Max-Age also uses parseInt, which accepts non-integer strings like \"10abc\". I track whether a valid Max-Age was seen, make Expires skip in that case, and validate Max-Age with /^-?\\d+$/.",
+  "edits": 3
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.039,
+ "seconds": 14,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "max-age|maxAge",
+    "path": "packages/playwright-core/src/server",
+    "ignore_case": true
+   },
+   "matches": 7,
+   "grep_shown": [
+    "packages/playwright-core/src/server/bidi/third_party/bidiProtocolCore.ts:1670",
+    "packages/playwright-core/src/server/cookieStore.ts:169",
+    "packages/playwright-core/src/server/cookieStore.ts:170",
+    "packages/playwright-core/src/server/cookieStore.ts:171",
+    "packages/playwright-core/src/server/cookieStore.ts:175",
+    "packages/playwright-core/src/server/cookieStore.ts:178",
+    "packages/playwright-core/src/server/har/harTracer.ts:803"
+   ],
+   "picked_shown": [],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.010266,
+   "action": "read",
+   "analysis": "parseRawCookie in cookieStore.ts handles max-age; need to see the full function to fix ordering with expires and integer validation.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ]
+  },
+  {
+   "step": 2,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright-core/src/server/cookieStore.ts lines 133-211 (parseRawCookie)"
+   ],
+   "prompt_cache": [
+    0,
+    0
+   ],
+   "call_cost": 0.018674,
+   "action": "edit",
+   "analysis": "In parseRawCookie, Expires and Max-Age both write cookie.expires in attribute order, so a later past Expires overrides an earlier Max-Age. Max-Age also uses parseInt, which accepts non-integer strings like \"10abc\". I track whether a valid Max-Age was seen, make Expires skip in that case, and validate Max-Age with /^-?\\d+$/.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

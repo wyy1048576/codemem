@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-42792",
+ "exit": 0,
+ "seconds": 17,
+ "cost_usd": 0.0526182,
+ "turns": 9,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 7252,
+  "cache_read_input_tokens": 53162,
+  "output_tokens": 1827,
+  "output_tokens_details": {
+   "thinking_tokens": 56
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 7252,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 394,
+    "cache_read_input_tokens": 12368,
+    "cache_creation_input_tokens": 276,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 276
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 5,
+  "Read": 1,
+  "Edit": 2
+ },
+ "subtype": "success",
+ "diff_stat": "packages/playwright/src/common/testType.ts | 10 +++++++++-\n packages/playwright/types/test.d.ts        |  2 +-\n 2 files changed, 10 insertions(+), 2 deletions(-)",
+ "final": "I've added the `lock` option to `test.describe.configure()`. It takes one lock name or an array of names. I haven't built or run anything.\n\n- **Implementation:** in `packages/playwright/src/common/testType.ts`, `_configure` now accepts `lock`. It normalizes a string to a one-element array and pushes the names onto the current suite's `_locks`. It throws if the value isn't a string or an array of strings.\n- **Propagation:** `suiteUtils.ts` already copies a suite's `_locks` onto its tests, and the `lock` details option on `describe` already works this way. So the locks apply to every test in the group without further changes.\n- **Types:** I updated the `configure` signature in `packages/playwright/types/test.d.ts` to include `lock?: string | string[]`.\n- **Not done:** I didn't update the docs source (`docs/src/test-api/class-test.md`) or add tests. `test.d.ts` is generated from those docs, so the next regeneration will drop the type change until the docs are updated.",
+ "stderr": ""
+}

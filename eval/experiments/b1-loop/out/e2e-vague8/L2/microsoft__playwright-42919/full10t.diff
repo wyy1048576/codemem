@@ -1,0 +1,25 @@
+diff --git a/packages/playwright-core/src/server/trace/recorder/tracing.ts b/packages/playwright-core/src/server/trace/recorder/tracing.ts
+index 67b163b..fa4463c 100644
+--- a/packages/playwright-core/src/server/trace/recorder/tracing.ts
++++ b/packages/playwright-core/src/server/trace/recorder/tracing.ts
+@@ -515,16 +515,16 @@ export class Tracing extends SdkObject implements InstrumentationListener, Snaps
+     if (this._snapshotter?.started()) {
+       // Node references are only reset by the first snapshot of the action.
+       const resetTargets = phase === 'before';
+-      await this._snapshotter?.captureSnapshot(page, progress.metadata.id, phase, resetTargets).catch(() => {});
++      await progress.race(this._snapshotter.captureSnapshot(page, progress.metadata.id, phase, resetTargets).catch(() => {}));
+     }
+ 
+     const options = this._state?.options;
+     if (options?.snapshotScreen)
+-      await this._captureScreenshot(progress, page, phase);
++      await progress.race(this._captureScreenshot(progress, page, phase));
+     if (options?.snapshotAria)
+-      await this._captureAriaSnapshot(progress, page, phase);
++      await progress.race(this._captureAriaSnapshot(progress, page, phase));
+     if (phase === 'after')
+-      await this._captureCoverage(progress, page);
++      await progress.race(this._captureCoverage(progress, page));
+   }
+ 
+   private async _captureCoverage(progress: Progress, page: Page): Promise<void> {

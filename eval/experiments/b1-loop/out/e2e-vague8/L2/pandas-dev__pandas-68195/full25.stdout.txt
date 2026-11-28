@@ -1,0 +1,32 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0071,
+ "task": "pandas-dev__pandas-68195",
+ "fixed": {
+  "round": 1,
+  "explanation": "`_validate_tolerance` only rejects tolerances below zero, so zero is valid. The error message wrongly said \"positive\". All three branches (datetimelike, integer, float) now say \"tolerance must be non-negative\". Tests that match the old message also need updating, but they were not shown.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1016,
+ "seconds": 26,
+ "diff_stat": "pandas/core/reshape/merge.py | 6 +++---\n 1 file changed, 3 insertions(+), 3 deletions(-)"
+}
+round 1: found=True picked=['pandas/core/reshape/merge.py:_AsOfMerge._validate_tolerance']
+  fix: applied: `_validate_tolerance` only rejects tolerances below zero, so zero is valid. The error message wrongly said "positive". All three branches (datetimelike, integer, float) now say "tolerance must be non-negative". Tests that match the old message also need updating, but they were not shown.
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   2%|▏         | 5/290 [00:00<00:06, 47.08it/s]
+Loading weights:   3%|▎         | 10/290 [00:00<00:06, 45.35it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 1267.32it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

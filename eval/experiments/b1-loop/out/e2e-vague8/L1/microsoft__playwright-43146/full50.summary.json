@@ -1,0 +1,352 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0094,
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "Both Expires and Max-Age wrote cookie.expires, so the last attribute won. Max-Age is now stored separately and applied after the loop, so it always overrides Expires. Max-Age values that don't match /^-?\\d+$/ (including empty ones) are now ignored, as RFC 6265 section 5.2.2 requires.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.2768,
+ "seconds": 20,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 12 ++++++++----\n 1 file changed, 8 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The Set-Cookie parsing code for the API request context (cookie store / parseSetCookieHeader) reads attributes in order, with both max-age and expires setting the same expires field so the last wins. It should track Max-Age separately so it takes precedence over Expires regardless of order, and ignore Max-Age values that aren't an optional minus followed only by digits.",
+    "symptom": "A cookie with Max-Age followed by a past Expires is stored as expired and not sent, and malformed Max-Age values like \"10abc\" or empty are parsed as numbers instead of ignored.",
+    "anchors": [
+     "Max-Age",
+     "Expires",
+     "Set-Cookie",
+     "Set-Cookie header",
+     "API request context"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     211
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     260,
+     285
+    ],
+    [
+     "packages/playwright-core/src/server/har/harTracer.ts",
+     776,
+     818
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     287,
+     299
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     835,
+     851
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     56,
+     60
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     392,
+     591
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     238,
+     413
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     114,
+     119
+    ],
+    [
+     "tests/library/browsercontext-cookies.spec.ts",
+     363,
+     469
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     89,
+     102
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     21,
+     61
+    ],
+    [
+     "tests/library/browsercontext-cookies.spec.ts",
+     1,
+     175
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     142,
+     160
+    ],
+    [
+     "packages/playwright-client/types/types.d.ts",
+     26720,
+     26741
+    ],
+    [
+     "packages/playwright-core/types/types.d.ts",
+     26720,
+     26741
+    ],
+    [
+     "tests/library/browsercontext-add-cookies.spec.ts",
+     1,
+     179
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     46,
+     236
+    ],
+    [
+     "tests/library/browsercontext-add-cookies.spec.ts",
+     181,
+     373
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     63,
+     120
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     27,
+     29
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     42,
+     46
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/crNetworkManager.ts",
+     744,
+     746
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     104,
+     112
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     129,
+     140
+    ],
+    [
+     "packages/playwright-core/src/server/network.ts",
+     118,
+     123
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     213,
+     221
+    ],
+    [
+     "tests/library/browsercontext-route.spec.ts",
+     1,
+     197
+    ],
+    [
+     "packages/isomorphic/headers.ts",
+     46,
+     58
+    ],
+    [
+     "tests/page/firefox-network-response.spec.ts",
+     49,
+     172
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     794,
+     804
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     223,
+     231
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/protocol.d.ts",
+     11072,
+     11271
+    ],
+    [
+     "packages/playwright-core/types/protocol.d.ts",
+     11072,
+     11271
+    ],
+    [
+     "packages/playwright-core/src/server/chromium/protocol.d.ts",
+     11330,
+     11450
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     1349,
+     1534
+    ],
+    [
+     "tests/library/browsercontext-fetch.spec.ts",
+     205,
+     390
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     48,
+     50
+    ],
+    [
+     "packages/playwright-core/types/protocol.d.ts",
+     11330,
+     11450
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     52,
+     54
+    ],
+    [
+     "packages/playwright-core/src/server/webkit/protocol.d.ts",
+     7124,
+     7294
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     122,
+     131
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     1,
+     19
+    ],
+    [
+     "tests/library/browsercontext-cookies.spec.ts",
+     177,
+     361
+    ],
+    [
+     "tests/library/global-fetch-cookie.spec.ts",
+     415,
+     607
+    ],
+    [
+     "packages/playwright-core/src/client/network.ts",
+     940,
+     942
+    ],
+    [
+     "tests/library/har.spec.ts",
+     233,
+     425
+    ],
+    [
+     "browser_patches/firefox/juggler/TargetRegistry.js",
+     1171,
+     1211
+    ],
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     71,
+     76
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     889,
+     892
+    ]
+   ],
+   "analysis": "parseRawCookie in cookieStore.ts reads attributes in order, and both 'expires' and 'max-age' write cookie.expires, so the last one wins. It also uses parseInt, which accepts \"10abc\" and treats an empty value as NaN only by accident. The fix belongs in this function: track Max-Age separately, validate it with /^-?\\d+$/, and apply it over Expires after the loop.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ],
+   "found": true,
+   "fix_shown": [
+    "packages/playwright-core/src/server/cookieStore.ts lines 133-211 (parseRawCookie)"
+   ],
+   "fix_attempt": "applied: Both Expires and Max-Age wrote cookie.expires, so the last attribute won. Max-Age is now stored separately and applied after the loop, so it always overrides Expires. Max-Age values that don't match /^-?\\d+$/ (including empty ones) are now ignored, as RFC 6265 section 5.2.2 requires."
+  }
+ ]
+}

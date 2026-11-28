@@ -1,0 +1,115 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0124,
+ "task": "pandas-dev__pandas-68945",
+ "fixed": {
+  "round": 1,
+  "explanation": "With categorical input, the cache index is a CategoricalIndex, so Series(arg, dtype=category).map(cache_array) stays categorical and gets boxed as CategoricalIndex. The edit casts a categorical result back to its categories' dtype (datetime64) before boxing, so a DatetimeIndex is returned regardless of length (cached or not).",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1061,
+ "seconds": 28,
+ "diff_stat": "pandas/core/tools/datetimes.py | 6 ++++++\n 1 file changed, 6 insertions(+)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The to_datetime conversion function handles array-like inputs by type. Categorical input is not handled consistently: a cache-based path (used when length exceeds a threshold, with unique values converted via _maybe_cache / _convert_listlike) maps results back, returning a CategoricalIndex instead of DatetimeIndex. Fix so the listlike conversion always yields a DatetimeIndex for categorical input.",
+    "symptom": "pd.to_datetime on a Categorical returns a DatetimeIndex for 50 or fewer elements but a CategoricalIndex for more than 50.",
+    "anchors": [
+     "pd.to_datetime",
+     "to_datetime",
+     "CategoricalIndex",
+     "DatetimeIndex",
+     "pd.Categorical",
+     "tz_localize"
+    ],
+    "look_in": []
+   },
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "shown": [
+    [
+     "pandas/core/tools/datetimes.py",
+     831,
+     1276
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     310,
+     336
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     816,
+     828
+    ],
+    [
+     "pandas/tests/indexes/datetimes/test_constructors.py",
+     82,
+     97
+    ],
+    [
+     "pandas/core/indexes/datetimes.py",
+     116,
+     1528
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     339,
+     362
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     365,
+     501
+    ],
+    [
+     "pandas/core/tools/datetimes.py",
+     786,
+     798
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     3085,
+     3090
+    ],
+    [
+     "pandas/tests/tools/test_to_datetime.py",
+     1535,
+     1546
+    ]
+   ],
+   "analysis": "Categorical input is list-like but not an Index, so with 50 or more values it takes the cache branch of to_datetime. _convert_and_box_cache then builds Series(arg, dtype=cache_array.index.dtype).map(cache_array). Mapping a categorical Series returns categorical values, and _box_as_indexlike wraps them in a generic Index, which becomes a CategoricalIndex. The fix is to make the mapped result non-categorical (or convert the categorical before mapping), so a DatetimeIndex comes out.",
+   "picked": [
+    "pandas/core/tools/datetimes.py:_convert_and_box_cache",
+    "pandas/core/tools/datetimes.py:_box_as_indexlike"
+   ],
+   "found": true,
+   "fix_shown": [
+    "pandas/core/tools/datetimes.py lines 339-362 (_convert_and_box_cache)",
+    "pandas/core/tools/datetimes.py lines 310-336 (_box_as_indexlike)"
+   ],
+   "fix_attempt": "applied: With categorical input, the cache index is a CategoricalIndex, so Series(arg, dtype=category).map(cache_array) stays categorical and gets boxed as CategoricalIndex. The edit casts a categorical result back to its categories' dtype (datetime64) before boxing, so a DatetimeIndex is returned regardless of length (cached or not)."
+  }
+ ]
+}

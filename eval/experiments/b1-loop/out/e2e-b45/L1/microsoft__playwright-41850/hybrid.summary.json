@@ -1,0 +1,58 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "step": 2,
+  "explanation": "The redirect code checks and sets only headers['host'] in lowercase, so a header named 'Host' is ignored. The edit loops over the header keys, compares each name in lowercase, and updates every key that matches 'host'.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0427,
+ "seconds": 13,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "grep",
+   "input": {
+    "pattern": "\\['host'\\]|'host'",
+    "path": "packages/playwright-core/src/server/fetch.ts",
+    "ignore_case": false
+   },
+   "matches": 2,
+   "grep_shown": [
+    "packages/playwright-core/src/server/fetch.ts:479",
+    "packages/playwright-core/src/server/fetch.ts:480"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "The redirect handling in _sendRequest checks headers['host'] only in lowercase. I need to see the surrounding code to write an exact edit that handles any casing.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ]
+  },
+  {
+   "step": 2,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/playwright-core/src/server/fetch.ts lines 320-639 (APIRequestContext._sendRequest)"
+   ],
+   "action": "edit",
+   "analysis": "The redirect code checks and sets only headers['host'] in lowercase, so a header named 'Host' is ignored. The edit loops over the header keys, compares each name in lowercase, and updates every key that matches 'host'.",
+   "picked": [],
+   "edit_attempt": "applied"
+  }
+ ]
+}

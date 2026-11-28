@@ -1,0 +1,31 @@
+diff --git a/pandas/core/internals/managers.py b/pandas/core/internals/managers.py
+index 13ba2c3..d43b61c 100644
+--- a/pandas/core/internals/managers.py
++++ b/pandas/core/internals/managers.py
+@@ -1181,14 +1181,19 @@ class BlockManager(libinternals.BlockManager, BaseBlockManager):
+             result: np.ndarray | ExtensionArray = self.blocks[0].iget(
+                 (slice(None), loc)
+             )
+-            # in the case of a single block, the new block is a view
+             bp = BlockPlacement(slice(0, len(result)))
+-            block = new_block(
+-                result,
+-                placement=bp,
+-                ndim=1,
+-                refs=self.blocks[0].refs,
+-            )
++            if not self.blocks[0].refs.has_reference():
++                # Nobody else shares this data (e.g. it is a temporary from
++                #  a column take), so a view would keep the whole array alive.
++                block = new_block(result.copy(), placement=bp, ndim=1)
++            else:
++                # in the case of a single block, the new block is a view
++                block = new_block(
++                    result,
++                    placement=bp,
++                    ndim=1,
++                    refs=self.blocks[0].refs,
++                )
+             return SingleBlockManager(block, self.axes[0].view())
+ 
+         # GH#62263 cache interleaved_dtype to avoid recomputing on

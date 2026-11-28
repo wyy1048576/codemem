@@ -1,0 +1,63 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "found",
+    "picks",
+    "analysis",
+    "intent",
+    "symptom",
+    "anchors",
+    "look_in",
+    "guessed_location",
+    "next_k"
+  ],
+  "properties": {
+    "found": {
+      "type": "boolean"
+    },
+    "picks": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "analysis": {
+      "type": "string"
+    },
+    "intent": {
+      "type": "string"
+    },
+    "symptom": {
+      "type": "string"
+    },
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "look_in": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "guessed_location": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_k": {
+      "type": "integer",
+      "enum": [
+        1,
+        2,
+        3,
+        5,
+        10
+      ]
+    }
+  }
+}

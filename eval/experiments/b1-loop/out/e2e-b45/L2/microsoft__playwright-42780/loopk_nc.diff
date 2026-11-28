@@ -1,0 +1,31 @@
+diff --git a/packages/isomorphic/locatorGenerators.ts b/packages/isomorphic/locatorGenerators.ts
+index 942c5d1..a77f680 100644
+--- a/packages/isomorphic/locatorGenerators.ts
++++ b/packages/isomorphic/locatorGenerators.ts
+@@ -166,16 +166,16 @@ function innerAsLocators(factory: LocatorFactory, parsed: ParsedSelector, isFram
+       const attrSelector = parseAttributeSelector(part.body as string, true);
+       const options: LocatorOptions = { attrs: [] };
+       for (const attr of attrSelector.attributes) {
+-        if (attr.name === 'name') {
+-          if (options.exact !== undefined && options.exact !== attr.caseSensitive)
+-            throw new Error(`Conflicting exactness in internal:role selector: ${stringifySelector({ parts: [part] })}`);
+-          options.exact = attr.caseSensitive;
+-          options.name = attr.value;
+-        } else if (attr.name === 'description') {
+-          if (options.exact !== undefined && options.exact !== attr.caseSensitive)
+-            throw new Error(`Conflicting exactness in internal:role selector: ${stringifySelector({ parts: [part] })}`);
+-          options.exact = attr.caseSensitive;
+-          options.description = attr.value;
++        if (attr.name === 'name' || attr.name === 'description') {
++          if (typeof attr.value === 'string') {
++            if (options.exact !== undefined && options.exact !== attr.caseSensitive)
++              throw new Error(`Conflicting exactness in internal:role selector: ${stringifySelector({ parts: [part] })}`);
++            options.exact = attr.caseSensitive;
++          }
++          if (attr.name === 'name')
++            options.name = attr.value;
++          else
++            options.description = attr.value;
+         } else {
+           if (attr.name === 'level' && typeof attr.value === 'string')
+             attr.value = +attr.value;

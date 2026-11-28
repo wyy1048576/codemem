@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-67897",
+ "exit": 0,
+ "seconds": 20,
+ "cost_usd": 0.058596699999999995,
+ "turns": 12,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 6767,
+  "cache_read_input_tokens": 50647,
+  "output_tokens": 2644,
+  "output_tokens_details": {
+   "thinking_tokens": 203
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 6767,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 403,
+    "cache_read_input_tokens": 10799,
+    "cache_creation_input_tokens": 1360,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1360
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 3,
+  "Read": 3,
+  "Edit": 5
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/core/arrays/arrow/extension_types.py | 16 ++++++++++++++--\n pandas/core/arrays/interval.py              |  8 +++++++-\n 2 files changed, 21 insertions(+), 3 deletions(-)",
+ "final": "I've made the code changes for the fix, but I haven't run or tested any of it, since I can't run code here.\n\n- **Writing to pyarrow:** `IntervalArray.__arrow_array__` in `pandas/core/arrays/interval.py` used `pyarrow.from_numpy_dtype`, which fails for any pandas extension type. For a `DatetimeTZDtype` subtype it now builds `pyarrow.timestamp(unit, tz)` directly. I also imported `DatetimeTZDtype` there.\n- **Reading back from parquet:** `ArrowIntervalType` in `pandas/core/arrays/arrow/extension_types.py` stored the subtype as text and read it back with `pyarrow.type_for_alias`. That has no name for a timezone-aware timestamp. I added a `_parse_subtype` helper that handles strings like `timestamp[ns, tz=Europe/Brussels]` and falls back to `type_for_alias` for everything else. Both the constructor and `__arrow_ext_deserialize__` now use it.\n\nTogether these should let a timezone-aware interval Series convert to pyarrow and round-trip through parquet to the same interval dtype. I didn't add a test.",
+ "stderr": ""
+}
+

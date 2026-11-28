@@ -1,0 +1,32 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0089,
+ "task": "microsoft__playwright-42503",
+ "fixed": {
+  "round": 1,
+  "explanation": "runDaemonForContext called browser.bind for every created context, and the second bind throws because a server is already running. The fix tracks bound browsers in a WeakSet, so each browser is bound and paused once. Later contexts on the same browser return early. I couldn't see the callers, so returning true on the early exit is a guess about what they expect.",
+  "edits": 2
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.1151,
+ "seconds": 25,
+ "diff_stat": "packages/playwright/src/mcp/test/browserBackend.ts | 9 ++++++++-\n 1 file changed, 8 insertions(+), 1 deletion(-)"
+}
+round 1: found=True picked=['packages/playwright/src/mcp/test/browserBackend.ts:runDaemonForContext']
+  fix: applied: runDaemonForContext called browser.bind for every created context, and the second bind throws because a server is already running. The fix tracks bound browsers in a WeakSet, so each browser is bound and paused once. Later contexts on the same browser return early. I couldn't see the callers, so returning true on the early exit is a guess about what they expect.
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   2%|▏         | 6/290 [00:00<00:04, 57.01it/s]
+Loading weights:   6%|▌         | 16/290 [00:00<00:04, 56.41it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 983.80it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,88 @@
+diff --git a/pandas/conftest.py b/pandas/conftest.py
+index 977e730..84711a0 100644
+--- a/pandas/conftest.py
++++ b/pandas/conftest.py
+@@ -96,9 +96,55 @@ PANDAS_MARKERS = [
+     "clipboard: mark a pd.read_clipboard test",
+     "arm_slow: mark a test as slow for arm64 architecture",
+     "high_memory: mark a test as requiring >5GB of memory",
++    "english_lc_time: run the test with an English LC_TIME (skip if unavailable)",
+ ]
+ 
+ 
++_ENGLISH_LC_TIME_CANDIDATES = [
++    "C",
++    "en_US.UTF-8",
++    "en_US.utf8",
++    "en_US",
++    "English_United States.1252",
++]
++
++
++@pytest.fixture(autouse=True)
++def _english_lc_time(request):
++    """
++    For tests marked ``english_lc_time``, set LC_TIME to an English locale for
++    the duration of the test, restoring it afterwards. Skip if none is available.
++    """
++    if request.node.get_closest_marker("english_lc_time") is None:
++        yield
++        return
++
++    import locale
++
++    from pandas._config.localization import set_locale
++
++    if td.has_english_lc_time():
++        yield
++        return
++
++    for candidate in _ENGLISH_LC_TIME_CANDIDATES:
++        try:
++            cm = set_locale(candidate, lc_var=locale.LC_TIME)
++            cm.__enter__()
++        except (ValueError, locale.Error):
++            continue
++        if td.has_english_lc_time():
++            break
++        cm.__exit__(None, None, None)
++    else:
++        pytest.skip("Could not set an English LC_TIME")
++
++    try:
++        yield
++    finally:
++        cm.__exit__(None, None, None)
++
++
+ def pytest_addoption(parser) -> None:
+     parser.addoption(
+         "--no-strict-data-files",
+diff --git a/pandas/util/_test_decorators.py b/pandas/util/_test_decorators.py
+index 6c41bde..140eb29 100644
+--- a/pandas/util/_test_decorators.py
++++ b/pandas/util/_test_decorators.py
+@@ -113,7 +113,7 @@ skip_if_32bit = pytest.mark.skipif(not IS64, reason="skipping for 32 bit")
+ skip_if_windows = pytest.mark.skipif(is_platform_windows(), reason="Running on Windows")
+ 
+ 
+-def _has_english_lc_time() -> bool:
++def has_english_lc_time() -> bool:
+     """
+     Whether LC_TIME yields English month/day names and AM/PM markers.
+ 
+@@ -127,10 +127,10 @@ def _has_english_lc_time() -> bool:
+     return stamp.strftime("%b|%B|%a|%A|%p") == "Jan|January|Wed|Wednesday|PM"
+ 
+ 
+-skip_if_not_english_lc_time = pytest.mark.skipif(
+-    not _has_english_lc_time(),
+-    reason="LC_TIME does not use English month names and AM/PM markers",
+-)
++# Tests marked with this get an English LC_TIME for their duration, via the
++# ``_english_lc_time`` fixture in pandas/conftest.py. They are skipped only if
++# no English LC_TIME can be set.
++skip_if_not_english_lc_time = pytest.mark.english_lc_time
+ 
+ skip_if_wasm = pytest.mark.skipif(
+     WASM,

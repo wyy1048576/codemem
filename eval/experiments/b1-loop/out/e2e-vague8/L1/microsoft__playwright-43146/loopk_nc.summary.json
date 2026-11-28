@@ -1,0 +1,62 @@
+{
+ "arm": "codemem-loop-k",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43146",
+ "fixed": {
+  "round": 1,
+  "explanation": "parseRawCookie sets cookie.expires from both Expires and Max-Age in order, so the last one wins. Track Max-Age separately and apply it after the loop so it takes precedence. Also only accept Max-Age values matching /^-?[0-9]+$/.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot_k": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0302,
+ "seconds": 20,
+ "diff_stat": "packages/playwright-core/src/server/cookieStore.ts | 12 ++++++++----\n 1 file changed, 8 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Set-Cookie header parsing in the API request context cookie jar: parsing of Max-Age and Expires attributes into the cookie's expires value. Should track Max-Age separately so it takes precedence over Expires regardless of order, and ignore Max-Age values not matching /^-?[0-9]+$/.",
+    "symptom": "Cookie with Max-Age followed by a past Expires is stored as expired and not sent, and malformed Max-Age values like \"10abc\" or empty are parsed as numbers instead of ignored.",
+    "anchors": [
+     "Max-Age",
+     "Expires",
+     "Set-Cookie"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/cookieStore.ts",
+     133,
+     211
+    ],
+    [
+     "packages/playwright-core/src/server/har/harTracer.ts",
+     776,
+     818
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "parseRawCookie sets cookie.expires from both Expires and Max-Age in order, so the last one wins. Track Max-Age separately and apply it after the loop so it takes precedence. Also only accept Max-Age values matching /^-?[0-9]+$/.",
+   "picked": [
+    "packages/playwright-core/src/server/cookieStore.ts:parseRawCookie"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

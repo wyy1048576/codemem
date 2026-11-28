@@ -1,0 +1,13 @@
+diff --git a/packages/injected/src/roleUtils.ts b/packages/injected/src/roleUtils.ts
+index a05f4d5..dacfbb0 100644
+--- a/packages/injected/src/roleUtils.ts
++++ b/packages/injected/src/roleUtils.ts
+@@ -746,7 +746,7 @@ function getTextAlternativeInternal(element: Element, options: AccessibleNameOpt
+     const isOwnLabel = [...(element as (HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)).labels || []].includes(element as any);
+     const isOwnLabelledBy = (labelledBy || []).includes(element);
+     if (!isOwnLabel && !isOwnLabelledBy) {
+-      if (role === 'textbox') {
++      if (role === 'textbox' || role === 'searchbox') {
+         options.visitedElements.add(element);
+         if (tagName === 'INPUT' || tagName === 'TEXTAREA')
+           return compositeString((element as HTMLInputElement | HTMLTextAreaElement).value, element, options.collectElements);

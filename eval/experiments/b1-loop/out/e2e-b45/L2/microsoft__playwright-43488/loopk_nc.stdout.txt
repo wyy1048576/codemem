@@ -1,0 +1,39 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43488",
+ "fixed": {
+  "round": 2,
+  "explanation": "Worker targets are attached in FrameSession._onAttachedToTarget, which never sends locale emulation to the worker session. I added Emulation.setLocaleOverride, using emulateLocale, and Emulation.setUserAgentOverride with acceptLanguage when the context has a locale. Workers now get the same locale for navigator.languages and for the Accept-Language header.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  5,
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0603,
+ "seconds": 33,
+ "diff_stat": "packages/playwright-core/src/server/chromium/crPage.ts | 9 +++++++++\n 1 file changed, 9 insertions(+)"
+}
+round 1: k=5 action=search picked=['packages/playwright-core/src/server/chromium/crPage.ts:emulateLocale', 'packages/playwright-core/src/server/chromium/crPage.ts:FrameSession._updateUserAgent'] 
+round 2: k=3 action=edit picked=['packages/playwright-core/src/server/chromium/crPage.ts:FrameSession._onAttachedToTarget'] applied
+
+parse errors in tests/library/locator-parser.spec.ts; chunking what tree-sitter recovered
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  21%|██        | 61/290 [00:00<00:00, 580.13it/s]
+Loading weights:  41%|████▏     | 120/290 [00:00<00:00, 521.86it/s]
+Loading weights:  68%|██████▊   | 197/290 [00:00<00:00, 596.51it/s]
+Loading weights:  89%|████████▊ | 257/290 [00:00<00:00, 569.31it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 609.70it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

@@ -1,0 +1,64 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41682",
+ "fixed": {
+  "round": 1,
+  "explanation": "resolveGlobBase replaces every path token, including host:port, with an opaque placeholder. That stops URL normalization of default ports, percent-encoding and punycode. The fix replaces only tokens that contain glob special characters (*, ?, {, }, backslash). Literal tokens go through URL resolution unchanged.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0304,
+ "seconds": 21,
+ "diff_stat": "packages/isomorphic/urlMatch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "URL glob-to-regex conversion and base-URL resolution of glob patterns replaces every part of the URL (host, port, path) with an opaque placeholder before calling the URL constructor, so normalization of default ports, percent-encoding and punycode is lost. Should only replace parts containing glob special characters (*, ?, {, }, backslash) with placeholders and leave literal parts to URL resolution.",
+    "symptom": "A URL glob pattern with an explicit default port (e.g. http://localhost:80/**), a space, or an IDN host never matches the normalized request URL in route, waitForURL and toHaveURL.",
+    "anchors": [
+     "http://localhost:80/**",
+     "münchen.de",
+     "xn--mnchen-3ya.de",
+     "%20"
+    ],
+    "look_in": []
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/isomorphic/urlMatch.ts",
+     212,
+     261
+    ],
+    [
+     "packages/playwright-core/src/tools/backend/context.ts",
+     368,
+     383
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "resolveGlobBase replaces every path token, including host:port, with an opaque placeholder. That stops URL normalization of default ports, percent-encoding and punycode. The fix replaces only tokens that contain glob special characters (*, ?, {, }, backslash). Literal tokens go through URL resolution unchanged.",
+   "picked": [
+    "packages/isomorphic/urlMatch.ts:resolveGlobBase"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

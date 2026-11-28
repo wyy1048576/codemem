@@ -1,0 +1,15 @@
+diff --git a/packages/playwright-core/src/tools/cli-client/program.ts b/packages/playwright-core/src/tools/cli-client/program.ts
+index 4f3a0cc..b3ebc24 100644
+--- a/packages/playwright-core/src/tools/cli-client/program.ts
++++ b/packages/playwright-core/src/tools/cli-client/program.ts
+@@ -294,7 +294,9 @@ async function runInSession(entry: SessionFile, clientInfo: ClientInfo, args: Mi
+   for (const globalOption of globalOptions)
+     delete args[globalOption];
+   const session = new Session(entry);
+-  const result = await session.run(clientInfo, args, { raw, json: output.json });
++  const result = await session.run(clientInfo, args, { raw, json: output.json }) as { text: string, isError?: boolean };
++  if (result.isError)
++    process.exitCode = 1;
+   return result.text;
+ }
+ 

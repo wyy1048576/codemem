@@ -1,0 +1,25 @@
+diff --git a/packages/playwright/src/mcp/test/browserBackend.ts b/packages/playwright/src/mcp/test/browserBackend.ts
+index 001570c..85c0335 100644
+--- a/packages/playwright/src/mcp/test/browserBackend.ts
++++ b/packages/playwright/src/mcp/test/browserBackend.ts
+@@ -117,12 +117,19 @@ async function generatePausedMessage(tools: typeof import('playwright-core/lib/c
+   return lines.join('\n');
+ }
+ 
++const boundBrowsers = new WeakSet<object>();
++
+ export async function runDaemonForContext(testInfo: TestInfoImpl, context: playwright.BrowserContext) {
+   if (testInfo._configInternal.configCLIOverrides.debug !== 'cli')
+     return false;
+ 
++  const browser = context.browser()!;
++  if (boundBrowsers.has(browser))
++    return false;
++  boundBrowsers.add(browser);
++
+   const sessionName = `tw-${crypto.randomBytes(3).toString('hex')}`;
+-  await context.browser()!.bind(sessionName, { workspaceDir: testInfo.project.testDir });
++  await browser.bind(sessionName, { workspaceDir: testInfo.project.testDir });
+ 
+   /* eslint-disable-next-line no-console */
+   console.log([

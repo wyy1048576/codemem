@@ -1,0 +1,14 @@
+diff --git a/pandas/tests/api/test_api.py b/pandas/tests/api/test_api.py
+index ab3cd66..c191aea 100644
+--- a/pandas/tests/api/test_api.py
++++ b/pandas/tests/api/test_api.py
+@@ -426,6 +426,9 @@ class TestApi(Base):
+     ]
+ 
+     def test_api(self):
++        # submodules only appear in dir() once imported; internals is not
++        # imported by pandas/api/__init__.py
++        importlib.import_module("pandas.api.internals")
+         self.check(pd.api, self.allowed_api_dirs)
+ 
+     def test_api_typing(self):

@@ -1,0 +1,19 @@
+diff --git a/packages/playwright/src/plugins/gitCommitInfoPlugin.ts b/packages/playwright/src/plugins/gitCommitInfoPlugin.ts
+index 2b4096c..00838e2 100644
+--- a/packages/playwright/src/plugins/gitCommitInfoPlugin.ts
++++ b/packages/playwright/src/plugins/gitCommitInfoPlugin.ts
+@@ -154,7 +154,13 @@ async function gitDiff(gitDir: string, ci?: CIInfo): Promise<string | undefined>
+   const diffLimit = 100_000;
+   if (ci?.prBaseHash) {
+     // https://git-scm.com/docs/git-fetch
+-    await runGit(['fetch', 'origin', ci.prBaseHash, '--depth=1', '--no-auto-maintenance', '--no-auto-gc', '--no-tags', '--no-recurse-submodules'], gitDir);
++    // Do not shallow a complete clone: only limit depth when the repo is already shallow.
++    const isShallow = (await runGit(['rev-parse', '--is-shallow-repository'], gitDir))?.trim() !== 'false';
++    const fetchArgs = ['fetch', 'origin', ci.prBaseHash];
++    if (isShallow)
++      fetchArgs.push('--depth=1');
++    fetchArgs.push('--no-auto-maintenance', '--no-auto-gc', '--no-tags', '--no-recurse-submodules');
++    await runGit(fetchArgs, gitDir);
+     const diff = await runGit(['diff', ci.prBaseHash, 'HEAD'], gitDir);
+     if (diff)
+       return diff.substring(0, diffLimit);

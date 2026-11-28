@@ -1,0 +1,30 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 50,
+ "judge_sees": "raw code",
+ "oneshot_cost_usd": 0.0102,
+ "task": "microsoft__playwright-42919",
+ "fixed": {
+  "round": 1,
+  "explanation": "_captureSnapshot awaited the snapshotter directly, so when the page main thread is busy the wait was never tied to the progress budget and never aborted. Wrapping it in progress.race, as _captureCoverage does, lets the 3-second budget cut it off. The optional chaining was dropped because started() was already checked just above. The lint rule change is not included.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.2717,
+ "seconds": 19,
+ "diff_stat": "packages/playwright-core/src/server/trace/recorder/tracing.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+}
+round 1: found=True picked=['packages/playwright-core/src/server/trace/recorder/tracing.ts:Tracing._captureSnapshot']
+  fix: applied: _captureSnapshot awaited the snapshotter directly, so when the page main thread is busy the wait was never tied to the progress budget and never aborted. Wrapping it in progress.race, as _captureCoverage does, lets the 3-second budget cut it off. The optional chaining was dropped because started() was already checked just above. The lint rule change is not included.
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<?, ?it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

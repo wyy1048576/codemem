@@ -1,0 +1,28 @@
+diff --git a/packages/injected/src/clock.ts b/packages/injected/src/clock.ts
+index 69fe461..a713263 100644
+--- a/packages/injected/src/clock.ts
++++ b/packages/injected/src/clock.ts
+@@ -802,6 +802,23 @@ export function install(globalObject: WindowOrWorkerGlobalScope, config: Install
+   for (const method of toFake) {
+     if (method === 'Date') {
+       (globalObject as any).Date = mirrorDateProperties(api.Date, (globalObject as any).Date);
++        const temporal = (globalObject as any).Temporal;
++        if (temporal?.Now && temporal.Instant) {
++          const tNow = temporal.Now;
++          const instant = () => temporal.Instant.fromEpochMilliseconds(clock.now());
++          const zoned = (tz?: any) => instant().toZonedDateTimeISO(tz ?? tNow.timeZoneId());
++          const override = (name: string, fn: (...args: any[]) => any) => {
++            try {
++              Object.defineProperty(tNow, name, { value: fn, writable: true, configurable: true, enumerable: false });
++            } catch {
++            }
++          };
++          override('instant', instant);
++          override('zonedDateTimeISO', zoned);
++          override('plainDateTimeISO', (tz?: any) => zoned(tz).toPlainDateTime());
++          override('plainDateISO', (tz?: any) => zoned(tz).toPlainDate());
++          override('plainTimeISO', (tz?: any) => zoned(tz).toPlainTime());
++        }
+     } else if (method === 'Intl') {
+       (globalObject as any).Intl = api[method]!;
+     } else if (method === 'AbortSignal') {

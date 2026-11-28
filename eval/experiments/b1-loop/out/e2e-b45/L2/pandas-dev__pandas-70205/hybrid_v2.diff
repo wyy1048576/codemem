@@ -1,0 +1,18 @@
+diff --git a/pandas/io/excel/_base.py b/pandas/io/excel/_base.py
+index d970d4e..168e373 100644
+--- a/pandas/io/excel/_base.py
++++ b/pandas/io/excel/_base.py
+@@ -885,6 +885,13 @@ class BaseExcelReader(Generic[_WorkbookT]):
+                     assert isinstance(skiprows, int)
+                     row += skiprows
+ 
++                if index_col is not None and 0 < len(data) <= row:
++                    # trailing empty header rows are trimmed by the readers;
++                    # pad so the result is an empty frame as with read_csv
++                    data.extend(
++                        [""] * len(data[0]) for _ in range(row - len(data) + 1)
++                    )
++
+                 if row > len(data) - 1:
+                     raise ValueError(
+                         f"header index {row} exceeds maximum index "

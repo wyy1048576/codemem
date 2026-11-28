@@ -1,0 +1,852 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 10,
+ "task": "duckdb__duckdb-23876",
+ "fixed": null,
+ "rounds": 11,
+ "calls": {
+  "codemem_rounds": 10,
+  "judge": 10,
+  "fix": 9
+ },
+ "sonnet_calls": 19,
+ "cost_usd": 0.5651,
+ "seconds": 161,
+ "diff_stat": "",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The scalar function `contains` for strings needs a statistics-based filter pruning hook (e.g., a function-level filter_prune/statistics callback) so that table filters on contains(col, constant) can be evaluated against row group string statistics (max string length) and skip row groups where the needle is longer than the max length of the column.",
+    "symptom": "A query with WHERE contains(s, 'long constant') scans all row groups instead of pruning those whose string statistics (max length) show that the needle cannot match.",
+    "anchors": [
+     "contains",
+     "contains_pruning",
+     "Row Groups Scanned: 2 / 2",
+     "Table Scan",
+     "Filters:",
+     "contains(s, 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "src/planner/filter/table_filter_bloom_function.cpp",
+     220,
+     252
+    ],
+    [
+     "src/storage/table/row_group_reorderer.cpp",
+     253,
+     327
+    ],
+    [
+     "src/storage/table/row_group_reorderer.cpp",
+     154,
+     205
+    ],
+    [
+     "src/function/table/table_scan.cpp",
+     268,
+     270
+    ],
+    [
+     "src/function/table/table_scan.cpp",
+     399,
+     402
+    ],
+    [
+     "extension/parquet/parquet_reader.cpp",
+     1373,
+     1435
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     121,
+     126
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     80,
+     139
+    ],
+    [
+     "src/optimizer/row_group_pruner.cpp",
+     28,
+     89
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     76,
+     78
+    ]
+   ],
+   "analysis": "The prefix function already implements PrefixFilterPrune using FunctionStatisticsPruneInput, registered on its ScalarFunction. contains (GetStringContains in contains.cpp) has no such prune callback, so no row group pruning happens. The fix is to add a contains prune function that uses the string stats max length to compare against the constant needle length, and to register it in GetStringContains.",
+   "picked": [
+    "src/function/scalar/string/contains.cpp:duckdb.GetStringContains"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)"
+   ],
+   "fix_attempt": "could not fix: The cause is in GetStringContains, which sets no statistics-prune callback, so row group pruning never runs for contains. I wasn't shown prefix.cpp's PrefixFilterPrune, the FunctionStatisticsPruneInput definition, the ScalarFunction setter for the prune callback, or the StringStats API. Without them I'd be guessing the signatures, and I can't compile to check. Contains pruning would return \"always false\" when the constant needle is longer than the stats max string length, and \"no pruning\" otherwise."
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Find the prefix function's PrefixFilterPrune implementation and how it's registered on its ScalarFunction. Also find FunctionStatisticsPruneInput and the StringStats max-length accessors, so a similar prune callback can be written for contains.",
+    "symptom": "contains(s, constant) filters don't use string statistics to skip row groups. A needle longer than every string in a row group still scans all of them.",
+    "anchors": [
+     "GetStringContains",
+     "ContainsOperator",
+     "PrefixFilterPrune",
+     "FunctionStatisticsPruneInput",
+     "FilterPropagateResult",
+     "SetCollationHandling",
+     "PUSH_COMBINABLE_COLLATIONS"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/function/scalar/string/contains.cpp",
+     "src/include/duckdb/function/scalar_function.hpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     287,
+     287
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     286,
+     286
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     285,
+     285
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     143,
+     150
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     62,
+     79
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     63,
+     66
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     14,
+     57
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     67,
+     72
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     67,
+     78
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     128,
+     139
+    ]
+   ],
+   "analysis": "Prefix registers a filter prune callback via SetFilterPruneCallback (propagate_filter_t) taking FunctionStatisticsPruneInput. The contains string function (GetStringContains in contains.cpp, used by ContainsFun::GetFunctions) has no such callback. The fix is to add a prune function that uses the string stats max length and register it in GetStringContains.",
+   "picked": [
+    "src/function/scalar/string/contains.cpp:duckdb.ContainsFun.GetFunctions"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)",
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)"
+   ],
+   "fix_attempt": "could not fix: GetStringContains sets no filter-prune callback, so row groups are never pruned for contains. The fix is a prune function that returns \"always false\" when the constant needle is longer than the string stats max length, registered with SetFilterPruneCallback. I wasn't shown the FunctionStatisticsPruneInput definition, the FilterPropagateResult return values, the StringStats accessors, or prefix.cpp's PrefixFilterPrune. I can't compile, so writing against those signatures would be a guess."
+  },
+  {
+   "round": 3,
+   "query": {
+    "intent": "Find prefix.cpp's PrefixFilterPrune and how it's registered with SetFilterPruneCallback. Also find the FunctionStatisticsPruneInput definition and the StringStats max-length accessor, to write a matching prune function for contains.",
+    "symptom": "contains(s, constant) filters don't use string column statistics to prune row groups, so all row groups are scanned even when the needle is longer than the max string length.",
+    "anchors": [
+     "PrefixFilterPrune",
+     "FunctionStatisticsPruneInput",
+     "SetFilterPruneCallback",
+     "propagate_filter_t",
+     "GetStringContains",
+     "FilterPropagateResult"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/include/duckdb/function/scalar_function.hpp",
+     "src/storage/statistics/string_stats.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/storage/statistics/string_stats.cpp",
+     700,
+     722
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     732,
+     778
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     724,
+     730
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     129,
+     171
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     208,
+     359
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     1,
+     8
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     531,
+     535
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     370,
+     386
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     173,
+     206
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     511,
+     529
+    ]
+   ],
+   "analysis": "The scalar function `contains` is built in GetStringContains in contains.cpp, and it sets no filter-prune callback. Prefix uses a FunctionStatisticsPruneInput callback registered on its ScalarFunction, so it already prunes row groups. The fix is a prune function in contains.cpp. It should return an always-false result when the constant needle is longer than the string stats max length. GetStringContains should register it. This round's results are only supporting APIs, and none of them needs to change.",
+   "picked": [],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)",
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)"
+   ],
+   "fix_attempt": "could not fix: GetStringContains registers no filter-prune callback, so row group pruning never runs for contains. The fix is a prune function that returns always-false when the constant needle is longer than the string stats max length. I wasn't shown the prune callback API (FunctionStatisticsPruneInput, SetFilterPruneCallback, FilterPropagateResult) or the StringStats accessors, so I can't write it without guessing signatures."
+  },
+  {
+   "round": 4,
+   "query": {
+    "intent": "Find prefix's PrefixFilterPrune and its registration via SetFilterPruneCallback, plus the FunctionStatisticsPruneInput definition, FilterPropagateResult values and StringStats::Max/MaxStringLength accessors.",
+    "symptom": "contains(s, const) on a string column does not prune row groups using string statistics, so all row groups are scanned.",
+    "anchors": [
+     "PrefixFilterPrune",
+     "FunctionStatisticsPruneInput",
+     "SetFilterPruneCallback",
+     "FilterPropagateResult",
+     "StringStats",
+     "GetStringContains",
+     "ContainsOperator"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/include/duckdb/function/scalar_function.hpp",
+     "src/storage/statistics/string_stats.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/function/scalar/string/prefix.cpp",
+     59,
+     64
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     109,
+     114
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     188,
+     190
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     70,
+     76
+    ],
+    [
+     "src/planner/filter/table_filter_dynamic_function.cpp",
+     47,
+     71
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     94,
+     100
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     86,
+     92
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     102,
+     107
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     584,
+     621
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     66,
+     68
+    ]
+   ],
+   "analysis": "GetStringContains in contains.cpp, picked in earlier rounds, sets no filter-prune callback, so contains never prunes row groups. This round only showed supporting APIs: StringStats::MaxStringLength, HasMaxStringLength, and the prefix and prefix-range prune functions. None of these need to change. The fix is a contains prune function in contains.cpp. It should return FilterPropagateResult::FILTER_ALWAYS_FALSE when the constant needle is longer than the stats max string length, and NO_PRUNING_POSSIBLE otherwise. It would be registered with SetFilterPruneCallback.",
+   "picked": [],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)",
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)"
+   ],
+   "fix_attempt": "could not fix: The root cause is in GetStringContains in contains.cpp. It registers no filter-prune callback, so row groups are never pruned using string statistics. The fix would be a prune function that returns FILTER_ALWAYS_FALSE when the constant needle is longer than the stats max string length, registered with SetFilterPruneCallback. I wasn't shown the callback typedef, FunctionStatisticsPruneInput, the FilterPropagateResult enum, the StringStats accessors, or prefix.cpp's PrefixFilterPrune. I can't compile, so writing against those signatures would be a guess."
+  },
+  {
+   "round": 5,
+   "query": {
+    "intent": "Find prefix.cpp's PrefixFilterPrune and the FunctionStatisticsPruneInput struct. Find ScalarFunction::SetFilterPruneCallback, the function_statistics_pruning typedef, and the StringStats HasMaxStringLength and MaxStringLength accessors. These are the signatures a contains prune callback needs.",
+    "symptom": "contains(s, const) filters don't use string statistics (max string length) to prune row groups, so all row groups are scanned.",
+    "anchors": [
+     "GetStringContains",
+     "ContainsFun::GetFunctions",
+     "PrefixFilterPrune",
+     "FunctionStatisticsPruneInput",
+     "SetFilterPruneCallback",
+     "FilterPropagateResult",
+     "StringStats::MaxStringLength",
+     "HasMaxStringLength"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/include/duckdb/function/scalar_function.hpp",
+     "src/include/duckdb/storage/statistics/string_stats.hpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/include/duckdb/storage/statistics/string_stats.hpp",
+     65,
+     147
+    ],
+    [
+     "src/include/duckdb/storage/statistics/string_stats.hpp",
+     1,
+     16
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     271,
+     271
+    ],
+    [
+     "src/include/duckdb/storage/statistics/string_stats.hpp",
+     33,
+     63
+    ],
+    [
+     "src/include/duckdb/storage/statistics/string_stats.hpp",
+     26,
+     31
+    ],
+    [
+     "src/include/duckdb/storage/statistics/string_stats.hpp",
+     19,
+     24
+    ],
+    [
+     "src/planner/filter/table_filter_bloom_function.cpp",
+     269,
+     307
+    ],
+    [
+     "src/planner/filter/table_filter_dynamic_function.cpp",
+     139,
+     157
+    ],
+    [
+     "src/function/scalar/string/prefix.cpp",
+     60,
+     63
+    ],
+    [
+     "src/planner/filter/table_filter_optional_function.cpp",
+     68,
+     81
+    ]
+   ],
+   "analysis": "The `contains` function is built in GetStringContains in contains.cpp. It sets no filter-prune callback, so row groups are never pruned using string statistics. Earlier rounds picked that location. This round showed only supporting APIs (StringStats and other FilterPrune examples), and none of them needs to change. The fix is to add a prune function in contains.cpp. It should return FILTER_ALWAYS_FALSE when the constant needle is longer than the max string length. GetStringContains should register it with SetFilterPruneCallback.",
+   "picked": [],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)",
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)"
+   ],
+   "fix_attempt": "could not fix: The root cause is that GetStringContains in contains.cpp registers no filter-prune callback, so contains never prunes row groups from string stats. The fix is a prune function returning FILTER_ALWAYS_FALSE when the constant needle is longer than the max string length, registered via SetFilterPruneCallback. I wasn't shown FunctionStatisticsPruneInput's fields, the callback typedef, or the StringStats accessors, and I can't compile, so writing it would mean guessing signatures."
+  },
+  {
+   "round": 6,
+   "query": {
+    "intent": "Find prefix.cpp's PrefixFilterPrune, the FunctionStatisticsPruneInput struct, ScalarFunction::SetFilterPruneCallback, and the StringStats max-length accessors, to model a contains prune callback on them.",
+    "symptom": "contains(s, constant) with a needle longer than every string in a row group still scans that row group, because no statistics-based pruning is done.",
+    "anchors": [
+     "GetStringContains",
+     "SetFilterPruneCallback",
+     "FunctionStatisticsPruneInput",
+     "PrefixFilterPrune",
+     "FilterPropagateResult",
+     "StringStats::MaxStringLength",
+     "HasMaxStringLength",
+     "NO_PRUNING_POSSIBLE"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/function/scalar/string/contains.cpp",
+     "src/include/duckdb/function/scalar_function.hpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/function/scalar/string/contains.cpp",
+     32,
+     37
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     14,
+     19
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     76,
+     107
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     39,
+     65
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     21,
+     30
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     68,
+     71
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     109,
+     119
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     33,
+     36
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     15,
+     18
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     163,
+     202
+    ]
+   ],
+   "analysis": "The contains.cpp results show the matching internals only. GetStringContains and ContainsFun::GetFunctions, picked in earlier rounds, register no filter-prune callback, so row groups are never pruned by string stats. The fix is to add a prune function in contains.cpp and register it on the ScalarFunction.",
+   "picked": [],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)",
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)"
+   ],
+   "fix_attempt": "could not fix: GetStringContains in contains.cpp registers no filter-prune callback, so contains never uses string statistics to skip row groups. The fix is a prune function that returns FILTER_ALWAYS_FALSE when the constant needle is longer than the column's max string length, registered on the ScalarFunction. I wasn't shown the callback signature, the FunctionStatisticsPruneInput fields, the setter name, or the StringStats accessors. I can't compile, so writing against them would be guessing. I would need to see prefix.cpp's PrefixFilterPrune and the declarations of FunctionStatisticsPruneInput and the filter-prune setter."
+  },
+  {
+   "round": 7,
+   "query": {
+    "intent": "Find PrefixFilterPrune in prefix.cpp and how it is registered on its ScalarFunction. Find the FunctionStatisticsPruneInput struct, the filter-prune callback typedef and setter on ScalarFunction, and the StringStats max-length accessors.",
+    "symptom": "contains(s, constant) filters don't use string stats to prune row groups, so every row group is scanned.",
+    "anchors": [
+     "GetStringContains",
+     "ContainsFun::GetFunctions",
+     "SetFilterPruneCallback",
+     "FunctionStatisticsPruneInput",
+     "PrefixFilterPrune",
+     "FilterPropagateResult",
+     "StringStats::MaxStringLength",
+     "SetCollationHandling"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/include/duckdb/function/scalar_function.hpp",
+     "src/function/scalar/string/contains.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     272,
+     272
+    ],
+    [
+     "src/planner/filter/expression_filter.cpp",
+     605,
+     617
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     1,
+     8
+    ],
+    [
+     "src/include/duckdb/planner/filter/table_filter_functions.hpp",
+     246,
+     252
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     81,
+     91
+    ],
+    [
+     "src/planner/filter/expression_filter.cpp",
+     445,
+     468
+    ],
+    [
+     "src/function/scalar/string/contains.cpp",
+     22,
+     29
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     569,
+     578
+    ],
+    [
+     "src/planner/filter/table_filter_selectivity_optional_function.cpp",
+     167,
+     180
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     273,
+     273
+    ]
+   ],
+   "analysis": "The contains scalar function in contains.cpp (GetStringContains) registers no filter-prune callback, so row groups are never pruned using string stats. The expression filter code (CheckFunctionStatistics) calls a function's prune callback if it is set. The fix is to add a prune function in contains.cpp and register it.",
+   "picked": [
+    "src/function/scalar/string/contains.cpp:<block>"
+   ],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 1-8 (<block>)",
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)",
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)"
+   ],
+   "fix_attempt": "could not fix: GetStringContains in contains.cpp registers no filter-prune callback, so row groups are never pruned using string stats. The fix is a prune function returning FILTER_ALWAYS_FALSE when the constant needle is longer than the stats max string length, registered via SetFilterPruneCallback. I wasn't shown FunctionStatisticsPruneInput's fields, the callback signature, or the StringStats accessors, and I can't compile, so writing it would mean guessing the API."
+  },
+  {
+   "round": 8,
+   "query": {
+    "intent": "Find prefix.cpp's PrefixFilterPrune and its registration with SetFilterPruneCallback, plus the FunctionStatisticsPruneInput struct and the StringStats MaxStringLength/HasMaxStringLength accessors, to copy the pattern for contains.",
+    "symptom": "contains(s, constant) filters do not use string statistics to skip row groups whose max string length is shorter than the needle.",
+    "anchors": [
+     "GetStringContains",
+     "ContainsFun::GetFunctions",
+     "PrefixFilterPrune",
+     "FunctionStatisticsPruneInput",
+     "SetFilterPruneCallback",
+     "FilterPropagateResult",
+     "StringStats::MaxStringLength",
+     "HasMaxStringLength",
+     "CheckFunctionStatistics"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/include/duckdb/function/scalar_function.hpp",
+     "src/storage/statistics/string_stats.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/storage/statistics/string_stats.cpp",
+     259,
+     389
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     182,
+     186
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     249,
+     262
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     82,
+     85
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     290,
+     290
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     585,
+     587
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     289,
+     289
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     409,
+     423
+    ],
+    [
+     "src/storage/statistics/string_stats.cpp",
+     682,
+     698
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     1,
+     20
+    ]
+   ],
+   "analysis": "This round showed only supporting StringStats code and scalar_function.hpp pieces. None of it needs to change. The change is in contains.cpp, where GetStringContains registers no filter-prune callback, so row groups are never pruned from string stats. I'm not confident yet because I haven't seen how prefix.cpp wires up its prune callback.",
+   "picked": [],
+   "found": false
+  },
+  {
+   "round": 9,
+   "query": {
+    "intent": "Find the prefix scalar function's filter prune callback and how it is registered on its ScalarFunction. Also find the contains function's registration, so a similar max-string-length pruning callback can be added.",
+    "symptom": "contains(s, constant) does not use string statistics to prune row groups, so every row group is scanned even when the needle is longer than the max string length.",
+    "anchors": [
+     "GetStringContains",
+     "ContainsFun::GetFunctions",
+     "PrefixFilterPrune",
+     "FunctionStatisticsPruneInput",
+     "SetFilterPruneCallback",
+     "FilterPropagateResult",
+     "StringStats::MaxStringLength",
+     "HasMaxStringLength",
+     "CheckFunctionStatistics"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/function/scalar/string/contains.cpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     245,
+     247
+    ],
+    [
+     "src/planner/table_filter_set.cpp",
+     32,
+     59
+    ],
+    [
+     "src/include/duckdb/planner/filter/table_filter_functions.hpp",
+     237,
+     243
+    ],
+    [
+     "src/planner/filter/expression_filter.cpp",
+     103,
+     129
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     307,
+     320
+    ],
+    [
+     "src/planner/filter/expression_filter.cpp",
+     619,
+     645
+    ],
+    [
+     "src/execution/operator/join/physical_hash_join.cpp",
+     1384,
+     1400
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     528,
+     532
+    ],
+    [
+     "src/include/duckdb/planner/filter/table_filter_functions.hpp",
+     255,
+     261
+    ],
+    [
+     "src/optimizer/filter_combiner.cpp",
+     418,
+     453
+    ]
+   ],
+   "analysis": "Across nine rounds, the results showed that GetStringContains in contains.cpp registers no filter-prune callback, so contains never prunes row groups from string stats. This round returned only table-filter infrastructure that doesn't need to change. The fix is in contains.cpp: add a prune function that returns FILTER_ALWAYS_FALSE when the constant needle is longer than the max string length, and register it on the ScalarFunction. I picked contains.cpp in earlier rounds, so this round has no new picks.",
+   "picked": [],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)",
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)",
+    "src/function/scalar/string/contains.cpp lines 1-8 (<block>)"
+   ],
+   "fix_attempt": "could not fix: The cause is in GetStringContains in contains.cpp. It registers no filter-prune callback, so contains never uses string stats to skip row groups. The fix is a prune function that returns FILTER_ALWAYS_FALSE when the constant needle is longer than the stats max string length, registered with SetFilterPruneCallback. I wasn't shown the FunctionStatisticsPruneInput fields, the callback typedef, the StringStats accessors, or prefix.cpp's PrefixFilterPrune. I can't compile, so I won't guess those signatures."
+  },
+  {
+   "round": 10,
+   "query": {
+    "intent": "Find prefix.cpp's PrefixFilterPrune and how it is registered with SetFilterPruneCallback. Also find the FunctionStatisticsPruneInput struct and the StringStats::MaxStringLength and HasMaxStringLength accessors.",
+    "symptom": "contains(s, constant) with a needle longer than every string in a row group does not prune that row group using string statistics.",
+    "anchors": [
+     "FunctionStatisticsPruneInput",
+     "SetFilterPruneCallback",
+     "PrefixFilterPrune",
+     "FilterPropagateResult",
+     "StringStats::MaxStringLength",
+     "HasMaxStringLength",
+     "GetStringContains"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/include/duckdb/function/scalar_function.hpp"
+    ]
+   },
+   "shown": [
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     297,
+     297
+    ],
+    [
+     "src/include/duckdb/common/types/string_type.hpp",
+     90,
+     92
+    ],
+    [
+     "third_party/re2/re2/prog.h",
+     223,
+     232
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     282,
+     282
+    ],
+    [
+     "src/include/duckdb/common/types/string_type.hpp",
+     98,
+     104
+    ],
+    [
+     "extension/parquet/parquet_statistics.cpp",
+     720,
+     723
+    ],
+    [
+     "src/planner/filter/table_filter_prefix_range_function.cpp",
+     342,
+     344
+    ],
+    [
+     "src/include/duckdb/execution/join_hashtable.hpp",
+     577,
+     579
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     280,
+     280
+    ],
+    [
+     "src/include/duckdb/function/scalar_function.hpp",
+     248,
+     248
+    ]
+   ],
+   "analysis": "Earlier rounds identified GetStringContains in contains.cpp as the place that registers no filter-prune callback, so contains never prunes row groups from string stats. This round showed only supporting APIs, and none of them needs to change. The fix is a prune function in contains.cpp, registered on the ScalarFunction.",
+   "picked": [],
+   "found": true,
+   "fix_shown": [
+    "src/function/scalar/string/contains.cpp lines 121-126 (duckdb.GetStringContains)",
+    "src/function/scalar/string/contains.cpp lines 128-139 (duckdb.ContainsFun.GetFunctions)",
+    "src/function/scalar/string/contains.cpp lines 1-8 (<block>)"
+   ],
+   "fix_attempt": "could not fix: GetStringContains in contains.cpp registers no filter-prune callback, so contains never prunes row groups using string stats. The fix is a prune function returning FILTER_ALWAYS_FALSE when the constant needle is longer than the stats max string length, registered on the ScalarFunction. The needed API (FunctionStatisticsPruneInput fields, callback setter, StringStats accessors) was not shown, so writing it would mean guessing signatures."
+  },
+  {
+   "round": 11,
+   "query": {
+    "intent": "Find prefix.cpp's PrefixFilterPrune and how it is registered with SetFilterPruneCallback, plus the declarations of FunctionStatisticsPruneInput and StringStats::HasMaxStringLength/MaxStringLength.",
+    "symptom": "contains(s, constant) does not use string statistics to skip row groups, so all row groups are scanned even when the needle is longer than any string in the group.",
+    "anchors": [
+     "PrefixFilterPrune",
+     "FunctionStatisticsPruneInput",
+     "SetFilterPruneCallback",
+     "FilterPropagateResult",
+     "StringStats::MaxStringLength",
+     "HasMaxStringLength",
+     "GetStringContains",
+     "NO_PRUNING_POSSIBLE"
+    ],
+    "look_in": [
+     "src/function/scalar/string/prefix.cpp",
+     "src/include/duckdb/function/scalar_function.hpp",
+     "src/storage/statistics/string_stats.cpp"
+    ]
+   }
+  }
+ ]
+}

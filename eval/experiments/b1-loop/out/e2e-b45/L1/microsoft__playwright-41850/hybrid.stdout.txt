@@ -1,0 +1,28 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "step": 2,
+  "explanation": "The redirect code checks and sets only headers['host'] in lowercase, so a header named 'Host' is ignored. The edit loops over the header keys, compares each name in lowercase, and updates every key that matches 'host'.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "tools": {
+  "grep": 1,
+  "read": 1
+ },
+ "ks": [],
+ "calls": {
+  "first": 1,
+  "step": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0427,
+ "seconds": 13,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 6 ++++--\n 1 file changed, 4 insertions(+), 2 deletions(-)"
+}
+step 1: grep {"pattern": "\\['host'\\]|'host'", "path": "packages/playwright-core/src/server/fetch.ts", "ignore_case": false} -> action=read picked=['packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest'] 
+step 2: read {} -> action=edit picked=[] applied
+
+parse errors in utils/libwebp-wasm/webp_wasm.c; chunking what tree-sitter recovered

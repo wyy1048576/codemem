@@ -1,0 +1,82 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-69779",
+ "fixed": {
+  "step": 1,
+  "explanation": "_format_multi sparsifies using the formatted strings, so distinct float values that print identically are treated as the same group and blanked. I added an optional `keys` argument to sparsify_labels. It compares those keys, and _format_multi passes the level codes, so repeats are detected by identity instead of by text.",
+  "edits": 3
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.038,
+ "seconds": 26,
+ "diff_stat": "pandas/core/indexes/multi.py | 20 ++++++++++++++++----\n 1 file changed, 16 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "MultiIndex formatting for display (sparsification of labels) compares formatted strings of level values rather than the underlying codes, so distinct values with identical text get blanked out. Code in MultiIndex format / _format_multi that sparsifies repeated labels (sparsify_labels) used by DataFrameFormatter/HTML repr.",
+    "symptom": "Distinct float first-level values that format identically are treated as the same group and sparsified (blanked) in the MultiIndex display in notebook HTML.",
+    "anchors": [
+     "sum"
+    ],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "pandas/core/indexes/multi.py",
+     1607,
+     1614
+    ],
+    [
+     "pandas/core/indexes/base.py",
+     1591,
+     1610
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     5062,
+     5087
+    ],
+    [
+     "pandas/io/formats/format.py",
+     1115,
+     1125
+    ],
+    [
+     "pandas/core/indexes/multi.py",
+     1654,
+     1713
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "_format_multi sparsifies using the formatted strings, so distinct float values that print identically are treated as the same group and blanked. I added an optional `keys` argument to sparsify_labels. It compares those keys, and _format_multi passes the level codes, so repeats are detected by identity instead of by text.",
+   "picked": [
+    "pandas/core/indexes/multi.py:sparsify_labels",
+    "pandas/core/indexes/multi.py:MultiIndex._format_multi"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

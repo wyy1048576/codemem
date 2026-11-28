@@ -1,0 +1,17 @@
+diff --git a/pandas/io/excel/_base.py b/pandas/io/excel/_base.py
+index d970d4e..d5a3f3d 100644
+--- a/pandas/io/excel/_base.py
++++ b/pandas/io/excel/_base.py
+@@ -976,7 +976,11 @@ class BaseExcelReader(Generic[_WorkbookT]):
+ 
+             output[asheetname] = parser.read(nrows=nrows)
+ 
+-            if header_names:
++            # With no data rows the columns may not be a MultiIndex, in which
++            # case there are no levels to name.
++            if header_names and output[asheetname].columns.nlevels == len(
++                header_names
++            ):
+                 output[asheetname].columns = output[asheetname].columns.set_names(
+                     header_names
+                 )

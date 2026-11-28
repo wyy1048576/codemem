@@ -1,0 +1,55 @@
+diff --git a/src/common/operator/cast_operators.cpp b/src/common/operator/cast_operators.cpp
+index 85e9467a..ee9fca02 100644
+--- a/src/common/operator/cast_operators.cpp
++++ b/src/common/operator/cast_operators.cpp
+@@ -1823,12 +1823,36 @@ bool TryCastToGeometry::Operation(string_t input, string_t &result, Vector &resu
+ //===--------------------------------------------------------------------===//
+ // Cast To Date
+ //===--------------------------------------------------------------------===//
++static bool DateCastTrailingIsValid(const char *buf, idx_t len, idx_t pos) {
++	if (pos >= len) {
++		return true;
++	}
++	if (buf[pos] == 'T' || buf[pos] == 't') {
++		pos++;
++	} else if (StringUtil::CharacterIsSpace(buf[pos])) {
++		while (pos < len && StringUtil::CharacterIsSpace(buf[pos])) {
++			pos++;
++		}
++	} else {
++		return false;
++	}
++	if (pos >= len) {
++		return true;
++	}
++	// remaining text must look like the start of a time portion
++	return StringUtil::CharacterIsDigit(buf[pos]);
++}
++
+ template <>
+ bool TryCastErrorMessage::Operation(string_t input, date_t &result, CastParameters &parameters) {
+ 	idx_t pos;
+ 	bool special = false;
+ 	switch (Date::TryConvertDate(input.GetData(), input.GetSize(), pos, result, special, parameters.strict)) {
+ 	case DateCastResult::SUCCESS:
++		if (!special && !DateCastTrailingIsValid(input.GetData(), input.GetSize(), pos)) {
++			HandleCastError::AssignError(Date::FormatError(input), parameters);
++			return false;
++		}
+ 		break;
+ 	case DateCastResult::ERROR_INCORRECT_FORMAT:
+ 		HandleCastError::AssignError(Date::FormatError(input), parameters);
+@@ -1844,8 +1868,11 @@ template <>
+ bool TryCast::Operation(string_t input, date_t &result, bool strict) {
+ 	idx_t pos;
+ 	bool special = false;
+-	return Date::TryConvertDate(input.GetData(), input.GetSize(), pos, result, special, strict) ==
+-	       DateCastResult::SUCCESS;
++	if (Date::TryConvertDate(input.GetData(), input.GetSize(), pos, result, special, strict) !=
++	    DateCastResult::SUCCESS) {
++		return false;
++	}
++	return special || DateCastTrailingIsValid(input.GetData(), input.GetSize(), pos);
+ }
+ 
+ template <>

@@ -1,0 +1,110 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-68278",
+ "fixed": {
+  "round": 2,
+  "explanation": "The deltas array was sized by number of columns and indexed by column in the kernel. Size it by rows of the concatenated array (rows - 1) and index with deltas[i - 1] in the kernel.",
+  "edits": 3
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0549,
+ "seconds": 30,
+ "diff_stat": "pandas/core/window/ewm.py    | 4 +---\n pandas/core/window/online.py | 2 +-\n 2 files changed, 2 insertions(+), 4 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The online exponentially weighted mean (EWM online, numba kernel) builds the deltas/time-step array sized by number of columns instead of number of rows, and the numba kernel indexes deltas by column index instead of row index. Fix the array size to rows and index by row.",
+    "symptom": "Online EWM mean on a single-column DataFrame ignores decay and returns the cumulative mean, including when updating with new rows.",
+    "anchors": [
+     "com"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "pandas/core/window/online.py",
+     13,
+     89
+    ],
+    [
+     "pandas/core/window/ewm.py",
+     126,
+     1012
+    ],
+    [
+     "pandas/core/generic.py",
+     12477,
+     12692
+    ]
+   ],
+   "shown_whole": [
+    true,
+    false,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The kernel in online.py indexes deltas[j - 1] with the column index; it should be deltas[i - 1] (row). The deltas array is sized from the number of columns elsewhere, most likely in OnlineExponentialMovingWindow in ewm.py, which I haven't seen. I need to find it before editing.",
+   "picked": [
+    "pandas/core/window/online.py:generate_online_numba_ewma_func"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "OnlineExponentialMovingWindow class that builds the deltas array with np.ones sized by number of columns and calls the online ewma kernel in mean()",
+    "symptom": "Online EWM mean on a single-column DataFrame ignores decay and returns the cumulative mean.",
+    "anchors": [
+     "OnlineExponentialMovingWindow",
+     "deltas",
+     "old_wt_factor",
+     "online_ewma",
+     "generate_online_numba_ewma_func"
+    ],
+    "look_in": [
+     "pandas/core/window/ewm.py"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "pandas/core/window/ewm.py",
+     413,
+     452
+    ],
+    [
+     "pandas/core/window/ewm.py",
+     1049,
+     1207
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [
+    "pandas/core/window/online.py lines 13-89 (generate_online_numba_ewma_func)"
+   ],
+   "action": "edit",
+   "analysis": "The deltas array was sized by number of columns and indexed by column in the kernel. Size it by rows of the concatenated array (rows - 1) and index with deltas[i - 1] in the kernel.",
+   "picked": [
+    "pandas/core/window/ewm.py:OnlineExponentialMovingWindow"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

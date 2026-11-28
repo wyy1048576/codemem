@@ -1,0 +1,54 @@
+{
+ "arm": "grep",
+ "task": "microsoft__playwright-41988",
+ "exit": 0,
+ "seconds": 73,
+ "cost_usd": 0.25696050000000004,
+ "turns": 18,
+ "usage": {
+  "input_tokens": 32,
+  "cache_creation_input_tokens": 35682,
+  "cache_read_input_tokens": 346185,
+  "output_tokens": 7955,
+  "output_tokens_details": {
+   "thinking_tokens": 5062
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 35682,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 319,
+    "cache_read_input_tokens": 40003,
+    "cache_creation_input_tokens": 1071,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 1071
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 6,
+  "Read": 10,
+  "Edit": 1
+ },
+ "subtype": "success",
+ "diff_stat": "packages/injected/src/ariaSnapshotDistiller.ts | 8 +++++++-\n 1 file changed, 7 insertions(+), 1 deletion(-)",
+ "final": "I fixed this in `packages/injected/src/ariaSnapshotDistiller.ts`. I couldn't build or run anything, so I haven't tested it. The cause is also my reading of the code, because I never reproduced the bug.\n\n**Cause:** In AI mode, `removeRedundantNames` drops a node's name when every element that contributed to it is still represented in the output. A nested span counted as represented when the walk entered it, because at that point it still contained the icon. Once the icon was removed, the span held only the label text, and `removeNameRepeatingChild` removed it because its text matched the button's name. Then the button's name was cleared as redundant. That left the label in neither place.\n\n**Fix:** When `removeNameRepeatingChild` removes a node that has a ref, it now puts that ref back into `pendingContentRefs`. The parent's name then stays, because the content that justified clearing it is gone.\n\nI haven't added a test for the button, nested spans and hidden SVG case.",
+ "stderr": ""
+}

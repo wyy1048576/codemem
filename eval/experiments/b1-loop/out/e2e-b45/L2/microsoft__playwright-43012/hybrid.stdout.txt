@@ -1,0 +1,37 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "cache_grep_steps": false,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43012",
+ "fixed": {
+  "step": 1,
+  "explanation": "_retryAction waits between retries by evaluating setTimeout in the page's utility world, which hangs when JavaScript is disabled. Replace it with a server-side timer raced through progress.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0282,
+ "seconds": 26,
+ "diff_stat": "packages/playwright-core/src/server/dom.ts | 4 +---\n 1 file changed, 1 insertion(+), 3 deletions(-)"
+}
+step 1: codemem {"intent": "Action retry loop in the injected-script based progress/retry mechanism waits between retries using a page-side script (e.g. requestAnimationFrame o -> action=edit picked=['packages/playwright-core/src/server/dom.ts:ElementHandle._retryAction'] applied
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:  13%|█▎        | 38/290 [00:00<00:00, 344.29it/s]
+Loading weights:  44%|████▍     | 128/290 [00:00<00:00, 655.53it/s]
+Loading weights:  67%|██████▋   | 195/290 [00:00<00:00, 542.62it/s]
+Loading weights:  89%|████████▉ | 259/290 [00:00<00:00, 544.76it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 587.38it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

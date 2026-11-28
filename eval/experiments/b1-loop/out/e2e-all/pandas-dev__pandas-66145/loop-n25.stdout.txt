@@ -1,0 +1,31 @@
+{
+ "arm": "codemem-loop",
+ "shown_per_round": 25,
+ "task": "pandas-dev__pandas-66145",
+ "fixed": {
+  "round": 1,
+  "explanation": "read_json accepted convert_dates and keep_default_dates with real defaults, so explicit use couldn't be detected. They now default to lib.no_default; passing either emits a FutureWarning, and unset values resolve to True before the rest of the logic, so default behavior is unchanged. The docstring is updated with deprecation notes. Caveat: pyarrow-engine validation now sees True for an explicitly passed default value.",
+  "edits": 4
+ },
+ "rounds": 1,
+ "calls": {
+  "codemem_rounds": 1,
+  "judge": 1,
+  "fix": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0939,
+ "seconds": 27,
+ "diff_stat": "pandas/io/json/_json.py | 29 +++++++++++++++++++++++++++--\n 1 file changed, 27 insertions(+), 2 deletions(-)"
+}
+round 1: found=True picked=['pandas/io/json/_json.py:read_json', 'pandas/io/json/_json.py:Parser._try_convert_data', 'pandas/io/json/_json.py:_should_convert_dates', 'pandas/io/json/_json.py:Parser', 'pandas/io/json/_json.py:Parser.__init__']
+  fix: applied: read_json accepted convert_dates and keep_default_dates with real defaults, so explicit use couldn't be detected. They now default to lib.no_default; passing either emits a FutureWarning, and unset values resolve to True before the rest of the logic, so default behavior is unchanged. The docstring is updated with deprecation notes. Caveat: pyarrow-engine validation now sees True for an ex
+
+Could not reach the Hub (Cannot reach https://huggingface.co/api/models/jinaai/jina-code-embeddings-0.5b: offline mode is enabled. To disable it, please unset the `HF_HUB_OFFLINE` environment variable.). Using cached commit hash for 'jinaai/jina-code-embeddings-0.5b'.
+
+Loading weights:   0%|          | 0/290 [00:00<?, ?it/s]
+Loading weights:   3%|▎         | 10/290 [00:00<00:02, 93.50it/s]
+Loading weights:   7%|▋         | 20/290 [00:00<00:02, 95.37it/s]
+Loading weights:  10%|█         | 30/290 [00:00<00:02, 95.58it/s]
+Loading weights: 100%|██████████| 290/290 [00:00<00:00, 735.08it/s]
+This model was loaded in torch.bfloat16 on CPU. Depending on your CPU, inference may be significantly slower than with torch.float32. Consider comparing inference speeds by loading with `model_kwargs={"dtype": torch.float32}`.

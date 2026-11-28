@@ -1,0 +1,106 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41850",
+ "fixed": {
+  "round": 2,
+  "explanation": "The redirect code in _sendRequest checks and sets headers['host'] using an exact lowercase key. A header named 'Host' is therefore never updated. The fix finds the existing Host key case-insensitively and updates it.",
+  "edits": 1
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0454,
+ "seconds": 25,
+ "diff_stat": "packages/playwright-core/src/server/fetch.ts | 5 +++--\n 1 file changed, 3 insertions(+), 2 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "The APIRequestContext fetch redirect handling code rewrites the request headers when following a redirect; it checks or sets the 'host' header using a case-sensitive key lookup. It should find and update the Host header case-insensitively (e.g. via a header-name-insensitive helper) when the redirect URL host changes.",
+    "symptom": "On redirect, the Host header is updated to the new host only if named lowercase 'host'; headers named 'Host' keep the stale value.",
+    "anchors": [
+     "Host",
+     "host",
+     "headers"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     278,
+     290
+    ],
+    [
+     "packages/utils/httpServer.ts",
+     317,
+     324
+    ],
+    [
+     "browser_patches/firefox/juggler/NetworkObserver.js",
+     862,
+     870
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The cookie helper uses getHeader/setHeader, case-insensitive helpers. The redirect code that sets headers['host'] directly is in fetch.ts but not yet shown. Need to find the redirect handling in _sendRequest.",
+   "picked": []
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Redirect handling in APIRequestContext _sendRequestWithRetries/_sendRequest that updates the host header with redirectOptions.headers['host'] when following a redirect.",
+    "symptom": "Host header is not updated on redirect unless named lowercase 'host'.",
+    "anchors": [
+     "getHeader",
+     "setHeader",
+     "HeadersObject"
+    ],
+    "look_in": [
+     "packages/playwright-core/src/server/fetch.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     320,
+     639
+    ],
+    [
+     "packages/playwright-core/src/server/fetch.ts",
+     962,
+     965
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "The redirect code in _sendRequest checks and sets headers['host'] using an exact lowercase key. A header named 'Host' is therefore never updated. The fix finds the existing Host key case-insensitively and updates it.",
+   "picked": [
+    "packages/playwright-core/src/server/fetch.ts:APIRequestContext._sendRequest"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

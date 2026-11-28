@@ -1,0 +1,118 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-43429",
+ "fixed": {
+  "round": 2,
+  "explanation": "Save used truthiness on `trivial`, so falsy values and keys were dropped. Restore used `??`, which turned a saved null into undefined. `_trySerialize` treated every number as trivial, so Infinity went through JSON as null. I switched the save side to a presence check (`'trivial' in result`), the restore side to `'value' in record` and `'key' in record`, and made only finite numbers trivial.",
+  "edits": 4
+ },
+ "rounds": 2,
+ "ks": [
+  3,
+  2
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 2,
+  "loopk": 2
+ },
+ "sonnet_calls": 3,
+ "cost_usd": 0.0534,
+ "seconds": 27,
+ "diff_stat": "packages/injected/src/storageScript.ts | 22 +++++++++++-----------\n 1 file changed, 11 insertions(+), 11 deletions(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Code that serializes and deserializes IndexedDB records for storage state (save and restore) uses truthiness checks on the serialized value and key, so falsy ones (0, false, '', null) are dropped. It also treats every number as JSON-safe in the value serializer, so Infinity becomes null. Fix this with presence checks ('in' or !== undefined) and handle non-finite numbers.",
+    "symptom": "Saving and restoring IndexedDB storage state loses falsy values and keys (0, false, '', null), which produces load errors for key 0, and saves Infinity as null.",
+    "anchors": [
+     "IndexedDB",
+     "out-of-line keys",
+     "key generator",
+     "auto increment",
+     "Infinity",
+     "idb-keyval",
+     "localForage"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/playwright-core/src/server/browserContext.ts",
+     614,
+     614
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     196,
+     227
+    ],
+    [
+     "tests/library/browsercontext-storage-state.spec.ts",
+     651,
+     814
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "search",
+   "analysis": "The restore side in _restoreDB uses ?? on record.value/record.key, which turns a saved null into undefined. The save side (serializing records, with truthiness checks and an isJsonSafe-style number check) is in the same storageScript.ts but isn't shown yet. I need to see it before editing.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._restoreDB"
+   ]
+  },
+  {
+   "round": 2,
+   "query": {
+    "intent": "Code in storageScript.ts that collects IndexedDB records, serializing value and key into value/valueEncoded and key/keyEncoded, with a JSON-safe check for numbers.",
+    "symptom": "Falsy IndexedDB values and keys are dropped on save, and Infinity is saved as null.",
+    "anchors": [
+     "valueEncoded",
+     "keyEncoded",
+     "storageScript",
+     "_idbRequestToPromise",
+     "_restoreDB"
+    ],
+    "look_in": [
+     "packages/injected/src/storageScript.ts"
+    ]
+   },
+   "k": 2,
+   "shown": [
+    [
+     "packages/injected/src/storageScript.ts",
+     87,
+     153
+    ],
+    [
+     "packages/injected/src/storageScript.ts",
+     65,
+     85
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true
+   ],
+   "picked_shown": [
+    "packages/injected/src/storageScript.ts lines 196-227 (StorageScript._restoreDB)"
+   ],
+   "action": "edit",
+   "analysis": "Save used truthiness on `trivial`, so falsy values and keys were dropped. Restore used `??`, which turned a saved null into undefined. `_trySerialize` treated every number as trivial, so Infinity went through JSON as null. I switched the save side to a presence check (`'trivial' in result`), the restore side to `'value' in record` and `'key' in record`, and made only finite numbers trivial.",
+   "picked": [
+    "packages/injected/src/storageScript.ts:StorageScript._collectDB",
+    "packages/injected/src/storageScript.ts:StorageScript._trySerialize"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+diff --git a/src/execution/operator/order/physical_top_n.cpp b/src/execution/operator/order/physical_top_n.cpp
+index 91247490..3aa0cd20 100644
+--- a/src/execution/operator/order/physical_top_n.cpp
++++ b/src/execution/operator/order/physical_top_n.cpp
+@@ -347,6 +347,11 @@ bool TopNHeap::CheckBoundaryValues(DataChunk &sort_chunk, DataChunk &payload, To
+ void TopNHeap::Sink(DataChunk &input, optional_ptr<TopNBoundaryValue> global_boundary) {
+ 	static constexpr idx_t SMALL_HEAP_THRESHOLD = 100;
+ 
++	if (heap_size == 0) {
++		// LIMIT 0: nothing can ever enter the heap (and the heap is empty, so we must not read heap.front())
++		return;
++	}
++
+ 	// compute the ordering values for the new chunk
+ 	sort_chunk.Reset();
+ 	executor.Execute(input, sort_chunk);

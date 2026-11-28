@@ -1,0 +1,70 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "hop": null,
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-42433",
+ "fixed": {
+  "round": 1,
+  "explanation": "The embedded-control branch only handles role 'textbox', so input type=search (role 'searchbox') contributes nothing. Adding 'searchbox' to the textbox condition makes it return its value the same way.",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  3
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0324,
+ "seconds": 26,
+ "diff_stat": "packages/injected/src/roleUtils.ts | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Accessible name computation (roleUtils getElementAccessibleName / getTextAlternativeInternal) handles embedded controls inside a label or aria-labelledby target. Textbox and input embedded controls contribute their value, but searchbox role (input type=search) is not included in the embedded-control branch.",
+    "symptom": "An input type=search embedded in a label or aria-labelledby target contributes nothing to the computed accessible name, unlike text inputs.",
+    "anchors": [
+     "aria-labelledby",
+     "label",
+     "accessible name"
+    ],
+    "look_in": []
+   },
+   "k": 3,
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     687,
+     1015
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1224,
+     1233
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     23,
+     25
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "The embedded-control branch only handles role 'textbox', so input type=search (role 'searchbox') contributes nothing. Adding 'searchbox' to the textbox condition makes it return its value the same way.",
+   "picked": [
+    "packages/injected/src/roleUtils.ts:getTextAlternativeInternal"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

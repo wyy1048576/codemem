@@ -1,0 +1,61 @@
+diff --git a/pandas/io/json/_json.py b/pandas/io/json/_json.py
+index 7272f30..2709dd4 100644
+--- a/pandas/io/json/_json.py
++++ b/pandas/io/json/_json.py
+@@ -621,8 +621,8 @@ def read_json(
+     typ: Literal["frame", "series"] = "frame",
+     dtype: DtypeArg | None = None,
+     convert_axes: bool | None = None,
+-    convert_dates: bool | list[str] = True,
+-    keep_default_dates: bool = True,
++    convert_dates: bool | list[str] | lib.NoDefault = lib.no_default,
++    keep_default_dates: bool | lib.NoDefault = lib.no_default,
+     precise_float: bool = False,
+     date_unit: str | None = None,
+     encoding: str | None = None,
+@@ -712,6 +712,9 @@ def read_json(
+         For all ``orient`` values except ``'table'``, default is True.
+ 
+     convert_dates : bool or list of str, default True
++        .. deprecated:: 3.0
++            ``convert_dates`` is deprecated; use ``dtype`` instead.
++
+         If True then default datelike columns may be converted (depending on
+         keep_default_dates).
+         If False, no dates will be converted.
+@@ -720,6 +723,9 @@ def read_json(
+         keep_default_dates).
+ 
+     keep_default_dates : bool, default True
++        .. deprecated:: 3.0
++            ``keep_default_dates`` is deprecated; use ``dtype`` instead.
++
+         If parsing dates (convert_dates is not False), then try to parse the
+         default datelike columns.
+         A column label is datelike if
+@@ -905,6 +911,25 @@ def read_json(
+ 
+     check_dtype_backend(dtype_backend)
+ 
++    if convert_dates is not lib.no_default:
++        warnings.warn(
++            "The 'convert_dates' keyword in read_json is deprecated and will "
++            "be removed in a future version. Use 'dtype' instead.",
++            FutureWarning,
++            stacklevel=2,
++        )
++    else:
++        convert_dates = True
++    if keep_default_dates is not lib.no_default:
++        warnings.warn(
++            "The 'keep_default_dates' keyword in read_json is deprecated and "
++            "will be removed in a future version. Use 'dtype' instead.",
++            FutureWarning,
++            stacklevel=2,
++        )
++    else:
++        keep_default_dates = True
++
+     if engine == "pyarrow":
+         # Validate before dtype/convert_axes are resolved from None to True
+         # below, so an explicitly-passed value can be told apart from the

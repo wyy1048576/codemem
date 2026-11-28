@@ -1,0 +1,80 @@
+{
+ "arm": "codemem-loop-k",
+ "fixed_k": null,
+ "judge_sees": "raw code",
+ "task": "pandas-dev__pandas-70205",
+ "fixed": {
+  "round": 1,
+  "explanation": "In _parse_sheet, header_names gets one entry per header row. When the sheet has only header rows, the parser returns an empty frame whose columns are a flat Index with one level. The unconditional set_names call then gets a 2-item list and raises \"Expected 1 names, got 2\". The fix applies header_names only when the number of levels equals len(header_names).",
+  "edits": 1
+ },
+ "rounds": 1,
+ "ks": [
+  5
+ ],
+ "calls": {
+  "oneshot": 1,
+  "codemem_rounds": 1,
+  "loopk": 1
+ },
+ "sonnet_calls": 2,
+ "cost_usd": 0.0966,
+ "seconds": 15,
+ "diff_stat": "pandas/io/excel/_base.py | 4 +++-\n 1 file changed, 3 insertions(+), 1 deletion(-)",
+ "history": [
+  {
+   "round": 1,
+   "query": {
+    "intent": "Excel reader's parse path (TextParser / python parser) handling header=[0,1] with index_col=0 on a table where the data has only header rows; the multi-index header handling and index_col processing in read_excel's sheet parsing raises a ValueError when the data is empty after the header rows.",
+    "symptom": "read_excel with header=[0,1] and index_col=0 raises ValueError \"Expected 1 names, got 2\" (sheet 0), while read_csv with the same options returns an empty DataFrame.",
+    "anchors": [
+     "header",
+     "openpyxl"
+    ],
+    "look_in": []
+   },
+   "k": 5,
+   "shown": [
+    [
+     "pandas/io/excel/_base.py",
+     840,
+     992
+    ],
+    [
+     "pandas/io/excel/_base.py",
+     1573,
+     1995
+    ],
+    [
+     "pandas/io/excel/_base.py",
+     166,
+     560
+    ],
+    [
+     "pandas/tests/io/excel/test_openpyxl.py",
+     481,
+     492
+    ],
+    [
+     "pandas/tests/io/excel/test_readers.py",
+     1804,
+     1818
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "edit",
+   "analysis": "In _parse_sheet, header_names gets one entry per header row. When the sheet has only header rows, the parser returns an empty frame whose columns are a flat Index with one level. The unconditional set_names call then gets a 2-item list and raises \"Expected 1 names, got 2\". The fix applies header_names only when the number of levels equals len(header_names).",
+   "picked": [
+    "pandas/io/excel/_base.py:BaseExcelReader._parse_sheet"
+   ],
+   "edit_attempt": "applied"
+  }
+ ]
+}

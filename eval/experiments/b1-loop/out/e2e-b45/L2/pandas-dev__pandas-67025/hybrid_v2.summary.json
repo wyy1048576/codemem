@@ -1,0 +1,90 @@
+{
+ "arm": "hybrid-v2",
+ "session_id": "bc76c429-624f-46d6-b4bd-56c9d6c38d90",
+ "task": "pandas-dev__pandas-67025",
+ "fixed": {
+  "edits": 3,
+  "edit_steps": [
+   1
+  ]
+ },
+ "rounds": 1,
+ "tools": {
+  "codemem": 1
+ },
+ "repeats": [],
+ "ks": [
+  5
+ ],
+ "sonnet_calls": 2,
+ "cost_usd": 0.0511,
+ "first_call_cost_usd": 0.009866,
+ "tokens": {
+  "input_tokens": 4,
+  "cache_creation_input_tokens": 5242,
+  "cache_read_input_tokens": 9128,
+  "output_tokens": 1936
+ },
+ "seconds": 21,
+ "diff_stat": "pandas/core/arrays/arrow/array.py | 18 ++++++++++++------\n 1 file changed, 12 insertions(+), 6 deletions(-)",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "The Arrow-backed string extension array's str.extract implementation (_str_extract) splits regex capture groups into columns. It must label unnamed groups by position (0, 1, ...) like the object dtype, rather than failing or dropping columns.",
+    "symptom": "str.extract with unnamed capture groups on an Arrow-backed string Series fails or drops columns instead of labelling the groups by position.",
+    "anchors": []
+   },
+   "shown": [
+    [
+     "pandas/core/strings/accessor.py",
+     3408,
+     3534
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     4924,
+     4959
+    ],
+    [
+     "pandas/core/arrays/arrow/array.py",
+     4177,
+     4210
+    ],
+    [
+     "pandas/core/strings/accessor.py",
+     4899,
+     4921
+    ],
+    [
+     "pandas/core/arrays/arrow/array.py",
+     4190,
+     4197
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "call_cost": 0.04125,
+   "tokens": {
+    "input_tokens": 4,
+    "cache_creation_input_tokens": 5242,
+    "cache_read_input_tokens": 9128,
+    "output_tokens": 1936
+   },
+   "action": "edit",
+   "analysis": "_str_extract raises when no named groups. Use python fallback for unnamed/mixed groups, labeling unnamed by position.",
+   "picked": [
+    "pandas/core/arrays/arrow/array.py:ArrowExtensionArray._str_extract"
+   ],
+   "edit_attempt": "applied",
+   "done": true
+  }
+ ]
+}

@@ -1,0 +1,55 @@
+{
+ "arm": "grep",
+ "task": "pandas-dev__pandas-66145",
+ "exit": 0,
+ "seconds": 25,
+ "cost_usd": 0.0775969,
+ "turns": 14,
+ "usage": {
+  "input_tokens": 12,
+  "cache_creation_input_tokens": 10180,
+  "cache_read_input_tokens": 54729,
+  "output_tokens": 3138,
+  "output_tokens_details": {
+   "thinking_tokens": 219
+  },
+  "server_tool_use": {
+   "web_search_requests": 0,
+   "web_fetch_requests": 0
+  },
+  "service_tier": "standard",
+  "cache_creation": {
+   "ephemeral_1h_input_tokens": 10180,
+   "ephemeral_5m_input_tokens": 0
+  },
+  "inference_geo": "global",
+  "iterations": [
+   {
+    "input_tokens": 2,
+    "output_tokens": 435,
+    "cache_read_input_tokens": 13131,
+    "cache_creation_input_tokens": 856,
+    "cache_creation": {
+     "ephemeral_5m_input_tokens": 0,
+     "ephemeral_1h_input_tokens": 856
+    },
+    "type": "message"
+   }
+  ],
+  "speed": "standard",
+  "fallback_credit": null
+ },
+ "models": [
+  "claude-sonnet-5-5"
+ ],
+ "tool_calls": {
+  "Grep": 3,
+  "Read": 4,
+  "Edit": 6
+ },
+ "subtype": "success",
+ "diff_stat": "pandas/io/json/_json.py | 29 +++++++++++++++++++++++++++--\n 1 file changed, 27 insertions(+), 2 deletions(-)",
+ "final": "`read_json` now emits a `Pandas4Warning` whenever `convert_dates` or `keep_default_dates` is passed explicitly. I haven't run or tested anything, and I didn't add tests or a whatsnew entry.\n\nAll changes are in `pandas/io/json/_json.py`:\n- **Defaults:** both keywords now default to `lib.no_default`. That lets the function tell an explicit argument from an omitted one.\n- **Warning:** each explicitly passed keyword gets its own message saying it is deprecated and to use `dtype` instead.\n- **Behaviour:** after the warning, omitted values resolve to `True`, as before. Nothing else changes, including the pyarrow-engine validation that checks `is not True`.\n- **Docs:** both parameter entries in the docstring carry a `deprecated:: 3.1.0` note. That version number is my guess, so adjust it to the real target release.\n\nI left the `@overload` signatures as they were, so their type hints still show `bool` defaults rather than the new sentinel. Existing tests that pass these keywords will now see the warning, and they may need `pytest.warns` or a filter.\n\nI also didn't change `dtype`'s own behaviour, such as switching to `infer_dtype`. The issue describes that as the eventual direction, and it would be a separate change.",
+ "stderr": ""
+}
+

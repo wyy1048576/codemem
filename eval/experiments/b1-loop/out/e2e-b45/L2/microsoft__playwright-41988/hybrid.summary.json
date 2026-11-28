@@ -1,0 +1,425 @@
+{
+ "arm": "hybrid-grep-codemem",
+ "judge_sees": "raw code",
+ "task": "microsoft__playwright-41988",
+ "fixed": null,
+ "rounds": 15,
+ "tools": {
+  "codemem": 1,
+  "grep": 8,
+  "read": 6
+ },
+ "ks": [
+  5
+ ],
+ "calls": {
+  "first": 1,
+  "step": 15
+ },
+ "sonnet_calls": 16,
+ "cost_usd": 0.6954,
+ "seconds": 116,
+ "diff_stat": "",
+ "history": [
+  {
+   "step": 1,
+   "tool": "codemem",
+   "k": 5,
+   "input": {
+    "intent": "Accessible name computation (role/accessible name calculation) for elements, traversing child content; handling of hidden elements such as SVG and nested spans when computing name from content, used by AI aria snapshot generation.",
+    "symptom": "Buttons with label in nested spans next to a hidden SVG icon have an empty accessible name in the AI aria snapshot.",
+    "anchors": [],
+    "look_in": []
+   },
+   "shown": [
+    [
+     "packages/injected/src/roleUtils.ts",
+     668,
+     991
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     1200,
+     1209
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     489,
+     498
+    ],
+    [
+     "packages/injected/src/selectorUtils.ts",
+     115,
+     131
+    ],
+    [
+     "packages/injected/src/roleUtils.ts",
+     556,
+     586
+    ]
+   ],
+   "shown_whole": [
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "picked_shown": [],
+   "action": "grep",
+   "analysis": "The name computation for BUTTON goes through innerAccumulatedElementText, and the AI snapshot tracks collected elements. I need to see how the child traversal and the collected elements are used, mainly in ariaSnapshot.ts.",
+   "picked": []
+  },
+  {
+   "step": 2,
+   "tool": "grep",
+   "input": {
+    "pattern": "function innerAccumulatedElementText|collectElements|nameElements|\\.elements",
+    "path": "packages/injected/src",
+    "ignore_case": false
+   },
+   "matches": 62,
+   "grep_shown": [
+    "packages/injected/src/ariaSnapshot.ts:276",
+    "packages/injected/src/consoleApi.ts:48",
+    "packages/injected/src/injectedScript.ts:296",
+    "packages/injected/src/injectedScript.ts:1005",
+    "packages/injected/src/recorder/recorder.ts:129",
+    "packages/injected/src/recorder/recorder.ts:529",
+    "packages/injected/src/recorder/recorder.ts:575",
+    "packages/injected/src/recorder/recorder.ts:898",
+    "packages/injected/src/recorder/recorder.ts:910",
+    "packages/injected/src/recorder/recorder.ts:916",
+    "packages/injected/src/recorder/recorder.ts:939",
+    "packages/injected/src/recorder/recorder.ts:962",
+    "packages/injected/src/roleUtils.ts:513",
+    "packages/injected/src/roleUtils.ts:525",
+    "packages/injected/src/roleUtils.ts:529",
+    "packages/injected/src/roleUtils.ts:536",
+    "packages/injected/src/roleUtils.ts:550",
+    "packages/injected/src/roleUtils.ts:659",
+    "packages/injected/src/roleUtils.ts:707",
+    "packages/injected/src/roleUtils.ts:730"
+   ],
+   "picked_shown": [],
+   "action": "read",
+   "analysis": "The name computation in roleUtils.ts collects elements via compositeString with options.collectElements. Need to see getTextAlternativeInternal to find where child text elements are lost or mishandled when a hidden SVG sibling exists.",
+   "picked": [
+    "packages/injected/src/roleUtils.ts:getTextAlternativeInternal",
+    "packages/injected/src/roleUtils.ts:computeAccessibleNameComposite"
+   ]
+  },
+  {
+   "step": 3,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)"
+   ],
+   "action": "grep",
+   "analysis": "getTextAlternativeInternal delegates child traversal to innerAccumulatedElementText, which I haven't seen. The bug probably lies there or in joinCompositeString and how collected elements are merged. Hidden SVG and nested spans likely lose the text elements.",
+   "picked": []
+  },
+  {
+   "step": 4,
+   "tool": "grep",
+   "input": {
+    "pattern": "function (innerAccumulatedElementText|joinCompositeString|compositeString|emptyCompositeString)",
+    "path": "packages/injected/src/roleUtils.ts",
+    "ignore_case": false
+   },
+   "matches": 4,
+   "grep_shown": [
+    "packages/injected/src/roleUtils.ts:993",
+    "packages/injected/src/roleUtils.ts:1316",
+    "packages/injected/src/roleUtils.ts:1320",
+    "packages/injected/src/roleUtils.ts:1325"
+   ],
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)"
+   ],
+   "action": "read",
+   "analysis": "I need to see innerAccumulatedElementText and the composite string helpers to find where the collected elements are lost for nested spans next to a hidden SVG.",
+   "picked": [
+    "packages/injected/src/roleUtils.ts:innerAccumulatedElementText",
+    "packages/injected/src/roleUtils.ts:compositeString",
+    "packages/injected/src/roleUtils.ts:joinCompositeString"
+   ]
+  },
+  {
+   "step": 5,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)"
+   ],
+   "action": "grep",
+   "analysis": "The name computation in roleUtils looks right. The problem is probably in how ariaSnapshot.ts uses the collected name elements, so I need to find where they are used.",
+   "picked": []
+  },
+  {
+   "step": 6,
+   "tool": "grep",
+   "input": {
+    "pattern": "nameElements|collectElements|getElementAccessibleNameElements|computeAccessibleNameComposite",
+    "path": "packages/injected/src",
+    "ignore_case": false
+   },
+   "matches": 40,
+   "grep_shown": [
+    "packages/injected/src/roleUtils.ts:513",
+    "packages/injected/src/roleUtils.ts:525",
+    "packages/injected/src/roleUtils.ts:536",
+    "packages/injected/src/roleUtils.ts:550",
+    "packages/injected/src/roleUtils.ts:659",
+    "packages/injected/src/roleUtils.ts:707",
+    "packages/injected/src/roleUtils.ts:730",
+    "packages/injected/src/roleUtils.ts:731"
+   ],
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)"
+   ],
+   "action": "grep",
+   "analysis": "roleUtils name computation looks right. Need to see how ariaSnapshot uses the name elements returned by getElementAccessibleName.",
+   "picked": []
+  },
+  {
+   "step": 7,
+   "tool": "grep",
+   "input": {
+    "pattern": "getElementAccessibleName|nameElements|\\.elements",
+    "path": "packages/injected/src/ariaSnapshot.ts",
+    "ignore_case": false
+   },
+   "matches": 2,
+   "grep_shown": [
+    "packages/injected/src/ariaSnapshot.ts:259",
+    "packages/injected/src/ariaSnapshot.ts:276"
+   ],
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)"
+   ],
+   "action": "grep",
+   "analysis": "Name computation in roleUtils looks fine. Need to see how ariaSnapshot.ts uses nameSourceElements, which likely drops child text for nested spans.",
+   "picked": []
+  },
+  {
+   "step": 8,
+   "tool": "grep",
+   "input": {
+    "pattern": "nameSourceElements",
+    "path": "packages/injected/src/ariaSnapshot.ts",
+    "ignore_case": false
+   },
+   "matches": 5,
+   "grep_shown": [
+    "packages/injected/src/ariaSnapshot.ts:89",
+    "packages/injected/src/ariaSnapshot.ts:141",
+    "packages/injected/src/ariaSnapshot.ts:158",
+    "packages/injected/src/ariaSnapshot.ts:237",
+    "packages/injected/src/ariaSnapshot.ts:276"
+   ],
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)"
+   ],
+   "action": "read",
+   "analysis": "The name elements are collected in roleUtils. In ariaSnapshot.ts, generateAriaTree.visit (around lines 141-170) uses the contributors from nameSourceElements to skip children. I need to read that code to see why nested spans next to a hidden SVG lose their text.",
+   "picked": [
+    "packages/injected/src/ariaSnapshot.ts:generateAriaTree.visit"
+   ]
+  },
+  {
+   "step": 9,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)"
+   ],
+   "action": "grep",
+   "analysis": "I still need to see toAriaNode and how nameSourceElements is filled in ariaSnapshot.ts. visit() looks fine on its own. The bug is probably in how toAriaNode records the name contributors.",
+   "picked": []
+  },
+  {
+   "step": 10,
+   "tool": "grep",
+   "input": {
+    "pattern": "function toAriaNode|nameSourceElements|getElementAccessibleName",
+    "path": "packages/injected/src/ariaSnapshot.ts",
+    "ignore_case": false
+   },
+   "matches": 6,
+   "grep_shown": [
+    "packages/injected/src/ariaSnapshot.ts:89",
+    "packages/injected/src/ariaSnapshot.ts:141",
+    "packages/injected/src/ariaSnapshot.ts:158",
+    "packages/injected/src/ariaSnapshot.ts:237",
+    "packages/injected/src/ariaSnapshot.ts:259",
+    "packages/injected/src/ariaSnapshot.ts:276"
+   ],
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)"
+   ],
+   "action": "read",
+   "analysis": "roleUtils name computation looks fine; I need to read toAriaNode to see how the name and its contributors are used, and why a button with nested spans next to a hidden SVG ends up with no name.",
+   "picked": [
+    "packages/injected/src/ariaSnapshot.ts:toAriaNode"
+   ]
+  },
+  {
+   "step": 11,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)",
+    "packages/injected/src/ariaSnapshot.ts lines 237-308 (toAriaNode)"
+   ],
+   "action": "grep",
+   "analysis": "Name computation looks fine; need to find where nameFromContentRefs is consumed, since it may drop or mishandle the name.",
+   "picked": []
+  },
+  {
+   "step": 12,
+   "tool": "grep",
+   "input": {
+    "pattern": "nameFromContentRefs",
+    "path": "packages",
+    "ignore_case": false
+   },
+   "matches": 10,
+   "grep_shown": [
+    "packages/injected/src/ariaSnapshot.ts:27",
+    "packages/injected/src/ariaSnapshot.ts:93",
+    "packages/injected/src/ariaSnapshot.ts:142",
+    "packages/injected/src/ariaSnapshot.ts:145",
+    "packages/injected/src/ariaSnapshot.ts:161",
+    "packages/injected/src/ariaSnapshotDistiller.ts:173",
+    "packages/injected/src/ariaSnapshotDistiller.ts:182",
+    "packages/injected/src/ariaSnapshotDistiller.ts:183",
+    "packages/injected/src/ariaSnapshotDistiller.ts:185",
+    "packages/injected/src/ariaSnapshotDistiller.ts:188"
+   ],
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)",
+    "packages/injected/src/ariaSnapshot.ts lines 237-308 (toAriaNode)"
+   ],
+   "action": "read",
+   "analysis": "Name computation and collection look right in roleUtils and ariaSnapshot. The nameFromContentRefs are consumed in ariaSnapshotDistiller.ts around lines 173-190, where a hidden SVG or nested spans likely cause the name to be dropped. I need to read that code.",
+   "picked": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:<block>",
+    "packages/injected/src/ariaSnapshotDistiller.ts:<block>"
+   ]
+  },
+  {
+   "step": 13,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)",
+    "packages/injected/src/ariaSnapshot.ts lines 237-308 (toAriaNode)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "action": "grep",
+   "analysis": "The distiller's removeRedundantNames drops a name when all contributor refs are cleared. Whether a nested span counts as a leaf generic depends on isLeafGeneric, which I haven't seen; the hidden SVG sibling may affect it.",
+   "picked": []
+  },
+  {
+   "step": 14,
+   "tool": "grep",
+   "input": {
+    "pattern": "isLeafGeneric",
+    "path": "packages/injected/src",
+    "ignore_case": false
+   },
+   "matches": 2,
+   "grep_shown": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:101",
+    "packages/injected/src/ariaSnapshotDistiller.ts:176"
+   ],
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)",
+    "packages/injected/src/ariaSnapshot.ts lines 237-308 (toAriaNode)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "action": "read",
+   "analysis": "The distiller's removeRedundantNames clears the name when every contributor ref was cleared. isLeafGeneric decides which contributors stay pending; I need to read it to see how nested spans next to a hidden SVG are treated.",
+   "picked": [
+    "packages/injected/src/ariaSnapshotDistiller.ts:isLeafGeneric"
+   ]
+  },
+  {
+   "step": 15,
+   "tool": "read",
+   "input": {},
+   "picked_shown": [
+    "packages/injected/src/roleUtils.ts lines 668-991 (getTextAlternativeInternal)",
+    "packages/injected/src/roleUtils.ts lines 513-530 (computeAccessibleNameComposite)",
+    "packages/injected/src/roleUtils.ts lines 993-1043 (innerAccumulatedElementText)",
+    "packages/injected/src/roleUtils.ts lines 1320-1323 (compositeString)",
+    "packages/injected/src/roleUtils.ts lines 1325-1335 (joinCompositeString)",
+    "packages/injected/src/ariaSnapshot.ts lines 99-164 (generateAriaTree.visit)",
+    "packages/injected/src/ariaSnapshot.ts lines 237-308 (toAriaNode)",
+    "packages/injected/src/ariaSnapshotDistiller.ts lines 105-248 (<block>)"
+   ],
+   "action": "grep",
+   "analysis": "isLeafGeneric source was not shown in the picked code. It decides which contributors stay pending, so I need its definition to see how nested spans are treated.",
+   "picked": []
+  },
+  {
+   "step": 16,
+   "tool": "grep",
+   "input": {
+    "pattern": "isLeafGeneric",
+    "path": "packages",
+    "ignore_case": false
+   }
+  }
+ ]
+}

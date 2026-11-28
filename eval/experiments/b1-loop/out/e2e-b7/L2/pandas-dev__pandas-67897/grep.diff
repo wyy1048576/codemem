@@ -1,0 +1,70 @@
+diff --git a/pandas/core/arrays/arrow/extension_types.py b/pandas/core/arrays/arrow/extension_types.py
+index 7814a77..f778f8b 100644
+--- a/pandas/core/arrays/arrow/extension_types.py
++++ b/pandas/core/arrays/arrow/extension_types.py
+@@ -80,12 +80,19 @@ class ArrowIntervalType(pyarrow.ExtensionType):
+ 
+     def __arrow_ext_serialize__(self) -> bytes:
+         metadata = {"subtype": str(self.subtype), "closed": self.closed}
++        if pyarrow.types.is_timestamp(self.subtype):
++            metadata["subtype"] = "timestamp"
++            metadata["unit"] = self.subtype.unit
++            metadata["tz"] = self.subtype.tz
+         return json.dumps(metadata).encode()
+ 
+     @classmethod
+     def __arrow_ext_deserialize__(cls, storage_type, serialized) -> ArrowIntervalType:
+         metadata = json.loads(serialized.decode())
+-        subtype = pyarrow.type_for_alias(metadata["subtype"])
++        if metadata["subtype"] == "timestamp":
++            subtype = pyarrow.timestamp(metadata["unit"], metadata.get("tz"))
++        else:
++            subtype = pyarrow.type_for_alias(metadata["subtype"])
+         closed = metadata["closed"]
+         return ArrowIntervalType(subtype, closed)
+ 
+diff --git a/pandas/core/arrays/interval.py b/pandas/core/arrays/interval.py
+index fe8c7d9..a421c99 100644
+--- a/pandas/core/arrays/interval.py
++++ b/pandas/core/arrays/interval.py
+@@ -58,6 +58,7 @@ from pandas.core.dtypes.common import (
+ )
+ from pandas.core.dtypes.dtypes import (
+     CategoricalDtype,
++    DatetimeTZDtype,
+     IntervalDtype,
+ )
+ from pandas.core.dtypes.generic import (
+@@ -1614,7 +1615,12 @@ class IntervalArray(IntervalMixin, ExtensionArray):
+         from pandas.core.arrays.arrow.extension_types import ArrowIntervalType
+ 
+         try:
+-            subtype = pyarrow.from_numpy_dtype(self.dtype.subtype)
++            if isinstance(self.dtype.subtype, DatetimeTZDtype):
++                subtype = pyarrow.timestamp(
++                    self.dtype.subtype.unit, str(self.dtype.subtype.tz)
++                )
++            else:
++                subtype = pyarrow.from_numpy_dtype(self.dtype.subtype)
+         except TypeError as err:
+             raise TypeError(
+                 f"Conversion to arrow with subtype '{self.dtype.subtype}' "
+diff --git a/pandas/core/dtypes/dtypes.py b/pandas/core/dtypes/dtypes.py
+index 221f358..a1252cb 100644
+--- a/pandas/core/dtypes/dtypes.py
++++ b/pandas/core/dtypes/dtypes.py
+@@ -1487,8 +1487,12 @@ class IntervalDtype(PandasExtensionDtype):
+         for arr in chunks:
+             if isinstance(arr, pyarrow.ExtensionArray):
+                 arr = arr.storage
+-            left = np.asarray(arr.field("left"), dtype=self.subtype)
+-            right = np.asarray(arr.field("right"), dtype=self.subtype)
++            if isinstance(self.subtype, DatetimeTZDtype):
++                left = self.subtype.__from_arrow__(arr.field("left"))
++                right = self.subtype.__from_arrow__(arr.field("right"))
++            else:
++                left = np.asarray(arr.field("left"), dtype=self.subtype)
++                right = np.asarray(arr.field("right"), dtype=self.subtype)
+             iarr = IntervalArray.from_arrays(left, right, closed=self.closed)
+             results.append(iarr)
+ 
